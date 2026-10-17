@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Semântica de Movimento — std::move, lvalue × rvalue e construtor de movimento | Guia C++</title>
+<meta name="description" content="Semântica de movimento em C++ para quem está começando: lvalue × rvalue, std::move, construtor e atribuição de movimento (com saídas reais mostrando cópia × movimento), o objeto movido que fica vazio mas válido, mover para um vector, noexcept, por que mover é mais rápido e quando o compilador já move sozinho.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Semântica de Movimento</span></h1>
+
+<p class="intro">Na aula <a href="copia-movimento.html">Cópia e Movimento</a>, você viu que copiar um objeto pode dar muito trabalho: um <code>std::vector</code> com um milhão de textos precisa reservar memória nova e copiar cada texto. Mas muitas vezes o original <strong>nem vai ser usado de novo</strong>: ele está prestes a morrer, ou você só quer entregá-lo para outro lugar. Para que copiar, então? O C++11 trouxe a resposta: <strong>mover</strong>. Em vez de duplicar, o objeto novo simplesmente pega para si o que era do antigo. Nesta aula você vai ver a diferença em números reais, aprender a usar <code>std::move</code> e descobrir que, na maior parte do tempo, o compilador já move por você.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A diferença entre copiar e mover, com uma comparação do dia a dia.</li>
+  <li>O que são <strong>lvalue</strong> e <strong>rvalue</strong> (o suficiente para usar), e o <code>&amp;&amp;</code>.</li>
+  <li>O que <code>std::move</code> faz (e o que ele <strong>não</strong> faz).</li>
+  <li>Como escrever um construtor de movimento e ver, com prints, quando ele roda.</li>
+  <li>Que o objeto "movido" fica vazio, mas válido.</li>
+  <li>Como mover objetos para dentro de um <code>std::vector</code>, e por que o <code>noexcept</code> importa.</li>
+  <li>Quanto tempo o movimento economiza, e quando o compilador já move sozinho.</li>
+</ul>
+</div>
+
+<p>Esta aula usa <a href="copia-movimento.html">Cópia e Movimento</a>, <a href="referencias.html">Referências</a> e <a href="vector.html">std::vector</a>. Os programas foram compilados com o <strong>g++ 15</strong> na máquina da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: mudança de casa</h2>
+<p>A Ana vai se mudar. Ela tem duas opções:</p>
+<ul>
+  <li><strong>Copiar:</strong> comprar um sofá igual, uma geladeira igual, uma cama igual, para a casa nova. A casa velha continua mobiliada. Caro e demorado.</li>
+  <li><strong>Mover:</strong> pôr os móveis no caminhão e levar para a casa nova. A casa velha fica <strong>vazia</strong>, mas continua sendo uma casa: dá para mobiliá-la de novo ou vendê-la. Rápido e barato.</li>
+</ul>
+
+<p>Se a Ana não vai mais morar na casa velha, mover é óbvio. Em C++, é igual: quando o objeto original não vai mais ser usado, <strong>mover</strong> os recursos dele (a memória do texto, os itens do vetor) é muito mais barato que copiá-los.</p>
+
+<hr>
+
+<h2>1. Cópia × movimento, com prints</h2>
+<p>A classe <code>Mochila</code> guarda o nome do dono e uma lista de itens. Vamos escrever o construtor de cópia e o de movimento com um <code>std::cout</code> em cada um:</p>
+
+<pre class="file" data-file="mochila.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+class Mochila {
+public:
+    Mochila(std::string dono) : dono_{dono} {}
+
+    void guardar(std::string item) { itens_.push_back(item); }
+    std::size_t quantidade() const { return itens_.size(); }
+
+    // construtor de cópia: duplica tudo
+    Mochila(const Mochila&amp; outra) : dono_{outra.dono_}, itens_{outra.itens_} {
+        std::cout &lt;&lt; "  [cópia] duplicou " &lt;&lt; itens_.size() &lt;&lt; " itens\n";
+    }
+    // construtor de movimento: pega tudo da outra
+    Mochila(Mochila&amp;&amp; outra) noexcept
+        : dono_{std::move(outra.dono_)}, itens_{std::move(outra.itens_)} {
+        std::cout &lt;&lt; "  [movimento] levou " &lt;&lt; itens_.size() &lt;&lt; " itens\n";
+    }
+private:
+    std::string dono_;
+    std::vector&lt;std::string&gt; itens_;
+};
+
+int main() {
+    Mochila a{"Ana"};
+    a.guardar("caderno");
+    a.guardar("estojo");
+    a.guardar("garrafa");
+
+    std::cout &lt;&lt; "Mochila b = a;\n";
+    Mochila b = a;
+    std::cout &lt;&lt; "Mochila c = std::move(a);\n";
+    Mochila c = std::move(a);
+
+    std::cout &lt;&lt; "a: " &lt;&lt; a.quantidade() &lt;&lt; " itens\n";
+    std::cout &lt;&lt; "b: " &lt;&lt; b.quantidade() &lt;&lt; " itens\n";
+    std::cout &lt;&lt; "c: " &lt;&lt; c.quantidade() &lt;&lt; " itens\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>Mochila(Mochila&amp;&amp; outra)</dt><dd>O <strong>construtor de movimento</strong>. O <code>&amp;&amp;</code> (dois "e comercial") é uma <strong>referência a rvalue</strong>: ela só aceita objetos que podem ser "esvaziados" (seção 2). Repare que não tem <code>const</code>: o construtor vai mexer na <code>outra</code>, tirando as coisas dela.</dd>
+  <dt>noexcept</dt><dd>Uma promessa: "este construtor não lança exceções". Mover só troca ponteiros por dentro, então não tem como falhar. A seção 5 mostra por que essa palavra faz diferença.</dd>
+  <dt>dono_{std::move(outra.dono_)}</dt><dd>Move cada atributo: a string e o vetor também têm construtores de movimento, que fazem o trabalho de verdade.</dd>
+  <dt>std::move(a)</dt><dd>No <code>main</code>: "pode mover de <code>a</code>, eu não preciso mais dele". Precisa de <code>#include &lt;utility&gt;</code>.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra mochila.cpp -o mochila
+$ ./mochila
+Mochila b = a;
+  [cópia] duplicou 3 itens
+Mochila c = std::move(a);
+  [movimento] levou 3 itens
+a: 0 itens               « a mochila da Ana ficou vazia
+b: 3 itens               « b é uma cópia
+c: 3 itens               « c levou os itens originais</pre>
+
+<p>Sem <code>std::move</code>, o C++ copiou; com <code>std::move</code>, moveu. E a mochila <code>a</code> ficou com 0 itens: é a "casa vazia" depois da mudança.</p>
+
+<div class="note">
+<strong>E a regra dos cinco?</strong>
+<p>Esta <code>Mochila</code> só tem os construtores de cópia e de movimento, porque o objetivo é <strong>ver</strong> quando cada um roda. Uma classe completa teria também as duas atribuições (<code>operator=</code> de cópia e de movimento), como manda a <a href="copia-movimento.html">regra dos cinco</a>. Na prática, pela regra do zero, você não escreveria nenhum: com atributos <code>std::string</code> e <code>std::vector</code>, o compilador gera os cinco, e o movimento automático faz exatamente o que o nosso faz (sem os prints).</p>
+</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode e confira a cópia e o movimento. Depois acrescente <code>a.guardar("lanche");</code> depois do <code>std::move(a)</code> e mostre a quantidade de <code>a</code> de novo: a mochila vazia pode ser usada outra vez? Tente também <code>Mochila d = std::move(c);</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+class Mochila {
+public:
+    Mochila(std::string dono) : dono_{dono} {}
+
+    void guardar(std::string item) { itens_.push_back(item); }
+    std::size_t quantidade() const { return itens_.size(); }
+
+    Mochila(const Mochila&amp; outra) : dono_{outra.dono_}, itens_{outra.itens_} {
+        std::cout &lt;&lt; "  [cópia] duplicou " &lt;&lt; itens_.size() &lt;&lt; " itens\n";
+    }
+    Mochila(Mochila&amp;&amp; outra) noexcept
+        : dono_{std::move(outra.dono_)}, itens_{std::move(outra.itens_)} {
+        std::cout &lt;&lt; "  [movimento] levou " &lt;&lt; itens_.size() &lt;&lt; " itens\n";
+    }
+private:
+    std::string dono_;
+    std::vector&lt;std::string&gt; itens_;
+};
+
+int main() {
+    Mochila a{"Ana"};
+    a.guardar("caderno");
+    a.guardar("estojo");
+
+    Mochila b = a;
+    Mochila c = std::move(a);
+    std::cout &lt;&lt; "a: " &lt;&lt; a.quantidade() &lt;&lt; ", b: " &lt;&lt; b.quantidade()
+              &lt;&lt; ", c: " &lt;&lt; c.quantidade() &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. lvalue e rvalue (o suficiente para usar)</h2>
+<p>Como o C++ decide entre copiar e mover? Olhando para o <strong>tipo de valor</strong> que está do lado direito. São dois, com nomes que vêm de "lado esquerdo" (<em>left</em>) e "lado direito" (<em>right</em>) de uma atribuição:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><strong>lvalue</strong></th><th><strong>rvalue</strong></th></tr>
+<tr><td>O que é</td><td>Algo com <strong>nome</strong> e endereço, que continua existindo depois da linha</td><td>Um valor <strong>temporário</strong>, sem nome, que morre no fim da linha</td></tr>
+<tr><td>Exemplos</td><td><code>nome</code>, <code>a</code>, <code>lista[0]</code></td><td><code>nome + " Souza"</code>, <code>criar()</code>, <code>"Bia"</code> virando <code>std::string</code>, <code>42</code></td></tr>
+<tr><td>Pode mover dele?</td><td>Não, a não ser que você peça (<code>std::move</code>)</td><td>Sim: ninguém mais vai usá-lo</td></tr>
+<tr><td>Referência que aceita</td><td><code>T&amp;</code> e <code>const T&amp;</code></td><td><code>T&amp;&amp;</code> e <code>const T&amp;</code></td></tr>
+</table>
+</div>
+
+<p>Duas funções com o mesmo nome, uma recebendo <code>const std::string&amp;</code> e outra <code>std::string&amp;&amp;</code>, mostram qual é qual:</p>
+
+<pre class="file" data-file="valores.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+
+void receber(const std::string&amp; s) {
+    std::cout &lt;&lt; "lvalue (tem nome, vou copiar): " &lt;&lt; s &lt;&lt; '\n';
+}
+
+void receber(std::string&amp;&amp; s) {
+    std::cout &lt;&lt; "rvalue (temporário, posso pegar): " &lt;&lt; s &lt;&lt; '\n';
+}
+
+std::string nome_completo() {
+    return "Ana Souza";
+}
+
+int main() {
+    std::string nome = "Ana";
+    receber(nome);                  // variável com nome
+    receber(nome + " Souza");       // resultado de uma conta
+    receber(nome_completo());       // retorno de função
+    receber("Bia");                 // texto literal vira string temporária
+    receber(std::move(nome));       // "pode tratar como temporário"
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra valores.cpp -o valores
+$ ./valores
+lvalue (tem nome, vou copiar): Ana
+rvalue (temporário, posso pegar): Ana Souza
+rvalue (temporário, posso pegar): Ana Souza
+rvalue (temporário, posso pegar): Bia
+rvalue (temporário, posso pegar): Ana       « o std::move transformou nome em rvalue</pre>
+
+<p>O compilador escolheu a versão <code>&amp;&amp;</code> para todos os temporários, sozinho. Só a variável <code>nome</code> foi tratada como lvalue, até o <code>std::move(nome)</code> da última linha.</p>
+
+<div class="warning">
+<strong><code>std::move</code> não move nada</strong>
+<p>O nome engana. <code>std::move(x)</code> não copia, não move e não apaga: ele só <strong>muda o rótulo</strong> de <code>x</code> de lvalue para rvalue, como quem cola um aviso "pode levar". Quem move de verdade é o construtor (ou a atribuição) de movimento que roda <strong>depois</strong>, por causa do rótulo. Se ninguém aproveitar o aviso (como na função <code>receber</code>, que só imprime), <code>nome</code> continua intacto.</p>
+</div>
+
+<hr>
+
+<h2>3. O objeto movido: vazio, mas válido</h2>
+<p>O que sobra de um objeto depois que alguém se mudou dele? Veja com uma <code>std::string</code>:</p>
+
+<pre class="file" data-file="movida.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+
+int main() {
+    std::string texto = "Lista de compras: arroz, feijão, café";
+    std::string outro = std::move(texto);
+
+    std::cout &lt;&lt; "outro: [" &lt;&lt; outro &lt;&lt; "]\n";
+    std::cout &lt;&lt; "texto: [" &lt;&lt; texto &lt;&lt; "] tamanho " &lt;&lt; texto.size() &lt;&lt; '\n';
+
+    texto = "dá para usar de novo";
+    std::cout &lt;&lt; "texto: [" &lt;&lt; texto &lt;&lt; "]\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra movida.cpp -o movida
+$ ./movida
+outro: [Lista de compras: arroz, feijão, café]
+texto: [] tamanho 0      « vazia, mas ainda é uma string que funciona
+texto: [dá para usar de novo]</pre>
+
+<p>A regra oficial do C++ para os tipos da biblioteca padrão é: o objeto movido fica num estado <strong>"válido, mas não especificado"</strong>. Válido: você pode destruí-lo, atribuir um valor novo, perguntar o tamanho. Não especificado: o padrão não promete o que tem dentro. Na prática, <code>std::string</code>, <code>std::vector</code> e <code>std::unique_ptr</code> ficam vazios (o <code>unique_ptr</code> vira <code>nullptr</code>). A regra segura:</p>
+
+<div class="note">
+<strong>Depois de <code>std::move(x)</code>, só faça duas coisas com <code>x</code></strong>
+<ul>
+  <li>dar a ele um valor novo (<code>x = …;</code>); ou</li>
+  <li>deixá-lo morrer no fim do escopo.</li>
+</ul>
+<p>Ler o conteúdo de um objeto movido é um erro de lógica, mesmo quando "funciona".</p>
+</div>
+
+<h3>Como "pegar para si" funciona por dentro</h3>
+<p>Uma <code>std::string</code> longa guarda o texto num pedaço de memória separado e tem só um ponteiro para ele. Mover é copiar o <strong>ponteiro</strong> e zerar o da origem, sem tocar no texto. Veja o mesmo truque escrito à mão, na classe <code>Notas</code> da aula anterior (com ponteiro cru, só para entender; no dia a dia, regra do zero):</p>
+
+<pre class="file" data-file="roubar.cpp">// construtor de movimento: rouba o array e deixa a outra vazia
+Notas(Notas&amp;&amp; outra) noexcept
+    : tamanho_{outra.tamanho_}, dados_{outra.dados_} {
+    outra.tamanho_ = 0;
+    outra.dados_ = nullptr;     // a outra não vai apagar mais nada
+}
+// atribuição de movimento: devolve o antigo e rouba o novo
+Notas&amp; operator=(Notas&amp;&amp; outra) noexcept {
+    if (this != &amp;outra) {
+        delete[] dados_;
+        tamanho_ = outra.tamanho_;
+        dados_ = outra.dados_;
+        outra.tamanho_ = 0;
+        outra.dados_ = nullptr;
+    }
+    return *this;
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -g -fsanitize=address roubar.cpp -o roubar
+$ ./roubar
+ana: 0, bia: 3           « Notas bia = std::move(ana);
+bia: 0, caio: 3          « caio = std::move(bia);</pre>
+
+<p>O <code>outra.dados_ = nullptr;</code> é o passo essencial: sem ele, as duas teriam o mesmo array, e o <em>double free</em> da aula anterior voltaria. Com ele, o destrutor da origem faz <code>delete[] nullptr</code>, que não faz nada. O AddressSanitizer não encontrou nenhum problema.</p>
+
+<hr>
+
+<h2>4. Por que mover deixa o programa mais rápido</h2>
+<p>Quanto custa copiar um vetor com um milhão de textos, comparado a movê-lo? O <code>&lt;chrono&gt;</code> (aula <a href="chrono.html">Tempo e Datas</a>) mede:</p>
+
+<pre class="file" data-file="tempo.cpp">#include &lt;chrono&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+int main() {
+    using relogio = std::chrono::steady_clock;
+    std::vector&lt;std::string&gt; estoque(1'000'000, "produto da lojinha da Ana");
+
+    auto t0 = relogio::now();
+    std::vector&lt;std::string&gt; copia = estoque;              // cópia
+    auto t1 = relogio::now();
+    std::vector&lt;std::string&gt; movido = std::move(estoque);  // movimento
+    auto t2 = relogio::now();
+
+    auto us = [](auto d) {
+        return std::chrono::duration_cast&lt;std::chrono::microseconds&gt;(d).count();
+    };
+    std::cout &lt;&lt; "cópia:     " &lt;&lt; us(t1 - t0) &lt;&lt; " µs (" &lt;&lt; copia.size() &lt;&lt; " itens)\n";
+    std::cout &lt;&lt; "movimento: " &lt;&lt; us(t2 - t1) &lt;&lt; " µs (" &lt;&lt; movido.size() &lt;&lt; " itens)\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tempo.cpp -o tempo
+$ ./tempo
+cópia:     180694 µs (1000000 itens)     « cerca de 0,18 segundo
+movimento: 0 µs (1000000 itens)          « menos de um microssegundo</pre>
+
+<p>A cópia reservou memória para um milhão de textos e copiou cada um (cada texto tem 25 letras, guardadas num pedaço de memória próprio). O movimento trocou três ponteiros por dentro do vetor: o tempo nem chegou a 1 µs. Os números exatos mudam de computador para computador e de uma execução para outra, mas a diferença é sempre desse tamanho: a cópia cresce com o tamanho do vetor; o movimento custa sempre o mesmo, quase nada.</p>
+
+<hr>
+
+<h2>5. Mover para dentro de um <code>vector</code></h2>
+<p>Guardar objetos num <code>std::vector</code> é onde o movimento mais aparece no dia a dia. A <code>Mochila</code> agora só tem o dono, para a saída ficar curta:</p>
+
+<pre class="file" data-file="vetor.cpp">Mochila preparar(std::string dono) {
+    Mochila m{dono};
+    return m;
+}
+
+int main() {
+    std::vector&lt;Mochila&gt; armario;
+    armario.reserve(10);
+
+    Mochila ana{"Ana"};
+    std::cout &lt;&lt; "push_back(ana):\n";
+    armario.push_back(ana);
+    std::cout &lt;&lt; "push_back(std::move(ana)):\n";
+    armario.push_back(std::move(ana));
+    std::cout &lt;&lt; "push_back(Mochila{\"Bia\"}):\n";
+    armario.push_back(Mochila{"Bia"});
+    std::cout &lt;&lt; "emplace_back(\"Caio\"):\n";
+    armario.emplace_back("Caio");
+    std::cout &lt;&lt; "Mochila d = preparar(\"Davi\"):\n";
+    Mochila d = preparar("Davi");
+    std::cout &lt;&lt; "fim\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra vetor.cpp -o vetor
+$ ./vetor
+push_back(ana):
+  [cópia] Ana            « ana tem nome: copiou
+push_back(std::move(ana)):
+  [movimento] Ana        « pedimos para mover
+push_back(Mochila{"Bia"}):
+  [movimento] Bia        « temporário: o compilador moveu sozinho
+emplace_back("Caio"):            « nada: construiu direto dentro do vetor
+Mochila d = preparar("Davi"):    « nada: elisão de cópia
+fim</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que acontece</th><th>Quando usar</th></tr>
+<tr><td><code>v.push_back(x)</code></td><td>Copia <code>x</code></td><td>Você ainda vai usar <code>x</code> depois</td></tr>
+<tr><td><code>v.push_back(std::move(x))</code></td><td>Move <code>x</code> (que fica vazio)</td><td><code>x</code> não será mais usado</td></tr>
+<tr><td><code>v.push_back(Classe{…})</code></td><td>Move o temporário</td><td>Raramente: prefira o <code>emplace_back</code></td></tr>
+<tr><td><code>v.emplace_back(…)</code></td><td>Constrói direto no vetor, com os argumentos do construtor</td><td>Criar um objeto novo já dentro do vetor</td></tr>
+</table>
+</div>
+
+<h3>O <code>noexcept</code> faz diferença</h3>
+<p>Quando um vetor fica cheio, ele reserva um espaço maior e passa os itens antigos para lá (aula <a href="vector.html">std::vector</a>). Se algo der errado no meio dessa mudança, o vetor promete voltar ao estado anterior. Com <strong>cópias</strong>, ele consegue (os originais estão intactos); com movimentos que podem falhar, não. Por isso o vetor só <strong>move</strong> os itens antigos se o construtor de movimento prometer <code>noexcept</code>. Veja o mesmo programa com e sem a palavra:</p>
+
+<pre class="file" data-file="cresce.cpp">int main() {
+    std::vector&lt;Mochila&gt; armario;
+    armario.emplace_back("Ana");
+    std::cout &lt;&lt; "cabia " &lt;&lt; armario.capacity() &lt;&lt; "; colocando a Bia:\n";
+    armario.emplace_back("Bia");
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra cresce.cpp -o cresce
+$ ./cresce                       « Mochila(Mochila&amp;&amp; outra) noexcept
+cabia 1; colocando a Bia:
+  [movimento] Ana                « a Ana foi movida para o espaço novo
+$ g++ -std=c++23 -Wall -Wextra semnoexcept.cpp -o semnoexcept
+$ ./semnoexcept                  « Mochila(Mochila&amp;&amp; outra), sem noexcept
+cabia 1; colocando a Bia:
+  [cópia] Ana                    « sem a promessa, o vetor preferiu copiar</pre>
+
+<p>Nenhum aviso, nenhum erro: só um programa mais lento. Por isso, <strong>todo construtor e atribuição de movimento que você escrever deve ser <code>noexcept</code></strong>. (Os que o compilador gera sozinho já são, quando os atributos permitem.)</p>
+
+<hr>
+
+<h2>6. Quando o compilador já move sozinho</h2>
+<p>Você quase nunca precisa escrever <code>std::move</code>. O compilador move (ou faz melhor ainda, nem copia nem move) nos casos mais comuns:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>O que o compilador faz</th></tr>
+<tr><td><code>return obj;</code> de uma variável local</td><td>Constrói direto no destino (elisão de cópia). Se não puder, <strong>move</strong>.</td></tr>
+<tr><td>Um temporário: <code>Classe x = criar();</code>, <code>v.push_back(Classe{…})</code></td><td>Elisão ou movimento: temporários são rvalues.</td></tr>
+<tr><td><code>a = b + c;</code> com strings</td><td>O resultado de <code>b + c</code> é temporário: é movido para <code>a</code>.</td></tr>
+<tr><td>Variável com nome que você não vai mais usar</td><td><strong>Nada</strong>: aqui é a sua vez de escrever <code>std::move</code>.</td></tr>
+</table>
+</div>
+
+<p>Por isso, devolver objetos grandes por valor é a forma certa e barata em C++ moderno: <code>std::vector&lt;std::string&gt; ler_arquivo();</code>. E escrever <code>return std::move(local);</code> é pior do que não escrever, porque atrapalha a elisão. O g++ avisa:</p>
+
+<pre class="file" data-file="pessimo.cpp">std::string montar_lista() {
+    std::string lista = "arroz, feijão, café";
+    return std::move(lista);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra pessimo.cpp -o pessimo
+pessimo.cpp: In function ‘std::string montar_lista()’:
+pessimo.cpp:7:21: warning: moving a local object in a return statement prevents copy elision [-Wpessimizing-move]
+    7 |     return std::move(lista);
+      |            ~~~~~~~~~^~~~~~~
+pessimo.cpp:7:21: note: remove ‘std::move’ call</pre>
+
+<p>"Mover um objeto local num <code>return</code> impede a elisão de cópia". O nome do aviso diz tudo: <em>pessimizing move</em>, o movimento que "pessimiza" (o contrário de otimizar). A nota já dá o conserto: <code>return lista;</code>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"use of deleted function" ao copiar um <code>unique_ptr</code></strong>
+<pre class="file" data-file="unico.cpp">auto caderno = std::make_unique&lt;std::string&gt;("caderno de receitas");
+std::unique_ptr&lt;std::string&gt; emprestado = caderno;
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra unico.cpp -o unico
+unico.cpp: In function ‘int main()’:
+unico.cpp:7:47: error: use of deleted function ‘std::unique_ptr&lt;_Tp, _Dp&gt;::unique_ptr(const std::unique_ptr&lt;_Tp, _Dp&gt;&amp;) [with _Tp = std::__cxx11::basic_string&lt;char&gt;; _Dp = std::default_delete&lt;std::__cxx11::basic_string&lt;char&gt; &gt;]’
+    7 |     std::unique_ptr&lt;std::string&gt; emprestado = caderno;
+      |                                               ^~~~~~~
+In file included from /usr/include/c++/15/memory:80,
+                 from unico.cpp:2:
+/usr/include/c++/15/bits/unique_ptr.h:524:7: note: declared here
+  524 |       unique_ptr(const unique_ptr&amp;) = delete;
+      |       ^~~~~~~~~~
+unico.cpp:7:47: note: use ‘-fdiagnostics-all-candidates’ to display considered candidates
+    7 |     std::unique_ptr&lt;std::string&gt; emprestado = caderno;
+      |                                               ^~~~~~~</pre>
+<p><strong>O que significa:</strong> o construtor de cópia do <code>unique_ptr</code> é <code>= delete</code> (a nota mostra a linha da biblioteca). Um <code>unique_ptr</code> é o <strong>único</strong> dono do objeto: copiar criaria dois donos. O <code>std::__cxx11::basic_string&lt;char&gt;</code> é só o nome completo de <code>std::string</code>. (Clang: <code>call to deleted constructor of 'std::unique_ptr&lt;std::string&gt;'</code>.)</p>
+<p><strong>Como consertar:</strong> se a intenção é <strong>transferir</strong> a posse, mova: <code>std::unique_ptr&lt;std::string&gt; emprestado = std::move(caderno);</code>. Depois disso, <code>caderno</code> vale <code>nullptr</code>. Se a intenção é só <strong>usar</strong> o objeto em outro lugar, passe uma referência (<code>const std::string&amp;</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>Usei a variável depois do <code>std::move</code> e ela estava vazia</strong>
+<p><strong>O que significa:</strong> não há mensagem: o programa simplesmente mostra um texto vazio, um vetor com 0 itens ou quebra ao usar um <code>unique_ptr</code> que virou <code>nullptr</code>. O objeto foi movido (seção 3).</p>
+<p><strong>Como consertar:</strong> mova só no último uso. Se ainda precisar do valor, copie (sem <code>std::move</code>) ou guarde o que precisa antes.</p>
+</div>
+
+<div class="cenario">
+<strong>Escrevi <code>std::move</code>, mas copiou mesmo assim</strong>
+<pre class="file" data-file="constmove.cpp">const Mochila ana{"Ana"};
+Mochila outra = std::move(ana);
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra constmove.cpp -o constmove
+$ ./constmove
+  [cópia] Ana</pre>
+<p><strong>O que significa:</strong> <code>ana</code> é <code>const</code>, e mover significa mudar a origem (esvaziá-la). O construtor de movimento recebe <code>Mochila&amp;&amp;</code>, sem <code>const</code>, então não aceita; o compilador cai no de cópia, que aceita <code>const Mochila&amp;</code>. Nenhum aviso. O mesmo acontece se a classe não tiver construtor de movimento (por exemplo, porque você escreveu só o de cópia).</p>
+<p><strong>Como consertar:</strong> não declare <code>const</code> o que você pretende mover; e confira se a classe tem movimento (regra do zero ou dos cinco).</p>
+</div>
+
+<div class="cenario">
+<strong>"moving a local object in a return statement prevents copy elision"</strong>
+<p><strong>O que significa:</strong> <code>return std::move(variavel_local);</code>, como na seção 6.</p>
+<p><strong>Como consertar:</strong> <code>return variavel_local;</code>. O compilador já move (ou faz melhor) sozinho.</p>
+</div>
+
+<hr>
+
+<h2>Missão</h2>
+
+<div class="trycpp" data-goal="out:cópias: 0\, movimentos: 2,src:push_back\s*\(\s*std::move">
+<p class="try-task"><strong>Missão:</strong> a <code>Mochila</code> conta quantas cópias e quantos movimentos aconteceram. Do jeito que está, guardar a Ana e a Bia no armário faz 2 cópias. Como as duas variáveis não são usadas depois, mude o <code>main</code> para a saída ficar <code>cópias: 0, movimentos: 2</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+class Mochila {
+public:
+    inline static int copias = 0;
+    inline static int movimentos = 0;
+
+    Mochila(std::string dono) : dono_{dono} {}
+    Mochila(const Mochila&amp; outra) : dono_{outra.dono_} { ++copias; }
+    Mochila(Mochila&amp;&amp; outra) noexcept : dono_{std::move(outra.dono_)} { ++movimentos; }
+private:
+    std::string dono_;
+};
+
+int main() {
+    std::vector&lt;Mochila&gt; armario;
+    armario.reserve(3);
+
+    Mochila ana{"Ana"};
+    Mochila bia{"Bia"};
+    armario.push_back(ana);
+    armario.push_back(bia);
+
+    std::cout &lt;&lt; "cópias: " &lt;&lt; Mochila::copias &lt;&lt; ", movimentos: " &lt;&lt; Mochila::movimentos &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+class Mochila {
+public:
+    inline static int copias = 0;
+    inline static int movimentos = 0;
+
+    Mochila(std::string dono) : dono_{dono} {}
+    Mochila(const Mochila&amp; outra) : dono_{outra.dono_} { ++copias; }
+    Mochila(Mochila&amp;&amp; outra) noexcept : dono_{std::move(outra.dono_)} { ++movimentos; }
+private:
+    std::string dono_;
+};
+
+int main() {
+    std::vector&lt;Mochila&gt; armario;
+    armario.reserve(3);
+
+    Mochila ana{"Ana"};
+    Mochila bia{"Bia"};
+    armario.push_back(std::move(ana));
+    armario.push_back(std::move(bia));
+
+    std::cout &lt;&lt; "cópias: " &lt;&lt; Mochila::copias &lt;&lt; ", movimentos: " &lt;&lt; Mochila::movimentos &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<p>A saída da solução no laboratório:</p>
+<pre class="term" data-cwd="~/cpp">$ ./contador
+cópias: 0, movimentos: 2</pre>
+
+<p>Os contadores são <a href="membros-static.html">membros static</a>: pertencem à classe, não a cada mochila. Para ir além: e se, em vez de criar <code>ana</code> e <code>bia</code>, você usasse <code>armario.emplace_back("Ana");</code>? Quantos movimentos sobrariam?</p>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>O que faz</th></tr>
+<tr><td><code>std::move(x)</code></td><td>Marca <code>x</code> como "pode mover de mim" (rvalue). Não move nada sozinho. <code>#include &lt;utility&gt;</code></td></tr>
+<tr><td><code>Classe(Classe&amp;&amp; outra) noexcept</code></td><td>Construtor de movimento: pega os recursos de <code>outra</code></td></tr>
+<tr><td><code>Classe&amp; operator=(Classe&amp;&amp; outra) noexcept</code></td><td>Atribuição de movimento</td></tr>
+<tr><td><code>T&amp;&amp;</code></td><td>Referência a rvalue: só aceita temporários (ou o que passou por <code>std::move</code>)</td></tr>
+<tr><td><code>v.push_back(std::move(x))</code></td><td>Move <code>x</code> para dentro do vetor</td></tr>
+<tr><td><code>v.emplace_back(args…)</code></td><td>Constrói o objeto direto dentro do vetor</td></tr>
+<tr><td><code>return local;</code></td><td>Elisão de cópia ou movimento automático. Nunca <code>return std::move(local);</code></td></tr>
+<tr><td>Objeto movido</td><td>Válido, mas não especificado (na prática, vazio). Só atribua ou deixe morrer</td></tr>
+<tr><td><code>const</code> + <code>std::move</code></td><td>Vira cópia, sem aviso</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Entregar sem copiar</h3>
+<p>Complete para colocar a string <code>nome</code> no vetor <code>lista</code> sem copiar (você não vai mais usar <code>nome</code>):</p>
+<div class="ex-code">lista.push_back(<input data-answer="std::move(nome)" aria-label="argumento">);</div>
+</div>
+
+<div class="exercise">
+<h3>2. A assinatura</h3>
+<p>Complete o construtor de movimento da classe <code>Cesta</code>:</p>
+<div class="ex-code">Cesta(<input data-answer="Cesta&amp;&amp; outra|Cesta&amp;&amp;outra|Cesta &amp;&amp;outra|Cesta&amp;&amp; o|Cesta&amp;&amp;" aria-label="parâmetro">) noexcept</div>
+</div>
+
+<div class="exercise">
+<h3>3. O que sobrou</h3>
+<p>Depois de <code>std::string b = std::move(a);</code>, em que <code>a</code> valia <code>"feijão"</code>, quanto vale <code>a.size()</code> na prática (g++)?</p>
+<div class="ex-code"><input data-answer="0|zero" aria-label="tamanho"></div>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. O que <code>std::move(x)</code> faz sozinho?</p>
+<label><input type="radio" name="q4"> Copia <code>x</code> para outro lugar da memória.</label>
+<label><input type="radio" name="q4"> Apaga <code>x</code>.</label>
+<label><input type="radio" name="q4"> Move <code>x</code> para o fim do programa.</label>
+<label><input type="radio" name="q4"> Nada além de marcar <code>x</code> como rvalue; quem move é o construtor ou a atribuição de movimento.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Qual destes é um <strong>rvalue</strong>?</p>
+<label><input type="radio" name="q5"> <code>nome + " Souza"</code></label>
+<label><input type="radio" name="q5"> <code>nome</code></label>
+<label><input type="radio" name="q5"> <code>lista[0]</code></label>
+<label><input type="radio" name="q5"> <code>*ponteiro</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">6. Por que o construtor de movimento deve ser <code>noexcept</code>?</p>
+<label><input type="radio" name="q6"> Porque sem ele o código não compila.</label>
+<label><input type="radio" name="q6"> Porque ele deixa o objeto movido vazio.</label>
+<label><input type="radio" name="q6"> Porque o <code>std::vector</code>, ao crescer, só move os itens se o movimento prometer não lançar exceções; senão, copia.</label>
+<label><input type="radio" name="q6"> Porque o <code>noexcept</code> faz o compilador mover sozinho no <code>return</code>.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>Mover</strong> = o objeto novo pega os recursos do antigo, que fica vazio. É muito mais barato que copiar (0 µs × 0,18 s no teste com um milhão de textos).</li>
+  <li><strong>lvalue</strong> tem nome e continua existindo; <strong>rvalue</strong> é temporário. Temporários são movidos automaticamente.</li>
+  <li><code>std::move(x)</code> só marca <code>x</code> como "pode mover"; o construtor de movimento <code>Classe(Classe&amp;&amp;) noexcept</code> faz o trabalho.</li>
+  <li>O objeto movido fica válido, mas sem conteúdo garantido: atribua um valor novo ou deixe-o morrer.</li>
+  <li>Em vetores: <code>push_back(std::move(x))</code> ou <code>emplace_back(…)</code>. Movimento sem <code>noexcept</code> faz o vetor copiar ao crescer.</li>
+  <li>O compilador já move (ou elimina a cópia) em <code>return local;</code> e com temporários. Não escreva <code>return std::move(local);</code>.</li>
+  <li><code>std::move</code> num objeto <code>const</code> vira cópia. <code>unique_ptr</code> só pode ser movido, nunca copiado.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
