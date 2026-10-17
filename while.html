@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ while — repetir enquanto a condição for verdadeira | Guia C++</title>
+<meta name="description" content="O laço while em C++ para quem nunca programou: contador, contagem regressiva, acumular uma soma, ler números até o usuário digitar 0, o laço infinito (e como pará-lo e evitá-lo), com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">while</span></h1>
+
+<p class="intro">Até agora, cada linha dos seus programas rodou <strong>uma vez só</strong>, de cima para baixo. Mas boa parte do trabalho de um computador é <strong>repetir</strong>: mostrar os 30 alunos da turma, somar os preços de todos os produtos, perguntar de novo até a pessoa digitar algo válido. Para isso existem os <strong>laços</strong> (em inglês, <em>loops</em>). O mais simples deles é o <code>while</code>, que quer dizer "enquanto": <em>enquanto</em> a condição for verdadeira, repita.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um laço e como escrever um <code>while</code>.</li>
+  <li>Como contar de 1 até 5, e de 5 até 1, com uma variável <strong>contadora</strong>.</li>
+  <li>Como <strong>acumular</strong> um resultado (uma soma) ao longo das voltas.</li>
+  <li>Como repetir uma pergunta até o usuário digitar <code>0</code>.</li>
+  <li>O que é um <strong>laço infinito</strong>, como pará-lo e como evitá-lo.</li>
+  <li>Os avisos do compilador que pegam os erros mais comuns de <code>while</code>.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code> (veja <a href="compilar.html">Compilar com g++</a>). Você pode rodar cada um no editor do guia.</p>
+
+<hr>
+
+<h2>A ideia: "enquanto tiver louça, lave um prato"</h2>
+<p>Imagine que alguém deixou um bilhete para você: <em>"Enquanto tiver louça na pia, lave um prato."</em> Você não sabe quantos pratos há. Mesmo assim, a instrução funciona:</p>
+<ol class="passo">
+  <li>Você olha a pia: tem louça? <strong>Sim</strong> → lava um prato.</li>
+  <li>Olha de novo: tem louça? <strong>Sim</strong> → lava mais um.</li>
+  <li>… e assim por diante …</li>
+  <li>Olha de novo: tem louça? <strong>Não</strong> → acabou, você vai fazer outra coisa.</li>
+</ol>
+<p>Repare em três detalhes, porque eles valem para todo <code>while</code>:</p>
+<ul>
+  <li>A <strong>pergunta vem antes</strong> de cada prato. Se a pia já estiver vazia, você não lava nenhum.</li>
+  <li>Cada volta <strong>muda alguma coisa</strong> (um prato a menos). Sem isso, a pergunta teria sempre a mesma resposta.</li>
+  <li>Quando a resposta vira <strong>não</strong>, você sai e continua com o resto do dia.</li>
+</ul>
+<p>Em C++, a "pergunta" é uma <strong>condição</strong>, igual à do <a href="if-else.html">if</a>: uma expressão que vale <code>true</code> (verdadeiro) ou <code>false</code> (falso). A diferença é que o <code>if</code> executa o bloco <strong>uma vez</strong> se a condição for verdadeira; o <code>while</code> executa <strong>de novo e de novo</strong>, enquanto ela continuar verdadeira.</p>
+
+<hr>
+
+<h2>1. O primeiro <code>while</code>: contar de 1 a 5</h2>
+
+<pre class="file" data-file="contar.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int i = 1;
+    while (i &lt;= 5) {
+        std::cout &lt;&lt; "Volta " &lt;&lt; i &lt;&lt; '\n';
+        i++;
+    }
+    std::cout &lt;&lt; "Fim! i agora vale " &lt;&lt; i &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>int i = 1;</dt><dd>A variável <strong>contadora</strong>, criada <strong>antes</strong> do laço, com o valor inicial. O nome <code>i</code> (de "índice") é uma tradição para contadores; poderia ser <code>volta</code> ou <code>contador</code>.</dd>
+  <dt>while</dt><dd>A palavra-chave do laço: "enquanto".</dd>
+  <dt>(i &lt;= 5)</dt><dd>A <strong>condição</strong>, sempre entre parênteses. É testada <strong>antes de cada volta</strong>. Lê-se: "enquanto <code>i</code> for menor ou igual a 5" (os operadores estão em <a href="operadores-comparacao.html">Comparação</a>).</dd>
+  <dt>{ … }</dt><dd>O <strong>corpo</strong> do laço: as linhas que se repetem. Cada execução do corpo se chama uma <strong>volta</strong> (ou <strong>iteração</strong>).</dd>
+  <dt>i++;</dt><dd>Soma 1 ao contador (veja <a href="incremento.html">++ e --</a>). É esta linha que faz o laço <strong>andar</strong>: sem ela, <code>i</code> seria 1 para sempre.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra contar.cpp -o contar
+$ ./contar
+Volta 1
+Volta 2
+Volta 3
+Volta 4
+Volta 5
+Fim! i agora vale 6</pre>
+
+<h3>Passo a passo: o que o computador fez</h3>
+<p>Siga a variável <code>i</code> volta por volta. Este exercício de "ser o computador" é a melhor forma de entender laços:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Momento</th><th>Valor de <code>i</code></th><th><code>i &lt;= 5</code>?</th><th>O que acontece</th></tr>
+<tr><td>Antes do laço</td><td>1</td><td>verdadeiro</td><td>Entra: mostra <code>Volta 1</code>, e <code>i</code> vira 2</td></tr>
+<tr><td>2ª pergunta</td><td>2</td><td>verdadeiro</td><td>Mostra <code>Volta 2</code>, <code>i</code> vira 3</td></tr>
+<tr><td>3ª pergunta</td><td>3</td><td>verdadeiro</td><td>Mostra <code>Volta 3</code>, <code>i</code> vira 4</td></tr>
+<tr><td>4ª pergunta</td><td>4</td><td>verdadeiro</td><td>Mostra <code>Volta 4</code>, <code>i</code> vira 5</td></tr>
+<tr><td>5ª pergunta</td><td>5</td><td>verdadeiro</td><td>Mostra <code>Volta 5</code>, <code>i</code> vira 6</td></tr>
+<tr><td>6ª pergunta</td><td>6</td><td><strong>falso</strong></td><td>Sai do laço e vai para a linha depois da <code>}</code></td></tr>
+</table>
+</div>
+
+<p>Por isso a última linha mostra <code>i agora vale 6</code>: o laço só termina quando a condição fica falsa, e ela só fica falsa quando <code>i</code> passa de 5. A condição foi testada <strong>6 vezes</strong> para o corpo rodar <strong>5 vezes</strong>.</p>
+
+<div class="tip">
+<strong>As três peças de todo laço com contador</strong>
+<p>1) <strong>início</strong>: <code>int i = 1;</code> · 2) <strong>condição</strong>: <code>i &lt;= 5</code> · 3) <strong>passo</strong>: <code>i++</code>. Se faltar qualquer uma, o laço dá errado. Guarde esse trio: na aula <a href="for.html">for</a>, ele aparece todo numa linha só.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Volta 10,src:while">
+<p class="try-task"><strong>Missão:</strong> faça o programa contar até <strong>10</strong> em vez de 5. Depois experimente começar do 3 (troque o valor inicial) e veja quantas voltas sobram.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int i = 1;
+    while (i &lt;= 5) {
+        std::cout &lt;&lt; "Volta " &lt;&lt; i &lt;&lt; '\n';
+        i++;
+    }
+    std::cout &lt;&lt; "Fim! i agora vale " &lt;&lt; i &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int i = 1;
+    while (i &lt;= 10) {
+        std::cout &lt;&lt; "Volta " &lt;&lt; i &lt;&lt; '\n';
+        i++;
+    }
+    std::cout &lt;&lt; "Fim! i agora vale " &lt;&lt; i &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Contar para trás</h2>
+<p>O passo não precisa ser <code>++</code>. Para uma contagem regressiva, comece do maior número, use <code>--</code> e troque a condição para "maior que zero":</p>
+
+<pre class="file" data-file="regressiva.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int segundos = 5;
+    while (segundos &gt; 0) {
+        std::cout &lt;&lt; segundos &lt;&lt; "...\n";
+        segundos--;
+    }
+    std::cout &lt;&lt; "Já!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra regressiva.cpp -o regressiva
+$ ./regressiva
+5...
+4...
+3...
+2...
+1...
+Já!</pre>
+
+<p>Quando <code>segundos</code> chega a 0, a pergunta <code>0 &gt; 0</code> é falsa e o laço termina. O <code>Já!</code> fica <strong>fora</strong> das chaves, então aparece uma vez só, no fim.</p>
+
+<p>O passo também pode ser de 2 em 2 (<code>i += 2</code>), de 10 em 10, ou até uma multiplicação (<code>valor *= 2</code>), como você vai ver na missão final. Os atalhos <code>+=</code> e <code>*=</code> estão em <a href="operadores-atribuicao.html">Operadores de Atribuição</a>.</p>
+
+<hr>
+
+<h2>3. Acumular: somar de 1 até 100</h2>
+<p>Um uso clássico de laço é ir <strong>juntando</strong> um resultado. A técnica tem duas variáveis com papéis diferentes:</p>
+<ul>
+  <li>o <strong>contador</strong> (<code>n</code>) diz em que volta estamos;</li>
+  <li>o <strong>acumulador</strong> (<code>soma</code>) guarda o total até agora. Ele começa em 0 e, a cada volta, recebe mais um pouco.</li>
+</ul>
+
+<pre class="file" data-file="soma100.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int soma = 0;
+    int n = 1;
+    while (n &lt;= 100) {
+        soma += n;
+        n++;
+    }
+    std::cout &lt;&lt; "1 + 2 + ... + 100 = " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra soma100.cpp -o soma100
+$ ./soma100
+1 + 2 + ... + 100 = 5050</pre>
+
+<p>Nas primeiras voltas: <code>soma</code> vale 0, depois 0+1 = 1, depois 1+2 = 3, depois 3+3 = 6, depois 6+4 = 10… até chegar a 5050. Fazer isso à mão levaria um bom tempo; o computador faz as 100 voltas num piscar de olhos.</p>
+
+<div class="warning">
+<strong>Crie o acumulador fora do laço</strong>
+<p>Se a linha <code>int soma = 0;</code> ficar <strong>dentro</strong> das chaves, ela roda em toda volta e zera o total. Veja esse erro na seção <a href="#erros">Quando dá errado</a>.</p>
+</div>
+
+<h3>Quando você não sabe quantas voltas serão</h3>
+<p>O <code>while</code> brilha quando o número de voltas <strong>não é conhecido</strong> de antemão. A Ana guardou R$ 100 numa aplicação que rende 10% ao mês. Em quantos meses o dinheiro dobra?</p>
+
+<pre class="file" data-file="poupanca.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double saldo = 100.0;
+    int meses = 0;
+    while (saldo &lt; 200.0) {
+        saldo = saldo * 1.10;
+        meses++;
+    }
+    std::cout &lt;&lt; "Dobrou em " &lt;&lt; meses &lt;&lt; " meses: R$ " &lt;&lt; saldo &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra poupanca.cpp -o poupanca
+$ ./poupanca
+Dobrou em 8 meses: R$ 214.359</pre>
+
+<p>Aqui a condição não olha um contador, e sim o próprio <code>saldo</code>. A variável <code>meses</code> só conta as voltas para mostrar no fim. (Para mostrar <code>214,36</code> com duas casas, veja <a href="iomanip.html">iomanip</a> ou <a href="format-print.html">std::format</a>.)</p>
+
+<hr>
+
+<h2>4. Repetir até o usuário digitar 0</h2>
+<p>Agora o programa vai conversar com a pessoa. A Ana quer somar os preços das compras: ela digita um preço por vez e, quando terminar, digita <code>0</code>. Ninguém sabe quantos preços serão: é trabalho para o <code>while</code>.</p>
+
+<pre class="file" data-file="soma.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int numero = 0;
+    int soma = 0;
+    std::cout &lt;&lt; "Digite um número (0 para parar): ";
+    std::cin &gt;&gt; numero;
+    while (numero != 0) {
+        soma += numero;
+        std::cout &lt;&lt; "Digite um número (0 para parar): ";
+        std::cin &gt;&gt; numero;
+    }
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>std::cin &gt;&gt; numero;</dt><dd>A <strong>primeira leitura</strong>, antes do laço. Sem ela, o <code>while</code> não teria um número para testar (veja <a href="entrada-cin.html">Entrada com cin</a>).</dd>
+  <dt>while (numero != 0)</dt><dd>"Enquanto o número for <strong>diferente</strong> de zero." O <code>0</code> funciona como uma <strong>sentinela</strong>: um valor combinado que significa "acabou".</dd>
+  <dt>soma += numero;</dt><dd>Junta o número ao acumulador.</dd>
+  <dt>std::cin &gt;&gt; numero;</dt><dd>A <strong>leitura seguinte</strong>, no fim do corpo. É ela que muda a variável da condição. Depois dela, o laço volta para a pergunta <code>numero != 0</code>.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra soma.cpp -o soma
+$ ./soma
+Digite um número (0 para parar): 10
+Digite um número (0 para parar): 25
+Digite um número (0 para parar): 7
+Digite um número (0 para parar): 0
+Soma: 42</pre>
+
+<p>O <code>0</code> não entra na soma: assim que ele é lido, a condição fica falsa e o laço termina antes do <code>soma += numero</code>. E se a primeira coisa digitada for <code>0</code>, o corpo nem roda: a resposta é <code>Soma: 0</code>.</p>
+
+<p>Repare que a pergunta e o <code>cin</code> aparecem <strong>duas vezes</strong> (antes do laço e no fim do corpo). Isso funciona, mas é repetição. Há duas formas de escrever só uma vez, que você vai ver nas próximas aulas: o <a href="do-while.html">do-while</a> (pergunta primeiro, testa depois) e o <code>while (true)</code> com <code>break</code> (<a href="break-continue.html">break e continue</a>).</p>
+
+<div class="note">
+<strong>No editor do guia, a entrada já vem pronta</strong>
+<p>Nas caixas com entrada pronta, o editor entrega os números ao <code>std::cin</code> de uma vez, como se alguém tivesse digitado muito rápido. Por isso os números digitados não aparecem na saída, e as perguntas ficam grudadas: <code>Digite um número (0 para parar): Digite um número…</code>. No terminal de verdade, como acima, cada número aparece depois da pergunta porque é você quem o digita.</p>
+</div>
+
+<div class="trycpp" data-stdin="10 25 7 0" data-goal="out:Você digitou 3 números.,out:Soma: 42">
+<p class="try-task"><strong>Missão:</strong> a entrada já traz <code>10 25 7 0</code>. Crie uma segunda variável, <code>quantos</code>, que <strong>conta</strong> quantos números foram somados (sem contar o 0), e mostre no fim <code>Você digitou 3 números.</code> antes da soma.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int numero = 0;
+    int soma = 0;
+    std::cin &gt;&gt; numero;
+    while (numero != 0) {
+        soma += numero;
+        std::cin &gt;&gt; numero;
+    }
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int numero = 0;
+    int soma = 0;
+    int quantos = 0;
+    std::cin &gt;&gt; numero;
+    while (numero != 0) {
+        soma += numero;
+        quantos++;
+        std::cin &gt;&gt; numero;
+    }
+    std::cout &lt;&lt; "Você digitou " &lt;&lt; quantos &lt;&lt; " números.\n";
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>5. Zero voltas: quando a condição já começa falsa</h2>
+<p>O <code>while</code> testa <strong>antes</strong> de entrar. Se a condição for falsa logo na primeira pergunta, o corpo não roda nenhuma vez, e o programa segue para a linha depois da <code>}</code>:</p>
+
+<pre class="file" data-file="nunca.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int estoque = 0;
+    while (estoque &gt; 0) {
+        std::cout &lt;&lt; "Vendendo uma unidade...\n";
+        estoque--;
+    }
+    std::cout &lt;&lt; "Acabou o estoque.\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra nunca.cpp -o nunca
+$ ./nunca
+Acabou o estoque.</pre>
+
+<p>Isso não é erro: é exatamente o que você quer numa lojinha sem estoque. Quando precisar que o corpo rode <strong>pelo menos uma vez</strong>, a ferramenta é o <a href="do-while.html">do-while</a>.</p>
+
+<hr>
+
+<h2 id="infinito">6. O laço infinito</h2>
+<p>Se a condição <strong>nunca</strong> ficar falsa, o laço nunca termina. Isso se chama <strong>laço infinito</strong>, e o motivo mais comum é esquecer o passo. Neste programa, falta o <code>i++</code>, então <code>i</code> vale 1 para sempre e <code>1 &lt;= 5</code> é sempre verdadeiro:</p>
+
+<pre class="file" data-file="infinito2.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int i = 1;
+    long long voltas = 0;
+    std::cout &lt;&lt; "Somando..." &lt;&lt; std::endl;
+    while (i &lt;= 5) {
+        voltas++;
+    }
+    std::cout &lt;&lt; "Fim\n";
+}
+</pre>
+
+<p>O compilador não reclama: um laço infinito é um programa válido (às vezes ele é até de propósito, como num jogo que roda até o jogador sair). O problema só aparece ao rodar: o programa mostra <code>Somando...</code> e fica parado, com o processador trabalhando a 100%, sem nunca chegar ao <code>Fim</code>.</p>
+
+<h3>Como parar: <kbd>Ctrl</kbd>+<kbd>C</kbd></h3>
+<p>No terminal, aperte <kbd>Ctrl</kbd>+<kbd>C</kbd>. O terminal manda um aviso de "interromper" ao programa, que é encerrado na hora. O <code>echo $?</code> mostra o código de saída do último programa; <code>130</code> quer dizer "interrompido por Ctrl+C":</p>
+
+<pre class="term" data-cwd="~/cpp">$ ./infinito2
+Somando...
+^C                      « aqui a Ana apertou Ctrl+C
+$ echo $?
+130</pre>
+
+<h3>Como testar sem medo: <code>timeout</code></h3>
+<p>Quando você suspeita que um programa pode travar, rode-o com o comando <code>timeout</code>, que dá um prazo em segundos e encerra o programa se ele passar disso. É assim que os laços infinitos deste guia foram testados:</p>
+
+<pre class="term" data-cwd="~/cpp">$ timeout 3 ./infinito2
+Somando...                « e 3 segundos de espera
+$ echo $?
+124</pre>
+
+<p>O código <code>124</code> é o jeito do <code>timeout</code> dizer "o prazo acabou e eu tive que encerrar o programa". Se o programa tivesse terminado sozinho a tempo, o código seria o dele (normalmente <code>0</code>).</p>
+
+<div class="note">
+<strong>Por que o <code>std::endl</code> aqui?</strong>
+<p>O <code>std::endl</code> pula a linha e <strong>manda o texto para a tela na hora</strong> (veja <a href="novas-linhas.html">Novas Linhas</a>). Com <code>'\n'</code>, o texto pode ficar guardado esperando, e um programa encerrado à força nem sempre chega a mostrá-lo. Num programa que pode travar, é bom que a última mensagem apareça.</p>
+</div>
+
+<div class="warning">
+<strong>No editor do guia</strong>
+<p>Um laço infinito no editor deixa a aba ocupada até você parar. Antes de clicar em Rodar, confira as três peças: início, condição e passo.</p>
+</div>
+
+<h3>Como evitar</h3>
+<p>Antes de rodar um <code>while</code>, faça a si mesmo três perguntas:</p>
+<ol class="passo">
+  <li><strong>O que muda a cada volta?</strong> Alguma linha do corpo precisa mudar uma variável que aparece na condição (<code>i++</code>, <code>segundos--</code>, um novo <code>std::cin &gt;&gt; numero</code>).</li>
+  <li><strong>A mudança vai na direção certa?</strong> Com <code>while (i &lt;= 5)</code>, o <code>i</code> precisa <strong>subir</strong>. Um <code>i--</code> por engano faria <code>i</code> descer para sempre.</li>
+  <li><strong>O valor de parada é alcançável?</strong> Com <code>while (i != 10)</code> e <code>i += 3</code> começando do 1, o <code>i</code> passa por 1, 4, 7, 10: para. Começando do 0, passa por 0, 3, 6, 9, 12… e <strong>pula</strong> o 10. Prefira <code>&lt;</code> e <code>&lt;=</code> a <code>!=</code> em contadores.</li>
+</ol>
+
+<p>Há também laços infinitos <strong>de propósito</strong>: <code>while (true) { … }</code>. Eles têm uma saída escondida no meio do corpo, o <code>break</code>. Isso tem aula própria: <a href="break-continue.html">break e continue</a>.</p>
+
+<hr>
+
+<h2>Formas diferentes de escrever</h2>
+
+<h3>Chaves num laço de uma linha</h3>
+<p>Como no <code>if</code>, se o corpo tiver <strong>uma única</strong> instrução, as chaves podem ser omitidas:</p>
+<pre class="file" data-file="trecho.cpp">while (segundos &gt; 0)
+    std::cout &lt;&lt; segundos-- &lt;&lt; "...\n";
+</pre>
+<p>Funciona, mas é fácil acrescentar uma segunda linha achando que ela está dentro do laço. <strong>Use sempre as chaves</strong>: é o que este guia faz.</p>
+
+<h3>Onde fazer o passo</h3>
+<p><code>i++</code> numa linha separada (como nos exemplos) é a forma mais clara. Também existe <code>std::cout &lt;&lt; i++;</code>, que mostra e soma ao mesmo tempo. Para quem está começando, uma coisa por linha.</p>
+
+<h3>Qual laço usar?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Laço recomendado</th></tr>
+<tr><td>Não sei quantas voltas serão (até o usuário digitar 0, até o saldo dobrar)</td><td><code>while</code></td></tr>
+<tr><td>O corpo precisa rodar pelo menos uma vez (menu, "deseja continuar?")</td><td><a href="do-while.html">do-while</a></td></tr>
+<tr><td>Sei quantas voltas serão (de 1 a 10, cada aluno da turma)</td><td><a href="for.html">for</a></td></tr>
+<tr><td>Passar por todos os itens de uma lista</td><td><a href="for-range.html">for de intervalo</a></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2 id="erros">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>O programa trava e não termina (esqueceu o passo)</strong>
+<pre class="term" data-cwd="~/cpp">$ timeout 3 ./infinito2
+Somando...
+$ echo $?
+124</pre>
+<p><strong>O que aconteceu:</strong> nada no corpo muda a variável da condição, então ela continua verdadeira para sempre. O <code>timeout</code> encerrou o programa depois de 3 segundos (código <code>124</code>).</p>
+<p><strong>Como consertar:</strong> acrescente o passo (<code>i++;</code>) dentro das chaves. Para sair de um programa travado no terminal, <kbd>Ctrl</kbd>+<kbd>C</kbd>.</p>
+</div>
+
+<div class="cenario">
+<strong>Um ponto e vírgula depois do <code>while ( … )</code></strong>
+<pre class="file" data-file="pontovirgula.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int i = 1;
+    while (i &lt;= 5); {
+        std::cout &lt;&lt; i &lt;&lt; '\n';
+        i++;
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra pontovirgula.cpp -o pontovirgula
+pontovirgula.cpp: In function ‘int main()’:
+pontovirgula.cpp:5:5: warning: this ‘while’ clause does not guard... [-Wmisleading-indentation]
+    5 |     while (i &lt;= 5); {
+      |     ^~~~~
+pontovirgula.cpp:5:21: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the ‘while’
+    5 |     while (i &lt;= 5); {
+      |                     ^
+$ timeout 3 ./pontovirgula
+$ echo $?
+124</pre>
+<p><strong>O que significa:</strong> "esta cláusula <code>while</code> não protege… esta instrução, mas a indentação engana, como se ela estivesse protegida pelo <code>while</code>". O <code>;</code> logo depois do parêntese é um <strong>corpo vazio</strong>: o laço é só <code>while (i &lt;= 5);</code>, que repete "nada" para sempre, porque o <code>i++</code> ficou fora dele. As chaves de baixo viraram um bloco comum, que nunca é alcançado. O programa nem mostra o <code>1</code>.</p>
+<p><strong>No editor do guia</strong>, o Clang avisa com outras palavras: <code>warning: while loop has empty body [-Wempty-body]</code> ("o laço while tem corpo vazio").</p>
+<p><strong>Como consertar:</strong> apague o <code>;</code> entre o <code>)</code> e a <code>{</code>. Um <code>while</code> nunca leva ponto e vírgula ali (quem leva, no fim, é o <a href="do-while.html">do-while</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>"suggest parentheses around assignment used as truth value"</strong>
+<pre class="file" data-file="igual.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int numero = 5;
+    while (numero = 0) {
+        std::cout &lt;&lt; numero &lt;&lt; '\n';
+        numero--;
+    }
+    std::cout &lt;&lt; "Fim\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra igual.cpp -o igual
+igual.cpp: In function ‘int main()’:
+igual.cpp:5:19: warning: suggest parentheses around assignment used as truth value [-Wparentheses]
+    5 |     while (numero = 0) {
+      |            ~~~~~~~^~~
+$ ./igual
+Fim</pre>
+<p><strong>O que significa:</strong> "sugiro parênteses em volta da atribuição usada como valor verdadeiro/falso". Um <code>=</code> sozinho é <strong>atribuição</strong> ("recebe"), não comparação. A condição <code>numero = 0</code> guarda 0 em <code>numero</code> e vale 0, que conta como <code>false</code>: o laço não rodou nenhuma vez. Com <code>numero = 1</code>, valeria sempre <code>true</code> e o laço seria infinito.</p>
+<p><strong>Como consertar:</strong> para comparar, use <code>==</code> ou, como aqui, <code>!=</code>: <code>while (numero != 0)</code>. O Clang do editor dá o mesmo aviso (<code>using the result of an assignment as a condition without parentheses</code>) e ainda sugere: <code>use '==' to turn this assignment into an equality comparison</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A soma não acumula (acumulador dentro do laço)</strong>
+<pre class="file" data-file="zera.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int n = 1;
+    while (n &lt;= 3) {
+        int soma = 0;
+        soma += n;
+        std::cout &lt;&lt; "Soma até agora: " &lt;&lt; soma &lt;&lt; '\n';
+        n++;
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra zera.cpp -o zera
+$ ./zera
+Soma até agora: 1
+Soma até agora: 2
+Soma até agora: 3</pre>
+<p><strong>O que aconteceu:</strong> o esperado era 1, 3, 6. Como <code>int soma = 0;</code> está dentro das chaves, uma <strong>nova</strong> <code>soma</code>, valendo 0, é criada em cada volta. O compilador não avisa: o programa é válido, só faz outra coisa.</p>
+<p><strong>Como consertar:</strong> mova <code>int soma = 0;</code> para antes do <code>while</code>. Regra prática: o que deve <strong>sobreviver</strong> entre uma volta e outra nasce fora do laço.</p>
+</div>
+
+<div class="cenario">
+<strong>O laço não roda nenhuma vez</strong>
+<p><strong>O que aconteceu:</strong> a condição já era falsa na primeira pergunta, como no exemplo do <a href="#infinito">estoque zerado</a>. Às vezes é o certo; às vezes é a condição invertida (<code>&gt;</code> no lugar de <code>&lt;</code>) ou o contador começando no valor errado.</p>
+<p><strong>Como investigar:</strong> mostre a variável antes do laço (<code>std::cout &lt;&lt; "i = " &lt;&lt; i &lt;&lt; '\n';</code>) e faça a tabela do passo a passo para a primeira pergunta.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que faz</th></tr>
+<tr><td><code>while (condição) { … }</code></td><td>Testa a condição; se verdadeira, roda o corpo e testa de novo. Pode rodar 0 vezes.</td></tr>
+<tr><td><code>int i = 1; while (i &lt;= N) { …; i++; }</code></td><td>Contador de 1 até N.</td></tr>
+<tr><td><code>int i = N; while (i &gt; 0) { …; i--; }</code></td><td>Contagem regressiva de N até 1.</td></tr>
+<tr><td><code>int soma = 0; … soma += x;</code></td><td>Acumulador: nasce fora, cresce dentro.</td></tr>
+<tr><td><code>std::cin &gt;&gt; x; while (x != 0) { …; std::cin &gt;&gt; x; }</code></td><td>Ler até a sentinela (o 0).</td></tr>
+<tr><td><code>while (true) { … }</code></td><td>Laço infinito de propósito; sai com <code>break</code> (<a href="break-continue.html">aula</a>).</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>Interrompe um programa travado no terminal (código 130).</td></tr>
+<tr><td><code>timeout 3 ./programa</code></td><td>Roda com prazo de 3 segundos (código 124 se estourar).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Complete a condição</h3>
+<p>Complete para o laço mostrar os números de 1 a 10:</p>
+<div class="ex-code">int i = 1; while (<input data-answer="i &lt;= 10|i&lt;=10|i &lt; 11|i&lt;11" aria-label="condição">) { std::cout &lt;&lt; i &lt;&lt; '\n'; i++; }</div>
+</div>
+
+<div class="exercise">
+<h3>2. O passo que falta</h3>
+<p>Complete o passo para esta contagem regressiva terminar:</p>
+<div class="ex-code">int n = 3; while (n &gt; 0) { std::cout &lt;&lt; n &lt;&lt; '\n'; <input data-answer="n--;|n--|--n;|--n|n -= 1;|n -= 1|n = n - 1;|n = n - 1" aria-label="passo"> }</div>
+</div>
+
+<div class="exercise">
+<h3>3. Quanto vale no fim?</h3>
+<p>Depois de <code>int i = 0; while (i &lt; 4) { i++; }</code>, quanto vale <code>i</code>?</p>
+<div class="ex-code"><input data-answer="4" aria-label="valor de i"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Quantas vezes o corpo de <code>int x = 10; while (x &lt; 5) { x++; }</code> roda?</p>
+<label><input type="radio" name="q4"> 5</label>
+<label><input type="radio" name="q4"> Nenhuma</label>
+<label><input type="radio" name="q4"> Uma</label>
+<label><input type="radio" name="q4"> Infinitas</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. <code>int i = 1; while (i &lt;= 5) { std::cout &lt;&lt; i; }</code> — o que acontece?</p>
+<label><input type="radio" name="q5"> Mostra <code>12345</code></label>
+<label><input type="radio" name="q5"> Erro de compilação</label>
+<label><input type="radio" name="q5"> Laço infinito: mostra <code>1</code> sem parar, porque falta o <code>i++</code></label>
+<label><input type="radio" name="q5"> Não mostra nada</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Você rodou <code>timeout 3 ./jogo</code> e depois <code>echo $?</code> mostrou <code>124</code>. O que isso quer dizer?</p>
+<label><input type="radio" name="q6"> O programa não terminou em 3 segundos e foi encerrado pelo <code>timeout</code></label>
+<label><input type="radio" name="q6"> O programa terminou normalmente</label>
+<label><input type="radio" name="q6"> Houve um erro de compilação</label>
+<label><input type="radio" name="q6"> A Ana apertou Ctrl+C</label>
+</div>
+
+<h3>Missão final: dobrar até passar de 1000</h3>
+<div class="trycpp" data-goal="out:512,src:while">
+<p class="try-task"><strong>Missão:</strong> a variável <code>valor</code> começa em 1. Enquanto ela for <strong>menor que 1000</strong>, mostre o valor (um por linha) e <strong>dobre-o</strong>. O último número mostrado deve ser <code>512</code> (o próximo, 1024, já passa de 1000). Use um <code>while</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int valor = 1;
+    // escreva o while aqui
+
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int valor = 1;
+    while (valor &lt; 1000) {
+        std::cout &lt;&lt; valor &lt;&lt; '\n';
+        valor *= 2;
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>while (condição) { corpo }</code> repete o corpo <strong>enquanto</strong> a condição for verdadeira. A condição é testada <strong>antes</strong> de cada volta, então o corpo pode rodar 0 vezes.</li>
+  <li>Todo laço com contador tem três peças: <strong>início</strong> (<code>int i = 1;</code>), <strong>condição</strong> (<code>i &lt;= 5</code>) e <strong>passo</strong> (<code>i++</code>).</li>
+  <li>Um <strong>acumulador</strong> (<code>soma</code>) nasce fora do laço, valendo 0, e cresce dentro dele.</li>
+  <li>Para ler até uma <strong>sentinela</strong> (o 0): leia uma vez antes do laço e de novo no fim do corpo.</li>
+  <li>Se nada muda a condição, o laço é <strong>infinito</strong>: pare com <kbd>Ctrl</kbd>+<kbd>C</kbd> e teste com <code>timeout 3</code> (código 124).</li>
+  <li>Nada de <code>;</code> logo depois de <code>while ( … )</code>, e <code>=</code> não é <code>==</code>: o <code>-Wall</code> avisa os dois.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
