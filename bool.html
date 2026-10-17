@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Booleanos (bool) — true, false e boolalpha | Guia C++</title>
+<meta name="description" content="O tipo bool em C++ para quem nunca programou: true e false, por que o cout mostra 1 e 0, std::boolalpha, o resultado das comparações, os parênteses obrigatórios no cout e a conversão de números para bool, com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Booleanos (bool)</span></h1>
+
+<p class="intro">Muitas perguntas de um programa têm só duas respostas: o cliente pagou? Está chovendo? A senha está certa? A nota é maior que 7? Para guardar essas respostas existe o tipo <code>bool</code>, que só tem dois valores: <code>true</code> (verdadeiro) e <code>false</code> (falso). Ele parece o tipo mais simples de todos, e é, mas tem algumas surpresas: o <code>cout</code> o mostra como <code>1</code> e <code>0</code>, e qualquer número pode virar <code>bool</code>. Os booleanos são a base de todas as decisões (<code>if</code>) e repetições (<code>while</code>) que vêm depois.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como criar variáveis <code>bool</code> com <code>true</code> e <code>false</code>.</li>
+  <li>Por que o <code>cout</code> mostra <code>1</code> e <code>0</code>, e como o <code>std::boolalpha</code> muda isso.</li>
+  <li>Que toda comparação (<code>&gt;</code>, <code>==</code>…) produz um <code>bool</code>, e por que ela precisa de parênteses no <code>cout</code>.</li>
+  <li>Como números viram <code>bool</code> (zero é falso, o resto é verdadeiro) e o caminho inverso.</li>
+  <li>Como dar bons nomes a variáveis <code>bool</code>.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: o interruptor</h2>
+<p>Um interruptor de luz tem duas posições: ligado ou desligado. Não existe "meio ligado". Um <code>bool</code> é um interruptor guardado na memória: <code>true</code> é ligado, <code>false</code> é desligado.</p>
+
+<p>O nome vem de <strong>George Boole</strong>, um matemático inglês do século XIX que criou uma álgebra só com "verdadeiro" e "falso" (a "álgebra booleana"). Cem anos depois, ela virou a base dos circuitos de todo computador.</p>
+
+<hr>
+
+<h2>1. <code>true</code>, <code>false</code> e o que o <code>cout</code> mostra</h2>
+
+<pre class="file" data-file="bool.cpp">#include &lt;iostream&gt;
+
+int main() {
+    bool chovendo = true;
+    bool pago = false;
+    std::cout &lt;&lt; "chovendo: " &lt;&lt; chovendo &lt;&lt; "\n";
+    std::cout &lt;&lt; "pago: " &lt;&lt; pago &lt;&lt; "\n";
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "chovendo: " &lt;&lt; chovendo &lt;&lt; "\n";
+    std::cout &lt;&lt; "pago: " &lt;&lt; pago &lt;&lt; "\n";
+    std::cout &lt;&lt; std::noboolalpha &lt;&lt; "de volta: " &lt;&lt; chovendo &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra bool.cpp -o bool
+$ ./bool
+chovendo: 1
+pago: 0
+chovendo: true
+pago: false
+de volta: 1</pre>
+
+<dl class="anatomy">
+  <dt>bool chovendo = true;</dt><dd>Uma variável <code>bool</code> com o valor verdadeiro. <code>true</code> e <code>false</code> são palavras-chave, escritas em minúsculas e <strong>sem aspas</strong> (<code>"true"</code> seria um texto).</dd>
+  <dt>std::cout &lt;&lt; chovendo</dt><dd>Por padrão, o <code>cout</code> mostra <code>true</code> como <code>1</code> e <code>false</code> como <code>0</code>. É herança da linguagem C, onde "verdadeiro" e "falso" eram só os números 1 e 0.</dd>
+  <dt>std::boolalpha</dt><dd>"Booleano em letras" (<em>alpha</em>, de alfabeto). Não mostra nada: <strong>muda o modo</strong> do <code>cout</code>. Dali em diante, todo <code>bool</code> sai como <code>true</code>/<code>false</code>.</dd>
+  <dt>std::noboolalpha</dt><dd>Desliga o modo: de volta a <code>1</code>/<code>0</code>.</dd>
+</dl>
+
+<p>Um <code>bool</code> ocupa 1 byte (aula <a href="tipos-dados.html">Tipos de Dados</a>), embora só precisasse de 1 bit: o byte é o menor pedaço de memória que o computador consegue endereçar.</p>
+
+<div class="note">
+<strong>Com <code>std::println</code>, sai em palavras</strong> <span class="versao">C++23</span>
+<p>A forma moderna de mostrar valores, <code>std::println</code> (aula <a href="format-print.html">std::format e std::print</a>), já escreve <code>true</code> e <code>false</code> sem precisar de nada:</p>
+<pre class="term" data-cwd="~/cpp">$ cat println.cpp
+#include &lt;print&gt;
+
+int main() {
+    bool pago = false;
+    std::println("pago: {}", pago);
+    std::println("5 &gt; 3: {}", 5 &gt; 3);
+}
+$ g++ -std=c++23 -Wall -Wextra println.cpp -o println
+$ ./println
+pago: false
+5 &gt; 3: true</pre>
+</div>
+
+<div class="trycpp" data-goal="out:Estoque vazio? false,src:boolalpha">
+<p class="try-task"><strong>Missão:</strong> o programa mostra <code>Estoque vazio? 0</code>. Use o <code>std::boolalpha</code> para ele mostrar <code>Estoque vazio? false</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    bool estoqueVazio = false;
+    std::cout &lt;&lt; "Estoque vazio? " &lt;&lt; estoqueVazio &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    bool estoqueVazio = false;
+    std::cout &lt;&lt; std::boolalpha &lt;&lt; "Estoque vazio? " &lt;&lt; estoqueVazio &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Comparações produzem <code>bool</code></h2>
+<p>Você raramente escreve <code>true</code> ou <code>false</code> à mão. Quase sempre, um <code>bool</code> nasce de uma <strong>pergunta</strong>: uma comparação.</p>
+
+<pre class="file" data-file="comparar.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 17;
+    bool maiorDeIdade = idade &gt;= 18;
+    bool adolescente = idade &gt;= 13 &amp;&amp; idade &lt;= 19;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "maior de idade: " &lt;&lt; maiorDeIdade &lt;&lt; "\n";
+    std::cout &lt;&lt; "adolescente: " &lt;&lt; adolescente &lt;&lt; "\n";
+    std::cout &lt;&lt; "17 == 17: " &lt;&lt; (idade == 17) &lt;&lt; "\n";
+    std::cout &lt;&lt; "17 != 17: " &lt;&lt; (idade != 17) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra comparar.cpp -o comparar
+$ ./comparar
+maior de idade: false
+adolescente: true
+17 == 17: true
+17 != 17: false</pre>
+
+<dl class="anatomy">
+  <dt>idade &gt;= 18</dt><dd>"<code>idade</code> é maior ou igual a 18?" O C++ calcula a resposta (<code>false</code>, porque 17 não é) e a guarda em <code>maiorDeIdade</code>.</dd>
+  <dt>idade &gt;= 13 &amp;&amp; idade &lt;= 19</dt><dd>Duas perguntas ligadas por <code>&amp;&amp;</code> ("e"): só é <code>true</code> se as duas forem. Os operadores lógicos (<code>&amp;&amp;</code>, <code>||</code>, <code>!</code>) têm aula própria: <a href="operadores-logicos.html">Operadores Lógicos</a>.</dd>
+  <dt>idade == 17</dt><dd>"É igual a 17?" Dois sinais de igual: um só (<code>=</code>) guardaria 17 na variável.</dd>
+  <dt>idade != 17</dt><dd>"É diferente de 17?"</dd>
+</dl>
+
+<p>Os seis operadores de comparação (<code>==</code>, <code>!=</code>, <code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code>) estão em <a href="operadores-comparacao.html">Operadores de Comparação</a>. O que importa aqui: o resultado de qualquer um deles é um <code>bool</code>.</p>
+
+<h3>No <code>cout</code>, a comparação vai entre parênteses</h3>
+<p>Repare nos parênteses em <code>(idade == 17)</code>. Sem eles, o programa nem compila:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat parenteses.cpp
+#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; 5 &gt; 3;
+}
+$ g++ -std=c++23 -Wall -Wextra parenteses.cpp -o parenteses
+parenteses.cpp: In function ‘int main()’:
+parenteses.cpp:4:20: error: no match for ‘operator&gt;’ (operand types are ‘std::basic_ostream&lt;char&gt;::__ostream_type’ {aka ‘std::basic_ostream&lt;char&gt;’} and ‘int’)
+    4 |     std::cout &lt;&lt; 5 &gt; 3;
+      |     ~~~~~~~~~~~~~~ ^ ~
+      |               |      |
+      |               |      int
+      |               std::basic_ostream&lt;char&gt;::__ostream_type {aka std::basic_ostream&lt;char&gt;}
+parenteses.cpp:4:20: note: there are 22 candidates
+    4 |     std::cout &lt;&lt; 5 &gt; 3;
+      |     ~~~~~~~~~~~~~~~^~~
+                         « …e mais umas 170 linhas de "candidatos"</pre>
+
+<p>A mensagem assusta (são 178 linhas no total), mas a primeira explica tudo. O <code>&lt;&lt;</code> tem <strong>prioridade</strong> sobre o <code>&gt;</code> (aula <a href="precedencia.html">Precedência</a>), então o C++ leu a linha como <code>(std::cout &lt;&lt; 5) &gt; 3</code>: "mostre 5, e depois compare o <code>cout</code> com 3". <em>No match for ‘operator&gt;’ (operand types are … ‘std::basic_ostream&lt;char&gt;’ … and ‘int’)</em> = "não há um <code>&gt;</code> que compare um <code>cout</code> (um <code>basic_ostream</code>, "fluxo de saída") com um <code>int</code>". As linhas de "candidatos" são as versões de <code>&gt;</code> que o compilador tentou e descartou; pode pular.</p>
+
+<p>O Clang, no editor, é mais direto: antes do erro, avisa <code>overloaded operator &lt;&lt; has higher precedence than comparison operator</code> ("o <code>&lt;&lt;</code> tem precedência maior que o operador de comparação"). O conserto é sempre o mesmo: <strong>parênteses em volta da comparação</strong>, <code>std::cout &lt;&lt; (5 &gt; 3);</code>.</p>
+
+<div class="trycpp" data-goal="out:Tem peças? true">
+<p class="try-task"><strong>Missão:</strong> este programa não compila. Ponha parênteses em volta da comparação e use o <code>std::boolalpha</code> para sair <code>Tem peças? true</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int pecas = 12;
+    std::cout &lt;&lt; "Tem peças? " &lt;&lt; pecas &gt; 0 &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int pecas = 12;
+    std::cout &lt;&lt; std::boolalpha &lt;&lt; "Tem peças? " &lt;&lt; (pecas &gt; 0) &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<p>(Nesse programa, o g++ reclama de outro pedaço, <code>0 &lt;&lt; "\n"</code>: <code>invalid operands of types ‘int’ and ‘const char [2]’ to binary ‘operator&lt;&lt;’</code>. A causa e o conserto são os mesmos.)</p>
+
+<hr>
+
+<h2>3. Números viram <code>bool</code> (e vice-versa)</h2>
+<p>O C++ converte números em <code>bool</code> sozinho, com uma regra só: <strong>zero é <code>false</code>; qualquer outro valor é <code>true</code></strong>. E no caminho inverso, <code>true</code> vira 1 e <code>false</code> vira 0.</p>
+
+<pre class="file" data-file="converte.cpp">#include &lt;iostream&gt;
+
+int main() {
+    bool a = 0;
+    bool b = 1;
+    bool c = -7;
+    bool d = 0.0;
+    bool e = 0.5;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; a &lt;&lt; " " &lt;&lt; b &lt;&lt; " " &lt;&lt; c &lt;&lt; " " &lt;&lt; d &lt;&lt; " " &lt;&lt; e &lt;&lt; "\n";
+    int n = true;
+    std::cout &lt;&lt; n &lt;&lt; " " &lt;&lt; true + true &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra converte.cpp -o converte
+$ ./converte
+false true true false true
+1 2</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Valor</th><th>Vira</th><th>Por quê</th></tr>
+<tr><td><code>0</code>, <code>0.0</code></td><td><code>false</code></td><td>Zero é o único "falso".</td></tr>
+<tr><td><code>1</code>, <code>-7</code>, <code>0.5</code></td><td><code>true</code></td><td>Diferente de zero. Até o negativo e o 0,5.</td></tr>
+<tr><td><code>true</code> numa conta ou num <code>int</code></td><td><code>1</code></td><td>Por isso <code>true + true</code> deu <code>2</code>.</td></tr>
+<tr><td><code>false</code> numa conta ou num <code>int</code></td><td><code>0</code></td><td></td></tr>
+</table>
+</div>
+
+<p>Essa regra explica as funções <code>std::isdigit</code> e companhia da aula <a href="char.html">Caracteres</a>, que devolvem 1024 ou 8192 para dizer "sim": qualquer número diferente de zero é verdadeiro. E é por isso que contar quantos <code>true</code> existem é fácil: some os <code>bool</code>.</p>
+
+<h3>Com chaves, só 0 e 1</h3>
+<p>A inicialização com chaves (aula <a href="variaveis.html">Variáveis</a>) não deixa um número qualquer virar <code>bool</code> em silêncio:</p>
+<pre class="term" data-cwd="~/cpp">$ cat chaves.cpp
+int main() {
+    bool ligado{2};
+    return ligado;
+}
+$ g++ -std=c++23 -Wall -Wextra chaves.cpp -o chaves
+chaves.cpp: In function ‘int main()’:
+chaves.cpp:2:17: error: narrowing conversion of ‘2’ from ‘int’ to ‘bool’ [-Wnarrowing]
+    2 |     bool ligado{2};
+      |                 ^</pre>
+
+<h3>A pegadinha do texto <code>"false"</code></h3>
+<pre class="term" data-cwd="~/cpp">$ cat texto.cpp
+#include &lt;iostream&gt;
+
+int main() {
+    bool resposta = "false";
+    std::cout &lt;&lt; std::boolalpha &lt;&lt; resposta &lt;&lt; "\n";
+}
+$ g++ -std=c++23 -Wall -Wextra texto.cpp -o texto
+$ ./texto
+true                     « o texto "false" virou true!</pre>
+
+<p>Sem aviso nenhum. O texto <code>"false"</code> (com aspas) não é o valor <code>false</code>: é um texto guardado em algum lugar da memória, e o C++ converteu o <strong>endereço</strong> desse lugar (que não é zero) em <code>true</code>. Endereços são assunto de <a href="ponteiros.html">Ponteiros</a>. A lição: <code>true</code> e <code>false</code> nunca levam aspas.</p>
+
+<hr>
+
+<h2>4. Bons nomes para <code>bool</code></h2>
+<p>Uma variável <code>bool</code> responde a uma pergunta de sim ou não. Dê a ela um nome que soe como a pergunta (ou a afirmação), para que o código se leia como uma frase:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ruim</th><th>Bom</th><th>Lê-se</th></tr>
+<tr><td><code>bool status;</code></td><td><code>bool pago;</code></td><td>"pago?"</td></tr>
+<tr><td><code>bool flag;</code></td><td><code>bool temEstoque;</code></td><td>"tem estoque?"</td></tr>
+<tr><td><code>bool idade;</code></td><td><code>bool ehMaiorDeIdade;</code></td><td>"é maior de idade?"</td></tr>
+<tr><td><code>bool chuva;</code></td><td><code>bool estaChovendo;</code></td><td>"está chovendo?"</td></tr>
+<tr><td><code>bool naoAtivo;</code></td><td><code>bool ativo;</code></td><td>Evite nomes negativos: "não não ativo" confunde.</td></tr>
+</table>
+</div>
+
+<p>Mais regras de nomes em <a href="identificadores.html">Nomes de Variáveis</a>.</p>
+
+<hr>
+
+<h2>Para onde o <code>bool</code> vai</h2>
+<p>Até aqui, você só <strong>mostrou</strong> booleanos. O verdadeiro uso deles é <strong>decidir</strong>: o <code>if</code> executa um trecho só se um <code>bool</code> for <code>true</code>, e o <code>while</code> repete enquanto ele for <code>true</code>. Um gostinho do que vem em <a href="if-else.html">if e else</a>:</p>
+
+<pre class="file" data-file="gostinho.cpp">#include &lt;iostream&gt;
+
+int main() {
+    bool pago = true;
+    if (pago) {
+        std::cout &lt;&lt; "Pode retirar o pedido.\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra gostinho.cpp -o gostinho
+$ ./gostinho
+Pode retirar o pedido.</pre>
+
+<p>Troque <code>true</code> por <code>false</code>, e a frase não aparece.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>O <code>cout</code> mostra <code>1</code> e <code>0</code> em vez de <code>true</code> e <code>false</code></strong>
+<p><strong>O que significa:</strong> é o comportamento padrão do <code>cout</code>.</p>
+<p><strong>Como consertar:</strong> mande <code>std::boolalpha</code> para o <code>cout</code> uma vez, antes de mostrar; ou use <code>std::println</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: no match for ‘operator&gt;’</code> (ou <code>invalid operands … to binary ‘operator&lt;&lt;’</code>) numa linha com <code>cout</code></strong>
+<p><strong>O que significa:</strong> uma comparação dentro do <code>cout</code> está sem parênteses, e o <code>&lt;&lt;</code> "roubou" um dos lados dela.</p>
+<p><strong>Como consertar:</strong> <code>std::cout &lt;&lt; (a &gt; b);</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Um <code>bool</code> deu <code>true</code> quando deveria ser <code>false</code></strong>
+<p><strong>O que significa:</strong> ele recebeu um número diferente de zero, ou um texto entre aspas (<code>"false"</code>), que sempre vira <code>true</code>.</p>
+<p><strong>Como consertar:</strong> use <code>true</code>/<code>false</code> sem aspas, ou uma comparação. Inicializar com chaves (<code>bool b{...}</code>) faz o compilador barrar números como 2.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>bool pago = true;</code></td><td>Variável booleana</td></tr>
+<tr><td><code>std::cout &lt;&lt; std::boolalpha;</code></td><td>Mostrar <code>true</code>/<code>false</code> em palavras</td></tr>
+<tr><td><code>std::cout &lt;&lt; std::noboolalpha;</code></td><td>Voltar a <code>1</code>/<code>0</code></td></tr>
+<tr><td><code>bool b = x &gt; 10;</code></td><td>Guardar o resultado de uma comparação</td></tr>
+<tr><td><code>std::cout &lt;&lt; (x &gt; 10);</code></td><td>Mostrar uma comparação (parênteses obrigatórios)</td></tr>
+<tr><td><code>bool b = numero;</code></td><td>0 → <code>false</code>; qualquer outro → <code>true</code></td></tr>
+<tr><td><code>int n = true;</code></td><td><code>true</code> → 1; <code>false</code> → 0</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O valor falso</h3>
+<p>Complete com o valor booleano "falso":</p>
+<div class="ex-code">bool pago = <input data-answer="false" aria-label="valor">;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Em palavras</h3>
+<p>Complete para o <code>cout</code> mostrar <code>true</code> em vez de <code>1</code>:</p>
+<div class="ex-code">std::cout &lt;&lt; std::<input data-answer="boolalpha" aria-label="manipulador"> &lt;&lt; pago;</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Sem <code>std::boolalpha</code>, o que <code>std::cout &lt;&lt; (3 &lt; 2);</code> mostra?</p>
+<label><input type="radio" name="q3"> false</label>
+<label><input type="radio" name="q3"> 1</label>
+<label><input type="radio" name="q3"> 0</label>
+<label><input type="radio" name="q3"> Erro de compilação</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. Quanto vale <code>bool b = -3;</code>?</p>
+<label><input type="radio" name="q4"> <code>true</code></label>
+<label><input type="radio" name="q4"> <code>false</code></label>
+<label><input type="radio" name="q4"> -3</label>
+<label><input type="radio" name="q4"> Não compila</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Por que <code>std::cout &lt;&lt; 5 &gt; 3;</code> não compila?</p>
+<label><input type="radio" name="q5"> Porque 5 não é maior que 3</label>
+<label><input type="radio" name="q5"> Porque falta <code>std::boolalpha</code></label>
+<label><input type="radio" name="q5"> Porque <code>&gt;</code> não existe em C++</label>
+<label><input type="radio" name="q5"> Porque o <code>&lt;&lt;</code> é feito antes do <code>&gt;</code>; faltam parênteses</label>
+</div>
+
+<h3>Missão final: votar e dirigir</h3>
+
+<div class="trycpp" data-goal="out:Pode votar: true,out:Pode dirigir: false,src:boolalpha,src:\bbool\b">
+<p class="try-task"><strong>Missão:</strong> o Bruno tem 17 anos. Crie duas variáveis <code>bool</code>: <code>podeVotar</code> (no Brasil, a partir de 16 anos) e <code>podeDirigir</code> (a partir de 18), cada uma calculada com uma comparação usando <code>idade</code>. Mostre em palavras:</p>
+<pre class="out">Pode votar: true
+Pode dirigir: false</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 17;
+    // crie podeVotar e podeDirigir
+
+    // mostre as duas em palavras
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 17;
+    bool podeVotar = idade &gt;= 16;
+    bool podeDirigir = idade &gt;= 18;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "Pode votar: " &lt;&lt; podeVotar &lt;&lt; "\n";
+    std::cout &lt;&lt; "Pode dirigir: " &lt;&lt; podeDirigir &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>bool</code> guarda <code>true</code> ou <code>false</code> (sem aspas). Ocupa 1 byte.</li>
+  <li>O <code>cout</code> mostra <code>1</code>/<code>0</code>; <code>std::boolalpha</code> muda para <code>true</code>/<code>false</code>. <code>std::println</code> já mostra em palavras.</li>
+  <li>Toda comparação (<code>==</code>, <code>!=</code>, <code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code>) produz um <code>bool</code>. No <code>cout</code>, ponha a comparação entre parênteses.</li>
+  <li>Número → <code>bool</code>: zero é <code>false</code>, o resto é <code>true</code>. <code>bool</code> → número: 1 e 0. O texto <code>"false"</code> vira <code>true</code>!</li>
+  <li>Nomes que soam como pergunta: <code>pago</code>, <code>temEstoque</code>, <code>estaChovendo</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
