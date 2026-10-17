@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Variáveis — declarar, mudar e inicializar | Guia C++</title>
+<meta name="description" content="Variáveis em C++ para quem nunca programou: declarar com tipo, nome e valor, mudar o valor, várias numa linha, inicialização com chaves e o erro de narrowing, o lixo de uma variável sem valor inicial e os avisos -Wuninitialized, com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Variáveis</span></h1>
+
+<p class="intro">Todo programa precisa <strong>guardar coisas</strong> enquanto trabalha: a idade de uma pessoa, o preço de um caderno, quantas maçãs sobraram na lojinha da Ana. Em C++, cada coisa guardada fica numa <strong>variável</strong>. Nesta aula você vai criar suas primeiras variáveis, trocar o valor delas, conhecer as três formas de dar um valor inicial e entender por que o C++ reclama (ou, pior, <em>não</em> reclama) quando uma variável fica sem valor.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma variável e como criar uma: <code>int idade = 29;</code>.</li>
+  <li>Como trocar o valor e por que o <strong>tipo</strong> da variável nunca muda.</li>
+  <li>Como criar várias variáveis numa linha (e a armadilha que mora ali).</li>
+  <li>As três formas de inicializar: <code>= 10</code>, <code>(10)</code> e <code>{10}</code>, e o que as chaves impedem.</li>
+  <li>O que acontece com uma variável sem valor inicial (o "lixo") e os avisos <code>-Wuninitialized</code> e <code>-Wmaybe-uninitialized</code>.</li>
+  <li>Os erros de usar uma variável antes de criá-la e de criar duas com o mesmo nome.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code> (cada opção é explicada em <a href="compilar.html">Compilar com g++</a>). Você pode repetir cada um no editor do guia, que compila C++ de verdade no navegador.</p>
+
+<hr>
+
+<h2>A ideia: uma caixa com etiqueta e formato</h2>
+<p>Pense numa mudança de casa. Você guarda as coisas em caixas e escreve uma <strong>etiqueta</strong> em cada uma: "LIVROS", "PANELAS". Quando quer as panelas, procura pela etiqueta.</p>
+
+<p>Uma variável é isso: um pedacinho da memória do computador com uma etiqueta. A etiqueta é o <strong>nome</strong>; o que está dentro é o <strong>valor</strong>. O nome "variável" vem daí: o que está dentro pode <em>variar</em>.</p>
+
+<p>Em C++ existe um detalhe a mais: cada caixa tem um <strong>formato</strong>, escolhido quando você a cria, e esse formato nunca muda. Uma caixa de ovos só guarda ovos; uma caixa de sapatos só guarda sapatos. Esse formato se chama <strong>tipo</strong>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parte da caixa</th><th>Nome técnico</th><th>Exemplo</th></tr>
+<tr><td>O formato (o que cabe nela)</td><td><strong>tipo</strong></td><td><code>int</code> (número inteiro), <code>double</code> (número com vírgula), <code>std::string</code> (texto)</td></tr>
+<tr><td>A etiqueta</td><td><strong>nome</strong></td><td><code>idade</code>, <code>preco</code></td></tr>
+<tr><td>O que está guardado agora</td><td><strong>valor</strong></td><td><code>29</code>, <code>4.5</code>, <code>"Ana"</code></td></tr>
+</table>
+</div>
+
+<p>Os tipos têm aula própria (<a href="tipos-dados.html">Tipos de Dados</a>). Por enquanto, três bastam: <code>int</code> (de <em>integer</em>, "inteiro") para números sem vírgula, <code>double</code> ("duplo", de precisão dupla) para números com vírgula e <code>std::string</code> ("sequência de caracteres") para textos.</p>
+
+<hr>
+
+<h2>1. Declarar uma variável</h2>
+<p>Criar uma variável se chama <strong>declarar</strong>. A receita é sempre a mesma: <code>tipo nome = valor;</code>.</p>
+
+<pre class="file" data-file="ola.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    int idade = 29;
+    double altura = 1.65;
+    std::string nome = "Ana";
+    std::cout &lt;&lt; nome &lt;&lt; " tem " &lt;&lt; idade &lt;&lt; " anos e " &lt;&lt; altura &lt;&lt; " m de altura.\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;string&gt;</dt><dd>Traz o tipo <code>std::string</code> para o programa. O <code>int</code> e o <code>double</code> já fazem parte da linguagem e não precisam de <code>#include</code>.</dd>
+  <dt>int</dt><dd>O <strong>tipo</strong>: esta caixa guarda um número inteiro.</dd>
+  <dt>idade</dt><dd>O <strong>nome</strong> da variável. As regras de nomes estão em <a href="identificadores.html">Nomes de Variáveis</a>.</dd>
+  <dt>=</dt><dd>Leia como "recebe": <em>idade recebe 29</em>. Não é o "igual" da matemática; quem compara valores é o <code>==</code> (aula <a href="operadores-comparacao.html">Operadores de Comparação</a>).</dd>
+  <dt>29</dt><dd>O <strong>valor inicial</strong>. Números não levam aspas.</dd>
+  <dt>;</dt><dd>O ponto e vírgula termina a declaração, como o ponto final de uma frase.</dd>
+  <dt>1.65</dt><dd>Número com vírgula se escreve com <strong>ponto</strong>, como nos Estados Unidos. <code>1,65</code> significaria outra coisa.</dd>
+  <dt>"Ana"</dt><dd>Texto vai entre aspas duplas (veja <a href="strings.html">Strings</a>).</dd>
+  <dt>std::cout &lt;&lt; nome</dt><dd>Mostra o <strong>valor</strong> guardado em <code>nome</code>, e não a palavra "nome" (veja <a href="saida-cout.html">Saída com cout</a>).</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ola.cpp -o ola
+$ ./ola
+Ana tem 29 anos e 1.65 m de altura.</pre>
+
+<p>O <code>g++</code> não mostrou nada: isso quer dizer que compilou sem erros nem avisos. O <code>./ola</code> rodou o programa, e cada <code>&lt;&lt;</code> encaixou um pedaço da frase: o valor de <code>nome</code>, o texto <code>" tem "</code>, o valor de <code>idade</code> e assim por diante.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> troque os valores de <code>fruta</code> e <code>quantidade</code> e clique em <strong>Rodar</strong>. Depois crie uma terceira variável, <code>double preco = 1.5;</code>, e mostre-a também.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string fruta = "maçã";
+    int quantidade = 6;
+    std::cout &lt;&lt; "A Ana comprou " &lt;&lt; quantidade &lt;&lt; " unidades de " &lt;&lt; fruta &lt;&lt; ".\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Mudar o valor</h2>
+<p>Depois de declarada, a variável é usada só pelo nome, <strong>sem</strong> repetir o tipo. Para trocar o valor, escreva <code>nome = novo valor;</code>. O valor antigo é jogado fora:</p>
+
+<pre class="file" data-file="mudar.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int macas = 6;
+    std::cout &lt;&lt; "Antes: " &lt;&lt; macas &lt;&lt; "\n";
+    macas = 4;
+    std::cout &lt;&lt; "Depois: " &lt;&lt; macas &lt;&lt; "\n";
+    macas = macas + 2;
+    std::cout &lt;&lt; "Mais duas: " &lt;&lt; macas &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra mudar.cpp -o mudar
+$ ./mudar
+Antes: 6
+Depois: 4
+Mais duas: 6</pre>
+
+<p>O programa roda <strong>de cima para baixo</strong>. A linha <code>macas = macas + 2;</code> parece estranha para quem lembra da matemática, mas lembre que <code>=</code> é "recebe":</p>
+<ol class="passo">
+  <li>O C++ calcula primeiro o lado <strong>direito</strong>: lê o valor atual de <code>macas</code> (4) e soma 2, dando 6.</li>
+  <li>Depois guarda o resultado na caixa da esquerda, no lugar do 4.</li>
+</ol>
+<p>Esse padrão tem um atalho, <code>macas += 2;</code>, explicado em <a href="operadores-atribuicao.html">Operadores de Atribuição</a>.</p>
+
+<h3>Copiar uma variável para outra</h3>
+<p><code>int b = a;</code> <strong>copia</strong> o valor. Depois disso, as duas caixas são independentes:</p>
+
+<pre class="file" data-file="copia.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int a = 1;
+    int b = a;
+    a = 5;
+    std::cout &lt;&lt; "a=" &lt;&lt; a &lt;&lt; " b=" &lt;&lt; b &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ ./copia
+a=5 b=1                  « mudar a depois não mexeu em b</pre>
+
+<h3>O tipo nunca muda</h3>
+<p>Uma caixa de <code>int</code> continua sendo de <code>int</code> até o fim. Tentar guardar um texto nela é recusado pelo compilador:</p>
+
+<pre class="file" data-file="tipo.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 29;
+    idade = "trinta";
+    std::cout &lt;&lt; idade &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tipo.cpp -o tipo
+tipo.cpp: In function ‘int main()’:
+tipo.cpp:5:13: error: invalid conversion from ‘const char*’ to ‘int’ [-fpermissive]
+    5 |     idade = "trinta";
+      |             ^~~~~~~~
+      |             |
+      |             const char*</pre>
+
+<p><em>Invalid conversion from ‘const char*’ to ‘int’</em> = "conversão inválida de <code>const char*</code> para <code>int</code>". O <code>const char*</code> é o tipo que o C++ dá a um texto entre aspas (a aula <a href="strings.html">Strings</a> conta essa história); o compilador está dizendo "isso é texto, e a caixa é de inteiro". Como é um <strong>error</strong>, o arquivo <code>tipo</code> nem foi criado. (A leitura da mensagem, parte por parte, está em <a href="erros-compilacao.html">Lendo Erros do Compilador</a>.)</p>
+
+<p>Já um número com vírgula numa caixa de <code>int</code> passa <strong>sem nenhum aviso</strong>, e a parte depois da vírgula some:</p>
+
+<pre class="file" data-file="corta.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 29;
+    idade = 29.9;
+    std::cout &lt;&lt; idade &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra corta.cpp -o corta
+$ ./corta
+29                       « o .9 foi cortado (não arredondado), em silêncio</pre>
+
+<p>O C++ <strong>converte</strong> o <code>29.9</code> para <code>int</code> jogando fora a parte fracionária. Isso tem aula própria, <a href="conversao-tipos.html">Conversão de Tipos</a>. A próxima seção mostra um jeito de fazer o compilador barrar esse corte já na criação da variável.</p>
+
+<hr>
+
+<h2>3. Várias variáveis numa linha</h2>
+<p>Variáveis do <strong>mesmo tipo</strong> podem ser declaradas juntas, separadas por vírgula:</p>
+
+<pre class="file" data-file="linha.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int a = 1, b = 2, c = 3;
+    std::cout &lt;&lt; a &lt;&lt; " " &lt;&lt; b &lt;&lt; " " &lt;&lt; c &lt;&lt; "\n";
+    int x, y = 5;
+    std::cout &lt;&lt; x &lt;&lt; " " &lt;&lt; y &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra linha.cpp -o linha
+linha.cpp: In function ‘int main()’:
+linha.cpp:7:18: warning: ‘x’ is used uninitialized [-Wuninitialized]
+    7 |     std::cout &lt;&lt; x &lt;&lt; " " &lt;&lt; y &lt;&lt; "\n";
+      |                  ^
+linha.cpp:6:9: note: ‘x’ was declared here
+    6 |     int x, y = 5;
+      |         ^
+$ ./linha
+1 2 3
+0 5</pre>
+
+<p>A linha 4 está certa: três variáveis, cada uma com seu valor. A linha 6 é a <strong>armadilha</strong>: quem lê <code>int x, y = 5;</code> pode achar que as duas valem 5, mas o <code>= 5</code> vale só para o <code>y</code>. O <code>x</code> ficou <strong>sem valor</strong>, e o compilador avisou. Aqui ele apareceu como <code>0</code> por acaso; a seção 5 mostra que ele poderia ser qualquer número.</p>
+
+<div class="tip">
+<strong>Uma variável por linha</strong>
+<p>Declarar várias numa linha economiza espaço, mas esconde erros como esse. A maioria dos guias de estilo recomenda <strong>uma declaração por linha</strong>, cada uma com seu valor. Variáveis de tipos diferentes (um <code>int</code> e um <code>double</code>) nunca podem ir na mesma linha.</p>
+</div>
+
+<hr>
+
+<h2>4. Três formas de dar o valor inicial</h2>
+<p>O C++ aceita três escritas para inicializar uma variável. As três abaixo criam um <code>int</code>:</p>
+
+<pre class="file" data-file="formas.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int a = 10;
+    int b(20);
+    int c{30};
+    int d{};
+    std::cout &lt;&lt; a &lt;&lt; " " &lt;&lt; b &lt;&lt; " " &lt;&lt; c &lt;&lt; " " &lt;&lt; d &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra formas.cpp -o formas
+$ ./formas
+10 20 30 0</pre>
+
+<dl class="anatomy">
+  <dt>int a = 10;</dt><dd>Com sinal de igual: a forma que veio da linguagem C, a mais comum de ler.</dd>
+  <dt>int b(20);</dt><dd>Com parênteses: herança do C++ antigo. Você vai vê-la de novo em <a href="construtores.html">Construtores</a>.</dd>
+  <dt>int c{30};</dt><dd>Com <strong>chaves</strong> <span class="versao">C++11</span>: a "inicialização uniforme", que funciona do mesmo jeito para números, textos, listas e objetos.</dd>
+  <dt>int d{};</dt><dd>Chaves vazias: o valor "zero" do tipo. Para <code>int</code>, <code>0</code>; para <code>double</code>, <code>0.0</code>; para <code>std::string</code>, o texto vazio. É o jeito mais curto de nunca deixar uma variável sem valor.</dd>
+</dl>
+
+<h3>O que as chaves impedem: o estreitamento (narrowing)</h3>
+<p>Você viu na seção 2 que <code>int idade = 29.9;</code> passa em silêncio e vira 29. Com chaves, o compilador <strong>recusa</strong>:</p>
+
+<pre class="file" data-file="estreita.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int x{3.7};
+    std::cout &lt;&lt; x &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra estreita.cpp -o estreita
+estreita.cpp: In function ‘int main()’:
+estreita.cpp:4:11: error: narrowing conversion of ‘3.7000000000000002e+0’ from ‘double’ to ‘int’ [-Wnarrowing]
+    4 |     int x{3.7};
+      |           ^~~</pre>
+
+<dl class="anatomy">
+  <dt>narrowing conversion</dt><dd>"Conversão de estreitamento": passar um valor para um tipo mais "estreito", onde ele não cabe inteiro. O 3.7 não cabe num <code>int</code> sem perder o .7.</dd>
+  <dt>of ‘3.7000000000000002e+0’</dt><dd>É o seu 3.7, escrito do jeito que o computador o guarda de verdade: em notação científica (<code>e+0</code> = "vezes 10 elevado a 0") e com um errinho na 16ª casa. Esse errinho é normal e é explicado em <a href="ponto-flutuante.html">float e double</a>.</dd>
+  <dt>from ‘double’ to ‘int’</dt><dd>De qual tipo para qual tipo.</dd>
+  <dt>[-Wnarrowing]</dt><dd>O nome da regra. Apesar do <code>-W</code> (de <em>warning</em>), aqui é um <strong>error</strong>: o programa não foi gerado.</dd>
+</dl>
+
+<p>Compare com a mesma conta usando <code>=</code>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat estreita2.cpp
+#include &lt;iostream&gt;
+
+int main() {
+    int x = 3.7;
+    std::cout &lt;&lt; x &lt;&lt; "\n";
+}
+$ g++ -std=c++23 -Wall -Wextra estreita2.cpp -o estreita2
+$ ./estreita2
+3                        « nenhum aviso, e o .7 sumiu</pre>
+
+<p>Nem o <code>-Wall -Wextra</code> avisou. Existe uma opção que avisa, o <code>-Wconversion</code> (ela não faz parte do <code>-Wall</code>; a aula <a href="avisos.html">Avisos</a> fala dela):</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -Wconversion estreita2.cpp -o estreita2
+estreita2.cpp: In function ‘int main()’:
+estreita2.cpp:4:13: warning: conversion from ‘double’ to ‘int’ changes value from ‘3.7000000000000002e+0’ to ‘3’ [-Wfloat-conversion]
+    4 |     int x = 3.7;
+      |             ^~~</pre>
+
+<p>O Clang, o compilador do editor do guia, é um pouco mais atento: quando o número está escrito direto no código, ele avisa mesmo sem <code>-Wall</code> (<code>implicit conversion from 'double' to 'int' changes value from 3.7 to 3 [-Wliteral-conversion]</code>). Mas é só um aviso, e o programa é gerado. Com chaves, você ganha um <strong>erro</strong> nos dois compiladores, sem opção extra.</p>
+
+<div class="trycpp" data-goal="erro:narrow">
+<p class="try-task"><strong>Missão:</strong> este programa compila e mostra <code>Preço: 9</code>, perdendo os centavos (o Clang do editor até mostra um aviso, mas gera o programa mesmo assim). Troque <code>int preco = 9.99;</code> pela forma com <strong>chaves</strong> e rode: o compilador tem que recusar o estreitamento. (O editor usa o Clang, que escreve <em>cannot be narrowed</em>; o g++ escreve <em>narrowing conversion</em>. Os dois dizem a mesma coisa.)</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int preco = 9.99;
+    std::cout &lt;&lt; "Preço: " &lt;&lt; preco &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int preco{9.99};
+    std::cout &lt;&lt; "Preço: " &lt;&lt; preco &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<p>E o conserto de verdade? Preço tem centavos, então a caixa certa é <code>double preco{9.99};</code>. O erro de narrowing quase sempre quer dizer "você escolheu o tipo errado".</p>
+
+<h3>Qual usar</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Barra o estreitamento?</th><th>Quando usar</th></tr>
+<tr><td><code>int x = 10;</code></td><td>Não</td><td>Valores simples e óbvios. É a mais lida em código do dia a dia, e o guia usa bastante.</td></tr>
+<tr><td><code>int x(10);</code></td><td>Não</td><td>Raramente para números; aparece com objetos e construtores.</td></tr>
+<tr><td><code>int x{10};</code></td><td>Sim</td><td>Quando o valor vem de uma conta ou de outra variável e você quer que o compilador vigie perdas.</td></tr>
+<tr><td><code>int x{};</code></td><td>(vale zero)</td><td>Quando você ainda não sabe o valor, mas quer começar do zero com segurança.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>5. Variável sem valor inicial: o "lixo"</h2>
+<p>O C++ deixa você criar uma variável <strong>sem</strong> valor: <code>int pontos;</code>. Ela existe, ocupa memória, mas o C++ não limpa essa memória. O que estiver lá, sobrado de outra parte do programa, vira o "valor". Programadores chamam isso de <strong>lixo</strong> (<em>garbage</em>).</p>
+
+<p>Neste programa, a função <code>prepara</code> usa um pedaço da memória e termina; depois a função <code>mostra</code> cria <code>pontos</code> sem valor. (Funções são do Nível 2, em <a href="funcoes.html">Funções</a>; aqui elas só servem para "sujar" a memória antes.)</p>
+
+<pre class="file" data-file="lixo.cpp">#include &lt;iostream&gt;
+
+void prepara() {
+    int numeros[4] = {1234, 5678, 9012, 3456};
+    std::cout &lt;&lt; "prepara usou: " &lt;&lt; numeros[0] &lt;&lt; "\n";
+}
+
+void mostra() {
+    int pontos;
+    std::cout &lt;&lt; "pontos vale: " &lt;&lt; pontos &lt;&lt; "\n";
+}
+
+int main() {
+    prepara();
+    mostra();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra lixo.cpp -o lixo
+lixo.cpp: In function ‘void mostra()’:
+lixo.cpp:10:37: warning: ‘pontos’ is used uninitialized [-Wuninitialized]
+   10 |     std::cout &lt;&lt; "pontos vale: " &lt;&lt; pontos &lt;&lt; "\n";
+      |                                     ^~~~~~
+lixo.cpp:9:9: note: ‘pontos’ was declared here
+    9 |     int pontos;
+      |         ^~~~~~
+$ ./lixo
+prepara usou: 1234
+pontos vale: 67871226
+$ ./lixo
+prepara usou: 1234
+pontos vale: 643496078
+$ ./lixo
+prepara usou: 1234
+pontos vale: -2034654050  « três execuções, três valores diferentes</pre>
+
+<dl class="anatomy">
+  <dt>warning:</dt><dd>"Aviso". Diferente de <code>error</code>, o programa <strong>foi</strong> gerado. Mas este aviso é sério.</dd>
+  <dt>‘pontos’ is used uninitialized</dt><dd>"<code>pontos</code> é usada sem ter sido inicializada": você leu o valor de uma caixa onde nunca guardou nada.</dd>
+  <dt>[-Wuninitialized]</dt><dd>A regra de aviso que pegou o problema. Ela vem ligada pelo <code>-Wall</code>.</dd>
+  <dt>note: ‘pontos’ was declared here</dt><dd>"Nota: <code>pontos</code> foi declarada aqui": o compilador aponta a linha da criação, onde está o conserto.</dd>
+</dl>
+
+<p>O número muda a cada execução e não tem nenhum significado. Num jogo, a Ana começaria a partida com 643 milhões de pontos. Ler uma variável sem valor é um <strong>comportamento indefinido</strong>: a linguagem não promete <em>nada</em> sobre o que acontece (aula <a href="comportamento-indefinido.html">Comportamento Indefinido</a>). Às vezes o lixo é <code>0</code>, como na seção 3, e o erro passa despercebido nos testes para aparecer depois.</p>
+
+<div class="warning">
+<strong>Regra do guia: toda variável nasce com valor</strong>
+<p>Sempre que puder, dê o valor já na declaração: <code>int pontos = 0;</code> ou <code>int pontos{};</code>. Se ainda não souber o valor certo, comece com zero. E nunca ignore um aviso <code>uninitialized</code>.</p>
+</div>
+
+<h3>"Talvez sem valor": <code>-Wmaybe-uninitialized</code></h3>
+<p>Às vezes a variável recebe valor só em <strong>alguns caminhos</strong> do programa. Aqui, <code>desconto</code> só recebe valor se a Ana fez mais de 5 compras (o <code>if</code> tem aula própria, <a href="if-else.html">if e else</a>; o <code>std::cin</code> lê um número do teclado, aula <a href="entrada-cin.html">Entrada com cin</a>):</p>
+
+<pre class="file" data-file="talvez.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int compras = 0;
+    std::cin &gt;&gt; compras;
+    int desconto;
+    if (compras &gt; 10) {
+        desconto = 5;
+    } else if (compras &gt; 5) {
+        desconto = 2;
+    }
+    std::cout &lt;&lt; "Desconto: " &lt;&lt; desconto &lt;&lt; "%\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra talvez.cpp -o talvez     « nenhum aviso!
+$ g++ -std=c++23 -Wall -Wextra -O2 talvez.cpp -o talvez
+talvez.cpp: In function ‘int main()’:
+talvez.cpp:12:34: warning: ‘desconto’ may be used uninitialized [-Wmaybe-uninitialized]
+   12 |     std::cout &lt;&lt; "Desconto: " &lt;&lt; desconto &lt;&lt; "%\n";
+      |                                  ^~~~~~~~
+talvez.cpp:6:9: note: ‘desconto’ was declared here
+    6 |     int desconto;
+      |         ^~~~~~~~
+$ echo 3 | ./talvez
+Desconto: 5%             « 3 compras não dão desconto, mas saiu 5%</pre>
+
+<ul>
+  <li><em>May be used uninitialized</em> = "<strong>pode</strong> ser usada sem valor". O compilador não tem certeza (depende do número digitado), mas achou um caminho em que nenhum valor é guardado: 5 compras ou menos.</li>
+  <li>No g++, esse aviso só aparece quando você também pede <strong>otimização</strong> (<code>-O2</code>, "otimize, nível 2"), porque a análise que encontra esses caminhos roda junto com a otimização. Sem <code>-O2</code>, o mesmo erro passou calado.</li>
+  <li>O resultado <code>5%</code> com 3 compras é o comportamento indefinido em ação: o otimizador supôs que o caminho sem valor nunca acontece.</li>
+  <li>O conserto é o mesmo: <code>int desconto = 0;</code>.</li>
+</ul>
+
+<div class="note">
+<strong>No editor do guia</strong>
+<p>O editor compila com o <strong>Clang</strong>, que pega este caso mesmo sem otimização, com outras palavras: <code>variable 'desconto' is used uninitialized whenever 'if' condition is false [-Wsometimes-uninitialized]</code> ("é usada sem valor sempre que a condição do <code>if</code> for falsa"). Para o <code>lixo.cpp</code>, o Clang escreve <code>variable 'pontos' is uninitialized when used here [-Wuninitialized]</code>. Duas ferramentas, a mesma lição.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Pontos: 10,semaviso">
+<p class="try-task"><strong>Missão:</strong> rode e leia o aviso: qual variável está sem valor? Conserte só a linha da declaração dela, para o programa mostrar <code>Pontos: 10</code> sem nenhum aviso.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int pontos;
+    int bonus = 10;
+    pontos = pontos + bonus;
+    std::cout &lt;&lt; "Pontos: " &lt;&lt; pontos &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int pontos = 0;
+    int bonus = 10;
+    pontos = pontos + bonus;
+    std::cout &lt;&lt; "Pontos: " &lt;&lt; pontos &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<p>No laboratório, esse programa com defeito mostrou <code>Pontos: 10</code> (o lixo daquela vez era zero), mas com o aviso <code>‘pontos’ is used uninitialized</code>. "Deu o número certo" não quer dizer que está certo.</p>
+
+<hr>
+
+<h2>6. Usar antes de declarar e declarar duas vezes</h2>
+<p>O compilador lê o arquivo de cima para baixo. Uma variável só existe <strong>da linha da declaração para baixo</strong>:</p>
+
+<pre class="file" data-file="antes.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; total &lt;&lt; "\n";
+    int total = 50;
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra antes.cpp -o antes
+antes.cpp: In function ‘int main()’:
+antes.cpp:4:18: error: ‘total’ was not declared in this scope
+    4 |     std::cout &lt;&lt; total &lt;&lt; "\n";
+      |                  ^~~~~</pre>
+
+<p><em>‘total’ was not declared in this scope</em> = "<code>total</code> não foi declarada neste escopo". <strong>Escopo</strong> é a região do código onde um nome existe (aula <a href="escopo.html">Escopo</a>); na linha 4, <code>total</code> ainda não existe. O mesmo erro aparece quando o nome está escrito diferente (<code>Total</code>, <code>totla</code>). O Clang, no editor, diz <code>use of undeclared identifier 'total'</code> ("uso de identificador não declarado").</p>
+
+<p>E criar <strong>duas</strong> variáveis com o mesmo nome no mesmo lugar também é erro:</p>
+
+<pre class="file" data-file="dupla.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int total = 50;
+    int total = 80;
+    std::cout &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra dupla.cpp -o dupla
+dupla.cpp: In function ‘int main()’:
+dupla.cpp:5:9: error: redeclaration of ‘int total’
+    5 |     int total = 80;
+      |         ^~~~~
+dupla.cpp:4:9: note: ‘int total’ previously declared here
+    4 |     int total = 50;
+      |         ^~~~~</pre>
+
+<p><em>Redeclaration</em> = "declaração repetida"; <em>previously declared here</em> = "declarada antes aqui". Para mudar o valor, escreva sem o tipo: <code>total = 80;</code>. Repetir o <code>int</code> pede uma caixa <strong>nova</strong> com uma etiqueta que já existe.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: ‘x’ was not declared in this scope</code></strong>
+<p><strong>O que significa:</strong> na linha indicada, o nome não existe. Causas: a declaração está <strong>mais abaixo</strong>, o nome está escrito diferente (maiúscula, acento, letra trocada) ou a variável foi criada dentro de outro bloco <code>{ }</code>.</p>
+<p><strong>Como consertar:</strong> copie o nome da mensagem e procure-o no arquivo. Confira se a declaração vem <strong>antes</strong> da linha do erro e se o nome é idêntico.</p>
+</div>
+
+<div class="cenario">
+<strong><code>warning: ‘x’ is used uninitialized</code> / <code>may be used uninitialized</code></strong>
+<p><strong>O que significa:</strong> o programa lê uma variável que não recebeu valor (ou pode não ter recebido, em algum caminho). O valor lido é lixo.</p>
+<p><strong>Como consertar:</strong> dê um valor na declaração apontada pela <code>note: ‘x’ was declared here</code>: <code>int x = 0;</code> ou <code>int x{};</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: narrowing conversion of … from ‘double’ to ‘int’</code></strong>
+<p><strong>O que significa:</strong> dentro de chaves, você pôs um valor que não cabe inteiro no tipo da variável.</p>
+<p><strong>Como consertar:</strong> quase sempre o tipo está errado: use <code>double</code> para valores com vírgula. Se você quer mesmo cortar, diga isso por escrito com <code>static_cast&lt;int&gt;(3.7)</code> (aula <a href="conversao-tipos.html">Conversão de Tipos</a>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: redeclaration of ‘int x’</code></strong>
+<p><strong>O que significa:</strong> o mesmo nome foi declarado duas vezes no mesmo bloco.</p>
+<p><strong>Como consertar:</strong> para trocar o valor, tire o tipo da segunda linha (<code>x = 80;</code>). Se são duas coisas diferentes, dê nomes diferentes.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: invalid conversion from ‘const char*’ to ‘int’</code></strong>
+<p><strong>O que significa:</strong> você tentou guardar um texto entre aspas numa variável de número.</p>
+<p><strong>Como consertar:</strong> se é texto, a variável deve ser <code>std::string</code>; se é número, tire as aspas (<code>30</code>, e não <code>"30"</code>). Para transformar texto em número de propósito, veja <a href="string-numero.html">Texto ↔ Número</a>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: expected initializer before ‘return’</code></strong>
+<p><strong>O que significa:</strong> faltou o <code>;</code> no fim da declaração (por exemplo, <code>int x</code> seguido de <code>return 0;</code> na linha de baixo). O compilador continuou lendo e tropeçou na próxima palavra.</p>
+<p><strong>Como consertar:</strong> quando o erro aponta uma linha que parece certa, olhe o fim da linha <strong>anterior</strong>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>int x = 10;</code></td><td>Declara <code>x</code> com valor 10</td></tr>
+<tr><td><code>int x(10);</code></td><td>O mesmo, com parênteses</td></tr>
+<tr><td><code>int x{10};</code></td><td>O mesmo, com chaves: recusa estreitamento</td></tr>
+<tr><td><code>int x{};</code></td><td>Declara <code>x</code> valendo zero</td></tr>
+<tr><td><code>int x;</code></td><td>Declara sem valor: lixo até receber um (evite)</td></tr>
+<tr><td><code>x = 20;</code></td><td>Troca o valor (sem repetir o tipo)</td></tr>
+<tr><td><code>x = x + 1;</code></td><td>Calcula com o valor atual e guarda o resultado</td></tr>
+<tr><td><code>int b = a;</code></td><td>Copia o valor de <code>a</code>; as duas ficam independentes</td></tr>
+<tr><td><code>int a = 1, b = 2;</code></td><td>Várias do mesmo tipo numa linha (cada uma com seu valor)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Declarar</h3>
+<p>Complete para criar uma variável inteira <code>alunos</code> valendo 32:</p>
+<div class="ex-code"><input data-answer="int" aria-label="tipo"> alunos = 32;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Começar do zero</h3>
+<p>Complete com a forma de chaves que dá o valor zero:</p>
+<div class="ex-code">int pontos<input data-answer="{}" aria-label="inicialização">;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Depois de <code>int x, y = 5;</code>, quanto vale <code>x</code>?</p>
+<label><input type="radio" name="q3"> 5</label>
+<label><input type="radio" name="q3"> Nenhum valor definido: é lixo (e o compilador avisa se você o usar)</label>
+<label><input type="radio" name="q3"> 0, sempre</label>
+<label><input type="radio" name="q3"> Não compila</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O que acontece com <code>int n{2.5};</code>?</p>
+<label><input type="radio" name="q4"> <code>n</code> vale 2</label>
+<label><input type="radio" name="q4"> <code>n</code> vale 3</label>
+<label><input type="radio" name="q4"> Erro de compilação: narrowing conversion</label>
+<label><input type="radio" name="q4"> <code>n</code> vale 2.5</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. O que o programa mostra? <code>int a = 2; int b = a; a = 7; std::cout &lt;&lt; b;</code></p>
+<label><input type="radio" name="q5"> 2</label>
+<label><input type="radio" name="q5"> 7</label>
+<label><input type="radio" name="q5"> 9</label>
+<label><input type="radio" name="q5"> Um erro de compilação</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. A linha 5 tem <code>int total = 80;</code> e a linha 4 já tinha <code>int total = 50;</code>. O que o g++ diz?</p>
+<label><input type="radio" name="q6"> Nada: <code>total</code> passa a valer 80</label>
+<label><input type="radio" name="q6"> <code>‘total’ was not declared in this scope</code></label>
+<label><input type="radio" name="q6"> <code>‘total’ is used uninitialized</code></label>
+<label><input type="radio" name="q6"> <code>redeclaration of ‘int total’</code></label>
+</div>
+
+<h3>Missão final: o caixa da lojinha</h3>
+
+<div class="trycpp" data-goal="out:Total: 7.5,out:Total: 10,semaviso,src:quantidade\s*\{\s*3\s*\},src:quantidade\s*=\s*4">
+<p class="try-task"><strong>Missão:</strong> a Ana vendeu 3 cadernos a 2.5 cada. Declare <code>quantidade</code> (<code>int</code>, valendo 3, <strong>com chaves</strong>) e <code>preco</code> (<code>double</code>, valendo 2.5), calcule <code>total</code> (<code>double</code>) como <code>quantidade * preco</code> (o <code>*</code> é "vezes") e mostre a primeira linha. Depois a cliente pegou mais um caderno: <strong>mude</strong> <code>quantidade</code> para 4, calcule o total de novo e mostre a segunda linha. Sem avisos.</p>
+<pre class="out">Total: 7.5
+Total: 10</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    // declare quantidade, preco e total aqui
+
+    // mostre o total
+
+    // mude a quantidade, recalcule e mostre de novo
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int quantidade{3};
+    double preco{2.5};
+    double total{quantidade * preco};
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; "\n";
+
+    quantidade = 4;
+    total = quantidade * preco;
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<p>Repare que o segundo total saiu <code>10</code>, e não <code>10.0</code>: o <code>std::cout</code> esconde os zeros desnecessários de um <code>double</code>. Para mostrar <code>10.00</code>, veja <a href="iomanip.html">Formatar com iomanip</a>.</p>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Variável = caixa com <strong>tipo</strong> (formato), <strong>nome</strong> (etiqueta) e <strong>valor</strong>. Declare com <code>tipo nome = valor;</code>.</li>
+  <li>Para mudar o valor: <code>nome = novo;</code>, sem repetir o tipo. O lado direito é calculado primeiro. O tipo nunca muda.</li>
+  <li>Várias numa linha: <code>int a = 1, b = 2;</code>. Em <code>int x, y = 5;</code>, só o <code>y</code> vale 5. Prefira uma por linha.</li>
+  <li>Três formas: <code>= 10</code>, <code>(10)</code>, <code>{10}</code>. As chaves recusam o estreitamento (<code>int x{3.7};</code> é erro); <code>{}</code> vazio dá zero.</li>
+  <li>Variável sem valor guarda lixo. <code>-Wall</code> avisa com <code>-Wuninitialized</code>; o <code>-Wmaybe-uninitialized</code> do g++ aparece com <code>-O2</code>. Regra: toda variável nasce com valor.</li>
+  <li>A variável só existe da declaração para baixo (<code>was not declared in this scope</code>), e o mesmo nome não pode ser declarado duas vezes no mesmo bloco (<code>redeclaration</code>).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
