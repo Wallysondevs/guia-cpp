@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Nomes de Variáveis — regras, palavras reservadas e convenções | Guia C++</title>
+<meta name="description" content="Identificadores em C++ para quem nunca programou: as regras de nomes, as 92 palavras reservadas, maiúsculas e minúsculas, camelCase e snake_case, nomes bons e ruins e o que o g++ 15 faz com acentos (int ação), com erros reais e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Nomes de Variáveis</span></h1>
+
+<p class="intro">Na aula <a href="variaveis.html">Variáveis</a>, você criou caixas com etiquetas como <code>idade</code> e <code>preco</code>. Essas etiquetas têm um nome técnico: <strong>identificadores</strong> (de "identificar"). O mesmo tipo de nome serve para funções, classes e tudo o que você batiza no programa. Nesta aula você vai ver o que o C++ <strong>exige</strong> de um nome, quais palavras ele guarda para si, por que <code>nota</code> e <code>Nota</code> são coisas diferentes e como escolher nomes que deixam o programa fácil de ler.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>As regras de um nome válido e os erros reais de quem as quebra.</li>
+  <li>As <strong>palavras reservadas</strong> (<code>int</code>, <code>return</code>, <code>class</code>…), que não podem ser nomes.</li>
+  <li>Por que maiúsculas e minúsculas fazem diferença.</li>
+  <li>As convenções <code>camelCase</code> e <code>snake_case</code>.</li>
+  <li>Como reconhecer um nome bom e um nome ruim.</li>
+  <li>Se o g++ 15 aceita <code>int ação</code> (aceita) e por que mesmo assim é melhor evitar.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: regras × combinados</h2>
+<p>Pense no nome de uma criança no cartório. Existem <strong>regras</strong> que o cartório confere (não pode ter número, não pode ser vazio) e existem <strong>costumes</strong> que ninguém confere, mas todo mundo segue (nome com inicial maiúscula, sobrenome no fim).</p>
+
+<p>No C++ é igual:</p>
+<ul>
+  <li><strong>Regras</strong>: o compilador confere. Quebrou, o programa não compila.</li>
+  <li><strong>Convenções</strong>: combinados entre programadores para o código ficar legível. O compilador não liga, mas as pessoas que vão ler o seu código (inclusive você daqui a um mês) ligam muito.</li>
+</ul>
+
+<hr>
+
+<h2>1. As regras</h2>
+<ol>
+  <li>Um nome usa <strong>letras</strong>, <strong>algarismos</strong> (0 a 9) e o <strong>sublinhado</strong> <code>_</code>.</li>
+  <li>O primeiro caractere é uma <strong>letra</strong> ou <code>_</code>. Nunca um algarismo.</li>
+  <li><strong>Sem espaços</strong>, sem hífen, sem pontuação (<code>-</code>, <code>.</code>, <code>!</code>, <code>@</code>…).</li>
+  <li>Não pode ser uma <strong>palavra reservada</strong> da linguagem (seção 2).</li>
+  <li>Não existe limite prático de tamanho: <code>quantidadeDeMacasNaPrateleira</code> é válido.</li>
+</ol>
+
+<p>Todos estes são válidos:</p>
+
+<pre class="file" data-file="validos.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 29;
+    int item2 = 7;
+    int _total = 100;
+    int nomeCompleto = 1;
+    int nome_completo = 2;
+    int NOTA_MAXIMA = 10;
+    std::cout &lt;&lt; idade &lt;&lt; " " &lt;&lt; item2 &lt;&lt; " " &lt;&lt; _total &lt;&lt; " "
+              &lt;&lt; nomeCompleto &lt;&lt; " " &lt;&lt; nome_completo &lt;&lt; " " &lt;&lt; NOTA_MAXIMA &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra validos.cpp -o validos
+$ ./validos
+29 7 100 1 2 10</pre>
+
+<p>Repare que <code>nomeCompleto</code> e <code>nome_completo</code> convivem no mesmo programa: para o C++, são nomes diferentes. (Fazer isso de propósito é péssima ideia; aqui é só para provar a regra.)</p>
+
+<h3>Começar com algarismo</h3>
+<pre class="file" data-file="a.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int 2lugar = 1;
+    std::cout &lt;&lt; 2lugar &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra a.cpp -o a
+a.cpp: In function ‘int main()’:
+a.cpp:4:9: error: expected unqualified-id before numeric constant
+    4 |     int 2lugar = 1;
+      |         ^~~~~~
+a.cpp:5:18: error: unable to find numeric literal operator ‘operator""lugar’
+    5 |     std::cout &lt;&lt; 2lugar &lt;&lt; "\n";
+      |                  ^~~~~~
+a.cpp:5:18: note: use ‘-fext-numeric-literals’ to enable more built-in suffixes</pre>
+
+<dl class="anatomy">
+  <dt>expected unqualified-id before numeric constant</dt><dd>"Esperava um identificador antes da constante numérica". Ao ver o <code>2</code>, o compilador entendeu "aqui começa um número", e não um nome.</dd>
+  <dt>unable to find numeric literal operator ‘operator""lugar’</dt><dd>Na linha 5, ele leu <code>2lugar</code> como o número <code>2</code> seguido de um "sufixo" chamado <code>lugar</code> (sufixos existem, como o <code>s</code> de <code>"oi"s</code>, visto em <a href="auto.html">auto</a>) e não achou esse sufixo.</dd>
+  <dt>note: use ‘-fext-numeric-literals’…</dt><dd>Uma dica que não se aplica ao seu caso. Notas do compilador às vezes chutam errado: o conserto real é mudar o nome.</dd>
+</dl>
+<p><strong>Conserto:</strong> <code>segundoLugar</code> ou <code>lugar2</code>.</p>
+
+<h3>Hífen e espaço</h3>
+<pre class="term" data-cwd="~/cpp">$ cat b.cpp
+#include &lt;iostream&gt;
+
+int main() {
+    int minha-variavel = 1;
+    std::cout &lt;&lt; minha-variavel &lt;&lt; "\n";
+}
+$ g++ -std=c++23 -Wall -Wextra b.cpp -o b
+b.cpp: In function ‘int main()’:
+b.cpp:4:14: error: expected initializer before ‘-’ token
+    4 |     int minha-variavel = 1;
+      |              ^
+b.cpp:5:18: error: ‘minha’ was not declared in this scope
+    5 |     std::cout &lt;&lt; minha-variavel &lt;&lt; "\n";
+      |                  ^~~~~
+b.cpp:5:24: error: ‘variavel’ was not declared in this scope
+    5 |     std::cout &lt;&lt; minha-variavel &lt;&lt; "\n";
+      |                        ^~~~~~~~</pre>
+
+<p>O hífen é o sinal de <strong>menos</strong>. O compilador leu <code>minha - variavel</code>: uma conta entre duas variáveis, <code>minha</code> e <code>variavel</code>, que não existem. Por isso os dois erros <code>was not declared</code> na linha 5. Na linha 4, ele esperava um valor inicial (<em>initializer</em>) e achou o <code>-</code>.</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra c.cpp -o c       « int minha variavel = 1;
+c.cpp: In function ‘int main()’:
+c.cpp:4:15: error: expected initializer before ‘variavel’
+    4 |     int minha variavel = 1;
+      |               ^~~~~~~~
+c.cpp:5:18: error: ‘minha’ was not declared in this scope
+    5 |     std::cout &lt;&lt; minha variavel &lt;&lt; "\n";
+      |                  ^~~~~</pre>
+
+<p>O espaço termina o nome. O compilador viu uma variável chamada <code>minha</code> e depois uma palavra solta, <code>variavel</code>, onde esperava <code>=</code> ou <code>;</code>.</p>
+<p><strong>Conserto:</strong> junte as palavras com sublinhado ou com maiúscula: <code>minha_variavel</code> ou <code>minhaVariavel</code>.</p>
+
+<div class="trycpp" data-goal="out:Primeiro: 95,out:Nota final: 87,semaviso">
+<p class="try-task"><strong>Missão:</strong> o boletim da Ana não compila: os dois nomes quebram as regras. Rode, leia os erros e troque os nomes (nas duas linhas em que cada um aparece) por nomes válidos, como <code>primeiroColocado</code> e <code>notaFinal</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int 1colocado = 95;
+    int nota-final = 87;
+    std::cout &lt;&lt; "Primeiro: " &lt;&lt; 1colocado &lt;&lt; "\n";
+    std::cout &lt;&lt; "Nota final: " &lt;&lt; nota-final &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int primeiroColocado = 95;
+    int notaFinal = 87;
+    std::cout &lt;&lt; "Primeiro: " &lt;&lt; primeiroColocado &lt;&lt; "\n";
+    std::cout &lt;&lt; "Nota final: " &lt;&lt; notaFinal &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<h3>Nomes com sublinhado no começo: permitidos, mas reservados</h3>
+<p>Dois padrões de nome são válidos para o compilador, mas a norma do C++ os <strong>reserva</strong> para o próprio compilador e para a biblioteca padrão:</p>
+<ul>
+  <li>começar com <code>_</code> seguido de letra <strong>maiúscula</strong>: <code>_Total</code>;</li>
+  <li>ter <strong>dois sublinhados</strong> seguidos em qualquer lugar: <code>__x</code>, <code>meu__nome</code>.</li>
+</ul>
+<p>O g++ compila esses nomes sem reclamar, mas um dia eles podem colidir com algo interno da biblioteca. O Clang tem um aviso específico, que não vem no <code>-Wall</code>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ clang++ -std=c++23 -Wall -Wextra -Wreserved-identifier res.cpp -o res
+res.cpp:2:9: warning: identifier '_Total' is reserved because it starts with '_' followed by a capital letter [-Wreserved-identifier]
+    2 |     int _Total = 1;
+      |         ^
+res.cpp:3:9: warning: identifier '__x' is reserved because it starts with '__' [-Wreserved-identifier]
+    3 |     int __x = 2;
+      |         ^
+2 warnings generated.</pre>
+
+<p>Regra prática: <strong>não comece nomes com sublinhado</strong>. Assim você nunca precisa lembrar quais casos são reservados.</p>
+
+<hr>
+
+<h2>2. Palavras reservadas</h2>
+<p>Algumas palavras já têm significado para o C++: <code>int</code>, <code>if</code>, <code>return</code>… Elas se chamam <strong>palavras-chave</strong> (<em>keywords</em>) ou palavras reservadas, e nenhuma delas pode ser nome de variável:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat h.cpp
+int main() {
+    int return = 1;
+}
+$ g++ -std=c++23 -Wall -Wextra h.cpp -o h
+h.cpp: In function ‘int main()’:
+h.cpp:2:9: error: expected unqualified-id before ‘return’
+    2 |     int return = 1;
+      |         ^~~~~~
+$ g++ -std=c++23 -Wall -Wextra e.cpp -o e       « int new = 1;
+e.cpp: In function ‘int main()’:
+e.cpp:2:9: error: expected unqualified-id before ‘new’
+    2 |     int new = 1;
+      |         ^~~
+$ g++ -std=c++23 -Wall -Wextra d.cpp -o d       « int class = 1;
+d.cpp: In function ‘int main()’:
+d.cpp:2:5: error: expected primary-expression before ‘int’
+    2 |     int class = 1;
+      |     ^~~</pre>
+
+<p><em>Expected unqualified-id</em> = "esperava um identificador (um nome)". O compilador achou uma palavra-chave onde deveria vir um nome. O erro do <code>class</code> é mais confuso (aponta para o <code>int</code>), porque <code>int class</code> parece o começo de outra construção. Quando uma mensagem não faz sentido numa linha simples, desconfie de uma palavra reservada.</p>
+
+<p>O C++23 tem <strong>92 palavras-chave</strong>. No laboratório, cada uma delas foi testada como nome de variável (<code>int PALAVRA = 1;</code>), e o g++ 15 recusou as 92. Você não precisa decorá-las: a maioria você vai aprender aula a aula, e os editores costumam pintá-las de outra cor.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Assunto</th><th>Palavras-chave</th><th>Onde aparecem</th></tr>
+<tr><td>Tipos</td><td><code>bool char char8_t char16_t char32_t wchar_t short int long signed unsigned float double void auto</code></td><td><a href="tipos-dados.html">Tipos de Dados</a>, <a href="auto.html">auto</a></td></tr>
+<tr><td>Valores</td><td><code>true false nullptr this</code></td><td><a href="bool.html">bool</a>, <a href="nullptr.html">nullptr</a>, <a href="this.html">this</a></td></tr>
+<tr><td>Decisões</td><td><code>if else switch case default</code></td><td><a href="if-else.html">if e else</a>, <a href="switch.html">switch</a></td></tr>
+<tr><td>Repetições e saltos</td><td><code>for while do break continue return goto</code></td><td><a href="for.html">for</a>, <a href="while.html">while</a>, <a href="break-continue.html">break e continue</a></td></tr>
+<tr><td>Constantes e armazenamento</td><td><code>const constexpr consteval constinit static extern mutable volatile register thread_local inline</code></td><td><a href="constantes.html">Constantes</a>, <a href="constexpr.html">constexpr e consteval</a></td></tr>
+<tr><td>Tipos próprios e classes</td><td><code>struct class union enum public private protected friend virtual explicit operator typedef using namespace</code></td><td><a href="structs.html">Structs</a>, <a href="classes-objetos.html">Classes</a></td></tr>
+<tr><td>Memória</td><td><code>new delete sizeof alignof alignas</code></td><td><a href="new-delete.html">new e delete</a></td></tr>
+<tr><td>Conversões e tipos</td><td><code>static_cast dynamic_cast const_cast reinterpret_cast typeid decltype</code></td><td><a href="conversao-tipos.html">Conversão de Tipos</a></td></tr>
+<tr><td>Erros</td><td><code>try catch throw noexcept static_assert</code></td><td><a href="excecoes.html">Exceções</a></td></tr>
+<tr><td>Templates</td><td><code>template typename concept requires</code></td><td><a href="templates-funcao.html">Templates</a>, <a href="concepts.html">Concepts</a></td></tr>
+<tr><td>Corrotinas, módulos, outros</td><td><code>co_await co_return co_yield export asm</code></td><td>(avançado; <a href="modulos.html">Módulos</a>)</td></tr>
+<tr><td>Operadores escritos por extenso</td><td><code>and or not xor and_eq or_eq xor_eq not_eq bitand bitor compl</code></td><td><a href="operadores-logicos.html">Operadores Lógicos</a></td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong><code>cout</code>, <code>string</code> e <code>main</code> não são palavras-chave</strong>
+<p><code>cout</code> e <code>string</code> são nomes que <strong>a biblioteca padrão</strong> criou dentro do <code>std</code>. <code>main</code> é só o nome que o sistema procura para começar. Por isso o programa abaixo compila, e as variáveis <code>cout</code> e <code>string</code> convivem com <code>std::cout</code> e <code>std::string</code>:</p>
+<pre class="term" data-cwd="~/cpp">$ cat cout.cpp
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    int cout = 5;
+    std::string string = "texto";
+    std::cout &lt;&lt; cout &lt;&lt; " " &lt;&lt; string &lt;&lt; "\n";
+}
+$ g++ -std=c++23 -Wall -Wextra cout.cpp -o cout
+$ ./cout
+5 texto</pre>
+<p>Funciona, mas confunde qualquer leitor. O mesmo vale para <code>final</code> e <code>override</code>, que só são especiais em certos lugares (aula <a href="polimorfismo.html">Polimorfismo</a>): <code>int final = 1;</code> compila. Evite todos eles como nomes.</p>
+</div>
+
+<hr>
+
+<h2>3. Maiúsculas e minúsculas fazem diferença</h2>
+<p>Para o C++, <code>nota</code>, <code>Nota</code> e <code>NOTA</code> são <strong>três nomes diferentes</strong>. Isso se diz assim: o C++ é <strong>case-sensitive</strong> ("sensível à caixa", isto é, a letras maiúsculas e minúsculas). Uma letra trocada já basta para o compilador não achar a variável:</p>
+
+<pre class="file" data-file="g.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int nota = 8;
+    std::cout &lt;&lt; Nota &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra g.cpp -o g
+g.cpp: In function ‘int main()’:
+g.cpp:5:18: error: ‘Nota’ was not declared in this scope; did you mean ‘nota’?
+    5 |     std::cout &lt;&lt; Nota &lt;&lt; "\n";
+      |                  ^~~~
+      |                  nota
+g.cpp:4:9: warning: unused variable ‘nota’ [-Wunused-variable]
+    4 |     int nota = 8;
+      |         ^~~~</pre>
+
+<dl class="anatomy">
+  <dt>‘Nota’ was not declared in this scope</dt><dd>"<code>Nota</code> não foi declarada": com N maiúsculo, ela não existe.</dd>
+  <dt>did you mean ‘nota’?</dt><dd>"Você quis dizer <code>nota</code>?" O g++ procura um nome parecido e sugere. A linha de baixo, com <code>nota</code> embaixo do <code>^~~~</code>, mostra como ficaria a correção.</dd>
+  <dt>warning: unused variable ‘nota’</dt><dd>Consequência do mesmo engano: como o programa nunca usou <code>nota</code> (com n minúsculo), o compilador avisa que ela foi criada à toa.</dd>
+</dl>
+
+<p>As palavras-chave também são sensíveis: <code>Int</code> ou <code>RETURN</code> não são palavras do C++. Tudo o que é da linguagem e da biblioteca padrão é escrito em minúsculas.</p>
+
+<hr>
+
+<h2>4. Convenções: como escrever nomes de várias palavras</h2>
+<p>Como não pode haver espaço, os programadores juntam as palavras de um destes jeitos:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Estilo</th><th>Exemplo</th><th>Como é</th><th>Quem usa</th></tr>
+<tr><td><strong>camelCase</strong> ("caixa de camelo")</td><td><code>precoTotal</code></td><td>Primeira palavra minúscula; as outras começam com maiúscula, como as corcovas de um camelo.</td><td>Muitos projetos C++ (e Java, JavaScript). <strong>É o estilo deste guia</strong> para variáveis.</td></tr>
+<tr><td><strong>snake_case</strong> ("caixa de cobra")</td><td><code>preco_total</code></td><td>Tudo minúsculo, palavras ligadas por <code>_</code>, como uma cobra rastejando.</td><td>A <strong>biblioteca padrão</strong> do C++ (<code>std::to_string</code>, <code>push_back</code>, <code>numeric_limits</code>) e muitos projetos.</td></tr>
+<tr><td><strong>PascalCase</strong></td><td><code>ContaBancaria</code></td><td>Todas as palavras com maiúscula.</td><td>Costuma ser reservado para <strong>tipos</strong> que você cria (<a href="structs.html">structs</a> e <a href="classes-objetos.html">classes</a>).</td></tr>
+<tr><td><strong>MAIÚSCULAS_COM_SUBLINHADO</strong></td><td><code>NOTA_MAXIMA</code></td><td>Tudo maiúsculo.</td><td>Tradicionalmente, macros do <code>#define</code> (aula <a href="constantes.html">Constantes</a>). Alguns projetos usam também para constantes.</td></tr>
+</table>
+</div>
+
+<p>Nenhum é "o certo". O importante é escolher <strong>um</strong> por projeto e seguir sempre. Se você entra num projeto que já existe, use o estilo que ele já usa.</p>
+
+<hr>
+
+<h2>5. Nomes bons e nomes ruins</h2>
+<p>Um nome bom responde à pergunta "o que tem nesta caixa?" sem que o leitor precise caçar o resto do código. Compare duas versões do mesmo programa:</p>
+
+<pre class="file" data-file="ruim.cpp">int a = 3;
+double b = 2.5;
+double c = a * b;
+</pre>
+
+<pre class="file" data-file="bom.cpp">int quantidade = 3;
+double precoUnitario = 2.5;
+double total = quantidade * precoUnitario;
+</pre>
+
+<p>As duas fazem exatamente a mesma conta e geram o mesmo programa. Mas só a segunda dá para entender sem explicação.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ruim</th><th>Por quê</th><th>Melhor</th></tr>
+<tr><td><code>x</code>, <code>a</code>, <code>n2</code></td><td>Não diz nada.</td><td><code>idade</code>, <code>alunos</code></td></tr>
+<tr><td><code>qtdPrdEst</code></td><td>Abreviação que só o autor entende.</td><td><code>quantidadeEmEstoque</code></td></tr>
+<tr><td><code>dados</code>, <code>valor</code>, <code>coisa</code></td><td>Genérico demais: todo valor é um "dado".</td><td><code>notaDaProva</code>, <code>saldo</code></td></tr>
+<tr><td><code>numeroDeAlunosMatriculadosNaTurmaDoTerceiroAno</code></td><td>Longo demais para ler e digitar.</td><td><code>alunosTerceiroAno</code></td></tr>
+<tr><td><code>l</code>, <code>O</code>, <code>I</code></td><td>Confundem-se com <code>1</code> e <code>0</code> em muitas fontes.</td><td><code>linha</code>, <code>total</code></td></tr>
+<tr><td><code>temp2</code>, <code>teste</code></td><td>Sobras de testes que ficam para sempre.</td><td>Um nome que diga o papel da variável.</td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>Exceções aceitas</strong>
+<p>Nomes de uma letra são normais em lugares curtos e tradicionais: <code>i</code>, <code>j</code> como contador de um <a href="for.html">for</a>, <code>x</code> e <code>y</code> para coordenadas. Fora disso, escreva por extenso.</p>
+</div>
+
+<hr>
+
+<h2>6. Acentos nos nomes: o g++ 15 aceita <code>int ação</code>?</h2>
+<p><strong>Aceita.</strong> Desde o C++11, a norma permite letras de outros alfabetos em nomes, e o C++23 definiu exatamente quais (as letras do padrão Unicode, um catálogo de todos os caracteres do mundo; a aula <a href="acentos-utf8.html">Acentos e UTF-8</a> explica). O g++ 15 e o Clang 21 aceitam:</p>
+
+<pre class="file" data-file="acento.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int ação = 3;
+    double preço = 4.5;
+    double π = 3.14159;
+    std::cout &lt;&lt; ação &lt;&lt; " " &lt;&lt; preço &lt;&lt; " " &lt;&lt; π &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra acento.cpp -o acento
+$ ./acento
+3 4.5 3.14159
+$ g++ -std=c++23 -Wall -Wextra -pedantic acento.cpp -o acento    « nem o modo rigoroso reclama
+$ clang++ -std=c++23 -Wall -Wextra acento.cpp -o acento-clang
+$ ./acento-clang
+3 4.5 3.14159</pre>
+
+<p>E um emoji? A norma diz que não (emoji não é letra). O Clang segue a norma; o g++ só recusa no modo rigoroso:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat emoji.cpp
+#include &lt;iostream&gt;
+
+int main() {
+    int 😀 = 1;
+    std::cout &lt;&lt; 😀 &lt;&lt; "\n";
+}
+$ g++ -std=c++23 -Wall -Wextra emoji.cpp -o emoji
+$ ./emoji
+1                        « o g++ deixou passar, como extensão própria
+$ g++ -std=c++23 -Wall -Wextra -pedantic emoji.cpp -o emoji
+emoji.cpp:4:9: error: extended character 😀 is not valid in an identifier
+    4 |     int 😀 = 1;
+      |         ^
+emoji.cpp:5:18: error: extended character 😀 is not valid in an identifier
+    5 |     std::cout &lt;&lt; 😀 &lt;&lt; "\n";
+      |                  ^
+$ clang++ -std=c++23 -Wall -Wextra emoji.cpp -o emoji
+emoji.cpp:4:9: error: unexpected character &lt;U+1F600&gt;
+    4 |     int 😀 = 1;
+      |         ^~
+emoji.cpp:4:14: error: expected unqualified-id
+    4 |     int 😀 = 1;
+      |            ^
+emoji.cpp:5:18: error: unexpected character &lt;U+1F600&gt;
+    5 |     std::cout &lt;&lt; 😀 &lt;&lt; "\n";
+      |                  ^~
+emoji.cpp:5:23: error: expected expression
+    5 |     std::cout &lt;&lt; 😀 &lt;&lt; "\n";
+      |                     ^
+4 errors generated.</pre>
+
+<h3>Por que, mesmo assim, evitar acentos</h3>
+<p>Uma letra acentuada pode ser guardada no arquivo de <strong>dois jeitos</strong>: o <code>ç</code> "pronto" (um caractere só) ou um <code>c</code> seguido de um "cedilha solto" que se encaixa nele. Na tela, os dois são idênticos. Para o compilador, são nomes diferentes. Veja o que acontece quando a declaração foi digitada de um jeito e o uso, de outro (isso acontece ao copiar e colar de páginas web, PDFs ou do macOS):</p>
+
+<pre class="file" data-file="normal.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double preço = 4.5;
+    std::cout &lt;&lt; preço &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra normal.cpp -o normal
+normal.cpp:4:12: warning: ‘prec\U00000327o’ is not in NFC [-Wnormalized=]
+    4 |     double prec&lt;U+0327&gt;o = 4.5;
+      |            ^~~~~~~~~~~~~
+normal.cpp: In function ‘int main()’:
+normal.cpp:5:18: error: ‘preço’ was not declared in this scope; did you mean ‘preço’?
+    5 |     std::cout &lt;&lt; preço &lt;&lt; "\n";
+      |                  ^~~~~
+      |                  preço
+normal.cpp:4:12: warning: unused variable ‘preço’ [-Wunused-variable]
+    4 |     double preço = 4.5;
+      |            ^~~~~</pre>
+
+<ul>
+  <li><em>is not in NFC</em>: o g++ avisa que o nome não está na forma "pronta" (NFC, a forma normal composta, a que a norma exige). Repare como ele mostra o cedilha solto: <code>prec&lt;U+0327&gt;o</code>.</li>
+  <li><em>‘preço’ was not declared in this scope; did you mean ‘preço’?</em>: "<code>preço</code> não foi declarada; você quis dizer <code>preço</code>?". Os dois nomes parecem iguais, e mesmo assim são diferentes. É um erro dificílimo de achar a olho nu.</li>
+</ul>
+
+<p>Somando isso a outros motivos práticos (nem todo teclado digita <code>ç</code> com facilidade, programadores de outros países vão ler o código, algumas ferramentas antigas não lidam bem com acentos), a recomendação do guia é: <strong>nomes sem acento</strong>. Escreva <code>preco</code>, <code>acao</code>, <code>endereco</code>. Acentos ficam <strong>dentro dos textos</strong> entre aspas, como <code>"Preço: "</code>, onde são bem-vindos.</p>
+
+<div class="note">
+<strong>E o cifrão?</strong>
+<p>O g++ e o Clang aceitam <code>$</code> em nomes (<code>int $preco = 5;</code>) como extensão, mas a norma não. O Clang avisa com <code>-pedantic</code> (<code>'$' in identifier [-Wdollar-in-identifier-extension]</code>). Em C++, não use: <code>$</code> é coisa de PHP e de shell.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: expected unqualified-id before numeric constant</code></strong>
+<p><strong>O que significa:</strong> o nome começa com algarismo (<code>2lugar</code>).</p>
+<p><strong>Como consertar:</strong> comece com letra: <code>segundoLugar</code>, <code>lugar2</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: expected unqualified-id before ‘return’</code> (ou <code>‘new’</code>, <code>‘int’</code>…)</strong>
+<p><strong>O que significa:</strong> você usou uma palavra reservada como nome.</p>
+<p><strong>Como consertar:</strong> escolha outro nome, de preferência mais descritivo: <code>valorDeRetorno</code>, <code>novoItem</code>, <code>tipoDeConta</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: expected initializer before ‘-’ token</code> / <code>before ‘palavra’</code></strong>
+<p><strong>O que significa:</strong> o nome tem hífen ou espaço no meio, e o compilador entendeu duas coisas separadas.</p>
+<p><strong>Como consertar:</strong> <code>minhaVariavel</code> ou <code>minha_variavel</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: ‘Nota’ was not declared in this scope; did you mean ‘nota’?</code></strong>
+<p><strong>O que significa:</strong> o nome existe, mas escrito com outras maiúsculas e minúsculas (ou com uma letra trocada).</p>
+<p><strong>Como consertar:</strong> aceite a sugestão do compilador ou copie o nome exatamente como na declaração. Se a sugestão parecer idêntica ao que você escreveu, desconfie de acentos (seção 6).</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Nome</th><th>Vale?</th><th>Por quê</th></tr>
+<tr><td><code>idade</code>, <code>item2</code></td><td>Sim</td><td>Letras e algarismos, começando com letra.</td></tr>
+<tr><td><code>precoTotal</code>, <code>preco_total</code></td><td>Sim</td><td>camelCase e snake_case.</td></tr>
+<tr><td><code>_total</code></td><td>Sim, mas evite</td><td>Começar com <code>_</code> fica perto demais dos nomes reservados.</td></tr>
+<tr><td><code>_Total</code>, <code>__x</code></td><td>Compila, mas é reservado</td><td><code>_</code> + maiúscula e <code>__</code> pertencem ao compilador e à biblioteca.</td></tr>
+<tr><td><code>preço</code>, <code>ação</code></td><td>Sim (g++ 15 e Clang 21), mas evite</td><td>Risco de dois "ç" invisivelmente diferentes; teclados; leitores de outros países.</td></tr>
+<tr><td><code>2lugar</code></td><td>Não</td><td>Começa com algarismo.</td></tr>
+<tr><td><code>minha-variavel</code>, <code>minha variavel</code></td><td>Não</td><td>Hífen é "menos"; espaço separa palavras.</td></tr>
+<tr><td><code>int</code>, <code>return</code>, <code>class</code>, <code>new</code></td><td>Não</td><td>Palavras reservadas.</td></tr>
+<tr><td><code>cout</code>, <code>string</code>, <code>final</code></td><td>Compila, mas evite</td><td>Não são palavras-chave, mas confundem o leitor.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. camelCase</h3>
+<p>Escreva em camelCase o nome para "nota da prova":</p>
+<div class="ex-code">double <input data-answer="notaDaProva|notaProva" aria-label="nome"> = 9.5;</div>
+</div>
+
+<div class="exercise">
+<h3>2. snake_case</h3>
+<p>Escreva em snake_case o nome para "total de vendas":</p>
+<div class="ex-code">int <input data-answer="total_de_vendas|total_vendas" aria-label="nome"> = 0;</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Qual destes nomes é válido <strong>e</strong> segue as recomendações do guia?</p>
+<label><input type="radio" name="q3"> <code>3notas</code></label>
+<label><input type="radio" name="q3"> <code>media-final</code></label>
+<label><input type="radio" name="q3"> <code>mediaFinal</code></label>
+<label><input type="radio" name="q3"> <code>médiaFinal</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O programa declara <code>int Total = 10;</code> e depois usa <code>total</code>. O que acontece?</p>
+<label><input type="radio" name="q4"> Funciona: o C++ não diferencia maiúsculas</label>
+<label><input type="radio" name="q4"> Erro: <code>‘total’ was not declared in this scope; did you mean ‘Total’?</code></label>
+<label><input type="radio" name="q4"> Só um aviso</label>
+<label><input type="radio" name="q4"> Erro: <code>redeclaration of ‘int Total’</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Qual destas palavras <strong>não</strong> é uma palavra-chave do C++?</p>
+<label><input type="radio" name="q5"> <code>return</code></label>
+<label><input type="radio" name="q5"> <code>class</code></label>
+<label><input type="radio" name="q5"> <code>double</code></label>
+<label><input type="radio" name="q5"> <code>cout</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. O g++ 15 compila <code>int ação = 3;</code>?</p>
+<label><input type="radio" name="q6"> Sim, mas o guia recomenda nomes sem acento</label>
+<label><input type="radio" name="q6"> Não: só letras sem acento são permitidas</label>
+<label><input type="radio" name="q6"> Só com <code>-pedantic</code></label>
+<label><input type="radio" name="q6"> Só no Clang</label>
+</div>
+
+<h3>Missão final: rebatize as variáveis</h3>
+
+<div class="trycpp" data-goal="out:Total: 7.5,src:\bquantidade\b,src:\bpreco\b,src:\btotal\b,semaviso">
+<p class="try-task"><strong>Missão:</strong> o programa funciona, mas ninguém entende o que <code>a</code>, <code>b</code> e <code>c</code> guardam. Troque os nomes por <code>quantidade</code>, <code>preco</code> e <code>total</code> (em todos os lugares em que aparecem) e rode. A saída tem que continuar <code>Total: 7.5</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int a = 3;
+    double b = 2.5;
+    double c = a * b;
+    std::cout &lt;&lt; "Total: " &lt;&lt; c &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int quantidade = 3;
+    double preco = 2.5;
+    double total = quantidade * preco;
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Nome (identificador) = letras, algarismos e <code>_</code>, começando com letra. Sem espaço, hífen ou pontuação.</li>
+  <li>As 92 palavras-chave do C++23 (<code>int</code>, <code>return</code>, <code>class</code>…) não podem ser nomes. <code>cout</code> e <code>string</code> podem, mas não devem.</li>
+  <li>Não comece nomes com <code>_</code>: <code>_Maiuscula</code> e <code>__</code> são reservados.</li>
+  <li><code>nota</code>, <code>Nota</code> e <code>NOTA</code> são nomes diferentes. O g++ ajuda com <code>did you mean</code>.</li>
+  <li>Convenções: <code>camelCase</code> (este guia) ou <code>snake_case</code> (a biblioteca padrão); um estilo por projeto.</li>
+  <li>Bons nomes dizem o que a caixa guarda: <code>quantidade</code>, e não <code>a</code>.</li>
+  <li>O g++ 15 aceita <code>int ação</code>, mas evite acentos em nomes: dois "ç" podem parecer iguais e ser diferentes.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
