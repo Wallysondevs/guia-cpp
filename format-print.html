@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ std::format e std::print — formatar com {} | Guia C++</title>
+<meta name="description" content="std::format (C++20) e std::print/std::println (C++23) para quem nunca programou: o {}, casas decimais com {:.2f}, largura e alinhamento, zeros à esquerda, hexadecimal, argumentos numerados, formato brasileiro com {:L}, erros de formato na compilação e o -std=c++23 obrigatório no g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">std::format e std::print</span></h1>
+
+<p class="intro">Na aula anterior, você montou a tabela de notas da Ana com <code>std::cout</code>, <code>std::setw</code>, <code>std::left</code>, <code>std::fixed</code>… e muitos <code>&lt;&lt;</code>. Funciona, mas é comprido e as configurações "grudam". O C++ moderno trouxe um jeito mais curto, inspirado em Python: você escreve o texto com <strong>buracos</strong> marcados por <code>{}</code>, e o C++ preenche cada buraco com um valor. Isso é o <code>std::format</code> <span class="versao">C++20</span>. E o <code>std::println</code> <span class="versao">C++23</span> faz o mesmo e já mostra na tela, pulando a linha.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como o <code>{}</code> funciona e a diferença entre <code>std::format</code>, <code>std::print</code> e <code>std::println</code>.</li>
+  <li>Casas decimais (<code>{:.2f}</code>), largura e alinhamento (<code>{:&gt;10}</code>), zeros à esquerda (<code>{:05}</code>), hexadecimal (<code>{:x}</code>).</li>
+  <li>Argumentos numerados (<code>{0}</code>, <code>{1}</code>) e como escrever uma chave de verdade (<code>{{</code>).</li>
+  <li>A mesma tabela de notas com <code>cout</code> + <code>iomanip</code> e com <code>println</code>, lado a lado.</li>
+  <li>Como mostrar <code>1.234,50</code> no formato brasileiro, com <code>{:L}</code> e o <em>locale</em>.</li>
+  <li>Por que um erro no texto de formato aparece já na <strong>compilação</strong>, e qual <code>-std=</code> cada recurso exige.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Aqui o <code>-std=c++23</code> é <strong>obrigatório</strong> (seção 6).</p>
+
+<hr>
+
+<h2>A ideia: o formulário com lacunas</h2>
+<p>Pense num formulário impresso: "Eu, ______, com ______ anos, declaro…". Você não reescreve o formulário inteiro para cada pessoa: só preenche as lacunas. No <code>std::format</code>, o texto com lacunas se chama <strong>string de formato</strong>, e cada lacuna é um par de chaves <code>{}</code>:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Jeito</th><th>Código</th></tr>
+<tr><td><code>cout</code></td><td><code>std::cout &lt;&lt; nome &lt;&lt; " tem " &lt;&lt; idade &lt;&lt; " anos.\n";</code></td></tr>
+<tr><td><code>format</code></td><td><code>std::cout &lt;&lt; std::format("{} tem {} anos.\n", nome, idade);</code></td></tr>
+<tr><td><code>println</code></td><td><code>std::println("{} tem {} anos.", nome, idade);</code></td></tr>
+</table>
+</div>
+
+<p>As três linhas mostram a mesma coisa. Com as lacunas, você enxerga a frase inteira de uma vez, sem picotá-la em pedaços.</p>
+
+<hr>
+
+<h2>1. <code>std::format</code>: o <code>{}</code></h2>
+
+<pre class="file" data-file="ola.cpp">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana";
+    int idade = 29;
+    std::string frase = std::format("{} tem {} anos.", nome, idade);
+    std::cout &lt;&lt; frase &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/fmt">$ g++ -std=c++23 -Wall -Wextra ola.cpp -o ola
+$ ./ola
+Ana tem 29 anos.</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;format&gt;</dt><dd>Traz o <code>std::format</code> (C++20).</dd>
+  <dt>"{} tem {} anos."</dt><dd>A string de formato. Cada <code>{}</code> é uma lacuna. Tudo o mais é copiado como está.</dd>
+  <dt>nome, idade</dt><dd>Os <strong>argumentos</strong>, os valores que preenchem as lacunas, <strong>na ordem</strong>: o primeiro <code>{}</code> recebe <code>nome</code>, o segundo recebe <code>idade</code>.</dd>
+  <dt>std::string frase = …</dt><dd>O <code>std::format</code> <strong>não mostra nada</strong>: ele devolve um texto (<code>std::string</code>, aula <a href="strings.html">Strings</a>) pronto. Você pode guardá-lo, juntá-lo com outros, gravá-lo num arquivo, ou mostrá-lo com <code>cout</code>.</dd>
+</dl>
+
+<p>Qualquer tipo básico entra numa lacuna: textos, inteiros, <code>double</code>, <code>char</code>, e até <code>bool</code>, que sai como <code>true</code>/<code>false</code> (sem precisar de <code>boolalpha</code>).</p>
+
+<hr>
+
+<h2>2. <code>std::print</code> e <code>std::println</code>: formatar e mostrar <span class="versao">C++23</span></h2>
+<p>Como quase sempre o objetivo é mostrar o texto na tela, o C++23 juntou as duas coisas:</p>
+
+<pre class="file" data-file="println.cpp">#include &lt;print&gt;
+
+int main() {
+    std::print("Olá, ");
+    std::print("{}!\n", "Ana");
+    std::println("Total: R$ {:.2f}", 4.5 * 3);
+    std::println("{:&lt;8}{:&gt;6.1f}", "Bruno", 7.0);
+}
+</pre>
+
+<pre class="term" data-cwd="~/fmt">$ g++ -std=c++23 -Wall -Wextra println.cpp -o println
+$ ./println
+Olá, Ana!                « dois print na mesma linha: o print não pula linha
+Total: R$ 13.50
+Bruno      7.0</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;print&gt;</dt><dd>Traz <code>std::print</code> e <code>std::println</code>. Repare que nem precisou de <code>&lt;iostream&gt;</code>.</dd>
+  <dt>std::print(...)</dt><dd>Formata e mostra. <strong>Não</strong> pula linha: você põe o <code>\n</code> se quiser.</dd>
+  <dt>std::println(...)</dt><dd><em>print line</em>, "mostre a linha": formata, mostra e pula linha no final.</dd>
+</dl>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Cabeçalho</th><th>Mostra na tela?</th><th>Pula linha?</th><th>Versão</th></tr>
+<tr><td><code>std::format</code></td><td><code>&lt;format&gt;</code></td><td>Não, devolve um <code>std::string</code></td><td>Só com <code>\n</code></td><td>C++20</td></tr>
+<tr><td><code>std::print</code></td><td><code>&lt;print&gt;</code></td><td>Sim</td><td>Só com <code>\n</code></td><td>C++23</td></tr>
+<tr><td><code>std::println</code></td><td><code>&lt;print&gt;</code></td><td>Sim</td><td>Sim, sozinho</td><td>C++23</td></tr>
+</table>
+</div>
+
+<div class="trycpp" data-goal="out:Ana tem 29 anos e 1.65 m de altura.,src:println">
+<p class="try-task"><strong>Missão:</strong> complete o <code>println</code> para mostrar <code>Ana tem 29 anos e 1.65 m de altura.</code>, usando as três variáveis. A altura deve sair com duas casas (veja a seção 3, ou use a dica: <code>{:.2f}</code>).</p>
+<pre class="script">#include &lt;print&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana";
+    int idade = 29;
+    double altura = 1.6489;
+    std::println("...");
+}
+</pre>
+<pre class="solucao">#include &lt;print&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana";
+    int idade = 29;
+    double altura = 1.6489;
+    std::println("{} tem {} anos e {:.2f} m de altura.", nome, idade, altura);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Dentro das chaves: as especificações</h2>
+<p>Uma lacuna pode levar instruções de <strong>como</strong> mostrar o valor. Elas vêm depois de dois-pontos: <code>{:especificação}</code>. É o mesmo trabalho dos manipuladores da <a href="iomanip.html">aula anterior</a>, numa linguagem curtinha:</p>
+
+<pre class="file" data-file="basico.cpp">#include &lt;format&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; std::format("Preço: R$ {:.2f}", 19.9) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::format("[{:&gt;10}]", "Ana") &lt;&lt; "\n";
+    std::cout &lt;&lt; std::format("[{:&lt;10}]", "Ana") &lt;&lt; "\n";
+    std::cout &lt;&lt; std::format("[{:^10}]", "Ana") &lt;&lt; "\n";
+    std::cout &lt;&lt; std::format("[{:*^10}]", "Ana") &lt;&lt; "\n";
+    std::cout &lt;&lt; std::format("[{:05}]", 42) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::format("{:x} {:X} {:#x} {:b}", 255, 255, 255, 5) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/fmt">$ ./basico
+Preço: R$ 19.90          « {:.2f}: duas casas
+[       Ana]             « {:&gt;10}: largura 10, à direita
+[Ana       ]             « {:&lt;10}: à esquerda
+[   Ana    ]             « {:^10}: centralizado
+[***Ana****]             « {:*^10}: centralizado, preenchendo com *
+[00042]                  « {:05}: largura 5 com zeros
+ff FF 0xff 101           « hexadecimal, maiúsculo, com 0x, e binário</pre>
+
+<p>A especificação segue sempre a mesma ordem. Você só escreve as partes de que precisa:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parte</th><th>Exemplo</th><th>O que faz</th></tr>
+<tr><td>preenchimento + alinhamento</td><td><code>*^</code>, <code>&lt;</code>, <code>&gt;</code>, <code>^</code></td><td><code>&lt;</code> esquerda, <code>&gt;</code> direita, <code>^</code> centro. Um caractere antes do sinal é o preenchimento (padrão: espaço).</td></tr>
+<tr><td>sinal</td><td><code>+</code></td><td>Mostra <code>+</code> também nos positivos: <code>{:+}</code> com 5 → <code>+5</code>.</td></tr>
+<tr><td><code>#</code></td><td><code>#x</code></td><td>Mostra o prefixo da base (<code>0x</code>, <code>0b</code>).</td></tr>
+<tr><td><code>0</code> + largura</td><td><code>05</code></td><td>Completa com zeros à esquerda (só para números).</td></tr>
+<tr><td>largura</td><td><code>10</code></td><td>Largura mínima do campo.</td></tr>
+<tr><td><code>.</code> precisão</td><td><code>.2</code></td><td>Com <code>f</code>: casas decimais. Num texto: corta no tamanho.</td></tr>
+<tr><td>tipo</td><td><code>f</code>, <code>e</code>, <code>x</code>, <code>X</code>, <code>b</code>, <code>o</code>, <code>d</code></td><td><code>f</code> ponto fixo, <code>e</code> notação científica, <code>x</code> hexadecimal, <code>b</code> binário, <code>o</code> octal, <code>d</code> decimal.</td></tr>
+</table>
+</div>
+
+<p>Exemplo completo: <code>{:*&gt;10.2f}</code> = "preencha com <code>*</code>, alinhe à direita, largura 10, duas casas, ponto fixo". Sem alinhamento, os textos vão à <strong>esquerda</strong> e os números à <strong>direita</strong>: <code>{:10}</code> com <code>"Ana"</code> dá <code>[Ana       ]</code>, e com <code>42</code> dá <code>[        42]</code>.</p>
+
+<div class="tip">
+<strong>Nada gruda</strong>
+<p>Cada lacuna tem a sua especificação, que vale só para ela. Não existe o problema da aula de iomanip, em que um <code>std::fixed</code> esquecido muda o resto do programa.</p>
+</div>
+
+<hr>
+
+<h2>4. Argumentos numerados e chaves de verdade</h2>
+<p>Dentro das chaves, antes dos dois-pontos, você pode dizer <strong>qual</strong> argumento usar, começando do zero. Assim dá para repetir um valor ou trocar a ordem:</p>
+
+<pre class="file" data-file="numerados.cpp">#include &lt;format&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; std::format("{0} e {1}; {1} e {0}", "Ana", "Bruno") &lt;&lt; "\n";
+    std::cout &lt;&lt; std::format("{{chaves}} {}", 1) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/fmt">$ ./numerados
+Ana e Bruno; Bruno e Ana
+{chaves} 1               « {{ vira {, e }} vira }</pre>
+
+<dl class="anatomy">
+  <dt>{0}, {1}</dt><dd>O argumento número 0 (<code>"Ana"</code>) e o número 1 (<code>"Bruno"</code>). Com número e especificação: <code>{1:&gt;8}</code>.</dd>
+  <dt>{{ e }}</dt><dd>Para escrever uma chave de verdade no texto, dobre-a.</dd>
+</dl>
+<p>Não dá para misturar os dois estilos na mesma string: ou todas as lacunas têm número, ou nenhuma tem.</p>
+
+<hr>
+
+<h2>5. Comparação: a mesma tabela com <code>cout</code> e com <code>println</code></h2>
+<p>Esta é a tabela de notas da <a href="iomanip.html">aula de iomanip</a>, feita dos dois jeitos. As saídas são idênticas:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th><code>cout</code> + <code>&lt;iomanip&gt;</code></th><th><code>std::println</code></th></tr>
+<tr><td><pre>std::cout &lt;&lt; std::left &lt;&lt; std::setw(10) &lt;&lt; "Aluno"
+          &lt;&lt; std::right &lt;&lt; std::setw(8) &lt;&lt; "Nota" &lt;&lt; "\n";
+std::cout &lt;&lt; std::setfill('-') &lt;&lt; std::setw(18) &lt;&lt; ""
+          &lt;&lt; std::setfill(' ') &lt;&lt; "\n";
+std::cout &lt;&lt; std::fixed &lt;&lt; std::setprecision(1);
+std::cout &lt;&lt; std::left &lt;&lt; std::setw(10) &lt;&lt; "Ana"
+          &lt;&lt; std::right &lt;&lt; std::setw(8) &lt;&lt; 9.5 &lt;&lt; "\n";</pre></td>
+<td><pre>std::println("{:&lt;10}{:&gt;8}", "Aluno", "Nota");
+std::println("{:-&lt;18}", "");
+std::println("{:&lt;10}{:&gt;8.1f}", "Ana", 9.5);
+std::println("{:&lt;10}{:&gt;8.1f}", "Bruno", 7.25);
+std::println("{:&lt;10}{:&gt;8.1f}", "Carla", 10.0);</pre></td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/fmt">$ g++ -std=c++23 -Wall -Wextra tabela.cpp -o tabela
+$ ./tabela
+Aluno         Nota
+------------------
+Ana            9.5
+Bruno          7.2       « como no cout: empate exato vai para o par
+Carla         10.0</pre>
+
+<p>Cinco linhas curtas contra mais de dez, e o formato de cada linha fica visível de uma vez: <code>{:&lt;10}{:&gt;8.1f}</code> é "nome à esquerda em 10, nota à direita em 8 com uma casa". Outra vantagem: o <code>std::format</code> mede a largura pela <strong>aparência</strong> das letras, e não pelos bytes. Os nomes com acento, que entortavam a coluna do <code>setw</code>, ficam alinhados:</p>
+
+<pre class="file" data-file="largura.cpp">    std::cout &lt;&lt; std::format("{:&lt;10}|", "Ana") &lt;&lt; "\n";
+    std::cout &lt;&lt; std::format("{:&lt;10}|", "João") &lt;&lt; "\n";
+    std::cout &lt;&lt; std::format("{:&lt;10}|", "Lúcia Inês") &lt;&lt; "\n";
+</pre>
+
+<pre class="term" data-cwd="~/fmt">$ ./largura
+Ana       |
+João      |              « alinhado (com setw, faltava um espaço)
+Lúcia Inês|</pre>
+
+<h3>Qual usar</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th></tr>
+<tr><td>Código novo, compilador moderno (g++ 14 ou mais novo, Clang 18 ou mais novo, Visual Studio 2022 versão 17.7 ou mais nova)</td><td><code>std::println</code> / <code>std::print</code></td></tr>
+<tr><td>Precisa do texto numa variável (para gravar num arquivo, juntar, devolver de uma função)</td><td><code>std::format</code></td></tr>
+<tr><td>Compilador preso ao C++17 ou mais antigo, ou mexendo em código que já usa <code>cout</code></td><td><code>cout</code> + <code>&lt;iomanip&gt;</code></td></tr>
+<tr><td>Coisas simples, sem formatação</td><td>Tanto faz: <code>std::cout &lt;&lt; x</code> continua ótimo</td></tr>
+</table>
+</div>
+<p>Você pode misturar <code>cout</code> e <code>println</code> no mesmo programa; as saídas aparecem na ordem certa.</p>
+
+<hr>
+
+<h2>6. Versões: o <code>-std=c++23</code> é obrigatório</h2>
+<p>O g++ 15 compila como <strong>C++17</strong> se você não pedir outra versão. O <code>std::format</code> é do C++20 e o <code>std::print</code>, do C++23. Veja o que acontece sem o <code>-std=</code>:</p>
+
+<pre class="term" data-cwd="~/fmt">$ g++ -Wall -Wextra ola.cpp -o ola
+ola.cpp: In function ‘int main()’:
+ola.cpp:8:30: error: ‘format’ is not a member of ‘std’
+    8 |     std::string frase = std::format("{} tem {} anos.", nome, idade);
+      |                              ^~~~~~
+ola.cpp:8:30: note: ‘std::format’ is only available from C++20 onwards</pre>
+
+<p>E com <code>-std=c++20</code>, o <code>format</code> passa, mas o <code>print</code> não:</p>
+
+<pre class="term" data-cwd="~/fmt">$ g++ -std=c++20 -Wall -Wextra println.cpp -o println
+println.cpp: In function ‘int main()’:
+println.cpp:4:10: error: ‘print’ is not a member of ‘std’
+    4 |     std::print("Olá, ");
+      |          ^~~~~
+println.cpp:4:10: note: ‘std::print’ is only available from C++23 onwards
+println.cpp:5:10: error: ‘print’ is not a member of ‘std’
+    5 |     std::print("{}!\n", "Ana");
+      |          ^~~~~
+println.cpp:5:10: note: ‘std::print’ is only available from C++23 onwards
+println.cpp:6:10: error: ‘println’ is not a member of ‘std’
+    6 |     std::println("Total: R$ {:.2f}", 4.5 * 3);
+      |          ^~~~~~~
+println.cpp:6:10: note: ‘std::println’ is only available from C++23 onwards
+println.cpp:7:10: error: ‘println’ is not a member of ‘std’
+    7 |     std::println("{:&lt;8}{:&gt;6.1f}", "Bruno", 7.0);
+      |          ^~~~~~~
+println.cpp:7:10: note: ‘std::println’ is only available from C++23 onwards</pre>
+
+<p>As notas são claras: "<code>std::print</code> só está disponível a partir do C++23". Por isso este guia usa sempre <code>-std=c++23</code> (aula <a href="compilar.html">Compilar com g++</a>). O editor do guia já compila com <code>-std=c++23</code>. Para conhecer as versões, veja <a href="versoes.html">Versões do C++</a>.</p>
+
+<hr>
+
+<h2>7. O formato brasileiro: <code>{:L}</code> e o <em>locale</em></h2>
+<p>O <code>std::format</code> sempre usa <strong>ponto</strong> decimal e nenhum separador de milhar: <code>1234567.89</code>. Isso é proposital: o resultado é o mesmo em qualquer computador, o que é ótimo para arquivos e dados. Para mostrar ao usuário brasileiro <code>1.234.567,89</code>, você precisa de duas coisas:</p>
+<ol>
+  <li>a letra <code>L</code> na especificação (<code>{:L}</code>, <code>{:.2Lf}</code>), que quer dizer "use as regras do <em>locale</em>";</li>
+  <li>um <strong>locale</strong> brasileiro. <em>Locale</em> ("local") é o pacote de costumes de um lugar: vírgula ou ponto, separador de milhar, formato de data. O do Brasil se chama <code>pt_BR.UTF-8</code>.</li>
+</ol>
+
+<pre class="file" data-file="local.cpp">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;locale&gt;
+
+int main() {
+    double v = 1234567.891;
+    std::cout &lt;&lt; std::format("{:.2f}", v) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::format("{:L}", v) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::format(std::locale("pt_BR.UTF-8"), "{:.2Lf}", v) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::format(std::locale("pt_BR.UTF-8"), "{:L}", 1234567) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/fmt">$ g++ -std=c++23 -Wall -Wextra local.cpp -o local
+$ ./local
+1234567.89               « sem L: ponto, sem separador
+1234567.891              « L sozinho: o locale padrão do programa é o "C", americano
+1.234.567,89             « L + locale pt_BR: formato brasileiro
+1.234.567</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;locale&gt;</dt><dd>Traz o <code>std::locale</code>.</dd>
+  <dt>std::locale("pt_BR.UTF-8")</dt><dd>Carrega as regras brasileiras do sistema operacional.</dd>
+  <dt>std::format(locale, "...", v)</dt><dd>Quando o primeiro argumento é um locale, as lacunas com <code>L</code> seguem as regras dele.</dd>
+  <dt>{:L} sem locale</dt><dd>Repare na segunda linha: mesmo com o Linux da Ana em português, o programa começa no locale "C" (o "neutro", americano). O <code>L</code> não mudou nada.</dd>
+</dl>
+
+<p>Para não repetir o locale em toda chamada, você pode trocar o locale do programa inteiro no começo do <code>main</code>. O <code>std::locale("")</code> (texto vazio) quer dizer "o locale de quem está usando o computador", lido da variável <code>LANG</code> (<code>pt_BR.UTF-8</code> na máquina da Ana):</p>
+
+<pre class="file" data-file="global.cpp">    std::locale::global(std::locale(""));
+    std::cout &lt;&lt; std::format("{:L}", 1234.5) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::format("R$ {:.2Lf}", 1234.5) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::format("{:.2f}", 1234.5) &lt;&lt; "\n";
+</pre>
+
+<pre class="term" data-cwd="~/fmt">$ ./global
+1.234,5
+R$ 1.234,50
+1234.50                  « sem o L, continua com ponto</pre>
+
+<div class="warning">
+<strong>O locale precisa existir no sistema</strong>
+<p>Os locales vêm do sistema operacional. Se o <code>pt_BR.UTF-8</code> não estiver instalado (é comum em servidores e contêineres), o programa <strong>compila</strong>, mas morre ao rodar. Com um nome inexistente:</p>
+<pre class="term" data-cwd="~/fmt">$ ./semlocale; echo $?    « usa std::locale("xx_XX.UTF-8")
+terminate called after throwing an instance of 'std::runtime_error'
+  what():  locale::facet::_S_create_c_locale name not valid
+134</pre>
+<p>"O nome do locale não é válido". Isso é uma <strong>exceção</strong> (aula <a href="excecoes.html">Exceções</a>) que ninguém tratou, e o programa foi encerrado. No Ubuntu, o locale brasileiro vem com o pacote <code>language-pack-pt</code>. O editor do guia roda no navegador, sem os locales do sistema: lá, rode só os exemplos sem <code>std::locale</code>.</p>
+</div>
+
+<hr>
+
+<h2>8. Erros de formato aparecem na compilação</h2>
+<p>Aqui o <code>std::format</code> tem uma vantagem enorme sobre o <code>printf</code> do C: o compilador <strong>lê a string de formato</strong> e confere se ela combina com os argumentos. Se não combinar, o programa nem chega a ser criado. Três erros comuns:</p>
+
+<pre class="file" data-file="erro2.cpp">#include &lt;format&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; std::format("{} tem {} anos", "Ana") &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/fmt">$ g++ -std=c++23 -Wall -Wextra erro2.cpp -o erro2
+erro2.cpp: In function ‘int main()’:
+erro2.cpp:5:30: error: call to consteval function ‘std::basic_format_string&lt;char, const char (&amp;)[4]&gt;("{} tem {} anos")’ is not a constant expression
+    5 |     std::cout &lt;&lt; std::format("{} tem {} anos", "Ana") &lt;&lt; "\n";
+      |                              ^~~~~~~~~~~~~~~~
+In file included from erro2.cpp:1:
+erro2.cpp:5:30:   in ‘constexpr’ expansion of ‘std::basic_format_string&lt;char, const char (&amp;)[4]&gt;("{} tem {} anos")’
+/usr/include/c++/15/format:4810:19:   in ‘constexpr’ expansion of ‘__scanner.std::__format::_Checking_scanner&lt;char, char [4]&gt;::std::__format::_Scanner&lt;char&gt;.std::__format::_Scanner&lt;char&gt;::_M_scan()’
+/usr/include/c++/15/format:4504:30:   in ‘constexpr’ expansion of ‘((std::__format::_Scanner&lt;char&gt;*)this)-&gt;std::__format::_Scanner&lt;char&gt;::_M_on_replacement_field()’
+/usr/include/c++/15/format:4537:28:   in ‘constexpr’ expansion of ‘((std::__format::_Scanner&lt;char&gt;*)this)-&gt;std::__format::_Scanner&lt;char&gt;::_M_pc.std::__format::_Scanner&lt;char&gt;::_Parse_context::std::basic_format_parse_context&lt;char&gt;.std::basic_format_parse_context&lt;char&gt;::next_arg_id()’
+/usr/include/c++/15/format:313:56: error: call to non-‘constexpr’ function ‘void std::__format::__invalid_arg_id_in_format_string()’
+  313 |             __format::__invalid_arg_id_in_format_string();
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/include/c++/15/format:259:3: note: ‘void std::__format::__invalid_arg_id_in_format_string()’ declared here
+  259 |   __invalid_arg_id_in_format_string()
+      |   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~</pre>
+
+<p>Assusta, mas só duas partes importam:</p>
+<dl class="anatomy">
+  <dt>erro2.cpp:5:30: error: call to consteval function … is not a constant expression</dt><dd>A <strong>linha</strong> do problema (5) e o aviso de que a conferência da string de formato, feita durante a compilação, falhou. <em>Consteval</em> = "avaliado na compilação".</dd>
+  <dt>__invalid_arg_id_in_format_string</dt><dd>O <strong>motivo</strong>, escondido no nome de uma função interna da biblioteca: "número de argumento inválido na string de formato". A string tem dois <code>{}</code>, mas só um argumento foi passado.</dd>
+</dl>
+
+<p>Os outros dois erros comuns têm a mesma primeira linha, e o motivo aparece em outro nome de função:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código errado</th><th>Nome que aparece no erro</th><th>Tradução</th></tr>
+<tr><td><code>std::format("{} tem {} anos", "Ana")</code></td><td><code>__invalid_arg_id_in_format_string</code></td><td>Mais lacunas do que argumentos.</td></tr>
+<tr><td><code>std::format("Total: {:.2f", 9.5)</code></td><td><code>__unmatched_left_brace_in_format_string</code></td><td>Uma <code>{</code> sem a <code>}</code> que a fecha.</td></tr>
+<tr><td><code>std::format("Nota: {:.1f}", "dez")</code></td><td><code>__failed_to_parse_format_spec</code></td><td>A especificação não serve para esse tipo: <code>f</code> é para números, e <code>"dez"</code> é texto.</td></tr>
+</table>
+</div>
+
+<p>No editor do guia (Clang), a primeira linha é igual (<code>call to consteval function … is not a constant expression</code>), e o motivo aparece numa <code>note:</code> logo abaixo, por exemplo <code>non-constexpr function '__invalid_arg_id_in_format_string' cannot be used in a constant expression</code>.</p>
+
+<div class="note">
+<strong>A string de formato precisa estar escrita no código</strong>
+<p>Para poder conferir, o compilador precisa ver a string. Guardá-la numa variável não funciona:</p>
+<pre class="term" data-cwd="~/fmt">$ g++ -std=c++23 -Wall -Wextra var.cpp -o var      « std::string modelo = "Olá, {}!"; std::format(modelo, "Ana")
+var.cpp: In function ‘int main()’:
+var.cpp:7:30: error: call to consteval function ‘std::basic_format_string&lt;char, const char (&amp;)[4]&gt;(modelo)’ is not a constant expression
+    7 |     std::cout &lt;&lt; std::format(modelo, "Ana") &lt;&lt; "\n";
+      |                              ^~~~~~</pre>
+<p>Escreva o texto entre aspas direto na chamada. (Para os raros casos em que o formato só é conhecido com o programa rodando, existe o <code>std::vformat</code>, que confere durante a execução; você não vai precisar dele tão cedo.)</p>
+</div>
+
+<div class="trycpp" data-goal="compila,out:Total: R$ 9.50">
+<p class="try-task"><strong>Missão:</strong> este programa não compila. Rode, leia o erro e conserte a string de formato para mostrar <code>Total: R$ 9.50</code>.</p>
+<pre class="script">#include &lt;print&gt;
+
+int main() {
+    double total = 9.5;
+    std::println("Total: R$ {:.2f", total);
+}
+</pre>
+<pre class="solucao">#include &lt;print&gt;
+
+int main() {
+    double total = 9.5;
+    std::println("Total: R$ {:.2f}", total);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: ‘format’ is not a member of ‘std’</code> / <code>‘print’ is not a member of ‘std’</code></strong>
+<p><strong>O que significa:</strong> há duas causas. Se a nota diz <code>only available from C++20 onwards</code> (ou <code>C++23</code>), faltou o <code>-std=c++23</code> no comando. Se não diz, faltou o <code>#include &lt;format&gt;</code> ou <code>#include &lt;print&gt;</code>.</p>
+<p><strong>Como consertar:</strong> compile com <code>g++ -std=c++23 -Wall -Wextra …</code> e confira os <code>#include</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: call to consteval function … is not a constant expression</code></strong>
+<p><strong>O que significa:</strong> a string de formato tem um problema: lacunas a mais, chave sem par, especificação que não serve para o tipo, ou não está escrita direto na chamada.</p>
+<p><strong>Como consertar:</strong> procure, mais abaixo na mensagem, o nome com <code>__</code> (como <code>__invalid_arg_id_in_format_string</code>) e use a tabela da seção 8. Conte as lacunas e os argumentos.</p>
+</div>
+
+<div class="cenario">
+<strong><code>terminate called after throwing an instance of 'std::runtime_error'</code> … <code>name not valid</code></strong>
+<p><strong>O que significa:</strong> o locale pedido (por exemplo, <code>pt_BR.UTF-8</code>) não está instalado no computador onde o programa rodou.</p>
+<p><strong>Como consertar:</strong> instale o locale (no Ubuntu, <code>sudo apt install language-pack-pt</code>) ou não dependa dele: mostre com ponto, ou troque o ponto pela vírgula no texto pronto.</p>
+</div>
+
+<div class="cenario">
+<strong>Apareceu <code>{}</code> na tela em vez do valor</strong>
+<p><strong>O que significa:</strong> você usou <code>std::cout &lt;&lt; "Olá, {}"</code>, sem <code>std::format</code>. O <code>cout</code> não entende lacunas: mostra o texto como está.</p>
+<p><strong>Como consertar:</strong> <code>std::cout &lt;&lt; std::format("Olá, {}", nome)</code> ou <code>std::println("Olá, {}", nome)</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Valor</th><th>Resultado</th></tr>
+<tr><td><code>{}</code></td><td><code>"Ana"</code>, <code>42</code>, <code>true</code></td><td><code>Ana</code>, <code>42</code>, <code>true</code></td></tr>
+<tr><td><code>{:.2f}</code></td><td><code>19.9</code></td><td><code>19.90</code></td></tr>
+<tr><td><code>{:&gt;10}</code> / <code>{:&lt;10}</code> / <code>{:^10}</code></td><td><code>"Ana"</code></td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ana</code> / <code>Ana&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code> / <code>&nbsp;&nbsp;&nbsp;Ana&nbsp;&nbsp;&nbsp;&nbsp;</code></td></tr>
+<tr><td><code>{:*^10}</code></td><td><code>"Ana"</code></td><td><code>***Ana****</code></td></tr>
+<tr><td><code>{:05}</code></td><td><code>42</code></td><td><code>00042</code></td></tr>
+<tr><td><code>{:x}</code> / <code>{:X}</code> / <code>{:#x}</code></td><td><code>255</code></td><td><code>ff</code> / <code>FF</code> / <code>0xff</code></td></tr>
+<tr><td><code>{:b}</code></td><td><code>5</code></td><td><code>101</code></td></tr>
+<tr><td><code>{:+}</code></td><td><code>5</code></td><td><code>+5</code></td></tr>
+<tr><td><code>{:e}</code></td><td><code>1234.5</code></td><td><code>1.234500e+03</code></td></tr>
+<tr><td><code>{0} {1} {0}</code></td><td><code>"a", "b"</code></td><td><code>a b a</code></td></tr>
+<tr><td><code>{{ }}</code></td><td></td><td><code>{ }</code></td></tr>
+<tr><td><code>{:.2Lf}</code> + locale <code>pt_BR</code></td><td><code>1234.5</code></td><td><code>1.234,50</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Duas casas</h3>
+<p>Complete para mostrar <code>preco</code> com duas casas decimais:</p>
+<div class="ex-code">std::println("R$ {<input data-answer=":.2f" aria-label="especificação">}", preco);</div>
+</div>
+
+<div class="exercise">
+<h3>2. O cabeçalho</h3>
+<p>Qual cabeçalho traz <code>std::println</code>?</p>
+<div class="ex-code">#include &lt;<input data-answer="print" aria-label="cabeçalho">&gt;</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. O que mostra <code>std::println("[{:&gt;5}]", 42);</code>?</p>
+<label><input type="radio" name="q3"> <code>[42   ]</code></label>
+<label><input type="radio" name="q3"> <code>[00042]</code></label>
+<label><input type="radio" name="q3"> <code>[   42]</code></label>
+<label><input type="radio" name="q3"> <code>[&gt;5 42]</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. A Ana compila <code>std::println("Oi")</code> com <code>g++ -Wall -Wextra oi.cpp</code> (sem <code>-std=</code>) no g++ 15. O que acontece?</p>
+<label><input type="radio" name="q4"> Compila e mostra <code>Oi</code></label>
+<label><input type="radio" name="q4"> Erro: <code>‘println’ is not a member of ‘std’</code>, porque o padrão do g++ 15 é C++17</label>
+<label><input type="radio" name="q4"> Compila, mas dá erro ao rodar</label>
+<label><input type="radio" name="q4"> Só um aviso</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. <code>std::format("{} e {}", "Ana")</code>, com um argumento só, dá:</p>
+<label><input type="radio" name="q5"> Erro de compilação</label>
+<label><input type="radio" name="q5"> <code>Ana e </code></label>
+<label><input type="radio" name="q5"> <code>Ana e {}</code></label>
+<label><input type="radio" name="q5"> Erro só quando o programa roda</label>
+</div>
+
+<h3>Missão final: o recibo da papelaria</h3>
+
+<div class="trycpp" data-goal="out:Produto       Qtd    Total,out:Caderno         3    37.50,out:Caneta         10    25.00,src:println">
+<p class="try-task"><strong>Missão:</strong> usando só <code>std::println</code>, faça o recibo sair exatamente assim: nome à esquerda numa coluna de 12, quantidade à direita numa coluna de 5, total à direita numa coluna de 9 com duas casas. O caderno custa R$ 12,50 e a caneta, R$ 2,50: calcule o total dentro do <code>println</code>.</p>
+<pre class="out">Produto       Qtd    Total
+Caderno         3    37.50
+Caneta         10    25.00</pre>
+<pre class="script">#include &lt;print&gt;
+
+int main() {
+    std::println("Produto Qtd Total");
+    std::println("Caderno 3 37.5");
+    std::println("Caneta 10 25");
+}
+</pre>
+<pre class="solucao">#include &lt;print&gt;
+
+int main() {
+    std::println("{:&lt;12}{:&gt;5}{:&gt;9}", "Produto", "Qtd", "Total");
+    std::println("{:&lt;12}{:&gt;5}{:&gt;9.2f}", "Caderno", 3, 3 * 12.5);
+    std::println("{:&lt;12}{:&gt;5}{:&gt;9.2f}", "Caneta", 10, 10 * 2.5);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>std::format("… {} …", valores)</code> <span class="versao">C++20</span> devolve um <code>std::string</code>; <code>std::print</code> e <code>std::println</code> <span class="versao">C++23</span> mostram na tela (o <code>println</code> pula a linha).</li>
+  <li>Especificações depois de <code>:</code> — <code>{:.2f}</code> casas, <code>{:&lt;10}</code>/<code>{:&gt;10}</code>/<code>{:^10}</code> alinhamento, <code>{:05}</code> zeros, <code>{:x}</code> hexadecimal. Nada gruda.</li>
+  <li><code>{0}</code>, <code>{1}</code> escolhem o argumento; <code>{{</code> e <code>}}</code> escrevem chaves.</li>
+  <li>Ponto decimal sempre, a menos que você use <code>{:L}</code> <strong>e</strong> um locale (<code>std::locale("pt_BR.UTF-8")</code>), que precisa estar instalado.</li>
+  <li>O compilador confere a string de formato: erro de formato é erro de <strong>compilação</strong> (<code>call to consteval function … is not a constant expression</code>).</li>
+  <li>No g++ 15, compile com <code>-std=c++23</code>: sem ele, nem <code>format</code> nem <code>print</code> existem.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

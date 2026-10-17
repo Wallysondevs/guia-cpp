@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ iomanip — setw, setprecision, fixed e tabelas | Guia C++</title>
+<meta name="description" content="Formatar a saída do cout com iomanip, para quem nunca programou: setw, setfill, left e right, fixed e setprecision para dinheiro, boolalpha, hex, uma tabela alinhada de notas e por que os manipuladores grudam, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Formatar com iomanip</span></h1>
+
+<p class="intro">O <code>std::cout</code> mostra os números do jeito dele: <code>19.9</code> em vez de <code>19.90</code>, <code>1.41421</code> com seis algarismos, colunas tortas quando os nomes têm tamanhos diferentes. Para uma lojinha ou um boletim, isso não serve. A biblioteca <code>&lt;iomanip&gt;</code> traz os <strong>manipuladores</strong>: instruções que você coloca no meio do <code>cout</code> para dizer <em>como</em> mostrar o que vem depois. Nesta aula você vai alinhar colunas, mostrar dinheiro com duas casas e montar a tabela de notas da turma da Ana.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um manipulador e onde ele entra no <code>cout</code>.</li>
+  <li>Largura de coluna com <code>std::setw</code> e o caractere de preenchimento com <code>std::setfill</code>.</li>
+  <li>Alinhar à esquerda ou à direita com <code>std::left</code> e <code>std::right</code>.</li>
+  <li>Dinheiro com duas casas: <code>std::fixed</code> + <code>std::setprecision(2)</code>, e o que o <code>setprecision</code> faz <strong>sem</strong> o <code>fixed</code>.</li>
+  <li><code>true</code>/<code>false</code> por extenso com <code>std::boolalpha</code>, e números em hexadecimal com <code>std::hex</code>.</li>
+  <li>Por que quase todos os manipuladores "grudam" no <code>cout</code>, e o único que não gruda.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Nas saídas, os colchetes <code>[ ]</code> foram impressos de propósito, para você enxergar os espaços.</p>
+
+<hr>
+
+<h2>A ideia: as configurações da impressora</h2>
+<p>Antes de imprimir um documento, você escolhe: margem, tamanho da letra, quantas cópias. Essas escolhas valem para tudo que for impresso depois, até você mudá-las de novo. Os manipuladores são as <strong>configurações</strong> do <code>cout</code>: você as "envia" com <code>&lt;&lt;</code>, como se fossem um valor, mas em vez de aparecer na tela, elas mudam o jeito como os próximos valores aparecem.</p>
+
+<pre class="file" data-file="exemplo.cpp">std::cout &lt;&lt; std::fixed &lt;&lt; std::setprecision(2) &lt;&lt; 19.9;   // mostra 19.90
+</pre>
+
+<p><code>std::fixed</code> e <code>std::setprecision(2)</code> não aparecem na tela: eles configuram. Só o <code>19.9</code> é mostrado, já do jeito configurado. Os manipuladores sem parênteses (<code>std::fixed</code>, <code>std::left</code>, <code>std::hex</code>) vêm de <code>&lt;iostream&gt;</code>; os que recebem um valor entre parênteses (<code>std::setw(8)</code>, <code>std::setprecision(2)</code>, <code>std::setfill('0')</code>) precisam de <code>#include &lt;iomanip&gt;</code> (<em>input/output manipulators</em>, manipuladores de entrada e saída). Para não se preocupar, inclua sempre os dois.</p>
+
+<hr>
+
+<h2>1. Largura: <code>std::setw</code></h2>
+<p><code>setw</code> vem de <em>set width</em>, "defina a largura". Ele reserva um espaço de N caracteres para o <strong>próximo</strong> valor. Se o valor for menor, o resto é preenchido com espaços:</p>
+
+<pre class="file" data-file="largura.cpp">#include &lt;iostream&gt;
+#include &lt;iomanip&gt;
+
+int main() {
+    std::cout &lt;&lt; "[" &lt;&lt; std::setw(8) &lt;&lt; 42 &lt;&lt; "]\n";
+    std::cout &lt;&lt; "[" &lt;&lt; std::setw(8) &lt;&lt; "Ana" &lt;&lt; "]\n";
+    std::cout &lt;&lt; "[" &lt;&lt; std::setw(8) &lt;&lt; 42 &lt;&lt; 42 &lt;&lt; "]\n";
+    std::cout &lt;&lt; "[" &lt;&lt; std::setw(2) &lt;&lt; 12345 &lt;&lt; "]\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/formato">$ g++ -std=c++23 -Wall -Wextra largura.cpp -o largura
+$ ./largura
+[      42]               « 6 espaços + "42" = 8 caracteres
+[     Ana]               « 5 espaços + "Ana" = 8
+[      4242]             « o setw só valeu para o PRIMEIRO 42
+[12345]                  « largura pequena demais: o número não é cortado</pre>
+
+<dl class="anatomy">
+  <dt>std::setw(8)</dt><dd>"O próximo valor ocupa pelo menos 8 caracteres." Por padrão, os espaços vão à <strong>esquerda</strong> (o valor fica encostado à direita).</dd>
+  <dt>linha 3</dt><dd>O segundo <code>42</code> saiu grudado: o <code>setw</code> vale para <strong>um</strong> valor só e depois é esquecido. Ele é a grande exceção da regra "manipuladores grudam" (seção 6).</dd>
+  <dt>linha 4</dt><dd><code>setw</code> é uma largura <strong>mínima</strong>. Se o valor não cabe, ele aparece inteiro, e a coluna fica torta, mas nenhum dígito se perde.</dd>
+</dl>
+
+<hr>
+
+<h2>2. Alinhar e preencher: <code>left</code>, <code>right</code> e <code>setfill</code></h2>
+<p>Textos (como nomes) costumam ficar alinhados à esquerda, e números, à direita, para que as unidades fiquem uma embaixo da outra. Para escolher o lado, use <code>std::left</code> ou <code>std::right</code>. Para trocar o espaço por outro caractere, <code>std::setfill</code>:</p>
+
+<pre class="file" data-file="lado.cpp">#include &lt;iostream&gt;
+#include &lt;iomanip&gt;
+
+int main() {
+    std::cout &lt;&lt; "[" &lt;&lt; std::left &lt;&lt; std::setw(8) &lt;&lt; "Ana" &lt;&lt; "]\n";
+    std::cout &lt;&lt; "[" &lt;&lt; std::setw(8) &lt;&lt; "Bruno" &lt;&lt; "]\n";
+    std::cout &lt;&lt; "[" &lt;&lt; std::right &lt;&lt; std::setw(8) &lt;&lt; "Ana" &lt;&lt; "]\n";
+    std::cout &lt;&lt; "[" &lt;&lt; std::setfill('.') &lt;&lt; std::setw(8) &lt;&lt; "Ana" &lt;&lt; "]\n";
+    std::cout &lt;&lt; "[" &lt;&lt; std::setfill('0') &lt;&lt; std::setw(5) &lt;&lt; 42 &lt;&lt; "]\n";
+    std::cout &lt;&lt; "[" &lt;&lt; std::setw(5) &lt;&lt; 7 &lt;&lt; "]\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/formato">$ ./lado
+[Ana     ]               « left: texto à esquerda, espaços à direita
+[Bruno   ]               « o left continuou valendo (gruda!)
+[     Ana]               « right: volta ao padrão
+[.....Ana]               « setfill('.'): pontinhos no lugar dos espaços
+[00042]                  « setfill('0') + setw(5): zeros à esquerda
+[00007]                  « o '0' continuou valendo</pre>
+
+<dl class="anatomy">
+  <dt>std::left</dt><dd>"Alinhe à esquerda": o valor primeiro, o preenchimento depois.</dd>
+  <dt>std::right</dt><dd>"Alinhe à direita" (o padrão).</dd>
+  <dt>std::setfill('.')</dt><dd>Preenche com <code>.</code> em vez de espaço. Repare nas <strong>aspas simples</strong>: é um caractere (<code>char</code>, aula <a href="char.html">Caracteres</a>), não um texto. Com <code>'0'</code>, faz números como <code>00042</code>, comuns em códigos de pedido e matrículas.</dd>
+</dl>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> troque o <code>'*'</code> por <code>'-'</code>, mude a largura e alterne entre <code>std::left</code> e <code>std::right</code>. Repare que o número do pedido usa outro preenchimento.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;iomanip&gt;
+
+int main() {
+    std::cout &lt;&lt; std::setfill('*') &lt;&lt; std::left &lt;&lt; std::setw(20) &lt;&lt; "Lojinha da Ana" &lt;&lt; "\n";
+    std::cout &lt;&lt; "Pedido: " &lt;&lt; std::setfill('0') &lt;&lt; std::right &lt;&lt; std::setw(6) &lt;&lt; 87 &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Casas decimais: <code>std::fixed</code> e <code>std::setprecision</code></h2>
+<p>Este é o manipulador mais usado: mostrar dinheiro com duas casas. Ele tem uma pegadinha, então veja os três jeitos lado a lado:</p>
+
+<pre class="file" data-file="dinheiro.cpp">#include &lt;iostream&gt;
+#include &lt;iomanip&gt;
+
+int main() {
+    double preco = 19.9;
+    double pi = 3.14159;
+    std::cout &lt;&lt; preco &lt;&lt; " " &lt;&lt; pi &lt;&lt; "\n";
+    std::cout &lt;&lt; std::setprecision(2) &lt;&lt; preco &lt;&lt; " " &lt;&lt; pi &lt;&lt; "\n";
+    std::cout &lt;&lt; std::fixed &lt;&lt; std::setprecision(2) &lt;&lt; preco &lt;&lt; " " &lt;&lt; pi &lt;&lt; "\n";
+    std::cout &lt;&lt; 7.0 &lt;&lt; " " &lt;&lt; 1234.5678 &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/formato">$ ./dinheiro
+19.9 3.14159             « padrão: até 6 algarismos, sem zeros no fim
+20 3.1                   « setprecision(2) SOZINHO: 2 algarismos no total!
+19.90 3.14               « fixed + setprecision(2): 2 casas depois do ponto
+7.00 1234.57             « continua valendo nas linhas seguintes</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Configuração</th><th>O que <code>setprecision(2)</code> significa</th><th><code>19.9</code> vira</th></tr>
+<tr><td>Padrão (sem <code>fixed</code>)</td><td>2 algarismos <strong>no total</strong> (algarismos significativos)</td><td><code>20</code></td></tr>
+<tr><td>Com <code>std::fixed</code></td><td>2 casas <strong>depois do ponto</strong></td><td><code>19.90</code></td></tr>
+</table>
+</div>
+
+<dl class="anatomy">
+  <dt>std::fixed</dt><dd>"Ponto fixo": nunca usa notação científica (<code>1e+06</code>) e faz o <code>setprecision</code> contar as casas decimais. Sem ele, <code>setprecision(2)</code> transformou <code>19.9</code> em <code>20</code>: um susto numa nota fiscal.</dd>
+  <dt>std::setprecision(2)</dt><dd>"Defina a precisão". Arredonda na hora de mostrar: <code>1234.5678</code> apareceu como <code>1234.57</code>. O valor guardado na variável <strong>não muda</strong>; só a exibição.</dd>
+</dl>
+
+<p><strong>Regra prática:</strong> para dinheiro, sempre os dois juntos: <code>std::cout &lt;&lt; std::fixed &lt;&lt; std::setprecision(2);</code>.</p>
+
+<div class="note">
+<strong>Por que <code>2.675</code> aparece como <code>2.67</code>, e não <code>2.68</code>?</strong>
+<pre class="file" data-file="arred.cpp">#include &lt;iostream&gt;
+#include &lt;iomanip&gt;
+
+int main() {
+    std::cout &lt;&lt; std::fixed &lt;&lt; std::setprecision(2);
+    std::cout &lt;&lt; 2.675 &lt;&lt; "\n";
+    std::cout &lt;&lt; 1.005 &lt;&lt; "\n";
+    std::cout &lt;&lt; std::setprecision(20) &lt;&lt; 2.675 &lt;&lt; "\n";
+}
+</pre>
+<pre class="term" data-cwd="~/formato">$ ./arred
+2.67
+1.00
+2.67499999999999982236   « o que está guardado de verdade na variável</pre>
+<p>O computador guarda números com vírgula em binário, e <code>2.675</code> não tem representação exata: o valor guardado é um pouquinho menor, <code>2.67499999…</code>. Arredondado, dá <code>2.67</code>. A aula <a href="ponto-flutuante.html">float e double</a> explica o porquê. Para sistemas que lidam com dinheiro de verdade, os programadores costumam guardar os valores em <strong>centavos</strong>, num inteiro (<code>int</code> ou <code>long long</code>), e só formatar na hora de mostrar.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Arroz: R$ 4.50,out:Feijão: R$ 12.00,src:setprecision">
+<p class="try-task"><strong>Missão:</strong> a lista de compras da Ana mostra <code>4.5</code> e <code>12</code>. Faça aparecer <code>R$ 4.50</code> e <code>R$ 12.00</code>, acrescentando uma linha com os manipuladores certos.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;iomanip&gt;
+
+int main() {
+    double arroz = 4.5;
+    double feijao = 12;
+    std::cout &lt;&lt; "Arroz: R$ " &lt;&lt; arroz &lt;&lt; "\n";
+    std::cout &lt;&lt; "Feijão: R$ " &lt;&lt; feijao &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;iomanip&gt;
+
+int main() {
+    double arroz = 4.5;
+    double feijao = 12;
+    std::cout &lt;&lt; std::fixed &lt;&lt; std::setprecision(2);
+    std::cout &lt;&lt; "Arroz: R$ " &lt;&lt; arroz &lt;&lt; "\n";
+    std::cout &lt;&lt; "Feijão: R$ " &lt;&lt; feijao &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<p>Repare que o <code>cout</code> sempre usa <strong>ponto</strong> como separador decimal (<code>4.50</code>), o jeito dos Estados Unidos. Mostrar <code>4,50</code> é possível configurando o "local" (<em>locale</em>) do programa; a aula <a href="format-print.html">std::format e std::print</a> mostra como e quais cuidados tomar.</p>
+
+<hr>
+
+<h2>4. <code>true</code> e <code>false</code> por extenso: <code>std::boolalpha</code></h2>
+<p>Por padrão, o <code>cout</code> mostra um <code>bool</code> (aula <a href="bool.html">Booleanos</a>) como <code>1</code> ou <code>0</code>. Com <code>std::boolalpha</code> ("booleano em letras"), mostra <code>true</code> ou <code>false</code>:</p>
+
+<pre class="file" data-file="boolhex.cpp">#include &lt;iostream&gt;
+#include &lt;iomanip&gt;
+
+int main() {
+    bool aprovada = true;
+    std::cout &lt;&lt; aprovada &lt;&lt; "\n";
+    std::cout &lt;&lt; std::boolalpha &lt;&lt; aprovada &lt;&lt; " " &lt;&lt; (2 &gt; 3) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::noboolalpha &lt;&lt; aprovada &lt;&lt; "\n";
+
+    std::cout &lt;&lt; std::hex &lt;&lt; 255 &lt;&lt; "\n";
+    std::cout &lt;&lt; 10 &lt;&lt; " " &lt;&lt; 16 &lt;&lt; "\n";
+    std::cout &lt;&lt; std::showbase &lt;&lt; 255 &lt;&lt; "\n";
+    std::cout &lt;&lt; std::dec &lt;&lt; 255 &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/formato">$ ./boolhex
+1                        « padrão: 1 = verdadeiro
+true false               « boolalpha: por extenso
+1                        « noboolalpha: de volta ao 1/0
+ff                       « 255 em hexadecimal
+a 10                     « o hex GRUDOU: 10 virou "a" e 16 virou "10"
+0xff                     « showbase: mostra o prefixo 0x
+255                      « dec: de volta ao decimal</pre>
+
+<h2>5. Outras bases: <code>std::hex</code>, <code>std::oct</code>, <code>std::dec</code></h2>
+<p>O <strong>hexadecimal</strong> (base 16) usa os dígitos <code>0</code>–<code>9</code> e as letras <code>a</code>–<code>f</code> (a = 10, … f = 15). Ele aparece em cores de páginas web (<code>#ff8800</code>), endereços de memória e códigos de erro. No exemplo acima:</p>
+<dl class="anatomy">
+  <dt>std::hex</dt><dd>Mostra os inteiros em base 16: <code>255</code> → <code>ff</code>.</dd>
+  <dt>std::oct</dt><dd>Base 8 (octal), usada nas permissões de arquivos do Linux (<code>755</code>).</dd>
+  <dt>std::dec</dt><dd>Volta à base 10, o padrão. <strong>Esqueça o <code>dec</code> e todos os números seguintes do programa sairão em hexadecimal</strong>, como o <code>a 10</code> acima.</dd>
+  <dt>std::showbase</dt><dd>Acrescenta o prefixo da base: <code>0x</code> no hexadecimal, <code>0</code> no octal.</dd>
+</dl>
+
+<hr>
+
+<h2>6. Os manipuladores grudam</h2>
+<p>Você já viu nas saídas: depois de um <code>std::fixed</code>, um <code>std::left</code> ou um <code>std::hex</code>, <strong>tudo</strong> o que vem depois segue a configuração, até no fim do programa. Isso pega muita gente de surpresa:</p>
+
+<pre class="file" data-file="grudam.cpp">#include &lt;iostream&gt;
+#include &lt;iomanip&gt;
+
+int main() {
+    double media = 8.0;
+    std::cout &lt;&lt; "Preço: " &lt;&lt; std::fixed &lt;&lt; std::setprecision(2) &lt;&lt; 4.5 &lt;&lt; "\n";
+    std::cout &lt;&lt; "Média: " &lt;&lt; media &lt;&lt; "\n";
+    std::cout &lt;&lt; "Pi: " &lt;&lt; 3.14159 &lt;&lt; "\n";
+    std::cout &lt;&lt; std::defaultfloat &lt;&lt; std::setprecision(6);
+    std::cout &lt;&lt; "Pi: " &lt;&lt; 3.14159 &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/formato">$ ./grudam
+Preço: 4.50
+Média: 8.00              « a Ana só queria as 2 casas no preço…
+Pi: 3.14                 « …mas o pi também perdeu casas
+Pi: 3.14159              « defaultfloat + setprecision(6): de volta ao padrão</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Manipulador</th><th>Gruda?</th><th>Como desfazer</th></tr>
+<tr><td><code>std::setw(n)</code></td><td><strong>Não</strong>: vale só para o próximo valor</td><td>(não precisa)</td></tr>
+<tr><td><code>std::setfill(c)</code></td><td>Sim</td><td><code>std::setfill(' ')</code></td></tr>
+<tr><td><code>std::left</code> / <code>std::right</code></td><td>Sim</td><td>O outro (<code>std::right</code> é o padrão)</td></tr>
+<tr><td><code>std::fixed</code></td><td>Sim</td><td><code>std::defaultfloat</code></td></tr>
+<tr><td><code>std::setprecision(n)</code></td><td>Sim</td><td><code>std::setprecision(6)</code> (o padrão)</td></tr>
+<tr><td><code>std::boolalpha</code></td><td>Sim</td><td><code>std::noboolalpha</code></td></tr>
+<tr><td><code>std::hex</code> / <code>std::oct</code></td><td>Sim</td><td><code>std::dec</code></td></tr>
+<tr><td><code>std::showbase</code></td><td>Sim</td><td><code>std::noshowbase</code></td></tr>
+</table>
+</div>
+
+<p>Por que o <code>setw</code> é diferente? Porque uma largura raramente serve para dois valores seguidos: cada coluna de uma tabela tem a sua. Por isso você repete o <code>setw</code> antes de cada valor, como na tabela a seguir.</p>
+
+<hr>
+
+<h2>7. Juntando tudo: a tabela de notas da Ana</h2>
+<p>A professora Ana quer imprimir as notas da turma com os nomes alinhados à esquerda e as notas alinhadas à direita, com uma casa decimal:</p>
+
+<pre class="file" data-file="notas.cpp">#include &lt;iostream&gt;
+#include &lt;iomanip&gt;
+
+int main() {
+    std::cout &lt;&lt; std::left &lt;&lt; std::setw(10) &lt;&lt; "Aluno"
+              &lt;&lt; std::right &lt;&lt; std::setw(8) &lt;&lt; "Nota" &lt;&lt; "\n";
+    std::cout &lt;&lt; std::setfill('-') &lt;&lt; std::setw(18) &lt;&lt; "" &lt;&lt; std::setfill(' ') &lt;&lt; "\n";
+
+    std::cout &lt;&lt; std::fixed &lt;&lt; std::setprecision(1);
+    std::cout &lt;&lt; std::left &lt;&lt; std::setw(10) &lt;&lt; "Ana"
+              &lt;&lt; std::right &lt;&lt; std::setw(8) &lt;&lt; 9.5 &lt;&lt; "\n";
+    std::cout &lt;&lt; std::left &lt;&lt; std::setw(10) &lt;&lt; "Bruno"
+              &lt;&lt; std::right &lt;&lt; std::setw(8) &lt;&lt; 7.25 &lt;&lt; "\n";
+    std::cout &lt;&lt; std::left &lt;&lt; std::setw(10) &lt;&lt; "Carla"
+              &lt;&lt; std::right &lt;&lt; std::setw(8) &lt;&lt; 10.0 &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/formato">$ g++ -std=c++23 -Wall -Wextra notas.cpp -o notas
+$ ./notas
+Aluno         Nota
+------------------
+Ana            9.5
+Bruno          7.2      « 7.25 com 1 casa: empate exato, vai para o par (7.2)
+Carla         10.0</pre>
+
+<ol class="passo">
+  <li><strong>Cabeçalho:</strong> "Aluno" à esquerda numa coluna de 10; "Nota" à direita numa coluna de 8. Total: 18 caracteres.</li>
+  <li><strong>A linha de traços:</strong> um truque comum. <code>setfill('-')</code> + <code>setw(18)</code> + um texto vazio <code>""</code> = 18 traços. Logo depois, <code>setfill(' ')</code> volta ao espaço, senão os traços apareceriam nas linhas seguintes.</li>
+  <li><strong>Uma casa decimal</strong>, configurada uma vez só: <code>fixed</code> e <code>setprecision</code> grudam, e é isso que queremos aqui.</li>
+  <li><strong>Cada linha</strong> repete <code>left</code>/<code>setw(10)</code> para o nome e <code>right</code>/<code>setw(8)</code> para a nota, porque <code>setw</code> não gruda e o lado muda a cada coluna.</li>
+</ol>
+
+<p>O <code>7.25</code> virou <code>7.2</code>, e não <code>7.3</code>: diferente do <code>2.675</code>, o <code>7.25</code> é guardado exato em binário, e quando o arredondamento cai exatamente no meio, a biblioteca do Linux escolhe o algarismo <strong>par</strong> (o "arredondamento do banqueiro"). Se a nota precisa ser arredondada "para cima no meio", arredonde o <strong>valor</strong> antes, com <code>std::round(nota * 10) / 10</code> (aula <a href="matematica.html">Matemática</a>).</p>
+
+<p>Quando a tabela crescer, você não vai escrever uma linha por aluno: vai guardar os nomes numa lista e usar uma repetição (aulas <a href="vector.html">std::vector</a> e <a href="for.html">for</a>).</p>
+
+<hr>
+
+<h2>Formas diferentes + qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Quando usar</th></tr>
+<tr><td><code>cout</code> + <code>&lt;iomanip&gt;</code></td><td><code>std::cout &lt;&lt; std::fixed &lt;&lt; std::setprecision(2) &lt;&lt; x;</code></td><td>Funciona em qualquer versão do C++. Você vai encontrar em quase todo código existente.</td></tr>
+<tr><td><code>std::format</code> / <code>std::print</code> <span class="versao">C++20/23</span></td><td><code>std::println("{:.2f}", x);</code></td><td>Mais curto, e a configuração não gruda. Preferível em código novo. Aula <a href="format-print.html">std::format e std::print</a>.</td></tr>
+<tr><td><code>printf</code> (do C)</td><td><code>std::printf("%.2f\n", x);</code></td><td>Código antigo. O compilador nem sempre confere se os tipos batem com o formato.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: ‘setw’ is not a member of ‘std’</code></strong>
+<pre class="file" data-file="semiomanip.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; std::setw(8) &lt;&lt; 42 &lt;&lt; "\n";
+}
+</pre>
+<pre class="term" data-cwd="~/formato">$ g++ -std=c++23 -Wall -Wextra semiomanip.cpp -o semiomanip
+semiomanip.cpp: In function ‘int main()’:
+semiomanip.cpp:4:23: error: ‘setw’ is not a member of ‘std’
+    4 |     std::cout &lt;&lt; std::setw(8) &lt;&lt; 42 &lt;&lt; "\n";
+      |                       ^~~~
+semiomanip.cpp:2:1: note: ‘std::setw’ is defined in header ‘&lt;iomanip&gt;’; this is probably fixable by adding ‘#include &lt;iomanip&gt;’
+    1 | #include &lt;iostream&gt;
+  +++ |+#include &lt;iomanip&gt;
+    2 |</pre>
+<p><strong>O que significa:</strong> "<code>setw</code> não é membro de <code>std</code>". A nota logo abaixo já dá a resposta: "<code>std::setw</code> é definido no cabeçalho <code>&lt;iomanip&gt;</code>; provavelmente se resolve acrescentando <code>#include &lt;iomanip&gt;</code>". As linhas com <code>+++ |+</code> mostram exatamente onde pôr a linha nova.</p>
+<p><strong>Como consertar:</strong> acrescente <code>#include &lt;iomanip&gt;</code>. O mesmo vale para <code>setprecision</code> e <code>setfill</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O preço sai <code>20</code> em vez de <code>19.90</code></strong>
+<p><strong>O que significa:</strong> você usou <code>std::setprecision(2)</code> sem <code>std::fixed</code>. Sem ele, a precisão conta os algarismos <strong>no total</strong>.</p>
+<p><strong>Como consertar:</strong> <code>std::cout &lt;&lt; std::fixed &lt;&lt; std::setprecision(2);</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Números estranhos depois de um <code>hex</code>, ou casas decimais onde não deviam</strong>
+<p><strong>O que significa:</strong> um manipulador usado lá em cima continua valendo (eles grudam).</p>
+<p><strong>Como consertar:</strong> desfaça depois de usar: <code>std::dec</code>, <code>std::defaultfloat</code>, <code>std::setprecision(6)</code>, <code>std::setfill(' ')</code>, <code>std::right</code>. Ou use <a href="format-print.html">std::format</a>, que não tem esse problema.</p>
+</div>
+
+<div class="cenario">
+<strong>A coluna fica torta nos nomes com acento</strong>
+<pre class="file" data-file="acento.cpp">    std::cout &lt;&lt; std::left &lt;&lt; std::setw(10) &lt;&lt; "Ana" &lt;&lt; "|\n";
+    std::cout &lt;&lt; std::left &lt;&lt; std::setw(10) &lt;&lt; "João" &lt;&lt; "|\n";
+    std::cout &lt;&lt; std::left &lt;&lt; std::setw(10) &lt;&lt; "Lúcia Inês" &lt;&lt; "|\n";
+</pre>
+<pre class="term" data-cwd="~/formato">$ ./acento
+Ana       |
+João     |               « um espaço a menos
+Lúcia Inês|              « dois a menos: a barra encostou</pre>
+<p><strong>O que significa:</strong> o <code>setw</code> conta <strong>bytes</strong>, não letras. Em UTF-8, cada letra acentuada (<code>ã</code>, <code>ú</code>, <code>ê</code>) ocupa 2 bytes. Para o <code>setw</code>, "João" tem 5 "caracteres" e "Lúcia Inês" tem 12. A aula <a href="acentos-utf8.html">Acentos e UTF-8</a> explica a codificação.</p>
+<p><strong>Como consertar:</strong> nas tabelas, prefira cabeçalhos sem acento ou deixe folga na largura. O <code>std::format</code> (C++20) calcula a largura pela aparência das letras e alinha certo (veja a aula <a href="format-print.html">std::format e std::print</a>).</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Manipulador</th><th>Cabeçalho</th><th>O que faz</th><th>Exemplo → saída</th></tr>
+<tr><td><code>std::setw(n)</code></td><td><code>&lt;iomanip&gt;</code></td><td>Largura mínima do próximo valor</td><td><code>setw(5) &lt;&lt; 42</code> → <code>&nbsp;&nbsp;&nbsp;42</code></td></tr>
+<tr><td><code>std::setfill(c)</code></td><td><code>&lt;iomanip&gt;</code></td><td>Caractere de preenchimento</td><td><code>setfill('0') &lt;&lt; setw(5) &lt;&lt; 42</code> → <code>00042</code></td></tr>
+<tr><td><code>std::left</code>, <code>std::right</code></td><td><code>&lt;iostream&gt;</code></td><td>Lado do alinhamento</td><td><code>left &lt;&lt; setw(5) &lt;&lt; "Ana"</code> → <code>Ana&nbsp;&nbsp;</code></td></tr>
+<tr><td><code>std::fixed</code></td><td><code>&lt;iostream&gt;</code></td><td>Casas decimais fixas, sem notação científica</td><td></td></tr>
+<tr><td><code>std::setprecision(n)</code></td><td><code>&lt;iomanip&gt;</code></td><td>Com <code>fixed</code>: n casas. Sem: n algarismos</td><td><code>fixed &lt;&lt; setprecision(2) &lt;&lt; 19.9</code> → <code>19.90</code></td></tr>
+<tr><td><code>std::defaultfloat</code></td><td><code>&lt;iostream&gt;</code></td><td>Desfaz o <code>fixed</code></td><td></td></tr>
+<tr><td><code>std::boolalpha</code></td><td><code>&lt;iostream&gt;</code></td><td><code>bool</code> como <code>true</code>/<code>false</code></td><td><code>boolalpha &lt;&lt; true</code> → <code>true</code></td></tr>
+<tr><td><code>std::hex</code>, <code>std::oct</code>, <code>std::dec</code></td><td><code>&lt;iostream&gt;</code></td><td>Base 16, 8 ou 10</td><td><code>hex &lt;&lt; 255</code> → <code>ff</code></td></tr>
+<tr><td><code>std::showbase</code></td><td><code>&lt;iostream&gt;</code></td><td>Mostra <code>0x</code> / <code>0</code></td><td><code>hex &lt;&lt; showbase &lt;&lt; 255</code> → <code>0xff</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Dinheiro</h3>
+<p>Complete para mostrar <code>preco</code> com duas casas decimais:</p>
+<div class="ex-code">std::cout &lt;&lt; std::<input data-answer="fixed" aria-label="manipulador"> &lt;&lt; std::setprecision(<input data-answer="2" aria-label="casas">) &lt;&lt; preco;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Zeros à esquerda</h3>
+<p>Complete para mostrar o pedido <code>87</code> como <code>000087</code>:</p>
+<div class="ex-code">std::cout &lt;&lt; std::setfill(<input data-answer="'0'" aria-label="caractere">) &lt;&lt; std::setw(6) &lt;&lt; 87;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. O que mostra <code>std::cout &lt;&lt; std::setprecision(3) &lt;&lt; 3.14159;</code> (sem <code>fixed</code>)?</p>
+<label><input type="radio" name="q3"> <code>3.142</code></label>
+<label><input type="radio" name="q3"> <code>3.14</code></label>
+<label><input type="radio" name="q3"> <code>3.141</code></label>
+<label><input type="radio" name="q3"> <code>3</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Qual manipulador vale só para o valor seguinte?</p>
+<label><input type="radio" name="q4"> <code>std::fixed</code></label>
+<label><input type="radio" name="q4"> <code>std::left</code></label>
+<label><input type="radio" name="q4"> <code>std::hex</code></label>
+<label><input type="radio" name="q4"> <code>std::setw</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Depois de <code>std::cout &lt;&lt; std::hex &lt;&lt; 255;</code>, o programa faz <code>std::cout &lt;&lt; 12;</code>. O que aparece?</p>
+<label><input type="radio" name="q5"> <code>c</code></label>
+<label><input type="radio" name="q5"> <code>12</code></label>
+<label><input type="radio" name="q5"> <code>0xc</code></label>
+<label><input type="radio" name="q5"> <code>ff</code></label>
+</div>
+
+<h3>Missão final: o boletim alinhado</h3>
+
+<div class="trycpp" data-goal="out:Ana        9.5,out:Bruno      7.0,out:Davi      10.0,src:setw">
+<p class="try-task"><strong>Missão:</strong> faça o boletim sair assim, com o nome à esquerda numa coluna de 8 e a nota à direita numa coluna de 6, sempre com uma casa decimal:</p>
+<pre class="out">Ana        9.5
+Bruno      7.0
+Davi      10.0</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;iomanip&gt;
+
+int main() {
+    std::cout &lt;&lt; "Ana" &lt;&lt; 9.5 &lt;&lt; "\n";
+    std::cout &lt;&lt; "Bruno" &lt;&lt; 7.0 &lt;&lt; "\n";
+    std::cout &lt;&lt; "Davi" &lt;&lt; 10.0 &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;iomanip&gt;
+
+int main() {
+    std::cout &lt;&lt; std::fixed &lt;&lt; std::setprecision(1);
+    std::cout &lt;&lt; std::left &lt;&lt; std::setw(8) &lt;&lt; "Ana" &lt;&lt; std::right &lt;&lt; std::setw(6) &lt;&lt; 9.5 &lt;&lt; "\n";
+    std::cout &lt;&lt; std::left &lt;&lt; std::setw(8) &lt;&lt; "Bruno" &lt;&lt; std::right &lt;&lt; std::setw(6) &lt;&lt; 7.0 &lt;&lt; "\n";
+    std::cout &lt;&lt; std::left &lt;&lt; std::setw(8) &lt;&lt; "Davi" &lt;&lt; std::right &lt;&lt; std::setw(6) &lt;&lt; 10.0 &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Manipuladores configuram o <code>cout</code>: você os envia com <code>&lt;&lt;</code>, eles não aparecem na tela. Os que têm parênteses precisam de <code>#include &lt;iomanip&gt;</code>.</li>
+  <li><code>std::setw(n)</code>: largura mínima do <strong>próximo</strong> valor (não gruda). <code>std::setfill(c)</code>: troca o espaço por outro caractere.</li>
+  <li><code>std::left</code>/<code>std::right</code>: lado do alinhamento. Nomes à esquerda, números à direita.</li>
+  <li>Dinheiro: <code>std::fixed &lt;&lt; std::setprecision(2)</code>. Sem <code>fixed</code>, <code>setprecision</code> conta algarismos no total (<code>19.9</code> → <code>20</code>).</li>
+  <li><code>std::boolalpha</code>: <code>true</code>/<code>false</code>. <code>std::hex</code>: base 16; volte com <code>std::dec</code>.</li>
+  <li>Quase todos os manipuladores <strong>grudam</strong> até você desfazê-los. O <code>setw</code> conta bytes, então acentos desalinham colunas.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
