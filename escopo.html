@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Escopo — variáveis locais, globais, static e blocos | Guia C++</title>
+<meta name="description" content="Escopo em C++ para quem nunca programou: variáveis locais que não existem fora da função (erro real was not declared in this scope), blocos { } criam escopo, a variável do for, variáveis globais e por que evitar, sombreamento com o aviso real -Wshadow, e a variável static local que lembra o valor entre chamadas. Com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Escopo</span></h1>
+
+<p class="intro">Toda variável tem um <strong>território</strong>: a parte do código onde ela existe e pode ser usada. Esse território se chama <strong>escopo</strong>. Até aqui, você já esbarrou nele sem saber: o parâmetro de uma função não existe no <code>main</code>, e a mensagem <code>was not declared in this scope</code> ("não foi declarado neste escopo") apareceu várias vezes. Nesta aula você vai entender onde cada variável nasce e morre, o que são variáveis locais e globais, o perigo de duas variáveis com o mesmo nome, e a variável <code>static</code>, que lembra o valor entre uma chamada e outra.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma variável <strong>local</strong>, e por que ela não existe fora da função.</li>
+  <li>Que todo par de chaves <code>{ }</code> cria um escopo, inclusive o do <code>if</code> e o do <code>for</code>.</li>
+  <li>O que é uma variável <strong>global</strong>, e por que o guia recomenda evitá-las.</li>
+  <li>O que é <strong>sombreamento</strong> (uma variável escondendo outra) e o aviso <code>-Wshadow</code>.</li>
+  <li>Como uma variável <code>static</code> local cria um contador que sobrevive entre chamadas.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com o comando padrão do guia, <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: os cômodos da casa</h2>
+<p>Na casa da Ana, o que está no <strong>quarto</strong> fica no quarto: quem está na cozinha não enxerga a escrivaninha dela. Já o que está na <strong>sala</strong>, que é de todos, qualquer um vê e qualquer um pode mudar de lugar. E dentro do quarto há um <strong>armário</strong>: o que está lá dentro só existe para quem abriu o armário.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na casa</th><th>Em C++</th></tr>
+<tr><td>O quarto</td><td>O corpo de uma função: as variáveis criadas ali são <strong>locais</strong></td></tr>
+<tr><td>O armário dentro do quarto</td><td>Um bloco <code>{ }</code> dentro da função (o de um <code>if</code>, de um <code>for</code>)</td></tr>
+<tr><td>A sala, de todos</td><td>Fora de qualquer função: variáveis <strong>globais</strong></td></tr>
+</table>
+</div>
+
+<p>A regra geral: <strong>de dentro, você enxerga o que está fora; de fora, você não enxerga o que está dentro.</strong></p>
+
+<hr>
+
+<h2>1. Variáveis locais: só existem dentro da função</h2>
+<p>Uma variável criada dentro de uma função é <strong>local</strong>: nasce na linha em que é criada e morre no <code>}</code> que fecha a função. Fora dela, o nome não existe:</p>
+
+<pre class="file" data-file="local.cpp">#include &lt;iostream&gt;
+
+void calcularTotal() {
+    double total = 3 * 10.0;
+    std::cout &lt;&lt; "Total na função: " &lt;&lt; total &lt;&lt; "\n";
+}
+
+int main() {
+    calcularTotal();
+    std::cout &lt;&lt; "Total no main: " &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra local.cpp -o local
+local.cpp: In function ‘int main()’:
+local.cpp:10:39: error: ‘total’ was not declared in this scope
+   10 |     std::cout &lt;&lt; "Total no main: " &lt;&lt; total &lt;&lt; "\n";
+      |                                       ^~~~~</pre>
+
+<dl class="anatomy">
+  <dt>In function ‘int main()’</dt><dd>O problema está no <code>main</code>.</dd>
+  <dt>‘total’ was not declared in this scope</dt><dd>"‘total’ não foi declarado <strong>neste escopo</strong>". O <code>total</code> existe, mas no escopo da <code>calcularTotal</code>; no escopo do <code>main</code>, não.</dd>
+</dl>
+
+<p>Mesmo que a função já tenha sido chamada na linha 9, quando ela termina, o <code>total</code> é destruído. Para levar um valor de dentro de uma função para fora, use o <code>return</code> (aula <a href="retorno.html">Retorno</a>): <code>double total = calcularTotal();</code>.</p>
+
+<p>Os <strong>parâmetros</strong> também são locais. Na função <code>void dobrar(int numero)</code>, o <code>numero</code> só existe dentro de <code>dobrar</code>; tentar usá-lo no <code>main</code> dá o mesmo erro, <code>‘numero’ was not declared in this scope</code>.</p>
+
+<h3>O lado bom: nomes iguais não se misturam</h3>
+<p>Como cada função tem o seu território, duas funções podem ter variáveis com o mesmo nome sem nenhuma confusão:</p>
+
+<pre class="file" data-file="mesmonome.cpp">#include &lt;iostream&gt;
+
+void loja() {
+    int quantidade = 3;
+    std::cout &lt;&lt; "loja: " &lt;&lt; quantidade &lt;&lt; "\n";
+}
+
+void estoque() {
+    int quantidade = 50;
+    std::cout &lt;&lt; "estoque: " &lt;&lt; quantidade &lt;&lt; "\n";
+}
+
+int main() {
+    int quantidade = 1;
+    loja();
+    estoque();
+    std::cout &lt;&lt; "main: " &lt;&lt; quantidade &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra mesmonome.cpp -o mesmonome
+$ ./mesmonome
+loja: 3
+estoque: 50
+main: 1</pre>
+
+<p>São <strong>três</strong> variáveis diferentes, que só têm o nome em comum. É isso que permite escrever uma função sem se preocupar com os nomes usados no resto do programa: quem escreveu a <code>loja</code> não precisa saber que o <code>main</code> também tem uma <code>quantidade</code>.</p>
+
+<hr>
+
+<h2>2. Todo bloco <code>{ }</code> cria um escopo</h2>
+<p>Não são só as funções. <strong>Qualquer</strong> par de chaves cria um território novo: o do <code>if</code>, o do <code>else</code>, o do <code>while</code>, o do <code>for</code>. Uma variável criada dentro de um bloco morre no <code>}</code> dele:</p>
+
+<pre class="file" data-file="bloco.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    double nota = 8.5;
+    if (nota &gt;= 6) {
+        std::string mensagem = "aprovada";
+        std::cout &lt;&lt; "Ana foi " &lt;&lt; mensagem &lt;&lt; "\n";
+    }
+    std::cout &lt;&lt; mensagem &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra bloco.cpp -o bloco
+bloco.cpp: In function ‘int main()’:
+bloco.cpp:10:18: error: ‘mensagem’ was not declared in this scope
+   10 |     std::cout &lt;&lt; mensagem &lt;&lt; "\n";
+      |                  ^~~~~~~~</pre>
+
+<p>A <code>mensagem</code> nasceu na linha 7, dentro do <code>if</code>, e morreu na linha 9. Já a <code>nota</code>, criada no bloco do <code>main</code>, é visível dentro do <code>if</code>: de dentro se enxerga o que está fora. Se você precisa da variável depois do bloco, crie-a <strong>antes</strong> dele: <code>std::string mensagem;</code> na linha 6 e, dentro do <code>if</code>, só <code>mensagem = "aprovada";</code>.</p>
+
+<h3>A variável do <code>for</code></h3>
+<p>A variável criada nos parênteses do <code>for</code> pertence ao laço e morre quando ele termina:</p>
+
+<pre class="file" data-file="forvar.cpp">#include &lt;iostream&gt;
+
+int main() {
+    for (int i = 1; i &lt;= 3; i++) {
+        std::cout &lt;&lt; "volta " &lt;&lt; i &lt;&lt; "\n";
+    }
+    std::cout &lt;&lt; "terminou na volta " &lt;&lt; i &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra forvar.cpp -o forvar
+forvar.cpp: In function ‘int main()’:
+forvar.cpp:7:42: error: ‘i’ was not declared in this scope
+    7 |     std::cout &lt;&lt; "terminou na volta " &lt;&lt; i &lt;&lt; "\n";
+      |                                          ^</pre>
+
+<p>Isso é proposital: o <code>i</code> só serve para contar as voltas, e assim não "vaza" para o resto da função. Se você precisa saber onde o laço parou, crie a variável antes:</p>
+
+<pre class="file" data-file="forvar2.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int i = 1;
+    for (; i &lt;= 3; i++) {
+        std::cout &lt;&lt; "volta " &lt;&lt; i &lt;&lt; "\n";
+    }
+    std::cout &lt;&lt; "o laço parou com i = " &lt;&lt; i &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra forvar2.cpp -o forvar2
+$ ./forvar2
+volta 1
+volta 2
+volta 3
+o laço parou com i = 4</pre>
+
+<h3>Dentro de um laço, a variável nasce de novo a cada volta</h3>
+<pre class="file" data-file="recria.cpp">#include &lt;iostream&gt;
+
+int main() {
+    for (int volta = 1; volta &lt;= 3; volta++) {
+        int contador = 0;
+        contador++;
+        std::cout &lt;&lt; "volta " &lt;&lt; volta &lt;&lt; ": contador = " &lt;&lt; contador &lt;&lt; "\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra recria.cpp -o recria
+$ ./recria
+volta 1: contador = 1
+volta 2: contador = 1
+volta 3: contador = 1</pre>
+
+<p>O <code>contador</code> nunca passa de 1: a cada volta, ele é criado com 0, somado, mostrado e destruído no <code>}</code>. Para contar as voltas, a variável precisa morar <strong>fora</strong> do laço. É um engano muito comum de quem está começando.</p>
+
+<div class="tip">
+<strong>Chaves sozinhas também valem</strong>
+<p>Você pode abrir um bloco sem <code>if</code> nem <code>for</code>, só com <code>{ }</code>, para limitar a vida de uma variável. É raro em código do dia a dia, mas mostra a regra na forma mais pura: <code>{ int y = 2; }</code> e, depois do <code>}</code>, o <code>y</code> não existe mais.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Total de itens: 6,src:int\s+total\s*=\s*0">
+<p class="try-task"><strong>Missão:</strong> a Ana quer somar as quantidades da lista, mas o programa não compila. Leia o erro e mude <strong>onde</strong> a variável <code>total</code> é criada (ela precisa existir antes do laço e continuar existindo depois dele) para aparecer <code>Total de itens: 6</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; quantidades = {1, 2, 3};
+    for (int q : quantidades) {
+        int total = 0;
+        total = total + q;
+    }
+    std::cout &lt;&lt; "Total de itens: " &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; quantidades = {1, 2, 3};
+    int total = 0;
+    for (int q : quantidades) {
+        total = total + q;
+    }
+    std::cout &lt;&lt; "Total de itens: " &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Variáveis globais (e por que evitar)</h2>
+<p>Uma variável criada <strong>fora de qualquer função</strong>, normalmente no topo do arquivo, é <strong>global</strong>: existe durante o programa inteiro, e todas as funções abaixo dela podem lê-la e mudá-la.</p>
+
+<pre class="file" data-file="global.cpp">#include &lt;iostream&gt;
+
+int visitas = 0;
+
+void registrarVisita() {
+    visitas++;
+}
+
+void mostrarVisitas() {
+    std::cout &lt;&lt; "Visitas hoje: " &lt;&lt; visitas &lt;&lt; "\n";
+}
+
+int main() {
+    registrarVisita();
+    registrarVisita();
+    registrarVisita();
+    mostrarVisitas();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra global.cpp -o global
+$ ./global
+Visitas hoje: 3</pre>
+
+<p>Parece prático: nada de parâmetros, nada de <code>return</code>. O problema aparece quando o programa cresce. Como <strong>qualquer</strong> função pode mudar uma global, quando o valor sai errado, você não sabe quem foi o culpado. Veja o que aconteceu com o caixa da Ana:</p>
+
+<pre class="file" data-file="globalbug.cpp">#include &lt;iostream&gt;
+
+int total = 0;
+
+void somarItem(int preco) {
+    total = total + preco;
+}
+
+void relatorioDoDia() {
+    for (total = 0; total &lt; 3; total++) {
+        std::cout &lt;&lt; "imprimindo página " &lt;&lt; total + 1 &lt;&lt; "\n";
+    }
+}
+
+int main() {
+    somarItem(30);
+    somarItem(5);
+    relatorioDoDia();
+    std::cout &lt;&lt; "Total da venda: " &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra globalbug.cpp -o globalbug
+$ ./globalbug
+imprimindo página 1
+imprimindo página 2
+imprimindo página 3
+Total da venda: 3            « deveria ser 35!</pre>
+
+<p>Quem escreveu o <code>relatorioDoDia</code> usou o nome <code>total</code> para contar páginas, sem lembrar que já existia uma global com esse nome. O compilador não reclamou: é tudo válido. O valor da venda foi apagado por uma função que não tinha nada a ver com vendas. Num programa de mil linhas, achar esse erro leva horas.</p>
+
+<p>A alternativa é passar o que a função precisa por <strong>parâmetro</strong> e receber o resultado pelo <strong>retorno</strong>. Assim, só mexe no <code>total</code> quem recebeu o <code>total</code>:</p>
+
+<pre class="file" data-file="semglobal.cpp">#include &lt;iostream&gt;
+
+int somarItem(int total, int preco) {
+    return total + preco;
+}
+
+int main() {
+    int total = 0;
+    total = somarItem(total, 30);
+    total = somarItem(total, 5);
+    std::cout &lt;&lt; "Total da venda: " &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semglobal.cpp -o semglobal
+$ ./semglobal
+Total da venda: 35</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Global</th><th>Quando é aceitável</th></tr>
+<tr><td><code>int visitas = 0;</code> (variável)</td><td>Quase nunca. Prefira parâmetros e retorno (ou <code>&amp;</code>, aula <a href="passagem-referencia.html">Por Valor × Por Referência</a>).</td></tr>
+<tr><td><code>const double TAXA = 0.05;</code> (constante)</td><td><strong>Tudo bem.</strong> Ninguém consegue mudá-la, então não há culpado a procurar (aula <a href="constantes.html">Constantes</a>).</td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>Globais começam com zero</strong>
+<p>Uma global sem valor inicial (<code>int visitas;</code>) começa com 0. Uma variável local sem valor inicial começa com um valor qualquer, o que sobrou na memória, e o <code>-Wall</code> avisa (<code>is used uninitialized</code>; veja <a href="variaveis.html">Variáveis</a>). De qualquer jeito, a regra do guia vale para as duas: <strong>sempre inicialize</strong>.</p>
+</div>
+
+<hr>
+
+<h2>4. Sombreamento: quando um nome esconde outro</h2>
+<p>Se você cria, num bloco de dentro, uma variável com o <strong>mesmo nome</strong> de uma de fora, a de dentro "faz sombra" na de fora: dali até o fim do bloco, o nome se refere à de dentro. Isso se chama <strong>sombreamento</strong> (em inglês, <em>shadowing</em>):</p>
+
+<pre class="file" data-file="sombra.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int preco = 10;
+    if (preco &gt; 5) {
+        int preco = 99;
+        std::cout &lt;&lt; "dentro do if: " &lt;&lt; preco &lt;&lt; "\n";
+    }
+    std::cout &lt;&lt; "fora do if: " &lt;&lt; preco &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sombra.cpp -o sombra       « compila sem nenhum aviso
+$ ./sombra
+dentro do if: 99
+fora do if: 10</pre>
+
+<p>Na linha 6, a Ana provavelmente queria <strong>mudar</strong> o preço (<code>preco = 99;</code>), mas escreveu <code>int</code> na frente e criou <strong>outra</strong> variável. A de fora continuou 10. Nem <code>-Wall</code> nem <code>-Wextra</code> avisam disso. Existe uma opção específica, <code>-Wshadow</code> ("avisar sombras"):</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -Wshadow sombra.cpp -o sombra
+sombra.cpp: In function ‘int main()’:
+sombra.cpp:6:13: warning: declaration of ‘preco’ shadows a previous local [-Wshadow]
+    6 |         int preco = 99;
+      |             ^~~~~
+sombra.cpp:4:9: note: shadowed declaration is here
+    4 |     int preco = 10;
+      |         ^~~~~</pre>
+
+<dl class="anatomy">
+  <dt>declaration of ‘preco’ shadows a previous local</dt><dd>"A declaração de ‘preco’ faz sombra a uma variável local anterior".</dd>
+  <dt>note: shadowed declaration is here</dt><dd>"A declaração que ficou na sombra está aqui": a linha 4.</dd>
+</dl>
+
+<p>O mesmo acontece com uma global e uma local de mesmo nome:</p>
+
+<pre class="file" data-file="sombraglobal.cpp">#include &lt;iostream&gt;
+
+int visitas = 100;
+
+void mostrar() {
+    int visitas = 5;
+    std::cout &lt;&lt; "local: " &lt;&lt; visitas &lt;&lt; "\n";
+    std::cout &lt;&lt; "global: " &lt;&lt; ::visitas &lt;&lt; "\n";
+}
+
+int main() {
+    mostrar();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -Wshadow sombraglobal.cpp -o sombraglobal
+sombraglobal.cpp: In function ‘void mostrar()’:
+sombraglobal.cpp:6:9: warning: declaration of ‘visitas’ shadows a global declaration [-Wshadow]
+    6 |     int visitas = 5;
+      |         ^~~~~~~
+sombraglobal.cpp:3:5: note: shadowed declaration is here
+    3 | int visitas = 100;
+      |     ^~~~~~~
+$ ./sombraglobal
+local: 5
+global: 100</pre>
+
+<p>O <code>::visitas</code> (dois-pontos duplos sem nada antes) quer dizer "a <code>visitas</code> global". Funciona, mas é um remendo: o certo é dar nomes diferentes. O <code>::</code> é o mesmo do <code>std::cout</code>, e tem aula própria: <a href="namespaces.html">Namespaces</a>.</p>
+
+<div class="tip">
+<strong>Vale ligar o <code>-Wshadow</code></strong>
+<p>Muita gente acrescenta <code>-Wshadow</code> ao comando de sempre. Ele às vezes avisa de sombras inofensivas, mas pega exatamente o tipo de erro do <code>sombra.cpp</code>, que nenhum outro aviso pega. A aula <a href="avisos.html">Avisos</a> lista outras opções úteis.</p>
+</div>
+
+<div class="trycpp" data-flags="-std=c++23 -Wall -Wextra -Wshadow" data-goal="semaviso,out:Preço com desconto: 90">
+<p class="try-task"><strong>Missão:</strong> este editor está compilando com <code>-Wshadow</code>. O programa deveria mostrar <code>Preço com desconto: 90</code>, mas mostra 100 e um aviso de sombra (no Clang: <code>declaration shadows a local variable</code>). Conserte a linha do desconto para mudar a variável de fora, sem criar outra.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    double preco = 100;
+    bool clienteFiel = true;
+    if (clienteFiel) {
+        double preco = 90;
+    }
+    std::cout &lt;&lt; "Preço com desconto: " &lt;&lt; preco &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    double preco = 100;
+    bool clienteFiel = true;
+    if (clienteFiel) {
+        preco = 90;
+    }
+    std::cout &lt;&lt; "Preço com desconto: " &lt;&lt; preco &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>5. <code>static</code> local: a variável que lembra</h2>
+<p>A lojinha da Ana tem uma máquina de senhas: cada cliente que chega recebe o próximo número. Com uma variável local comum, isso não funciona, porque ela nasce de novo a cada chamada. Com a palavra <code>static</code> na frente, ela nasce <strong>uma vez só</strong> e guarda o valor entre as chamadas:</p>
+
+<pre class="file" data-file="contador.cpp">#include &lt;iostream&gt;
+
+void atenderSemStatic() {
+    int senha = 0;
+    senha++;
+    std::cout &lt;&lt; "Senha " &lt;&lt; senha &lt;&lt; "\n";
+}
+
+void atender() {
+    static int senha = 0;
+    senha++;
+    std::cout &lt;&lt; "Senha " &lt;&lt; senha &lt;&lt; "\n";
+}
+
+int main() {
+    std::cout &lt;&lt; "Sem static:\n";
+    atenderSemStatic();
+    atenderSemStatic();
+    atenderSemStatic();
+    std::cout &lt;&lt; "Com static:\n";
+    atender();
+    atender();
+    atender();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra contador.cpp -o contador
+$ ./contador
+Sem static:
+Senha 1
+Senha 1
+Senha 1
+Com static:
+Senha 1
+Senha 2
+Senha 3</pre>
+
+<dl class="anatomy">
+  <dt>int senha = 0;</dt><dd>Variável local comum: criada com 0 a <strong>cada</strong> chamada e destruída no fim. Sempre mostra 1.</dd>
+  <dt>static int senha = 0;</dt><dd><code>static</code> ("estático", que fica parado): a variável é criada <strong>na primeira chamada</strong>, e o <code>= 0</code> só acontece nessa vez. Nas chamadas seguintes, a linha é pulada, e a variável continua com o valor que tinha. Ela só é destruída quando o programa termina.</dd>
+</dl>
+
+<p>O melhor dos dois mundos: a <code>senha</code> <strong>dura</strong> como uma global, mas é <strong>visível</strong> só dentro de <code>atender</code>, como uma local. Ninguém de fora consegue estragá-la:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra staticfora.cpp -o staticfora      « o main tenta mostrar a senha
+staticfora.cpp: In function ‘int main()’:
+staticfora.cpp:11:18: error: ‘senha’ was not declared in this scope
+   11 |     std::cout &lt;&lt; senha &lt;&lt; "\n";
+      |                  ^~~~~</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo de variável</th><th>Quem enxerga</th><th>Quanto tempo dura</th></tr>
+<tr><td>Local (<code>int x</code> dentro de função ou bloco)</td><td>Só o bloco onde foi criada</td><td>Até o <code>}</code> do bloco; recriada a cada vez</td></tr>
+<tr><td><code>static</code> local (<code>static int x</code> dentro de função)</td><td>Só a função</td><td>Da primeira chamada até o fim do programa</td></tr>
+<tr><td>Global (fora das funções)</td><td>Todas as funções abaixo dela</td><td>O programa inteiro</td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>A palavra <code>static</code> tem outros usos</strong>
+<p>Numa variável <strong>dentro de uma função</strong>, <code>static</code> quer dizer "dura o programa todo", como aqui. Em outros lugares ela muda de sentido: fora das funções, deixa a global visível só naquele arquivo (<a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>); dentro de uma classe, cria um membro compartilhado (<a href="membros-static.html">Membros static</a>).</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: ‘x’ was not declared in this scope</code>, mas a variável existe</strong>
+<p><strong>O que significa:</strong> a variável existe, mas em outro território: dentro de outra função, dentro de um <code>if</code>/<code>for</code> que já fechou, ou é o parâmetro de outra função.</p>
+<p><strong>Como consertar:</strong> procure onde a variável foi criada e a que <code>{ }</code> ela pertence. Se precisa dela depois do bloco, crie-a antes do bloco. Se o valor vem de outra função, traga-o com <code>return</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O contador nunca passa de 1</strong>
+<p><strong>O que significa:</strong> a variável foi criada dentro do laço ou da função, e nasce de novo, com o valor inicial, a cada volta ou chamada.</p>
+<p><strong>Como consertar:</strong> num laço, crie o contador antes do laço. Numa função que precisa lembrar entre chamadas, use <code>static</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Mudei a variável dentro do <code>if</code>, mas fora dela o valor é o antigo</strong>
+<p><strong>O que significa:</strong> provavelmente você escreveu o tipo na frente (<code>int preco = 99;</code>) e criou uma variável nova com o mesmo nome: sombreamento. Sem <code>-Wshadow</code>, não há aviso.</p>
+<p><strong>Como consertar:</strong> tire o tipo para mudar a variável existente (<code>preco = 99;</code>). Compile com <code>-Wshadow</code> para o g++ apontar casos assim: <code>warning: declaration of ‘preco’ shadows a previous local</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Uma variável global muda de valor "sozinha"</strong>
+<p><strong>O que significa:</strong> alguma função está mexendo nela, talvez sem querer, por usar o mesmo nome.</p>
+<p><strong>Como consertar:</strong> o melhor é eliminar a global: passe o valor por parâmetro e devolva com <code>return</code> (ou use <code>&amp;</code>). Se precisa mesmo ser global e nunca muda, faça-a <code>const</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que é</th></tr>
+<tr><td><code>void f() { int x = 0; }</code></td><td><code>x</code> é local de <code>f</code></td></tr>
+<tr><td><code>if (…) { int y; }</code></td><td><code>y</code> só existe dentro do <code>if</code></td></tr>
+<tr><td><code>for (int i = 0; …) { }</code></td><td><code>i</code> só existe dentro do laço</td></tr>
+<tr><td><code>int total = 0;</code> fora das funções</td><td>Global: evite (constantes globais tudo bem)</td></tr>
+<tr><td><code>static int n = 0;</code> dentro da função</td><td>Criada uma vez, lembra o valor entre chamadas</td></tr>
+<tr><td><code>::nome</code></td><td>A variável global <code>nome</code>, mesmo com uma local de mesmo nome</td></tr>
+<tr><td><code>-Wshadow</code></td><td>Opção do g++ que avisa quando um nome esconde outro</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A palavra que faz lembrar</h3>
+<p>Complete para que a variável mantenha o valor entre as chamadas da função:</p>
+<div class="ex-code"><input data-answer="static" aria-label="palavra"> int chamadas = 0;</div>
+</div>
+
+<div class="exercise">
+<h3>2. O que aparece?</h3>
+<p><code>int x = 1; { int x = 2; } std::cout &lt;&lt; x;</code></p>
+<div class="ex-code"><input data-answer="1" aria-label="saída"></div>
+</div>
+
+<div class="exercise">
+<h3>3. A opção de aviso</h3>
+<p>Qual opção do g++ avisa quando uma variável esconde outra de mesmo nome?</p>
+<div class="ex-code"><input data-answer="-Wshadow" aria-label="opção"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Uma variável criada dentro do bloco de um <code>if</code>…</p>
+<label><input type="radio" name="q4"> …pode ser usada no resto da função, depois do <code>if</code></label>
+<label><input type="radio" name="q4"> …só existe até o <code>}</code> do <code>if</code></label>
+<label><input type="radio" name="q4"> …vira global</label>
+<label><input type="radio" name="q4"> …só existe se a condição for falsa</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. A função <code>void f() { static int n = 0; n++; std::cout &lt;&lt; n; }</code> é chamada três vezes. O que aparece?</p>
+<label><input type="radio" name="q5"> <code>111</code></label>
+<label><input type="radio" name="q5"> <code>000</code></label>
+<label><input type="radio" name="q5"> Erro: <code>n</code> já existe</label>
+<label><input type="radio" name="q5"> <code>123</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">6. Por que o guia recomenda evitar variáveis globais?</p>
+<label><input type="radio" name="q6"> Porque elas deixam o programa mais lento</label>
+<label><input type="radio" name="q6"> Porque o g++ não aceita globais com <code>-Wall</code></label>
+<label><input type="radio" name="q6"> Porque qualquer função pode mudá-las, e fica difícil descobrir quem estragou o valor</label>
+<label><input type="radio" name="q6"> Porque elas somem quando a função termina</label>
+</div>
+
+<h3>Missão final: os pedidos da lojinha</h3>
+
+<div class="trycpp" data-goal="out:Pedido nº 1: caderno,out:Pedido nº 2: caneta,out:Pedido nº 3: mochila,src:static\s+int,semaviso">
+<p class="try-task"><strong>Missão:</strong> complete a função <code>registrarPedido</code> para que cada pedido receba o próximo número, começando em 1. Use uma variável <code>static</code> <strong>dentro</strong> da função, sem variáveis globais e sem mexer no <code>main</code>. Saída esperada:</p>
+<pre class="out">Pedido nº 1: caderno
+Pedido nº 2: caneta
+Pedido nº 3: mochila</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void registrarPedido(const std::string&amp; produto) {
+    // crie aqui o contador de pedidos
+    std::cout &lt;&lt; "Pedido nº " &lt;&lt; "?" &lt;&lt; ": " &lt;&lt; produto &lt;&lt; "\n";
+}
+
+int main() {
+    registrarPedido("caderno");
+    registrarPedido("caneta");
+    registrarPedido("mochila");
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void registrarPedido(const std::string&amp; produto) {
+    static int numero = 0;
+    numero++;
+    std::cout &lt;&lt; "Pedido nº " &lt;&lt; numero &lt;&lt; ": " &lt;&lt; produto &lt;&lt; "\n";
+}
+
+int main() {
+    registrarPedido("caderno");
+    registrarPedido("caneta");
+    registrarPedido("mochila");
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>Escopo</strong> é a parte do código onde uma variável existe. De dentro se enxerga o que está fora; de fora não se enxerga o que está dentro.</li>
+  <li>Variáveis <strong>locais</strong> (e parâmetros) existem só na função. Fora dela: <code>‘x’ was not declared in this scope</code>.</li>
+  <li>Todo bloco <code>{ }</code> cria um escopo: a variável do <code>if</code>, do <code>for</code> e do laço morre no <code>}</code>, e é recriada a cada volta.</li>
+  <li>Variáveis <strong>globais</strong> são vistas e mudadas por todos: evite. Constantes globais (<code>const</code>) são aceitáveis.</li>
+  <li><strong>Sombreamento</strong>: uma variável de dentro com o mesmo nome esconde a de fora. Só o <code>-Wshadow</code> avisa.</li>
+  <li><code>static</code> numa variável local faz ela ser criada uma vez e lembrar o valor entre chamadas, sem ficar visível fora da função.</li>
+  <li>Próxima aula: <a href="recursao.html">Recursão</a>, uma função que chama a si mesma.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
