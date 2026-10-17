@@ -1,0 +1,2128 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Projeto Controle de Estoque — map, optional, sort com lambda e CSV | Guia C++</title>
+<meta name="description" content="Projeto passo a passo em C++: o controle de estoque da lojinha da Ana com std::map de produtos, entrada e saída de mercadoria, alerta de estoque baixo, busca com std::optional, relatório ordenado por valor com std::sort e lambda, e salvar e carregar um arquivo CSV. Saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>Projeto <span class="hl">Controle de Estoque</span></h1>
+
+<p class="intro">A lojinha de papelaria da Ana cresceu, e o caderno onde ela anotava o estoque não dá mais conta: ela vende cadernos sem perceber que estão acabando e não sabe quanto dinheiro está parado na prateleira. Neste projeto você vai escrever, em sete etapas, o programa que ela precisa: guarda os produtos pelo nome, registra entradas e saídas, avisa quando algo está acabando, mostra um relatório do que vale mais e grava tudo num arquivo, para nada se perder quando o programa fecha.</p>
+
+<div class="note">
+<strong>Você vai praticar</strong>
+<ul>
+  <li><a href="structs.html">struct</a> para descrever um produto.</li>
+  <li><a href="map.html">std::map</a>: guardar e achar produtos pelo nome (<code>find</code>, <code>[]</code>, e a armadilha do <code>[]</code>).</li>
+  <li><a href="optional-variant.html">std::optional</a>: uma busca que pode não encontrar nada.</li>
+  <li><a href="for-range.html">for de intervalo</a> com desestruturação (<code>auto&amp; [nome, p]</code>, de <a href="pair-tuple.html">pair e tuple</a>).</li>
+  <li><a href="algoritmos.html">std::sort</a> com uma <a href="lambdas.html">lambda</a> que diz a ordem.</li>
+  <li>Gravar e ler um arquivo CSV (<a href="arquivos.html">arquivos</a>), convertendo texto em número (<a href="string-numero.html">stoi e stod</a>).</li>
+  <li>Um menu de comandos digitados pelo usuário.</li>
+</ul>
+</div>
+
+<p>Todos os programas foram compilados e executados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp/estoque</code>, com o <strong>g++ 15.2</strong> e o comando padrão do guia, <code>g++ -std=c++23 -Wall -Wextra estoque.cpp -o estoque</code>. O programa inteiro fica num arquivo só, <code>estoque.cpp</code>, que cresce a cada etapa.</p>
+
+<hr>
+
+<h2>O que vamos construir</h2>
+<p>O programa pronto, numa sessão da Ana (o que vem depois de <code>estoque&gt;</code> é o que ela digitou):</p>
+
+<pre class="term" data-cwd="~/cpp/estoque">$ g++ -std=c++23 -Wall -Wextra estoque.cpp -o estoque
+$ ./estoque
+Lojinha da Ana: 5 produtos carregados.
+estoque&gt; listar
+borracha     60 un.  R$   1.80
+caderno      40 un.  R$  12.50
+caneta       90 un.  R$   2.50
+cola         12 un.  R$   4.75
+mochila       5 un.  R$  89.90
+estoque&gt; entrada caneta 30
+Entrada registrada.
+estoque&gt; saida caderno 32
+ALERTA: caderno ficou com 8 (mínimo 10)
+Saída registrada.
+estoque&gt; saida mochila 10
+Quantidade inválida para mochila: pedido 10, há 5
+estoque&gt; buscar mochila
+mochila: 5 un. a R$ 89.90
+estoque&gt; buscar glitter
+Não temos glitter.
+estoque&gt; alertas
+Repor caderno: 8 no estoque, mínimo 10
+Repor cola: 12 no estoque, mínimo 15
+estoque&gt; relatorio
+Produto     Qtd    Preço     Valor
+mochila       5    89.90    449.50
+caneta      120     2.50    300.00
+borracha     60     1.80    108.00
+caderno       8    12.50    100.00
+cola         12     4.75     57.00
+Total                      1014.50
+estoque&gt; ajuda
+Comandos: listar, entrada NOME QTD, saida NOME QTD, buscar NOME, alertas, relatorio, sair
+estoque&gt; sair
+
+Estoque salvo em estoque.csv.
+$ cat estoque.csv
+borracha,1.8,60,15
+caderno,12.5,8,10
+caneta,2.5,120,30
+cola,4.75,12,15
+mochila,89.9,5,2</pre>
+
+<ol class="passo">
+  <li><a href="#etapa1">O produto e o map</a>: cadastrar e listar.</li>
+  <li><a href="#etapa2">Entrada e saída de mercadoria</a>: <code>find</code> e validação.</li>
+  <li><a href="#etapa3">Buscar com std::optional</a>.</li>
+  <li><a href="#etapa4">Alerta de estoque baixo</a>.</li>
+  <li><a href="#etapa5">Relatório ordenado por valor</a>: <code>std::sort</code> e lambda.</li>
+  <li><a href="#etapa6">Salvar e carregar o CSV</a>.</li>
+  <li><a href="#etapa7">O menu</a>.</li>
+</ol>
+
+<pre class="term">$ mkdir -p cpp/estoque
+$ cd cpp/estoque</pre>
+
+<hr>
+
+<h2 id="etapa1">Etapa 1 · O produto e o map</h2>
+<p>Cada produto tem nome, preço, quantidade em estoque e um <strong>mínimo</strong>: a quantidade abaixo da qual a Ana precisa comprar mais. Quatro informações que andam juntas: uma <a href="structs.html">struct</a>.</p>
+
+<p>E onde guardar os produtos? Num <code>std::vector</code>, achar o "caderno" exigiria olhar um por um. Num <a href="map.html">std::map</a> (mapa, "dicionário"), cada produto fica guardado debaixo de uma <strong>chave</strong>, o nome, e o map acha a chave rapidamente. De quebra, ele mantém as chaves em ordem alfabética.</p>
+
+<pre class="file" data-file="estoque.cpp">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+    int minimo = 0;            // abaixo disso, repor
+};
+
+using Estoque = std::map&lt;std::string, Produto&gt;;
+
+void cadastrar(Estoque&amp; estoque, const Produto&amp; p) {
+    estoque[p.nome] = p;
+}
+
+void listar(const Estoque&amp; estoque) {
+    for (const auto&amp; [nome, p] : estoque) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5} un.  R$ {:&gt;6.2f}\n", nome, p.quantidade, p.preco);
+    }
+}
+
+Estoque estoqueInicial() {
+    Estoque estoque;
+    cadastrar(estoque, {"caderno", 12.5, 40, 10});
+    cadastrar(estoque, {"caneta", 2.5, 120, 30});
+    cadastrar(estoque, {"borracha", 1.8, 60, 15});
+    cadastrar(estoque, {"mochila", 89.9, 5, 2});
+    cadastrar(estoque, {"cola", 4.75, 12, 15});
+    return estoque;
+}
+
+int main() {
+    Estoque estoque = estoqueInicial();
+    listar(estoque);
+    std::cout &lt;&lt; estoque.size() &lt;&lt; " produtos\n";
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>struct Produto { … };</code></td><td>O molde de um produto. Todos os campos têm valor inicial (<code>= 0</code>): nada fica com lixo.</td></tr>
+<tr><td><code>using Estoque = std::map&lt;std::string, Produto&gt;;</code></td><td>Um apelido (<a href="using-typedef.html">using</a>): <code>Estoque</code> é um map cuja chave é o nome (<code>std::string</code>) e o valor é o <code>Produto</code>.</td></tr>
+<tr><td><code>Estoque&amp; estoque</code></td><td>As funções recebem o estoque por <a href="referencias.html">referência</a>: trabalham no original, sem copiar. Quando só leem, <code>const Estoque&amp;</code>.</td></tr>
+<tr><td><code>estoque[p.nome] = p;</code></td><td>Guarda o produto debaixo do nome dele. Se o nome já existia, substitui.</td></tr>
+<tr><td><code>for (const auto&amp; [nome, p] : estoque)</code></td><td>Percorre o map em ordem de chave. Cada item é um par (chave, valor); <code>[nome, p]</code> dá um nome a cada metade (desestruturação, <span class="versao">C++17</span>).</td></tr>
+<tr><td><code>"{:&lt;10}{:&gt;5} un.  R$ {:&gt;6.2f}\n"</code></td><td>Nome em 10 colunas à esquerda, quantidade em 5 à direita, preço em 6 com 2 casas (<a href="format-print.html">std::format</a>).</td></tr>
+<tr><td><code>cadastrar(estoque, {"caderno", 12.5, 40, 10});</code></td><td>As chaves montam um <code>Produto</code> na ordem dos campos: nome, preço, quantidade, mínimo.</td></tr>
+<tr><td><code>Estoque estoqueInicial()</code></td><td>Monta o estoque de exemplo. Vamos reaproveitá-la em todas as etapas.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp/estoque">$ g++ -std=c++23 -Wall -Wextra estoque.cpp -o estoque
+$ ./estoque
+borracha     60 un.  R$   1.80
+caderno      40 un.  R$  12.50
+caneta      120 un.  R$   2.50
+cola         12 un.  R$   4.75
+mochila       5 un.  R$  89.90
+5 produtos</pre>
+
+<p>Os produtos foram cadastrados na ordem caderno, caneta, borracha, mochila, cola, mas saíram em ordem alfabética. Quem ordenou foi o <code>std::map</code>.</p>
+
+<div class="trycpp" data-goal="outre:tesoura +12 un\.  R\$  15\.90,out:6 produtos">
+<p class="try-task"><strong>Missão (etapa 1):</strong> a Ana começou a vender tesouras: R$ 15.90, 12 unidades, mínimo 4. Cadastre a tesoura no <code>main</code>, logo depois de criar o estoque. A listagem deve ganhar a linha:</p>
+<pre class="out">tesoura      12 un.  R$  15.90
+6 produtos</pre>
+<pre class="script">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+    int minimo = 0;            // abaixo disso, repor
+};
+
+using Estoque = std::map&lt;std::string, Produto&gt;;
+
+void cadastrar(Estoque&amp; estoque, const Produto&amp; p) {
+    estoque[p.nome] = p;
+}
+
+void listar(const Estoque&amp; estoque) {
+    for (const auto&amp; [nome, p] : estoque) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5} un.  R$ {:&gt;6.2f}\n", nome, p.quantidade, p.preco);
+    }
+}
+
+Estoque estoqueInicial() {
+    Estoque estoque;
+    cadastrar(estoque, {"caderno", 12.5, 40, 10});
+    cadastrar(estoque, {"caneta", 2.5, 120, 30});
+    cadastrar(estoque, {"borracha", 1.8, 60, 15});
+    cadastrar(estoque, {"mochila", 89.9, 5, 2});
+    cadastrar(estoque, {"cola", 4.75, 12, 15});
+    return estoque;
+}
+
+int main() {
+    Estoque estoque = estoqueInicial();
+    listar(estoque);
+    std::cout &lt;&lt; estoque.size() &lt;&lt; " produtos\n";
+}
+</pre>
+<pre class="solucao">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+    int minimo = 0;            // abaixo disso, repor
+};
+
+using Estoque = std::map&lt;std::string, Produto&gt;;
+
+void cadastrar(Estoque&amp; estoque, const Produto&amp; p) {
+    estoque[p.nome] = p;
+}
+
+void listar(const Estoque&amp; estoque) {
+    for (const auto&amp; [nome, p] : estoque) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5} un.  R$ {:&gt;6.2f}\n", nome, p.quantidade, p.preco);
+    }
+}
+
+Estoque estoqueInicial() {
+    Estoque estoque;
+    cadastrar(estoque, {"caderno", 12.5, 40, 10});
+    cadastrar(estoque, {"caneta", 2.5, 120, 30});
+    cadastrar(estoque, {"borracha", 1.8, 60, 15});
+    cadastrar(estoque, {"mochila", 89.9, 5, 2});
+    cadastrar(estoque, {"cola", 4.75, 12, 15});
+    return estoque;
+}
+
+int main() {
+    Estoque estoque = estoqueInicial();
+    cadastrar(estoque, {"tesoura", 15.9, 12, 4});
+    listar(estoque);
+    std::cout &lt;&lt; estoque.size() &lt;&lt; " produtos\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa2">Etapa 2 · Entrada e saída de mercadoria</h2>
+<p>Chegou mercadoria: <strong>entrada</strong>, a quantidade sobe. Vendeu: <strong>saída</strong>, a quantidade desce. As duas precisam de cuidado: o produto tem de existir, a quantidade tem de ser positiva e, na saída, não dá para tirar mais do que há. As duas funções novas (o resto do arquivo continua como na etapa 1):</p>
+
+<pre class="file" data-file="estoque.cpp (funções novas)">bool entrada(Estoque&amp; estoque, const std::string&amp; nome, int qtd) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        std::cout &lt;&lt; "Produto não encontrado: " &lt;&lt; nome &lt;&lt; '\n';
+        return false;
+    }
+    if (qtd &lt;= 0) {
+        std::cout &lt;&lt; "Quantidade inválida: " &lt;&lt; qtd &lt;&lt; '\n';
+        return false;
+    }
+    it-&gt;second.quantidade += qtd;
+    return true;
+}
+
+bool saida(Estoque&amp; estoque, const std::string&amp; nome, int qtd) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        std::cout &lt;&lt; "Produto não encontrado: " &lt;&lt; nome &lt;&lt; '\n';
+        return false;
+    }
+    Produto&amp; p = it-&gt;second;
+    if (qtd &lt;= 0 || qtd &gt; p.quantidade) {
+        std::cout &lt;&lt; std::format("Quantidade inválida para {}: pedido {}, há {}\n",
+                                 nome, qtd, p.quantidade);
+        return false;
+    }
+    p.quantidade -= qtd;
+    return true;
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>auto it = estoque.find(nome);</code></td><td>Procura a chave. Devolve um <a href="iteradores.html">iterador</a>: uma "seta" apontando para o item achado.</td></tr>
+<tr><td><code>it == estoque.end()</code></td><td>Se não achou, a seta aponta para <code>end()</code>, "depois do último". É assim que se pergunta "não existe?".</td></tr>
+<tr><td><code>it-&gt;second</code></td><td>O item é um par: <code>it-&gt;first</code> é a chave (o nome), <code>it-&gt;second</code> é o <code>Produto</code> guardado no map.</td></tr>
+<tr><td><code>Produto&amp; p = it-&gt;second;</code></td><td>Um apelido (referência) para o produto <strong>dentro</strong> do map: mexer em <code>p</code> é mexer no estoque. Sem o <code>&amp;</code>, seria uma cópia, e a saída não mudaria nada.</td></tr>
+<tr><td><code>return false;</code></td><td>Recusa e avisa quem chamou. A mensagem com o motivo já foi mostrada.</td></tr>
+</table>
+</div>
+
+<p>E um <code>main</code> que testa os casos bons e os ruins:</p>
+<pre class="file" data-file="estoque.cpp (main)">int main() {
+    Estoque estoque = estoqueInicial();
+    entrada(estoque, "caneta", 30);
+    saida(estoque, "caderno", 32);
+    saida(estoque, "mochila", 10);      // só há 5
+    saida(estoque, "cadreno", 1);       // nome digitado errado
+    entrada(estoque, "cola", -5);
+    listar(estoque);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/estoque">$ g++ -std=c++23 -Wall -Wextra estoque.cpp -o estoque
+$ ./estoque
+Quantidade inválida para mochila: pedido 10, há 5
+Produto não encontrado: cadreno
+Quantidade inválida: -5
+borracha     60 un.  R$   1.80
+caderno       8 un.  R$  12.50
+caneta      150 un.  R$   2.50
+cola         12 un.  R$   4.75
+mochila       5 un.  R$  89.90</pre>
+
+<p>Caneta: 120 + 30 = 150. Caderno: 40 − 32 = 8. As três operações erradas foram recusadas com o motivo, e nenhuma mexeu no estoque.</p>
+
+<div class="cenario">
+<strong>Quando dá errado: o <code>[]</code> que cria produto</strong>
+<p>Por que tanto trabalho com <code>find</code>, se <code>estoque["caderno"]</code> já dá o produto? Acrescente no <code>main</code>, antes do <code>listar</code>, uma linha com o nome digitado errado:</p>
+<pre class="file" data-file="estoque.cpp (no main)">    estoque["cadreno"].quantidade -= 1;   // tirar 1 caderno... com o nome errado</pre>
+<pre class="term" data-cwd="~/cpp/estoque">$ g++ -std=c++23 -Wall -Wextra estoque.cpp -o estoque
+$ ./estoque
+Quantidade inválida para mochila: pedido 10, há 5
+Produto não encontrado: cadreno
+Quantidade inválida: -5
+borracha     60 un.  R$   1.80
+caderno       8 un.  R$  12.50
+cadreno      -1 un.  R$   0.00
+caneta      150 un.  R$   2.50
+cola         12 un.  R$   4.75
+mochila       5 un.  R$  89.90</pre>
+<p>Nenhum erro, nenhum aviso, e apareceu um produto <code>cadreno</code> com −1 unidade e preço zero. Quando a chave não existe, o <code>[]</code> do map <strong>cria</strong> um item novo, com um <code>Produto</code> vazio, e devolve esse item. <strong>Como evitar:</strong> para procurar, use <code>find</code> (ou <code>contains</code>, <span class="versao">C++20</span>, que só responde sim ou não). Use <code>[]</code> só quando quer mesmo criar ou substituir, como no <code>cadastrar</code>. Mais em <a href="map.html">std::map</a>.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Quantidade inválida: -5,out:Produto não encontrado: tesoura,outre:caneta +150 un\.">
+<p class="try-task"><strong>Missão (etapa 2):</strong> a função <code>entrada</code> está vazia (por isso os avisos de parâmetro não usado). Escreva-a como a <code>saida</code>, mas somando: produto inexistente mostra <code>Produto não encontrado: NOME</code>; quantidade zero ou negativa mostra <code>Quantidade inválida: QTD</code>. Na saída devem aparecer:</p>
+<pre class="out">Quantidade inválida: -5
+Produto não encontrado: tesoura
+…
+caneta      150 un.  R$   2.50</pre>
+<pre class="script">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+    int minimo = 0;            // abaixo disso, repor
+};
+
+using Estoque = std::map&lt;std::string, Produto&gt;;
+
+void cadastrar(Estoque&amp; estoque, const Produto&amp; p) {
+    estoque[p.nome] = p;
+}
+
+void listar(const Estoque&amp; estoque) {
+    for (const auto&amp; [nome, p] : estoque) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5} un.  R$ {:&gt;6.2f}\n", nome, p.quantidade, p.preco);
+    }
+}
+
+bool entrada(Estoque&amp; estoque, const std::string&amp; nome, int qtd) {
+    // Missão: procure o produto com find; se não existir, mostre
+    // "Produto não encontrado: NOME" e devolva false. Se qtd &lt;= 0, mostre
+    // "Quantidade inválida: QTD" e devolva false. Senão, some e devolva true.
+    return false;
+}
+
+bool saida(Estoque&amp; estoque, const std::string&amp; nome, int qtd) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        std::cout &lt;&lt; "Produto não encontrado: " &lt;&lt; nome &lt;&lt; '\n';
+        return false;
+    }
+    Produto&amp; p = it-&gt;second;
+    if (qtd &lt;= 0 || qtd &gt; p.quantidade) {
+        std::cout &lt;&lt; std::format("Quantidade inválida para {}: pedido {}, há {}\n",
+                                 nome, qtd, p.quantidade);
+        return false;
+    }
+    p.quantidade -= qtd;
+    return true;
+}
+
+Estoque estoqueInicial() {
+    Estoque estoque;
+    cadastrar(estoque, {"caderno", 12.5, 40, 10});
+    cadastrar(estoque, {"caneta", 2.5, 120, 30});
+    cadastrar(estoque, {"borracha", 1.8, 60, 15});
+    cadastrar(estoque, {"mochila", 89.9, 5, 2});
+    cadastrar(estoque, {"cola", 4.75, 12, 15});
+    return estoque;
+}
+
+int main() {
+    Estoque estoque = estoqueInicial();
+    entrada(estoque, "caneta", 30);
+    saida(estoque, "caderno", 32);
+    saida(estoque, "mochila", 10);      // só há 5
+    saida(estoque, "cadreno", 1);       // nome digitado errado
+    entrada(estoque, "cola", -5);
+    entrada(estoque, "tesoura", 5);
+    listar(estoque);
+}
+</pre>
+<pre class="solucao">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+    int minimo = 0;            // abaixo disso, repor
+};
+
+using Estoque = std::map&lt;std::string, Produto&gt;;
+
+void cadastrar(Estoque&amp; estoque, const Produto&amp; p) {
+    estoque[p.nome] = p;
+}
+
+void listar(const Estoque&amp; estoque) {
+    for (const auto&amp; [nome, p] : estoque) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5} un.  R$ {:&gt;6.2f}\n", nome, p.quantidade, p.preco);
+    }
+}
+
+bool entrada(Estoque&amp; estoque, const std::string&amp; nome, int qtd) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        std::cout &lt;&lt; "Produto não encontrado: " &lt;&lt; nome &lt;&lt; '\n';
+        return false;
+    }
+    if (qtd &lt;= 0) {
+        std::cout &lt;&lt; "Quantidade inválida: " &lt;&lt; qtd &lt;&lt; '\n';
+        return false;
+    }
+    it-&gt;second.quantidade += qtd;
+    return true;
+}
+
+bool saida(Estoque&amp; estoque, const std::string&amp; nome, int qtd) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        std::cout &lt;&lt; "Produto não encontrado: " &lt;&lt; nome &lt;&lt; '\n';
+        return false;
+    }
+    Produto&amp; p = it-&gt;second;
+    if (qtd &lt;= 0 || qtd &gt; p.quantidade) {
+        std::cout &lt;&lt; std::format("Quantidade inválida para {}: pedido {}, há {}\n",
+                                 nome, qtd, p.quantidade);
+        return false;
+    }
+    p.quantidade -= qtd;
+    return true;
+}
+
+Estoque estoqueInicial() {
+    Estoque estoque;
+    cadastrar(estoque, {"caderno", 12.5, 40, 10});
+    cadastrar(estoque, {"caneta", 2.5, 120, 30});
+    cadastrar(estoque, {"borracha", 1.8, 60, 15});
+    cadastrar(estoque, {"mochila", 89.9, 5, 2});
+    cadastrar(estoque, {"cola", 4.75, 12, 15});
+    return estoque;
+}
+
+int main() {
+    Estoque estoque = estoqueInicial();
+    entrada(estoque, "caneta", 30);
+    saida(estoque, "caderno", 32);
+    saida(estoque, "mochila", 10);      // só há 5
+    saida(estoque, "cadreno", 1);       // nome digitado errado
+    entrada(estoque, "cola", -5);
+    entrada(estoque, "tesoura", 5);
+    listar(estoque);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa3">Etapa 3 · Buscar com std::optional</h2>
+<p>Agora a Ana quer <strong>consultar</strong> um produto: "tem mochila? quanto custa?". Uma função <code>buscar</code> que devolve o <code>Produto</code>… mas e se não existir? Devolver um produto vazio confundiria (um produto com preço zero existe ou não?). Para isso existe o <a href="optional-variant.html">std::optional</a> <span class="versao">C++17</span>: uma caixinha que tem <strong>um produto ou nada</strong>.</p>
+
+<pre class="file" data-file="estoque.cpp (função nova)">std::optional&lt;Produto&gt; buscar(const Estoque&amp; estoque, const std::string&amp; nome) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        return std::nullopt;
+    }
+    return it-&gt;second;
+}
+</pre>
+
+<p>Junto com <code>#include &lt;optional&gt;</code> no topo. E o <code>main</code>, com três jeitos de usar o resultado:</p>
+<pre class="file" data-file="estoque.cpp (main)">int main() {
+    Estoque estoque = estoqueInicial();
+
+    std::optional&lt;Produto&gt; p = buscar(estoque, "mochila");
+    if (p.has_value()) {
+        std::cout &lt;&lt; p-&gt;nome &lt;&lt; ": " &lt;&lt; p-&gt;quantidade &lt;&lt; " un. a R$ " &lt;&lt; p-&gt;preco &lt;&lt; '\n';
+    }
+
+    auto q = buscar(estoque, "glitter");
+    if (!q) {
+        std::cout &lt;&lt; "Não temos glitter.\n";
+    }
+
+    if (auto r = buscar(estoque, "cola")) {     // cria e testa de uma vez
+        std::cout &lt;&lt; "cola: " &lt;&lt; r-&gt;quantidade &lt;&lt; " un.\n";
+    }
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>std::optional&lt;Produto&gt;</code></td><td>"Talvez um <code>Produto</code>".</td></tr>
+<tr><td><code>return std::nullopt;</code></td><td>Devolve a caixa vazia (<em>null option</em>, "opção nula").</td></tr>
+<tr><td><code>return it-&gt;second;</code></td><td>Devolve a caixa com uma <strong>cópia</strong> do produto. Para ler, basta; para mudar o estoque, use <code>entrada</code> e <code>saida</code>.</td></tr>
+<tr><td><code>p.has_value()</code></td><td>Tem alguma coisa dentro?</td></tr>
+<tr><td><code>p-&gt;nome</code></td><td>Usa o produto de dentro da caixa (como num ponteiro). Só depois de conferir que ela não está vazia.</td></tr>
+<tr><td><code>if (!q)</code></td><td>Um <code>optional</code> vale <code>true</code> quando tem valor. <code>!q</code>: "se está vazio".</td></tr>
+<tr><td><code>if (auto r = buscar(…))</code></td><td>Cria <code>r</code> e testa na mesma linha. <code>r</code> só existe dentro do <code>if</code>. É o jeito mais usado.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp/estoque">$ g++ -std=c++23 -Wall -Wextra estoque.cpp -o estoque
+$ ./estoque
+mochila: 5 un. a R$ 89.9
+Não temos glitter.
+cola: 12 un.</pre>
+
+<p>O preço saiu <code>89.9</code> porque aqui usamos <code>cout</code>, não <code>std::format</code> com <code>.2f</code>.</p>
+
+<div class="cenario">
+<strong>Quando dá errado: abrir a caixa vazia</strong>
+<p>No fim do <code>main</code>, pegue o preço do glitter sem conferir, com <code>.value()</code>:</p>
+<pre class="file" data-file="estoque.cpp (no main)">    std::cout &lt;&lt; buscar(estoque, "glitter").value().preco &lt;&lt; '\n';</pre>
+<pre class="term" data-cwd="~/cpp/estoque">$ g++ -std=c++23 -Wall -Wextra estoque.cpp -o estoque
+$ ./estoque
+mochila: 5 un. a R$ 89.9
+Não temos glitter.
+cola: 12 un.
+terminate called after throwing an instance of 'std::bad_optional_access'
+  what():  bad optional access
+Abortado                   (imagem do núcleo gravada) ./estoque</pre>
+<p><code>.value()</code> abre a caixa e, se ela estiver vazia, lança a exceção <code>std::bad_optional_access</code> ("acesso ruim a optional"). Ninguém a capturou, e o programa abortou (como no <a href="projeto-banco.html#etapa3">projeto do banco</a>). Pior ainda seria <code>buscar(…)-&gt;preco</code> ou <code>*buscar(…)</code> numa caixa vazia: aí não há exceção, é <a href="comportamento-indefinido.html">comportamento indefinido</a>, e o programa pode mostrar lixo sem avisar. <strong>Como consertar:</strong> confira antes (<code>if (auto r = …)</code>) ou dê um valor reserva: <code>buscar(estoque, "glitter").value_or(Produto{}).preco</code> dá <code>0</code>.</p>
+</div>
+
+<div class="trycpp" data-goal="out:borracha: 60 un.,out:Não temos glitter.,src:buscar\s*\(">
+<p class="try-task"><strong>Missão (etapa 3):</strong> no <code>main</code>, use <code>buscar</code> duas vezes: mostre <code>borracha: 60 un.</code> e, para <code>"glitter"</code>, que não existe, <code>Não temos glitter.</code></p>
+<pre class="script">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;optional&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+    int minimo = 0;            // abaixo disso, repor
+};
+
+using Estoque = std::map&lt;std::string, Produto&gt;;
+
+void cadastrar(Estoque&amp; estoque, const Produto&amp; p) {
+    estoque[p.nome] = p;
+}
+
+void listar(const Estoque&amp; estoque) {
+    for (const auto&amp; [nome, p] : estoque) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5} un.  R$ {:&gt;6.2f}\n", nome, p.quantidade, p.preco);
+    }
+}
+
+std::optional&lt;Produto&gt; buscar(const Estoque&amp; estoque, const std::string&amp; nome) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        return std::nullopt;
+    }
+    return it-&gt;second;
+}
+
+Estoque estoqueInicial() {
+    Estoque estoque;
+    cadastrar(estoque, {"caderno", 12.5, 40, 10});
+    cadastrar(estoque, {"caneta", 2.5, 120, 30});
+    cadastrar(estoque, {"borracha", 1.8, 60, 15});
+    cadastrar(estoque, {"mochila", 89.9, 5, 2});
+    cadastrar(estoque, {"cola", 4.75, 12, 15});
+    return estoque;
+}
+
+int main() {
+    Estoque estoque = estoqueInicial();
+    // Missão: use buscar para mostrar "borracha: 60 un."
+    // e, para "glitter", que não existe, "Não temos glitter."
+}
+</pre>
+<pre class="solucao">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;optional&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+    int minimo = 0;            // abaixo disso, repor
+};
+
+using Estoque = std::map&lt;std::string, Produto&gt;;
+
+void cadastrar(Estoque&amp; estoque, const Produto&amp; p) {
+    estoque[p.nome] = p;
+}
+
+void listar(const Estoque&amp; estoque) {
+    for (const auto&amp; [nome, p] : estoque) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5} un.  R$ {:&gt;6.2f}\n", nome, p.quantidade, p.preco);
+    }
+}
+
+std::optional&lt;Produto&gt; buscar(const Estoque&amp; estoque, const std::string&amp; nome) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        return std::nullopt;
+    }
+    return it-&gt;second;
+}
+
+Estoque estoqueInicial() {
+    Estoque estoque;
+    cadastrar(estoque, {"caderno", 12.5, 40, 10});
+    cadastrar(estoque, {"caneta", 2.5, 120, 30});
+    cadastrar(estoque, {"borracha", 1.8, 60, 15});
+    cadastrar(estoque, {"mochila", 89.9, 5, 2});
+    cadastrar(estoque, {"cola", 4.75, 12, 15});
+    return estoque;
+}
+
+int main() {
+    Estoque estoque = estoqueInicial();
+    if (auto p = buscar(estoque, "borracha")) {
+        std::cout &lt;&lt; p-&gt;nome &lt;&lt; ": " &lt;&lt; p-&gt;quantidade &lt;&lt; " un.\n";
+    }
+    if (!buscar(estoque, "glitter")) {
+        std::cout &lt;&lt; "Não temos glitter.\n";
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa4">Etapa 4 · Alerta de estoque baixo</h2>
+<p>Dois avisos: um <strong>na hora</strong>, quando uma saída deixa o produto no mínimo ou abaixo dele; e um <strong>relatório de alertas</strong>, com tudo o que precisa ser reposto. O primeiro são três linhas a mais no fim da <code>saida</code>:</p>
+
+<pre class="file" data-file="estoque.cpp (saida, final)">    p.quantidade -= qtd;
+    if (p.quantidade &lt;= p.minimo) {
+        std::cout &lt;&lt; std::format("ALERTA: {} ficou com {} (mínimo {})\n",
+                                 nome, p.quantidade, p.minimo);
+    }
+    return true;
+}</pre>
+
+<p>O segundo é uma função nova, que percorre o estoque e conta quantos alertas deu, para dizer "nenhum" quando estiver tudo bem:</p>
+<pre class="file" data-file="estoque.cpp (função nova)">void alertas(const Estoque&amp; estoque) {
+    int contador = 0;
+    for (const auto&amp; [nome, p] : estoque) {
+        if (p.quantidade &lt;= p.minimo) {
+            std::cout &lt;&lt; std::format("Repor {}: {} no estoque, mínimo {}\n",
+                                     nome, p.quantidade, p.minimo);
+            ++contador;
+        }
+    }
+    if (contador == 0) {
+        std::cout &lt;&lt; "Nenhum produto abaixo do mínimo.\n";
+    }
+}
+</pre>
+
+<pre class="file" data-file="estoque.cpp (main)">int main() {
+    Estoque estoque = estoqueInicial();
+    saida(estoque, "caderno", 32);
+    saida(estoque, "caneta", 50);
+    std::cout &lt;&lt; "--- alertas ---\n";
+    alertas(estoque);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/estoque">$ g++ -std=c++23 -Wall -Wextra estoque.cpp -o estoque
+$ ./estoque
+ALERTA: caderno ficou com 8 (mínimo 10)
+--- alertas ---
+Repor caderno: 8 no estoque, mínimo 10
+Repor cola: 12 no estoque, mínimo 15</pre>
+
+<p>A saída de 32 cadernos disparou o alerta na hora (sobraram 8, mínimo 10). A de 50 canetas não: sobraram 70, bem acima de 30. E o relatório de alertas pegou também a cola, que <strong>já começou</strong> abaixo do mínimo (12 de 15): nenhuma saída a avisou, só a varredura.</p>
+
+<div class="trycpp" data-goal="out:Repor caderno: 8 no estoque\, mínimo 10,out:Repor cola: 12 no estoque\, mínimo 15">
+<p class="try-task"><strong>Missão (etapa 4):</strong> a função <code>alertas</code> está vazia. Escreva-a: um <code>for</code> pelo estoque e, para cada produto com quantidade menor ou igual ao mínimo, a linha <code>Repor NOME: QTD no estoque, mínimo MIN</code>. Se nenhum precisar, <code>Nenhum produto abaixo do mínimo.</code></p>
+<pre class="script">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+    int minimo = 0;            // abaixo disso, repor
+};
+
+using Estoque = std::map&lt;std::string, Produto&gt;;
+
+void cadastrar(Estoque&amp; estoque, const Produto&amp; p) {
+    estoque[p.nome] = p;
+}
+
+void listar(const Estoque&amp; estoque) {
+    for (const auto&amp; [nome, p] : estoque) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5} un.  R$ {:&gt;6.2f}\n", nome, p.quantidade, p.preco);
+    }
+}
+
+bool saida(Estoque&amp; estoque, const std::string&amp; nome, int qtd) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        std::cout &lt;&lt; "Produto não encontrado: " &lt;&lt; nome &lt;&lt; '\n';
+        return false;
+    }
+    Produto&amp; p = it-&gt;second;
+    if (qtd &lt;= 0 || qtd &gt; p.quantidade) {
+        std::cout &lt;&lt; std::format("Quantidade inválida para {}: pedido {}, há {}\n",
+                                 nome, qtd, p.quantidade);
+        return false;
+    }
+    p.quantidade -= qtd;
+    if (p.quantidade &lt;= p.minimo) {
+        std::cout &lt;&lt; std::format("ALERTA: {} ficou com {} (mínimo {})\n",
+                                 nome, p.quantidade, p.minimo);
+    }
+    return true;
+}
+
+void alertas(const Estoque&amp; estoque) {
+    // Missão: para cada produto com quantidade &lt;= minimo, mostre
+    // "Repor NOME: QTD no estoque, mínimo MIN". Se nenhum, mostre
+    // "Nenhum produto abaixo do mínimo."
+}
+
+Estoque estoqueInicial() {
+    Estoque estoque;
+    cadastrar(estoque, {"caderno", 12.5, 40, 10});
+    cadastrar(estoque, {"caneta", 2.5, 120, 30});
+    cadastrar(estoque, {"borracha", 1.8, 60, 15});
+    cadastrar(estoque, {"mochila", 89.9, 5, 2});
+    cadastrar(estoque, {"cola", 4.75, 12, 15});
+    return estoque;
+}
+
+int main() {
+    Estoque estoque = estoqueInicial();
+    saida(estoque, "caderno", 32);
+    saida(estoque, "caneta", 50);
+    std::cout &lt;&lt; "--- alertas ---\n";
+    alertas(estoque);
+}
+</pre>
+<pre class="solucao">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+    int minimo = 0;            // abaixo disso, repor
+};
+
+using Estoque = std::map&lt;std::string, Produto&gt;;
+
+void cadastrar(Estoque&amp; estoque, const Produto&amp; p) {
+    estoque[p.nome] = p;
+}
+
+void listar(const Estoque&amp; estoque) {
+    for (const auto&amp; [nome, p] : estoque) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5} un.  R$ {:&gt;6.2f}\n", nome, p.quantidade, p.preco);
+    }
+}
+
+bool saida(Estoque&amp; estoque, const std::string&amp; nome, int qtd) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        std::cout &lt;&lt; "Produto não encontrado: " &lt;&lt; nome &lt;&lt; '\n';
+        return false;
+    }
+    Produto&amp; p = it-&gt;second;
+    if (qtd &lt;= 0 || qtd &gt; p.quantidade) {
+        std::cout &lt;&lt; std::format("Quantidade inválida para {}: pedido {}, há {}\n",
+                                 nome, qtd, p.quantidade);
+        return false;
+    }
+    p.quantidade -= qtd;
+    if (p.quantidade &lt;= p.minimo) {
+        std::cout &lt;&lt; std::format("ALERTA: {} ficou com {} (mínimo {})\n",
+                                 nome, p.quantidade, p.minimo);
+    }
+    return true;
+}
+
+void alertas(const Estoque&amp; estoque) {
+    int contador = 0;
+    for (const auto&amp; [nome, p] : estoque) {
+        if (p.quantidade &lt;= p.minimo) {
+            std::cout &lt;&lt; std::format("Repor {}: {} no estoque, mínimo {}\n",
+                                     nome, p.quantidade, p.minimo);
+            ++contador;
+        }
+    }
+    if (contador == 0) {
+        std::cout &lt;&lt; "Nenhum produto abaixo do mínimo.\n";
+    }
+}
+
+Estoque estoqueInicial() {
+    Estoque estoque;
+    cadastrar(estoque, {"caderno", 12.5, 40, 10});
+    cadastrar(estoque, {"caneta", 2.5, 120, 30});
+    cadastrar(estoque, {"borracha", 1.8, 60, 15});
+    cadastrar(estoque, {"mochila", 89.9, 5, 2});
+    cadastrar(estoque, {"cola", 4.75, 12, 15});
+    return estoque;
+}
+
+int main() {
+    Estoque estoque = estoqueInicial();
+    saida(estoque, "caderno", 32);
+    saida(estoque, "caneta", 50);
+    std::cout &lt;&lt; "--- alertas ---\n";
+    alertas(estoque);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa5">Etapa 5 · Relatório ordenado por valor</h2>
+<p>"Onde está o meu dinheiro?" O <strong>valor em estoque</strong> de um produto é preço × quantidade. A Ana quer uma tabela do que vale mais para o que vale menos, com o total no fim. O map está em ordem de <strong>nome</strong>, e não dá para reordená-lo: a ordem do map é sempre a das chaves. Então copiamos os produtos para um <code>std::vector</code> e ordenamos o vetor com <a href="algoritmos.html">std::sort</a>, dizendo o critério com uma <a href="lambdas.html">lambda</a>.</p>
+
+<p>O <code>Produto</code> ganha um método que calcula o valor, e entra a função <code>relatorio</code> (mais <code>#include &lt;algorithm&gt;</code> e <code>#include &lt;vector&gt;</code>):</p>
+<pre class="file" data-file="estoque.cpp (o que é novo)">struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+    int minimo = 0;            // abaixo disso, repor
+
+    double valor() const { return preco * quantidade; }
+};
+
+void relatorio(const Estoque&amp; estoque) {
+    std::vector&lt;Produto&gt; lista;
+    for (const auto&amp; [nome, p] : estoque) {
+        lista.push_back(p);
+    }
+    std::sort(lista.begin(), lista.end(), [](const Produto&amp; a, const Produto&amp; b) {
+        return a.valor() &gt; b.valor();
+    });
+
+    std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5}{:&gt;9}{:&gt;10}\n", "Produto", "Qtd", "Preço", "Valor");
+    double total = 0.0;
+    for (const auto&amp; p : lista) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5}{:&gt;9.2f}{:&gt;10.2f}\n",
+                                 p.nome, p.quantidade, p.preco, p.valor());
+        total += p.valor();
+    }
+    std::cout &lt;&lt; std::format("{:&lt;24}{:&gt;10.2f}\n", "Total", total);
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>double valor() const</code></td><td>Um método dentro da struct: calcula na hora, então nunca fica desatualizado.</td></tr>
+<tr><td><code>lista.push_back(p);</code></td><td>Copia cada produto do map para o vetor.</td></tr>
+<tr><td><code>std::sort(lista.begin(), lista.end(), …)</code></td><td>Ordena o vetor inteiro, do começo (<code>begin</code>) ao fim (<code>end</code>).</td></tr>
+<tr><td><code>[](const Produto&amp; a, const Produto&amp; b) { … }</code></td><td>A lambda: uma função sem nome, escrita ali mesmo. O <code>sort</code> a chama para comparar dois produtos.</td></tr>
+<tr><td><code>return a.valor() &gt; b.valor();</code></td><td>"<code>a</code> vem antes de <code>b</code> se vale mais." Com <code>&gt;</code>, do maior para o menor; com <code>&lt;</code>, do menor para o maior.</td></tr>
+<tr><td><code>"{:&lt;24}{:&gt;10.2f}\n"</code></td><td>A linha do total: 24 colunas para "Total" (10 + 5 + 9, as três primeiras colunas juntas) e o valor alinhado embaixo da coluna "Valor".</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="estoque.cpp (main)">int main() {
+    Estoque estoque = estoqueInicial();
+    saida(estoque, "caderno", 32);
+    relatorio(estoque);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/estoque">$ g++ -std=c++23 -Wall -Wextra estoque.cpp -o estoque
+$ ./estoque
+ALERTA: caderno ficou com 8 (mínimo 10)
+Produto     Qtd    Preço     Valor
+mochila       5    89.90    449.50
+caneta      120     2.50    300.00
+borracha     60     1.80    108.00
+caderno       8    12.50    100.00
+cola         12     4.75     57.00
+Total                      1014.50</pre>
+
+<p>Surpresa para a Ana: as 5 mochilas valem mais que as 120 canetas. Repare também na coluna "Preço", com acento, alinhada certinho: o <code>std::format</code> conta colunas, não bytes (<a href="acentos-utf8.html">Acentos e UTF-8</a>).</p>
+
+<div class="tip">
+<strong>Outra forma: <code>std::ranges::sort</code></strong>
+<p>Desde o <span class="versao">C++20</span>, dá para escrever <code>std::ranges::sort(lista, comparador)</code>, sem <code>begin</code> e <code>end</code>; ou ainda <code>std::ranges::sort(lista, std::greater{}, &amp;Produto::valor)</code>, que diz "ordene pelo <code>valor</code>, do maior para o menor". Veja <a href="ranges.html">Ranges</a>.</p>
+</div>
+
+<div class="trycpp" data-goal="outre:Valor\ncaneta +120,src:quantidade">
+<p class="try-task"><strong>Missão (etapa 5):</strong> a Ana quer outra visão: ordene o relatório pela <strong>quantidade</strong>, da maior para a menor. Só a lambda muda. A primeira linha depois do cabeçalho deve ser a caneta:</p>
+<pre class="out">Produto     Qtd    Preço     Valor
+caneta      120     2.50    300.00</pre>
+<pre class="script">#include &lt;algorithm&gt;
+#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+    int minimo = 0;            // abaixo disso, repor
+
+    double valor() const { return preco * quantidade; }
+};
+
+using Estoque = std::map&lt;std::string, Produto&gt;;
+
+void cadastrar(Estoque&amp; estoque, const Produto&amp; p) {
+    estoque[p.nome] = p;
+}
+
+void listar(const Estoque&amp; estoque) {
+    for (const auto&amp; [nome, p] : estoque) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5} un.  R$ {:&gt;6.2f}\n", nome, p.quantidade, p.preco);
+    }
+}
+
+bool saida(Estoque&amp; estoque, const std::string&amp; nome, int qtd) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        std::cout &lt;&lt; "Produto não encontrado: " &lt;&lt; nome &lt;&lt; '\n';
+        return false;
+    }
+    Produto&amp; p = it-&gt;second;
+    if (qtd &lt;= 0 || qtd &gt; p.quantidade) {
+        std::cout &lt;&lt; std::format("Quantidade inválida para {}: pedido {}, há {}\n",
+                                 nome, qtd, p.quantidade);
+        return false;
+    }
+    p.quantidade -= qtd;
+    if (p.quantidade &lt;= p.minimo) {
+        std::cout &lt;&lt; std::format("ALERTA: {} ficou com {} (mínimo {})\n",
+                                 nome, p.quantidade, p.minimo);
+    }
+    return true;
+}
+
+void relatorio(const Estoque&amp; estoque) {
+    std::vector&lt;Produto&gt; lista;
+    for (const auto&amp; [nome, p] : estoque) {
+        lista.push_back(p);
+    }
+    std::sort(lista.begin(), lista.end(), [](const Produto&amp; a, const Produto&amp; b) {
+        return a.valor() &gt; b.valor();
+    });
+
+    std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5}{:&gt;9}{:&gt;10}\n", "Produto", "Qtd", "Preço", "Valor");
+    double total = 0.0;
+    for (const auto&amp; p : lista) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5}{:&gt;9.2f}{:&gt;10.2f}\n",
+                                 p.nome, p.quantidade, p.preco, p.valor());
+        total += p.valor();
+    }
+    std::cout &lt;&lt; std::format("{:&lt;24}{:&gt;10.2f}\n", "Total", total);
+}
+
+Estoque estoqueInicial() {
+    Estoque estoque;
+    cadastrar(estoque, {"caderno", 12.5, 40, 10});
+    cadastrar(estoque, {"caneta", 2.5, 120, 30});
+    cadastrar(estoque, {"borracha", 1.8, 60, 15});
+    cadastrar(estoque, {"mochila", 89.9, 5, 2});
+    cadastrar(estoque, {"cola", 4.75, 12, 15});
+    return estoque;
+}
+
+int main() {
+    Estoque estoque = estoqueInicial();
+    saida(estoque, "caderno", 32);
+    relatorio(estoque);
+}
+</pre>
+<pre class="solucao">#include &lt;algorithm&gt;
+#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+    int minimo = 0;            // abaixo disso, repor
+
+    double valor() const { return preco * quantidade; }
+};
+
+using Estoque = std::map&lt;std::string, Produto&gt;;
+
+void cadastrar(Estoque&amp; estoque, const Produto&amp; p) {
+    estoque[p.nome] = p;
+}
+
+void listar(const Estoque&amp; estoque) {
+    for (const auto&amp; [nome, p] : estoque) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5} un.  R$ {:&gt;6.2f}\n", nome, p.quantidade, p.preco);
+    }
+}
+
+bool saida(Estoque&amp; estoque, const std::string&amp; nome, int qtd) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        std::cout &lt;&lt; "Produto não encontrado: " &lt;&lt; nome &lt;&lt; '\n';
+        return false;
+    }
+    Produto&amp; p = it-&gt;second;
+    if (qtd &lt;= 0 || qtd &gt; p.quantidade) {
+        std::cout &lt;&lt; std::format("Quantidade inválida para {}: pedido {}, há {}\n",
+                                 nome, qtd, p.quantidade);
+        return false;
+    }
+    p.quantidade -= qtd;
+    if (p.quantidade &lt;= p.minimo) {
+        std::cout &lt;&lt; std::format("ALERTA: {} ficou com {} (mínimo {})\n",
+                                 nome, p.quantidade, p.minimo);
+    }
+    return true;
+}
+
+void relatorio(const Estoque&amp; estoque) {
+    std::vector&lt;Produto&gt; lista;
+    for (const auto&amp; [nome, p] : estoque) {
+        lista.push_back(p);
+    }
+    std::sort(lista.begin(), lista.end(), [](const Produto&amp; a, const Produto&amp; b) {
+        return a.quantidade &gt; b.quantidade;
+    });
+
+    std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5}{:&gt;9}{:&gt;10}\n", "Produto", "Qtd", "Preço", "Valor");
+    double total = 0.0;
+    for (const auto&amp; p : lista) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5}{:&gt;9.2f}{:&gt;10.2f}\n",
+                                 p.nome, p.quantidade, p.preco, p.valor());
+        total += p.valor();
+    }
+    std::cout &lt;&lt; std::format("{:&lt;24}{:&gt;10.2f}\n", "Total", total);
+}
+
+Estoque estoqueInicial() {
+    Estoque estoque;
+    cadastrar(estoque, {"caderno", 12.5, 40, 10});
+    cadastrar(estoque, {"caneta", 2.5, 120, 30});
+    cadastrar(estoque, {"borracha", 1.8, 60, 15});
+    cadastrar(estoque, {"mochila", 89.9, 5, 2});
+    cadastrar(estoque, {"cola", 4.75, 12, 15});
+    return estoque;
+}
+
+int main() {
+    Estoque estoque = estoqueInicial();
+    saida(estoque, "caderno", 32);
+    relatorio(estoque);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa6">Etapa 6 · Salvar e carregar o CSV</h2>
+<p>Até agora, cada vez que o programa fecha, o estoque volta ao inicial. Vamos gravar o estoque num arquivo <strong>CSV</strong> (<em>comma-separated values</em>, "valores separados por vírgula"): uma linha por produto, com os campos separados por vírgula. É um formato de texto simples, que qualquer planilha abre.</p>
+
+<pre class="file" data-file="estoque.csv">borracha,1.8,60,15
+caderno,12.5,40,10
+caneta,2.5,100,30</pre>
+
+<p>As duas funções novas (mais <code>#include &lt;fstream&gt;</code> e <code>#include &lt;sstream&gt;</code>):</p>
+<pre class="file" data-file="estoque.cpp (funções novas)">void salvar(const Estoque&amp; estoque, const std::string&amp; arquivo) {
+    std::ofstream arq{arquivo};
+    for (const auto&amp; [nome, p] : estoque) {
+        arq &lt;&lt; nome &lt;&lt; ',' &lt;&lt; p.preco &lt;&lt; ',' &lt;&lt; p.quantidade &lt;&lt; ',' &lt;&lt; p.minimo &lt;&lt; '\n';
+    }
+}
+
+Estoque carregar(const std::string&amp; arquivo) {
+    Estoque estoque;
+    std::ifstream arq{arquivo};
+    std::string linha;
+    while (std::getline(arq, linha)) {
+        std::istringstream campos{linha};
+        std::string nome, preco, qtd, minimo;
+        std::getline(campos, nome, ',');
+        std::getline(campos, preco, ',');
+        std::getline(campos, qtd, ',');
+        std::getline(campos, minimo);
+        cadastrar(estoque, {nome, std::stod(preco), std::stoi(qtd), std::stoi(minimo)});
+    }
+    return estoque;
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>std::ofstream arq{arquivo};</code></td><td>Abre o arquivo para <strong>escrever</strong> (<em>output file stream</em>), apagando o conteúdo antigo. Escreve-se com <code>&lt;&lt;</code>, como no <code>cout</code>. O arquivo é fechado sozinho no fim da função (<a href="destrutores-raii.html">RAII</a>).</td></tr>
+<tr><td><code>std::ifstream arq{arquivo};</code></td><td>Abre para <strong>ler</strong> (<em>input file stream</em>). Se o arquivo não existe, a leitura simplesmente não acha nada.</td></tr>
+<tr><td><code>while (std::getline(arq, linha))</code></td><td>Lê linha por linha até o fim (<a href="getline.html">getline</a>).</td></tr>
+<tr><td><code>std::istringstream campos{linha};</code></td><td>Trata a linha como um arquivinho, para ler pedaço por pedaço.</td></tr>
+<tr><td><code>std::getline(campos, nome, ',');</code></td><td>O terceiro argumento troca o separador: lê até a próxima <strong>vírgula</strong>. O último campo vai até o fim da linha.</td></tr>
+<tr><td><code>std::stod(preco)</code>, <code>std::stoi(qtd)</code></td><td>Texto → número: <code>stod</code> = <em>string to double</em>, <code>stoi</code> = <em>string to int</em> (<a href="string-numero.html">Texto ↔ Número</a>).</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="estoque.cpp (main)">int main() {
+    Estoque estoque = carregar("estoque.csv");
+    if (estoque.empty()) {
+        std::cout &lt;&lt; "Sem estoque.csv: usando o estoque inicial.\n";
+        estoque = estoqueInicial();
+    }
+    saida(estoque, "caneta", 10);
+    listar(estoque);
+    salvar(estoque, "estoque.csv");
+}
+</pre>
+
+<p>Na primeira execução, o arquivo não existe; na segunda, o programa continua de onde parou:</p>
+<pre class="term" data-cwd="~/cpp/estoque">$ g++ -std=c++23 -Wall -Wextra estoque.cpp -o estoque
+$ ./estoque
+Sem estoque.csv: usando o estoque inicial.
+borracha     60 un.  R$   1.80
+caderno      40 un.  R$  12.50
+caneta      110 un.  R$   2.50
+cola         12 un.  R$   4.75
+mochila       5 un.  R$  89.90
+$ ./estoque
+borracha     60 un.  R$   1.80
+caderno      40 un.  R$  12.50
+caneta      100 un.  R$   2.50
+cola         12 un.  R$   4.75
+mochila       5 un.  R$  89.90
+$ cat estoque.csv
+borracha,1.8,60,15
+caderno,12.5,40,10
+caneta,2.5,100,30
+cola,4.75,12,15
+mochila,89.9,5,2</pre>
+
+<p>A primeira execução tirou 10 canetas (120 → 110) e salvou; a segunda carregou 110 do arquivo e tirou mais 10 (→ 100). O <code>cat</code> mostra o arquivo de texto que o programa escreveu.</p>
+
+<div class="cenario">
+<strong>Quando dá errado: uma linha estragada no arquivo</strong>
+<p>Arquivos de texto podem ser editados à mão, e gente erra. A Ana acrescentou a tesoura escrevendo a quantidade por extenso:</p>
+<pre class="term" data-cwd="~/cpp/estoque">$ echo 'tesoura,15.9,doze,4' &gt;&gt; estoque.csv
+$ g++ -std=c++23 -Wall -Wextra estoque.cpp -o estoque
+$ ./estoque
+terminate called after throwing an instance of 'std::invalid_argument'
+  what():  stoi
+Abortado                   (imagem do núcleo gravada) ./estoque</pre>
+<p><code>std::stoi("doze")</code> não consegue converter e lança <code>std::invalid_argument</code>, cuja mensagem é só o nome da função, <code>stoi</code>. Ninguém capturou, e o programa morreu <strong>antes de abrir</strong>: uma linha ruim impede a Ana de trabalhar. <strong>Como consertar:</strong> capturar a exceção <strong>por linha</strong>, avisar qual linha foi ignorada e seguir com as outras. É a versão final do <code>carregar</code>:</p>
+<pre class="file" data-file="estoque.cpp (carregar, final)">Estoque carregar(const std::string&amp; arquivo) {
+    Estoque estoque;
+    std::ifstream arq{arquivo};
+    std::string linha;
+    int numero = 0;
+    while (std::getline(arq, linha)) {
+        ++numero;
+        std::istringstream campos{linha};
+        std::string nome, preco, qtd, minimo;
+        std::getline(campos, nome, ',');
+        std::getline(campos, preco, ',');
+        std::getline(campos, qtd, ',');
+        std::getline(campos, minimo);
+        try {
+            cadastrar(estoque, {nome, std::stod(preco), std::stoi(qtd), std::stoi(minimo)});
+        } catch (const std::exception&amp;) {
+            std::cout &lt;&lt; "Linha " &lt;&lt; numero &lt;&lt; " ignorada: " &lt;&lt; linha &lt;&lt; '\n';
+        }
+    }
+    return estoque;
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/estoque">$ g++ -std=c++23 -Wall -Wextra estoque.cpp -o estoque
+$ ./estoque
+Linha 6 ignorada: tesoura,15.9,doze,4
+borracha     60 un.  R$   1.80
+caderno      40 un.  R$  12.50
+caneta       90 un.  R$   2.50
+cola         12 un.  R$   4.75
+mochila       5 un.  R$  89.90</pre>
+<p>Agora o programa abre, avisa o problema e mostra a linha inteira para a Ana corrigir. Atenção: como o <code>salvar</code> regrava o arquivo só com os produtos carregados, a linha ruim <strong>some</strong> do <code>estoque.csv</code> ao salvar. Num programa de verdade, valeria guardar uma cópia do arquivo antigo antes.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Linha 6 ignorada: tesoura\,15.9\,doze\,4,outre:caneta +90 un\.">
+<p class="try-task"><strong>Missão (etapa 6):</strong> esta caixa tem duas abas: o programa e o <code>estoque.csv</code>, com a linha estragada. Rodando como está, o programa aborta. Mude o <code>carregar</code> para contar as linhas e capturar a exceção de cada uma, mostrando <code>Linha 6 ignorada: tesoura,15.9,doze,4</code> e seguindo em frente. Depois, experimente consertar a linha na aba <code>estoque.csv</code>.</p>
+<pre class="script" data-file="estoque.cpp">#include &lt;format&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+    int minimo = 0;            // abaixo disso, repor
+
+    double valor() const { return preco * quantidade; }
+};
+
+using Estoque = std::map&lt;std::string, Produto&gt;;
+
+void cadastrar(Estoque&amp; estoque, const Produto&amp; p) {
+    estoque[p.nome] = p;
+}
+
+void listar(const Estoque&amp; estoque) {
+    for (const auto&amp; [nome, p] : estoque) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5} un.  R$ {:&gt;6.2f}\n", nome, p.quantidade, p.preco);
+    }
+}
+
+bool saida(Estoque&amp; estoque, const std::string&amp; nome, int qtd) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        std::cout &lt;&lt; "Produto não encontrado: " &lt;&lt; nome &lt;&lt; '\n';
+        return false;
+    }
+    Produto&amp; p = it-&gt;second;
+    if (qtd &lt;= 0 || qtd &gt; p.quantidade) {
+        std::cout &lt;&lt; std::format("Quantidade inválida para {}: pedido {}, há {}\n",
+                                 nome, qtd, p.quantidade);
+        return false;
+    }
+    p.quantidade -= qtd;
+    if (p.quantidade &lt;= p.minimo) {
+        std::cout &lt;&lt; std::format("ALERTA: {} ficou com {} (mínimo {})\n",
+                                 nome, p.quantidade, p.minimo);
+    }
+    return true;
+}
+
+void salvar(const Estoque&amp; estoque, const std::string&amp; arquivo) {
+    std::ofstream arq{arquivo};
+    for (const auto&amp; [nome, p] : estoque) {
+        arq &lt;&lt; nome &lt;&lt; ',' &lt;&lt; p.preco &lt;&lt; ',' &lt;&lt; p.quantidade &lt;&lt; ',' &lt;&lt; p.minimo &lt;&lt; '\n';
+    }
+}
+
+Estoque carregar(const std::string&amp; arquivo) {
+    Estoque estoque;
+    std::ifstream arq{arquivo};
+    std::string linha;
+    while (std::getline(arq, linha)) {
+        std::istringstream campos{linha};
+        std::string nome, preco, qtd, minimo;
+        std::getline(campos, nome, ',');
+        std::getline(campos, preco, ',');
+        std::getline(campos, qtd, ',');
+        std::getline(campos, minimo);
+        cadastrar(estoque, {nome, std::stod(preco), std::stoi(qtd), std::stoi(minimo)});
+    }
+    return estoque;
+}
+
+Estoque estoqueInicial() {
+    Estoque estoque;
+    cadastrar(estoque, {"caderno", 12.5, 40, 10});
+    cadastrar(estoque, {"caneta", 2.5, 120, 30});
+    cadastrar(estoque, {"borracha", 1.8, 60, 15});
+    cadastrar(estoque, {"mochila", 89.9, 5, 2});
+    cadastrar(estoque, {"cola", 4.75, 12, 15});
+    return estoque;
+}
+
+int main() {
+    Estoque estoque = carregar("estoque.csv");
+    if (estoque.empty()) {
+        std::cout &lt;&lt; "Sem estoque.csv: usando o estoque inicial.\n";
+        estoque = estoqueInicial();
+    }
+    saida(estoque, "caneta", 10);
+    listar(estoque);
+    salvar(estoque, "estoque.csv");
+}
+</pre>
+<pre class="script" data-file="estoque.csv">borracha,1.8,60,15
+caderno,12.5,40,10
+caneta,2.5,100,30
+cola,4.75,12,15
+mochila,89.9,5,2
+tesoura,15.9,doze,4
+</pre>
+<pre class="solucao" data-file="estoque.cpp">#include &lt;format&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+    int minimo = 0;            // abaixo disso, repor
+
+    double valor() const { return preco * quantidade; }
+};
+
+using Estoque = std::map&lt;std::string, Produto&gt;;
+
+void cadastrar(Estoque&amp; estoque, const Produto&amp; p) {
+    estoque[p.nome] = p;
+}
+
+void listar(const Estoque&amp; estoque) {
+    for (const auto&amp; [nome, p] : estoque) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5} un.  R$ {:&gt;6.2f}\n", nome, p.quantidade, p.preco);
+    }
+}
+
+bool saida(Estoque&amp; estoque, const std::string&amp; nome, int qtd) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        std::cout &lt;&lt; "Produto não encontrado: " &lt;&lt; nome &lt;&lt; '\n';
+        return false;
+    }
+    Produto&amp; p = it-&gt;second;
+    if (qtd &lt;= 0 || qtd &gt; p.quantidade) {
+        std::cout &lt;&lt; std::format("Quantidade inválida para {}: pedido {}, há {}\n",
+                                 nome, qtd, p.quantidade);
+        return false;
+    }
+    p.quantidade -= qtd;
+    if (p.quantidade &lt;= p.minimo) {
+        std::cout &lt;&lt; std::format("ALERTA: {} ficou com {} (mínimo {})\n",
+                                 nome, p.quantidade, p.minimo);
+    }
+    return true;
+}
+
+void salvar(const Estoque&amp; estoque, const std::string&amp; arquivo) {
+    std::ofstream arq{arquivo};
+    for (const auto&amp; [nome, p] : estoque) {
+        arq &lt;&lt; nome &lt;&lt; ',' &lt;&lt; p.preco &lt;&lt; ',' &lt;&lt; p.quantidade &lt;&lt; ',' &lt;&lt; p.minimo &lt;&lt; '\n';
+    }
+}
+
+Estoque carregar(const std::string&amp; arquivo) {
+    Estoque estoque;
+    std::ifstream arq{arquivo};
+    std::string linha;
+    int numero = 0;
+    while (std::getline(arq, linha)) {
+        ++numero;
+        std::istringstream campos{linha};
+        std::string nome, preco, qtd, minimo;
+        std::getline(campos, nome, ',');
+        std::getline(campos, preco, ',');
+        std::getline(campos, qtd, ',');
+        std::getline(campos, minimo);
+        try {
+            cadastrar(estoque, {nome, std::stod(preco), std::stoi(qtd), std::stoi(minimo)});
+        } catch (const std::exception&amp;) {
+            std::cout &lt;&lt; "Linha " &lt;&lt; numero &lt;&lt; " ignorada: " &lt;&lt; linha &lt;&lt; '\n';
+        }
+    }
+    return estoque;
+}
+
+Estoque estoqueInicial() {
+    Estoque estoque;
+    cadastrar(estoque, {"caderno", 12.5, 40, 10});
+    cadastrar(estoque, {"caneta", 2.5, 120, 30});
+    cadastrar(estoque, {"borracha", 1.8, 60, 15});
+    cadastrar(estoque, {"mochila", 89.9, 5, 2});
+    cadastrar(estoque, {"cola", 4.75, 12, 15});
+    return estoque;
+}
+
+int main() {
+    Estoque estoque = carregar("estoque.csv");
+    if (estoque.empty()) {
+        std::cout &lt;&lt; "Sem estoque.csv: usando o estoque inicial.\n";
+        estoque = estoqueInicial();
+    }
+    saida(estoque, "caneta", 10);
+    listar(estoque);
+    salvar(estoque, "estoque.csv");
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa7">Etapa 7 · O menu</h2>
+<p>Falta a Ana poder usar tudo isso sem mexer no código. O <code>main</code> final carrega o arquivo, lê comandos até a Ana digitar <code>sair</code> e salva no fim. As outras funções não mudam.</p>
+
+<pre class="file" data-file="estoque.cpp (main)">int main() {
+    Estoque estoque = carregar("estoque.csv");
+    if (estoque.empty()) {
+        estoque = estoqueInicial();
+    }
+    std::cout &lt;&lt; "Lojinha da Ana: " &lt;&lt; estoque.size() &lt;&lt; " produtos carregados.\n";
+
+    std::string linha;
+    while (std::cout &lt;&lt; "estoque&gt; " &amp;&amp; std::getline(std::cin, linha)) {
+        std::istringstream pedaco{linha};
+        std::string comando, nome;
+        int qtd = 0;
+        pedaco &gt;&gt; comando &gt;&gt; nome &gt;&gt; qtd;
+
+        if (comando == "sair") {
+            break;
+        } else if (comando == "listar") {
+            listar(estoque);
+        } else if (comando == "entrada") {
+            if (entrada(estoque, nome, qtd)) {
+                std::cout &lt;&lt; "Entrada registrada.\n";
+            }
+        } else if (comando == "saida") {
+            if (saida(estoque, nome, qtd)) {
+                std::cout &lt;&lt; "Saída registrada.\n";
+            }
+        } else if (comando == "buscar") {
+            if (auto p = buscar(estoque, nome)) {
+                std::cout &lt;&lt; std::format("{}: {} un. a R$ {:.2f}\n", p-&gt;nome, p-&gt;quantidade, p-&gt;preco);
+            } else {
+                std::cout &lt;&lt; "Não temos " &lt;&lt; nome &lt;&lt; ".\n";
+            }
+        } else if (comando == "alertas") {
+            alertas(estoque);
+        } else if (comando == "relatorio") {
+            relatorio(estoque);
+        } else {
+            std::cout &lt;&lt; "Comandos: listar, entrada NOME QTD, saida NOME QTD, buscar NOME,"
+                         " alertas, relatorio, sair\n";
+        }
+    }
+    salvar(estoque, "estoque.csv");
+    std::cout &lt;&lt; "\nEstoque salvo em estoque.csv.\n";
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>while (std::cout &lt;&lt; "estoque&gt; " &amp;&amp; std::getline(std::cin, linha))</code></td><td>Mostra o convite e lê uma linha inteira, até a entrada acabar.</td></tr>
+<tr><td><code>pedaco &gt;&gt; comando &gt;&gt; nome &gt;&gt; qtd;</code></td><td>Separa <code>saida caderno 32</code> em três partes. Se faltarem partes (<code>listar</code>), elas ficam com o valor inicial (<code>""</code> e <code>0</code>). Por isso os nomes de produto não podem ter espaços.</td></tr>
+<tr><td><code>comando == "sair"</code></td><td><code>std::string</code> se compara com <code>==</code> diretamente.</td></tr>
+<tr><td><code>break;</code></td><td>Sai do laço; o programa segue para o <code>salvar</code>.</td></tr>
+<tr><td><code>else { … Comandos: … }</code></td><td>Qualquer coisa desconhecida (até uma linha vazia) mostra a ajuda.</td></tr>
+<tr><td><code>"…, buscar NOME,"</code> <code>" alertas, …"</code></td><td>Dois textos lado a lado viram um só: o jeito de quebrar uma frase comprida em duas linhas de código.</td></tr>
+</table>
+</div>
+
+<p>A sessão completa está no começo da página, em <a href="#etapa1">O que vamos construir</a>. Se a Ana apertar <kbd>Ctrl</kbd>+<kbd>D</kbd> (o "fim da entrada" no terminal) em vez de digitar <code>sair</code>, o <code>getline</code> falha, o laço termina e o estoque é salvo do mesmo jeito.</p>
+
+<div class="trycpp" data-stdin="valor mochila&#10;valor caneta&#10;valor glitter&#10;sair&#10;" data-goal="out:Valor em estoque de mochila: R$ 449.50,out:Valor em estoque de caneta: R$ 250.00,out:Não temos glitter.">
+<p class="try-task"><strong>Missão (etapa 7):</strong> crie o comando <code>valor NOME</code>, que mostra o valor em estoque de um produto (<code>Valor em estoque de mochila: R$ 449.50</code>) ou <code>Não temos NOME.</code>. Use <code>buscar</code> e o método <code>valor()</code>. A caixa já digita <code>valor mochila</code>, <code>valor caneta</code>, <code>valor glitter</code> e <code>sair</code>.</p>
+<pre class="script" data-file="estoque.cpp">#include &lt;algorithm&gt;
+#include &lt;format&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;optional&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+    int minimo = 0;            // abaixo disso, repor
+
+    double valor() const { return preco * quantidade; }
+};
+
+using Estoque = std::map&lt;std::string, Produto&gt;;
+
+void cadastrar(Estoque&amp; estoque, const Produto&amp; p) {
+    estoque[p.nome] = p;
+}
+
+void listar(const Estoque&amp; estoque) {
+    for (const auto&amp; [nome, p] : estoque) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5} un.  R$ {:&gt;6.2f}\n", nome, p.quantidade, p.preco);
+    }
+}
+
+bool entrada(Estoque&amp; estoque, const std::string&amp; nome, int qtd) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        std::cout &lt;&lt; "Produto não encontrado: " &lt;&lt; nome &lt;&lt; '\n';
+        return false;
+    }
+    if (qtd &lt;= 0) {
+        std::cout &lt;&lt; "Quantidade inválida: " &lt;&lt; qtd &lt;&lt; '\n';
+        return false;
+    }
+    it-&gt;second.quantidade += qtd;
+    return true;
+}
+
+bool saida(Estoque&amp; estoque, const std::string&amp; nome, int qtd) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        std::cout &lt;&lt; "Produto não encontrado: " &lt;&lt; nome &lt;&lt; '\n';
+        return false;
+    }
+    Produto&amp; p = it-&gt;second;
+    if (qtd &lt;= 0 || qtd &gt; p.quantidade) {
+        std::cout &lt;&lt; std::format("Quantidade inválida para {}: pedido {}, há {}\n",
+                                 nome, qtd, p.quantidade);
+        return false;
+    }
+    p.quantidade -= qtd;
+    if (p.quantidade &lt;= p.minimo) {
+        std::cout &lt;&lt; std::format("ALERTA: {} ficou com {} (mínimo {})\n",
+                                 nome, p.quantidade, p.minimo);
+    }
+    return true;
+}
+
+std::optional&lt;Produto&gt; buscar(const Estoque&amp; estoque, const std::string&amp; nome) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        return std::nullopt;
+    }
+    return it-&gt;second;
+}
+
+void alertas(const Estoque&amp; estoque) {
+    int contador = 0;
+    for (const auto&amp; [nome, p] : estoque) {
+        if (p.quantidade &lt;= p.minimo) {
+            std::cout &lt;&lt; std::format("Repor {}: {} no estoque, mínimo {}\n",
+                                     nome, p.quantidade, p.minimo);
+            ++contador;
+        }
+    }
+    if (contador == 0) {
+        std::cout &lt;&lt; "Nenhum produto abaixo do mínimo.\n";
+    }
+}
+
+void relatorio(const Estoque&amp; estoque) {
+    std::vector&lt;Produto&gt; lista;
+    for (const auto&amp; [nome, p] : estoque) {
+        lista.push_back(p);
+    }
+    std::sort(lista.begin(), lista.end(), [](const Produto&amp; a, const Produto&amp; b) {
+        return a.valor() &gt; b.valor();
+    });
+
+    std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5}{:&gt;9}{:&gt;10}\n", "Produto", "Qtd", "Preço", "Valor");
+    double total = 0.0;
+    for (const auto&amp; p : lista) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5}{:&gt;9.2f}{:&gt;10.2f}\n",
+                                 p.nome, p.quantidade, p.preco, p.valor());
+        total += p.valor();
+    }
+    std::cout &lt;&lt; std::format("{:&lt;24}{:&gt;10.2f}\n", "Total", total);
+}
+
+void salvar(const Estoque&amp; estoque, const std::string&amp; arquivo) {
+    std::ofstream arq{arquivo};
+    for (const auto&amp; [nome, p] : estoque) {
+        arq &lt;&lt; nome &lt;&lt; ',' &lt;&lt; p.preco &lt;&lt; ',' &lt;&lt; p.quantidade &lt;&lt; ',' &lt;&lt; p.minimo &lt;&lt; '\n';
+    }
+}
+
+Estoque carregar(const std::string&amp; arquivo) {
+    Estoque estoque;
+    std::ifstream arq{arquivo};
+    std::string linha;
+    int numero = 0;
+    while (std::getline(arq, linha)) {
+        ++numero;
+        std::istringstream campos{linha};
+        std::string nome, preco, qtd, minimo;
+        std::getline(campos, nome, ',');
+        std::getline(campos, preco, ',');
+        std::getline(campos, qtd, ',');
+        std::getline(campos, minimo);
+        try {
+            cadastrar(estoque, {nome, std::stod(preco), std::stoi(qtd), std::stoi(minimo)});
+        } catch (const std::exception&amp;) {
+            std::cout &lt;&lt; "Linha " &lt;&lt; numero &lt;&lt; " ignorada: " &lt;&lt; linha &lt;&lt; '\n';
+        }
+    }
+    return estoque;
+}
+
+Estoque estoqueInicial() {
+    Estoque estoque;
+    cadastrar(estoque, {"caderno", 12.5, 40, 10});
+    cadastrar(estoque, {"caneta", 2.5, 120, 30});
+    cadastrar(estoque, {"borracha", 1.8, 60, 15});
+    cadastrar(estoque, {"mochila", 89.9, 5, 2});
+    cadastrar(estoque, {"cola", 4.75, 12, 15});
+    return estoque;
+}
+
+int main() {
+    Estoque estoque = carregar("estoque.csv");
+    if (estoque.empty()) {
+        estoque = estoqueInicial();
+    }
+    std::cout &lt;&lt; "Lojinha da Ana: " &lt;&lt; estoque.size() &lt;&lt; " produtos carregados.\n";
+
+    std::string linha;
+    while (std::cout &lt;&lt; "estoque&gt; " &amp;&amp; std::getline(std::cin, linha)) {
+        std::istringstream pedaco{linha};
+        std::string comando, nome;
+        int qtd = 0;
+        pedaco &gt;&gt; comando &gt;&gt; nome &gt;&gt; qtd;
+
+        if (comando == "sair") {
+            break;
+        } else if (comando == "listar") {
+            listar(estoque);
+        } else if (comando == "entrada") {
+            if (entrada(estoque, nome, qtd)) {
+                std::cout &lt;&lt; "Entrada registrada.\n";
+            }
+        } else if (comando == "saida") {
+            if (saida(estoque, nome, qtd)) {
+                std::cout &lt;&lt; "Saída registrada.\n";
+            }
+        } else if (comando == "buscar") {
+            if (auto p = buscar(estoque, nome)) {
+                std::cout &lt;&lt; std::format("{}: {} un. a R$ {:.2f}\n", p-&gt;nome, p-&gt;quantidade, p-&gt;preco);
+            } else {
+                std::cout &lt;&lt; "Não temos " &lt;&lt; nome &lt;&lt; ".\n";
+            }
+        } else if (comando == "alertas") {
+            alertas(estoque);
+        } else if (comando == "relatorio") {
+            relatorio(estoque);
+        } else {
+            std::cout &lt;&lt; "Comandos: listar, entrada NOME QTD, saida NOME QTD, buscar NOME,"
+                         " alertas, relatorio, sair\n";
+        }
+    }
+    salvar(estoque, "estoque.csv");
+    std::cout &lt;&lt; "\nEstoque salvo em estoque.csv.\n";
+}
+</pre>
+<pre class="script" data-file="estoque.csv">borracha,1.8,60,15
+caderno,12.5,40,10
+caneta,2.5,100,30
+cola,4.75,12,15
+mochila,89.9,5,2
+</pre>
+<pre class="solucao" data-file="estoque.cpp">#include &lt;algorithm&gt;
+#include &lt;format&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;optional&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+    int minimo = 0;            // abaixo disso, repor
+
+    double valor() const { return preco * quantidade; }
+};
+
+using Estoque = std::map&lt;std::string, Produto&gt;;
+
+void cadastrar(Estoque&amp; estoque, const Produto&amp; p) {
+    estoque[p.nome] = p;
+}
+
+void listar(const Estoque&amp; estoque) {
+    for (const auto&amp; [nome, p] : estoque) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5} un.  R$ {:&gt;6.2f}\n", nome, p.quantidade, p.preco);
+    }
+}
+
+bool entrada(Estoque&amp; estoque, const std::string&amp; nome, int qtd) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        std::cout &lt;&lt; "Produto não encontrado: " &lt;&lt; nome &lt;&lt; '\n';
+        return false;
+    }
+    if (qtd &lt;= 0) {
+        std::cout &lt;&lt; "Quantidade inválida: " &lt;&lt; qtd &lt;&lt; '\n';
+        return false;
+    }
+    it-&gt;second.quantidade += qtd;
+    return true;
+}
+
+bool saida(Estoque&amp; estoque, const std::string&amp; nome, int qtd) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        std::cout &lt;&lt; "Produto não encontrado: " &lt;&lt; nome &lt;&lt; '\n';
+        return false;
+    }
+    Produto&amp; p = it-&gt;second;
+    if (qtd &lt;= 0 || qtd &gt; p.quantidade) {
+        std::cout &lt;&lt; std::format("Quantidade inválida para {}: pedido {}, há {}\n",
+                                 nome, qtd, p.quantidade);
+        return false;
+    }
+    p.quantidade -= qtd;
+    if (p.quantidade &lt;= p.minimo) {
+        std::cout &lt;&lt; std::format("ALERTA: {} ficou com {} (mínimo {})\n",
+                                 nome, p.quantidade, p.minimo);
+    }
+    return true;
+}
+
+std::optional&lt;Produto&gt; buscar(const Estoque&amp; estoque, const std::string&amp; nome) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        return std::nullopt;
+    }
+    return it-&gt;second;
+}
+
+void alertas(const Estoque&amp; estoque) {
+    int contador = 0;
+    for (const auto&amp; [nome, p] : estoque) {
+        if (p.quantidade &lt;= p.minimo) {
+            std::cout &lt;&lt; std::format("Repor {}: {} no estoque, mínimo {}\n",
+                                     nome, p.quantidade, p.minimo);
+            ++contador;
+        }
+    }
+    if (contador == 0) {
+        std::cout &lt;&lt; "Nenhum produto abaixo do mínimo.\n";
+    }
+}
+
+void relatorio(const Estoque&amp; estoque) {
+    std::vector&lt;Produto&gt; lista;
+    for (const auto&amp; [nome, p] : estoque) {
+        lista.push_back(p);
+    }
+    std::sort(lista.begin(), lista.end(), [](const Produto&amp; a, const Produto&amp; b) {
+        return a.valor() &gt; b.valor();
+    });
+
+    std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5}{:&gt;9}{:&gt;10}\n", "Produto", "Qtd", "Preço", "Valor");
+    double total = 0.0;
+    for (const auto&amp; p : lista) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5}{:&gt;9.2f}{:&gt;10.2f}\n",
+                                 p.nome, p.quantidade, p.preco, p.valor());
+        total += p.valor();
+    }
+    std::cout &lt;&lt; std::format("{:&lt;24}{:&gt;10.2f}\n", "Total", total);
+}
+
+void salvar(const Estoque&amp; estoque, const std::string&amp; arquivo) {
+    std::ofstream arq{arquivo};
+    for (const auto&amp; [nome, p] : estoque) {
+        arq &lt;&lt; nome &lt;&lt; ',' &lt;&lt; p.preco &lt;&lt; ',' &lt;&lt; p.quantidade &lt;&lt; ',' &lt;&lt; p.minimo &lt;&lt; '\n';
+    }
+}
+
+Estoque carregar(const std::string&amp; arquivo) {
+    Estoque estoque;
+    std::ifstream arq{arquivo};
+    std::string linha;
+    int numero = 0;
+    while (std::getline(arq, linha)) {
+        ++numero;
+        std::istringstream campos{linha};
+        std::string nome, preco, qtd, minimo;
+        std::getline(campos, nome, ',');
+        std::getline(campos, preco, ',');
+        std::getline(campos, qtd, ',');
+        std::getline(campos, minimo);
+        try {
+            cadastrar(estoque, {nome, std::stod(preco), std::stoi(qtd), std::stoi(minimo)});
+        } catch (const std::exception&amp;) {
+            std::cout &lt;&lt; "Linha " &lt;&lt; numero &lt;&lt; " ignorada: " &lt;&lt; linha &lt;&lt; '\n';
+        }
+    }
+    return estoque;
+}
+
+Estoque estoqueInicial() {
+    Estoque estoque;
+    cadastrar(estoque, {"caderno", 12.5, 40, 10});
+    cadastrar(estoque, {"caneta", 2.5, 120, 30});
+    cadastrar(estoque, {"borracha", 1.8, 60, 15});
+    cadastrar(estoque, {"mochila", 89.9, 5, 2});
+    cadastrar(estoque, {"cola", 4.75, 12, 15});
+    return estoque;
+}
+
+int main() {
+    Estoque estoque = carregar("estoque.csv");
+    if (estoque.empty()) {
+        estoque = estoqueInicial();
+    }
+    std::cout &lt;&lt; "Lojinha da Ana: " &lt;&lt; estoque.size() &lt;&lt; " produtos carregados.\n";
+
+    std::string linha;
+    while (std::cout &lt;&lt; "estoque&gt; " &amp;&amp; std::getline(std::cin, linha)) {
+        std::istringstream pedaco{linha};
+        std::string comando, nome;
+        int qtd = 0;
+        pedaco &gt;&gt; comando &gt;&gt; nome &gt;&gt; qtd;
+
+        if (comando == "sair") {
+            break;
+        } else if (comando == "listar") {
+            listar(estoque);
+        } else if (comando == "entrada") {
+            if (entrada(estoque, nome, qtd)) {
+                std::cout &lt;&lt; "Entrada registrada.\n";
+            }
+        } else if (comando == "saida") {
+            if (saida(estoque, nome, qtd)) {
+                std::cout &lt;&lt; "Saída registrada.\n";
+            }
+        } else if (comando == "buscar") {
+            if (auto p = buscar(estoque, nome)) {
+                std::cout &lt;&lt; std::format("{}: {} un. a R$ {:.2f}\n", p-&gt;nome, p-&gt;quantidade, p-&gt;preco);
+            } else {
+                std::cout &lt;&lt; "Não temos " &lt;&lt; nome &lt;&lt; ".\n";
+            }
+        } else if (comando == "valor") {
+            if (auto p = buscar(estoque, nome)) {
+                std::cout &lt;&lt; std::format("Valor em estoque de {}: R$ {:.2f}\n", p-&gt;nome, p-&gt;valor());
+            } else {
+                std::cout &lt;&lt; "Não temos " &lt;&lt; nome &lt;&lt; ".\n";
+            }
+        } else if (comando == "alertas") {
+            alertas(estoque);
+        } else if (comando == "relatorio") {
+            relatorio(estoque);
+        } else {
+            std::cout &lt;&lt; "Comandos: listar, entrada NOME QTD, saida NOME QTD, buscar NOME,"
+                         " alertas, relatorio, sair\n";
+        }
+    }
+    salvar(estoque, "estoque.csv");
+    std::cout &lt;&lt; "\nEstoque salvo em estoque.csv.\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>O código completo</h2>
+<p>O <code>estoque.cpp</code> final. Compile com <code>g++ -std=c++23 -Wall -Wextra estoque.cpp -o estoque</code>; na primeira vez, sem <code>estoque.csv</code>, ele começa com o estoque de exemplo.</p>
+<pre class="file" data-file="estoque.cpp">#include &lt;algorithm&gt;
+#include &lt;format&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;optional&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+    int minimo = 0;            // abaixo disso, repor
+
+    double valor() const { return preco * quantidade; }
+};
+
+using Estoque = std::map&lt;std::string, Produto&gt;;
+
+void cadastrar(Estoque&amp; estoque, const Produto&amp; p) {
+    estoque[p.nome] = p;
+}
+
+void listar(const Estoque&amp; estoque) {
+    for (const auto&amp; [nome, p] : estoque) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5} un.  R$ {:&gt;6.2f}\n", nome, p.quantidade, p.preco);
+    }
+}
+
+bool entrada(Estoque&amp; estoque, const std::string&amp; nome, int qtd) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        std::cout &lt;&lt; "Produto não encontrado: " &lt;&lt; nome &lt;&lt; '\n';
+        return false;
+    }
+    if (qtd &lt;= 0) {
+        std::cout &lt;&lt; "Quantidade inválida: " &lt;&lt; qtd &lt;&lt; '\n';
+        return false;
+    }
+    it-&gt;second.quantidade += qtd;
+    return true;
+}
+
+bool saida(Estoque&amp; estoque, const std::string&amp; nome, int qtd) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        std::cout &lt;&lt; "Produto não encontrado: " &lt;&lt; nome &lt;&lt; '\n';
+        return false;
+    }
+    Produto&amp; p = it-&gt;second;
+    if (qtd &lt;= 0 || qtd &gt; p.quantidade) {
+        std::cout &lt;&lt; std::format("Quantidade inválida para {}: pedido {}, há {}\n",
+                                 nome, qtd, p.quantidade);
+        return false;
+    }
+    p.quantidade -= qtd;
+    if (p.quantidade &lt;= p.minimo) {
+        std::cout &lt;&lt; std::format("ALERTA: {} ficou com {} (mínimo {})\n",
+                                 nome, p.quantidade, p.minimo);
+    }
+    return true;
+}
+
+std::optional&lt;Produto&gt; buscar(const Estoque&amp; estoque, const std::string&amp; nome) {
+    auto it = estoque.find(nome);
+    if (it == estoque.end()) {
+        return std::nullopt;
+    }
+    return it-&gt;second;
+}
+
+void alertas(const Estoque&amp; estoque) {
+    int contador = 0;
+    for (const auto&amp; [nome, p] : estoque) {
+        if (p.quantidade &lt;= p.minimo) {
+            std::cout &lt;&lt; std::format("Repor {}: {} no estoque, mínimo {}\n",
+                                     nome, p.quantidade, p.minimo);
+            ++contador;
+        }
+    }
+    if (contador == 0) {
+        std::cout &lt;&lt; "Nenhum produto abaixo do mínimo.\n";
+    }
+}
+
+void relatorio(const Estoque&amp; estoque) {
+    std::vector&lt;Produto&gt; lista;
+    for (const auto&amp; [nome, p] : estoque) {
+        lista.push_back(p);
+    }
+    std::sort(lista.begin(), lista.end(), [](const Produto&amp; a, const Produto&amp; b) {
+        return a.valor() &gt; b.valor();
+    });
+
+    std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5}{:&gt;9}{:&gt;10}\n", "Produto", "Qtd", "Preço", "Valor");
+    double total = 0.0;
+    for (const auto&amp; p : lista) {
+        std::cout &lt;&lt; std::format("{:&lt;10}{:&gt;5}{:&gt;9.2f}{:&gt;10.2f}\n",
+                                 p.nome, p.quantidade, p.preco, p.valor());
+        total += p.valor();
+    }
+    std::cout &lt;&lt; std::format("{:&lt;24}{:&gt;10.2f}\n", "Total", total);
+}
+
+void salvar(const Estoque&amp; estoque, const std::string&amp; arquivo) {
+    std::ofstream arq{arquivo};
+    for (const auto&amp; [nome, p] : estoque) {
+        arq &lt;&lt; nome &lt;&lt; ',' &lt;&lt; p.preco &lt;&lt; ',' &lt;&lt; p.quantidade &lt;&lt; ',' &lt;&lt; p.minimo &lt;&lt; '\n';
+    }
+}
+
+Estoque carregar(const std::string&amp; arquivo) {
+    Estoque estoque;
+    std::ifstream arq{arquivo};
+    std::string linha;
+    int numero = 0;
+    while (std::getline(arq, linha)) {
+        ++numero;
+        std::istringstream campos{linha};
+        std::string nome, preco, qtd, minimo;
+        std::getline(campos, nome, ',');
+        std::getline(campos, preco, ',');
+        std::getline(campos, qtd, ',');
+        std::getline(campos, minimo);
+        try {
+            cadastrar(estoque, {nome, std::stod(preco), std::stoi(qtd), std::stoi(minimo)});
+        } catch (const std::exception&amp;) {
+            std::cout &lt;&lt; "Linha " &lt;&lt; numero &lt;&lt; " ignorada: " &lt;&lt; linha &lt;&lt; '\n';
+        }
+    }
+    return estoque;
+}
+
+Estoque estoqueInicial() {
+    Estoque estoque;
+    cadastrar(estoque, {"caderno", 12.5, 40, 10});
+    cadastrar(estoque, {"caneta", 2.5, 120, 30});
+    cadastrar(estoque, {"borracha", 1.8, 60, 15});
+    cadastrar(estoque, {"mochila", 89.9, 5, 2});
+    cadastrar(estoque, {"cola", 4.75, 12, 15});
+    return estoque;
+}
+
+int main() {
+    Estoque estoque = carregar("estoque.csv");
+    if (estoque.empty()) {
+        estoque = estoqueInicial();
+    }
+    std::cout &lt;&lt; "Lojinha da Ana: " &lt;&lt; estoque.size() &lt;&lt; " produtos carregados.\n";
+
+    std::string linha;
+    while (std::cout &lt;&lt; "estoque&gt; " &amp;&amp; std::getline(std::cin, linha)) {
+        std::istringstream pedaco{linha};
+        std::string comando, nome;
+        int qtd = 0;
+        pedaco &gt;&gt; comando &gt;&gt; nome &gt;&gt; qtd;
+
+        if (comando == "sair") {
+            break;
+        } else if (comando == "listar") {
+            listar(estoque);
+        } else if (comando == "entrada") {
+            if (entrada(estoque, nome, qtd)) {
+                std::cout &lt;&lt; "Entrada registrada.\n";
+            }
+        } else if (comando == "saida") {
+            if (saida(estoque, nome, qtd)) {
+                std::cout &lt;&lt; "Saída registrada.\n";
+            }
+        } else if (comando == "buscar") {
+            if (auto p = buscar(estoque, nome)) {
+                std::cout &lt;&lt; std::format("{}: {} un. a R$ {:.2f}\n", p-&gt;nome, p-&gt;quantidade, p-&gt;preco);
+            } else {
+                std::cout &lt;&lt; "Não temos " &lt;&lt; nome &lt;&lt; ".\n";
+            }
+        } else if (comando == "alertas") {
+            alertas(estoque);
+        } else if (comando == "relatorio") {
+            relatorio(estoque);
+        } else {
+            std::cout &lt;&lt; "Comandos: listar, entrada NOME QTD, saida NOME QTD, buscar NOME,"
+                         " alertas, relatorio, sair\n";
+        }
+    }
+    salvar(estoque, "estoque.csv");
+    std::cout &lt;&lt; "\nEstoque salvo em estoque.csv.\n";
+}
+</pre>
+
+<hr>
+
+<h2>Desafios extras</h2>
+<ol>
+  <li><strong>Cadastrar pelo menu.</strong> Comando <code>novo NOME PRECO QTD MIN</code>. Recuse se o produto já existir (<code>contains</code>, <span class="versao">C++20</span>).</li>
+  <li><strong>Remover.</strong> Comando <code>remover NOME</code> com <code>estoque.erase(nome)</code>. O <code>erase</code> devolve quantos itens apagou (0 ou 1): use para avisar "não existe".</li>
+  <li><strong>Nomes com espaço.</strong> "caneta azul" quebra o menu. Troque o separador do menu, por exemplo <code>saida;caneta azul;3</code>, com <code>getline(pedaco, nome, ';')</code>.</li>
+  <li><strong>Histórico.</strong> Grave cada entrada e saída num segundo arquivo, <code>movimentos.csv</code>, aberto com <code>std::ofstream arq{"movimentos.csv", std::ios::app}</code> (<code>app</code> = acrescentar no fim, sem apagar).</li>
+  <li><strong>Cópia de segurança.</strong> Antes de salvar, renomeie o arquivo antigo para <code>estoque.csv.bak</code> com <code>std::filesystem::rename</code>.</li>
+  <li><strong>Busca por pedaço.</strong> <code>buscar cad</code> lista todos os produtos cujo nome contém "cad" (<code>nome.find(trecho) != std::string::npos</code>, veja <a href="ref-string.html">a referência de std::string</a>).</li>
+</ol>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>std::map&lt;std::string, Produto&gt;</code> guarda pela chave e percorre em ordem alfabética; <code>for (const auto&amp; [nome, p] : estoque)</code> separa chave e valor.</li>
+  <li>Para procurar, <code>find</code> e compare com <code>end()</code>. O <code>[]</code> <strong>cria</strong> a chave que não existe: um erro de digitação vira produto novo.</li>
+  <li><code>Produto&amp; p = it-&gt;second;</code> mexe no produto dentro do map; sem <code>&amp;</code>, numa cópia.</li>
+  <li><code>std::optional&lt;Produto&gt;</code> = "um produto ou nada". Devolva <code>std::nullopt</code> quando não achar; teste com <code>if (auto p = buscar(…))</code>. <code>.value()</code> numa caixa vazia lança <code>std::bad_optional_access</code>.</li>
+  <li>Para ordenar por outro critério, copie para um <code>std::vector</code> e use <code>std::sort(início, fim, lambda)</code>; a lambda responde "<code>a</code> vem antes de <code>b</code>?".</li>
+  <li>CSV: <code>std::ofstream</code> + <code>&lt;&lt;</code> para gravar; <code>std::ifstream</code> + <code>getline(campos, x, ',')</code> + <code>stoi</code>/<code>stod</code> para ler. Capture a exceção de conversão por linha, senão uma linha ruim derruba o programa.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
