@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Referências — int&amp;, apelidos e referência pendurada | Guia C++</title>
+<meta name="description" content="Referências em C++ para quem nunca programou: int&amp; como apelido de uma variável, mudar pelo apelido, por que a referência precisa ser inicializada e não troca de alvo, referência para const e a referência pendurada, com erros e avisos reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Referências</span></h1>
+
+<p class="intro">Este é o começo do grupo <strong>Memória</strong>, a parte do C++ que mais assusta quem está aprendendo. Vamos devagar, com desenhos. A primeira peça é a mais simples: a <strong>referência</strong>, que é só um <strong>segundo nome</strong> para uma variável que já existe. Você escreve <code>int&amp; placar = pontos;</code> e, a partir daí, <code>placar</code> e <code>pontos</code> são a mesma caixa. Mexeu num, mexeu no outro.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma referência e como criar uma: <code>int&amp; r = x;</code>.</li>
+  <li>A diferença entre <strong>copiar</strong> uma variável e criar um <strong>apelido</strong> para ela.</li>
+  <li>Por que toda referência precisa nascer ligada a alguém (o erro real do g++).</li>
+  <li>Por que uma referência nunca "troca de alvo".</li>
+  <li>A referência para <code>const</code>: um apelido que só deixa ler.</li>
+  <li>A <strong>referência pendurada</strong>, que aponta para uma variável que já morreu, e o aviso <code>-Wreturn-local-addr</code>.</li>
+</ul>
+</div>
+
+<p>Todos os programas foram compilados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia, <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code> (veja <a href="compilar.html">Compilar com g++</a>). As saídas e mensagens são as reais do <strong>g++ 15.2</strong>.</p>
+
+<hr>
+
+<h2>A ideia: um apelido</h2>
+<p>A Ana tem um primo chamado Roberto. Em casa, todo mundo chama ele de <strong>Beto</strong>. "Roberto" e "Beto" não são duas pessoas: são dois nomes para <strong>a mesma pessoa</strong>. Se o Beto corta o cabelo, o Roberto está de cabelo cortado. Não tem como ser diferente.</p>
+
+<p>Na aula de <a href="variaveis.html">Variáveis</a>, você aprendeu que uma variável é uma <strong>caixa com etiqueta</strong>. Uma referência é <strong>uma segunda etiqueta colada na mesma caixa</strong>. Não existe caixa nova, não existe cópia: só mais um nome.</p>
+
+<figure>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Etiquetas (nomes)</th><th>A caixa (o valor guardado)</th></tr>
+<tr><td><code>pontos</code> e <code>placar</code></td><td><strong>10</strong></td></tr>
+</table>
+</div>
+<figcaption>Depois de <code>int pontos = 10;</code> e <code>int&amp; placar = pontos;</code>: <strong>uma</strong> caixa só, com duas etiquetas.</figcaption>
+</figure>
+
+<hr>
+
+<h2>1. Criar uma referência</h2>
+<p>Para criar uma referência, escreva o tipo, um <code>&amp;</code> (o "e comercial") e o nome do apelido, e ligue-o a uma variável que já existe:</p>
+
+<pre class="file" data-file="apelido.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int pontos = 10;
+    int&amp; placar = pontos;   // placar é outro nome para pontos
+
+    std::cout &lt;&lt; "pontos = " &lt;&lt; pontos &lt;&lt; "\n";
+    std::cout &lt;&lt; "placar = " &lt;&lt; placar &lt;&lt; "\n";
+
+    placar = 25;            // muda pelo apelido
+    std::cout &lt;&lt; "Depois de placar = 25:\n";
+    std::cout &lt;&lt; "pontos = " &lt;&lt; pontos &lt;&lt; "\n";
+
+    pontos = pontos + 5;    // muda pelo nome original
+    std::cout &lt;&lt; "Depois de pontos + 5:\n";
+    std::cout &lt;&lt; "placar = " &lt;&lt; placar &lt;&lt; "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>int pontos = 10;</dt><dd>Uma variável comum: a caixa <code>pontos</code>, guardando 10.</dd>
+  <dt>int&amp;</dt><dd>Leia como "<strong>referência para int</strong>". O <code>&amp;</code> colado no tipo quer dizer: "isto não é uma caixa nova, é um apelido de uma caixa <code>int</code> que já existe".</dd>
+  <dt>placar</dt><dd>O nome do apelido. Escolha como qualquer nome de variável (veja <a href="identificadores.html">Nomes de Variáveis</a>).</dd>
+  <dt>= pontos;</dt><dd>Aqui o <code>=</code> <strong>não copia</strong>: ele diz <em>de quem</em> <code>placar</code> é apelido. Isso acontece uma vez, na criação, e nunca mais muda.</dd>
+  <dt>placar = 25;</dt><dd>Depois de criada, a referência se usa exatamente como a variável original. Escrever em <code>placar</code> escreve na caixa de <code>pontos</code>.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra apelido.cpp -o apelido
+$ ./apelido
+pontos = 10
+placar = 10
+Depois de placar = 25:
+pontos = 25                « mudou pelo apelido, o original mudou
+Depois de pontos + 5:
+placar = 30                « mudou pelo original, o apelido "vê" a mudança</pre>
+
+<p>Repare que nunca existiram dois números guardados. Existe um só, e dois jeitos de chamá-lo. O desenho, passo a passo:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>A caixa <code>pontos</code> / <code>placar</code></th></tr>
+<tr><td><code>int pontos = 10;</code></td><td>10 (só a etiqueta <code>pontos</code>)</td></tr>
+<tr><td><code>int&amp; placar = pontos;</code></td><td>10 (agora com as duas etiquetas)</td></tr>
+<tr><td><code>placar = 25;</code></td><td>25</td></tr>
+<tr><td><code>pontos = pontos + 5;</code></td><td>30</td></tr>
+</table>
+</div>
+
+<h3>Cópia × apelido</h3>
+<p>A diferença entre <code>int copia = original;</code> e <code>int&amp; apelido = original;</code> é um único <code>&amp;</code>, e muda tudo:</p>
+
+<pre class="file" data-file="copia.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int original = 10;
+    int copia = original;     // caixa nova, com o valor copiado
+    int&amp; apelido = original;  // a MESMA caixa, com outro nome
+
+    original = 99;
+
+    std::cout &lt;&lt; "original = " &lt;&lt; original &lt;&lt; "\n";
+    std::cout &lt;&lt; "copia    = " &lt;&lt; copia &lt;&lt; "\n";
+    std::cout &lt;&lt; "apelido  = " &lt;&lt; apelido &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra copia.cpp -o copia
+$ ./copia
+original = 99
+copia    = 10              « a cópia ficou com o valor antigo
+apelido  = 99              « o apelido é a própria caixa</pre>
+
+<figure>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Caixa</th><th>Etiquetas</th><th>Valor no fim</th></tr>
+<tr><td>caixa 1</td><td><code>original</code>, <code>apelido</code></td><td>99</td></tr>
+<tr><td>caixa 2</td><td><code>copia</code></td><td>10</td></tr>
+</table>
+</div>
+<figcaption>A cópia ganhou uma caixa só dela. O apelido não ganhou caixa nenhuma: é uma etiqueta a mais na caixa 1.</figcaption>
+</figure>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode o programa. Depois troque <code>int&amp; vidas_jogo</code> por <code>int vidas_jogo</code> (sem o <code>&amp;</code>) e rode de novo. O que mudou na primeira linha da saída?</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int vidas = 3;
+    int&amp; vidas_jogo = vidas;
+
+    vidas_jogo = vidas_jogo - 1;   // o jogador perdeu uma vida
+
+    std::cout &lt;&lt; "vidas      = " &lt;&lt; vidas &lt;&lt; "\n";
+    std::cout &lt;&lt; "vidas_jogo = " &lt;&lt; vidas_jogo &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<h3>Onde fica o <code>&amp;</code>?</h3>
+<p>Os espaços em volta do <code>&amp;</code> não importam. As três linhas abaixo são idênticas para o compilador:</p>
+
+<pre class="file" data-file="estilos.cpp">int&amp; r = x;    // o estilo deste guia: o &amp; "faz parte do tipo"
+int &amp;r = x;    // estilo comum em código herdado do C
+int &amp; r = x;   // também vale
+</pre>
+
+<p>Este guia usa <code>int&amp; r</code>, porque lê melhor: "<code>r</code> é um <code>int&amp;</code>". Mas cuidado com uma armadilha: numa linha com <strong>vírgula</strong>, o <code>&amp;</code> vale só para o primeiro nome.</p>
+
+<pre class="file" data-file="virgula.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int x = 1;
+    int&amp; a = x, b = x;   // cuidado: só o a é referência!
+
+    a = 50;
+    b = 99;
+    std::cout &lt;&lt; "x = " &lt;&lt; x &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra virgula.cpp -o virgula
+virgula.cpp: In function ‘int main()’:
+virgula.cpp:5:17: warning: variable ‘b’ set but not used [-Wunused-but-set-variable]
+    5 |     int&amp; a = x, b = x;   // cuidado: só o a é referência!
+      |                 ^
+$ ./virgula
+x = 50                     « o b = 99 não chegou no x: b é uma cópia</pre>
+
+<p>O aviso entrega o problema: "a variável <code>b</code> recebeu valor, mas nunca foi usada". Se <code>b</code> fosse apelido de <code>x</code>, escrever nele seria usar <code>x</code>. Como <code>b</code> é uma caixa separada, o 99 foi parar numa caixa que ninguém lê. Regra simples: <strong>uma referência por linha</strong>.</p>
+
+<hr>
+
+<h2>2. Toda referência precisa nascer ligada</h2>
+<p>Um apelido sem dono não faz sentido: "Beto" de quem? Por isso o C++ exige que a referência seja ligada a uma variável <strong>na mesma linha em que é criada</strong>. Esquecer dá erro de compilação:</p>
+
+<pre class="file" data-file="sem-alvo.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int&amp; r;
+    std::cout &lt;&lt; r &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sem-alvo.cpp -o sem-alvo
+sem-alvo.cpp: In function ‘int main()’:
+sem-alvo.cpp:4:10: error: ‘r’ declared as reference but not initialized
+    4 |     int&amp; r;
+      |          ^</pre>
+
+<p>Tradução: "<code>r</code> foi declarada como referência, mas não foi inicializada". <em>Inicializar</em> é dar o primeiro valor, na criação. Para uma referência, o "primeiro valor" é <strong>quem ela apelida</strong>. Conserto: <code>int&amp; r = alguma_variavel;</code>.</p>
+
+<p>Isso é uma vantagem, não um castigo. Como toda referência nasce ligada, você nunca encontra uma referência "vazia" num programa que compilou. Os <a href="ponteiros.html">ponteiros</a>, que você vai ver daqui a duas aulas, não têm essa garantia, e por isso dão mais trabalho.</p>
+
+<hr>
+
+<h2>3. A referência nunca troca de alvo</h2>
+<p>Uma vez apelido da Ana, sempre apelido da Ana. Depois da criação, todo <code>=</code> escrito na referência <strong>muda o valor</strong> da caixa, nunca a etiqueta de lugar. Veja o que acontece quando alguém tenta "apontar" a referência para outra variável:</p>
+
+<pre class="file" data-file="trocar.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int ana = 7;
+    int bruno = 3;
+    int&amp; r = ana;     // r é apelido da ana, para sempre
+
+    r = bruno;        // NÃO troca o alvo: copia o valor de bruno para ana
+
+    std::cout &lt;&lt; "ana   = " &lt;&lt; ana &lt;&lt; "\n";
+    std::cout &lt;&lt; "bruno = " &lt;&lt; bruno &lt;&lt; "\n";
+
+    r = 100;
+    std::cout &lt;&lt; "Depois de r = 100:\n";
+    std::cout &lt;&lt; "ana   = " &lt;&lt; ana &lt;&lt; "\n";
+    std::cout &lt;&lt; "bruno = " &lt;&lt; bruno &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra trocar.cpp -o trocar
+$ ./trocar
+ana   = 3                  « o 7 da ana foi trocado pelo 3 do bruno
+bruno = 3
+Depois de r = 100:
+ana   = 100                « r continua sendo a ana
+bruno = 3                  « o bruno nunca foi tocado</pre>
+
+<ol class="passo">
+  <li><code>int&amp; r = ana;</code> → a etiqueta <code>r</code> é colada na caixa da <code>ana</code>. Esta é a única vez em que o <code>=</code> "liga".</li>
+  <li><code>r = bruno;</code> → lê o valor do <code>bruno</code> (3) e guarda <strong>na caixa da ana</strong>. A etiqueta não se mexe.</li>
+  <li><code>r = 100;</code> → mais uma vez, a caixa da <code>ana</code> recebe 100.</li>
+</ol>
+
+<p>Não existe comando para "descolar" a etiqueta. Se você precisa de algo que aponte ora para uma variável, ora para outra, isso é um <a href="ponteiros.html">ponteiro</a>.</p>
+
+<hr>
+
+<h2>4. Referência para <code>const</code>: o apelido que só lê</h2>
+<p>Às vezes você quer dar um nome a uma variável sem dar <strong>permissão para mudá-la</strong>. Pense no extrato do banco: a Ana pode ver o saldo pelo aplicativo, mas não pode digitar um saldo novo. Para isso existe <code>const int&amp;</code>, a "referência para <code>const</code>" (veja <code>const</code> em <a href="constantes.html">Constantes</a>):</p>
+
+<pre class="file" data-file="const-ref.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int saldo = 500;
+    const int&amp; so_leitura = saldo;
+
+    std::cout &lt;&lt; "Saldo: " &lt;&lt; so_leitura &lt;&lt; "\n";
+    so_leitura = 0;
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra const-ref.cpp -o const-ref
+const-ref.cpp: In function ‘int main()’:
+const-ref.cpp:8:16: error: assignment of read-only reference ‘so_leitura’
+    8 |     so_leitura = 0;
+      |     ~~~~~~~~~~~^~~</pre>
+
+<p>Tradução: "atribuição numa referência somente-leitura <code>so_leitura</code>". O compilador barrou a linha 8 antes de o programa existir. Ler pelo apelido pode; escrever, não.</p>
+
+<p>Atenção: o <code>const</code> vale para <strong>o apelido</strong>, não para a caixa. A variável original continua podendo mudar, e o apelido vê a mudança:</p>
+
+<pre class="file" data-file="const-ref-ok.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int saldo = 500;
+    const int&amp; so_leitura = saldo;
+
+    std::cout &lt;&lt; "Saldo: " &lt;&lt; so_leitura &lt;&lt; "\n";
+    saldo = saldo + 100;     // o dono continua podendo mudar
+    std::cout &lt;&lt; "Saldo: " &lt;&lt; so_leitura &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra const-ref-ok.cpp -o const-ref-ok
+$ ./const-ref-ok
+Saldo: 500
+Saldo: 600</pre>
+
+<h3>Apelido de um número solto</h3>
+<p>Uma referência comum (<code>int&amp;</code>) só pode apelidar uma <strong>variável</strong>, algo que tem caixa. Um número solto como <code>10</code> não tem caixa: o g++ recusa.</p>
+
+<pre class="file" data-file="literal.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int&amp; r = 10;
+    std::cout &lt;&lt; r &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra literal.cpp -o literal
+literal.cpp: In function ‘int main()’:
+literal.cpp:4:14: error: cannot bind non-const lvalue reference of type ‘int&amp;’ to an rvalue of type ‘int’
+    4 |     int&amp; r = 10;
+      |              ^~</pre>
+
+<p>A mensagem assusta, mas leia por partes:</p>
+<ul>
+  <li><strong>cannot bind</strong> = "não dá para ligar";</li>
+  <li><strong>non-const lvalue reference of type ‘int&amp;’</strong> = "uma referência comum (sem <code>const</code>) do tipo <code>int&amp;</code>";</li>
+  <li><strong>to an rvalue of type ‘int’</strong> = "a um valor temporário do tipo <code>int</code>". <em>rvalue</em> é o nome técnico de um valor que não mora numa variável, como <code>10</code> ou o resultado de <code>a + b</code>. <em>lvalue</em> é o contrário: algo com caixa, que pode aparecer à esquerda (<em>left</em>) de um <code>=</code>.</li>
+</ul>
+
+<p>Por que proibir? Se <code>int&amp; r = 10;</code> fosse aceito, <code>r = 11;</code> estaria tentando mudar o número 10. Já com <code>const</code> não há risco, porque ninguém vai escrever pelo apelido. Então o C++ deixa, e cria uma caixinha escondida para guardar o 10:</p>
+
+<pre class="file" data-file="literal-const.cpp">#include &lt;iostream&gt;
+
+int main() {
+    const int&amp; r = 10;
+    std::cout &lt;&lt; r &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra literal-const.cpp -o literal-const
+$ ./literal-const
+10</pre>
+
+<p>Essa regra parece detalhe, mas é por causa dela que funções com parâmetro <code>const std::string&amp;</code> aceitam tanto uma variável quanto um texto escrito direto na chamada. A aula <a href="const-ponteiros.html">const com Ponteiros e Referências</a> volta a esse assunto.</p>
+
+<hr>
+
+<h2>5. Para que serve, na prática</h2>
+<p>Ninguém cria um apelido no meio do <code>main</code> só para ter dois nomes. As referências brilham em dois lugares, que têm aulas próprias:</p>
+
+<h3>Em parâmetros de função</h3>
+<p>Uma função normal recebe <strong>cópias</strong> dos valores. Com <code>&amp;</code> no parâmetro, ela recebe um apelido da variável de quem chamou e pode mudá-la:</p>
+
+<pre class="file" data-file="funcao.cpp">#include &lt;iostream&gt;
+
+void dar_bonus(int&amp; nota) {   // nota é um apelido da variável de quem chamou
+    nota = nota + 1;
+}
+
+int main() {
+    int nota_ana = 8;
+    dar_bonus(nota_ana);
+    std::cout &lt;&lt; "Nota da Ana: " &lt;&lt; nota_ana &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra funcao.cpp -o funcao
+$ ./funcao
+Nota da Ana: 9</pre>
+
+<p>Durante a chamada, <code>nota</code> é o "Beto" da <code>nota_ana</code>. Os detalhes (quando usar cópia, <code>&amp;</code> ou <code>const&amp;</code>) estão em <a href="passagem-referencia.html">Por Valor × Por Referência</a>.</p>
+
+<h3>No for de intervalo</h3>
+<p>No <code>for (int n : notas)</code>, cada <code>n</code> é uma cópia. Com <code>int&amp; n</code>, cada <code>n</code> é um apelido do elemento, e mudar <code>n</code> muda o vetor:</p>
+
+<pre class="file" data-file="for-ref.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas = {6, 7, 8};
+
+    for (int n : notas) {     // n é uma CÓPIA de cada nota
+        n = n + 1;
+    }
+    std::cout &lt;&lt; "Sem &amp;: " &lt;&lt; notas[0] &lt;&lt; " " &lt;&lt; notas[1] &lt;&lt; " " &lt;&lt; notas[2] &lt;&lt; "\n";
+
+    for (int&amp; n : notas) {    // n é um APELIDO de cada nota
+        n = n + 1;
+    }
+    std::cout &lt;&lt; "Com &amp;: " &lt;&lt; notas[0] &lt;&lt; " " &lt;&lt; notas[1] &lt;&lt; " " &lt;&lt; notas[2] &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra for-ref.cpp -o for-ref
+$ ./for-ref
+Sem &amp;: 6 7 8              « as cópias mudaram e foram jogadas fora
+Com &amp;: 7 8 9              « os apelidos mudaram o vetor de verdade</pre>
+
+<p>Mais sobre isso em <a href="for-range.html">for de Intervalo</a>.</p>
+
+<hr>
+
+<h2>6. A referência pendurada</h2>
+<p>Este é o perigo de verdade. Um apelido só vale enquanto a pessoa existe. Se a caixa some, a etiqueta fica <strong>pendurada</strong> no ar, colada em lugar nenhum. Usar uma referência assim é um erro grave, que o compilador nem sempre consegue barrar.</p>
+
+<p>O jeito mais comum de criar uma referência pendurada é uma função devolver um apelido para uma variável <strong>local</strong> dela. Variáveis locais morrem quando a função termina (você vai ver o porquê na próxima aula, <a href="memoria.html">Como a Memória Funciona</a>):</p>
+
+<pre class="file" data-file="pendurada.cpp">#include &lt;iostream&gt;
+
+const int&amp; dobro(int n) {
+    int resultado = n * 2;
+    return resultado;      // devolve um apelido para uma variável local
+}
+
+int main() {
+    const int&amp; r = dobro(21);
+    std::cout &lt;&lt; "Dobro: " &lt;&lt; r &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra pendurada.cpp -o pendurada
+pendurada.cpp: In function ‘const int&amp; dobro(int)’:
+pendurada.cpp:5:12: warning: reference to local variable ‘resultado’ returned [-Wreturn-local-addr]
+    5 |     return resultado;      // devolve um apelido para uma variável local
+      |            ^~~~~~~~~
+pendurada.cpp:4:9: note: declared here
+    4 |     int resultado = n * 2;
+      |         ^~~~~~~~~
+$ ./pendurada
+Falha de segmentação     (imagem do núcleo gravada) ./pendurada
+$ echo $?
+139</pre>
+
+<dl class="anatomy">
+  <dt>const int&amp; dobro(int n)</dt><dd>O tipo de retorno tem <code>&amp;</code>: a função promete devolver um <strong>apelido</strong>, não um número.</dd>
+  <dt>warning: reference to local variable ‘resultado’ returned</dt><dd>"Foi devolvida uma referência para a variável local <code>resultado</code>". É só um <strong>aviso</strong> (warning): o programa foi gerado mesmo assim. Por isso o guia sempre compila com <code>-Wall</code> (veja <a href="avisos.html">Avisos</a>).</dd>
+  <dt>[-Wreturn-local-addr]</dt><dd>O nome do aviso: "devolver o endereço de algo local".</dd>
+  <dt>note: declared here</dt><dd>Uma nota que mostra onde a vítima nasceu: na linha 4, dentro da função.</dd>
+  <dt>Falha de segmentação</dt><dd>O programa tentou ler uma memória que não podia e o sistema o matou. Em inglês, a mesma mensagem é <code>Segmentation fault (core dumped)</code>. O código de saída <code>139</code> (128 + 11, o sinal 11, <code>SIGSEGV</code>) confirma. A aula <a href="nullptr.html">nullptr</a> mostra esse erro com calma.</dd>
+</dl>
+
+<p>Quando a <code>dobro</code> termina, a caixa <code>resultado</code> é desmontada. O <code>main</code> recebe uma etiqueta colada no vazio. Desta vez o programa caiu; em outra máquina, ou com outras opções, ele poderia mostrar um número qualquer, ou até o 42 certo por sorte. Isso se chama <a href="comportamento-indefinido.html">comportamento indefinido</a>: o C++ não promete nada, e "funcionou no meu computador" não prova nada.</p>
+
+<div class="tip">
+<strong>No C++23, o caso mais simples virou erro</strong>
+<p>Se a função acima devolvesse <code>int&amp;</code> (sem <code>const</code>), o g++ 15 com <code>-std=c++23</code> nem compilaria: ele mostra <code>error: cannot bind non-const lvalue reference of type ‘int&amp;’ to an rvalue of type ‘int’</code> na linha do <code>return</code>. Com <code>-std=c++20</code>, o mesmo código passava só com o aviso <code>-Wreturn-local-addr</code>. O padrão novo fechou uma das portas, mas não todas: como você viu, com <code>const int&amp;</code> o problema continua.</p>
+</div>
+
+<p><strong>Conserto:</strong> devolva o valor, sem <code>&amp;</code>. A função entrega uma <strong>cópia</strong> do resultado, que sobrevive ao fim dela:</p>
+
+<pre class="file" data-file="pendurada-ok.cpp">#include &lt;iostream&gt;
+
+int dobro(int n) {
+    int resultado = n * 2;
+    return resultado;      // devolve uma CÓPIA do valor
+}
+
+int main() {
+    int r = dobro(21);
+    std::cout &lt;&lt; "Dobro: " &lt;&lt; r &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra pendurada-ok.cpp -o pendurada-ok
+$ ./pendurada-ok
+Dobro: 42</pre>
+
+<div class="warning">
+<strong>Regra de ouro</strong>
+<p>Nunca devolva <code>&amp;</code> para algo que nasceu dentro da função. Devolver referência só faz sentido para algo que <strong>continua vivo</strong> depois que a função termina, como um elemento de um vetor que a própria função recebeu por referência. Na dúvida, devolva por valor: copiar um <code>int</code> não custa nada.</p>
+</div>
+
+<hr>
+
+<h2>Cópia, <code>&amp;</code> ou <code>const&amp;</code>: qual usar</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Declaração</th><th>Cria caixa nova?</th><th>Pode mudar o original?</th><th>Use quando…</th></tr>
+<tr><td><code>int c = x;</code></td><td>Sim (cópia)</td><td>Não: mexe só na cópia</td><td>Você quer um valor independente. É o padrão para tipos pequenos (<code>int</code>, <code>double</code>, <code>char</code>, <code>bool</code>).</td></tr>
+<tr><td><code>int&amp; r = x;</code></td><td>Não</td><td>Sim</td><td>Você <strong>quer</strong> mudar o original (parâmetro de saída, <code>for</code> que altera o vetor).</td></tr>
+<tr><td><code>const int&amp; r = x;</code></td><td>Não</td><td>Não</td><td>Você só quer ler algo <strong>grande</strong> (uma <code>std::string</code>, um <code>std::vector</code>) sem pagar a cópia.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"declared as reference but not initialized"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sem-alvo.cpp -o sem-alvo
+sem-alvo.cpp: In function ‘int main()’:
+sem-alvo.cpp:4:10: error: ‘r’ declared as reference but not initialized
+    4 |     int&amp; r;
+      |          ^</pre>
+<p><strong>O que aconteceu:</strong> você criou um apelido sem dizer de quem. No editor do guia (Clang), a mesma coisa aparece como <code>declaration of reference variable 'r' requires an initializer</code>.</p>
+<p><strong>Como resolver:</strong> ligue na criação: <code>int&amp; r = x;</code>. Se não existe ainda uma variável para ligar, talvez você não queira uma referência, e sim uma variável comum.</p>
+</div>
+
+<div class="cenario">
+<strong>"assignment of read-only reference"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra const-ref.cpp -o const-ref
+const-ref.cpp: In function ‘int main()’:
+const-ref.cpp:8:16: error: assignment of read-only reference ‘so_leitura’
+    8 |     so_leitura = 0;
+      |     ~~~~~~~~~~~^~~</pre>
+<p><strong>O que aconteceu:</strong> você tentou escrever por uma referência <code>const</code>. O Clang diz <code>cannot assign to variable 'so_leitura' with const-qualified type 'const int &amp;'</code>.</p>
+<p><strong>Como resolver:</strong> se a mudança é intencional, mude pelo nome original ou tire o <code>const</code> da referência. Se não é, o compilador acabou de salvar você de um bug.</p>
+</div>
+
+<div class="cenario">
+<strong>"cannot bind non-const lvalue reference … to an rvalue"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra literal.cpp -o literal
+literal.cpp: In function ‘int main()’:
+literal.cpp:4:14: error: cannot bind non-const lvalue reference of type ‘int&amp;’ to an rvalue of type ‘int’
+    4 |     int&amp; r = 10;
+      |              ^~</pre>
+<p><strong>O que aconteceu:</strong> você tentou ligar uma <code>int&amp;</code> a algo que não é variável: um número, uma conta (<code>a + b</code>) ou o retorno de uma função que devolve por valor. A mesma mensagem aparece no <code>return</code> de uma função <code>int&amp;</code> que devolve uma variável local, no C++23.</p>
+<p><strong>Como resolver:</strong> se é só para ler, use <code>const int&amp;</code>. Se é para guardar o valor, use uma variável comum: <code>int r = 10;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Aviso "reference to local variable … returned" e o programa cai</strong>
+<pre class="term" data-cwd="~/cpp">$ ./pendurada
+Falha de segmentação     (imagem do núcleo gravada) ./pendurada
+$ echo $?
+139</pre>
+<p><strong>O que aconteceu:</strong> a função devolveu um apelido de uma variável local, que morreu no fim da função. O aviso <code>-Wreturn-local-addr</code> tinha avisado na compilação. Em outras execuções, o sintoma pode ser um número sem sentido em vez da queda.</p>
+<p><strong>Como resolver:</strong> devolva por valor (<code>int dobro(int n)</code>). Trate esse aviso como erro: ele nunca é alarme falso.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>O que faz</th></tr>
+<tr><td><code>int&amp; r = x;</code></td><td>Cria <code>r</code>, um apelido de <code>x</code>. Ler ou escrever <code>r</code> é ler ou escrever <code>x</code>.</td></tr>
+<tr><td><code>r = 5;</code></td><td>Guarda 5 na caixa de <code>x</code> (não muda de quem <code>r</code> é apelido).</td></tr>
+<tr><td><code>const int&amp; r = x;</code></td><td>Apelido só de leitura. <code>r = 5;</code> dá erro; <code>x = 5;</code> continua valendo.</td></tr>
+<tr><td><code>const int&amp; r = 10;</code></td><td>Permitido: o C++ cria uma caixa escondida para o 10.</td></tr>
+<tr><td><code>int&amp; r = 10;</code></td><td>Erro: referência comum só apelida variáveis.</td></tr>
+<tr><td><code>int&amp; r;</code></td><td>Erro: referência sem dono.</td></tr>
+<tr><td><code>void f(int&amp; n)</code></td><td>Parâmetro por referência: a função pode mudar a variável de quem chamou.</td></tr>
+<tr><td><code>for (int&amp; n : v)</code></td><td>Cada <code>n</code> é apelido de um elemento de <code>v</code>.</td></tr>
+<tr><td><code>int&amp; f() { int x; return x; }</code></td><td>Nunca: referência pendurada (erro no C++23; com <code>const int&amp;</code>, aviso <code>-Wreturn-local-addr</code>).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Criar o apelido</h3>
+<p>Complete para que <code>t</code> seja um apelido (e não uma cópia) de <code>total</code>:</p>
+<div class="ex-code">int<input data-answer="&amp;" aria-label="símbolo"> t = total;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Só leitura</h3>
+<p>Complete para criar um apelido de <code>nome</code> que <strong>não</strong> deixa mudar o texto:</p>
+<div class="ex-code"><input data-answer="const" aria-label="palavra"> std::string&amp; n = nome;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Depois de <code>int a = 1; int b = 2; int&amp; r = a; r = b; b = 9;</code>, quanto valem <code>a</code> e <code>b</code>?</p>
+<label><input type="radio" name="q3"> <code>a = 1</code>, <code>b = 9</code></label>
+<label><input type="radio" name="q3"> <code>a = 2</code>, <code>b = 9</code></label>
+<label><input type="radio" name="q3"> <code>a = 9</code>, <code>b = 9</code></label>
+<label><input type="radio" name="q3"> Erro: uma referência não pode receber outra variável</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Qual destas linhas <strong>não</strong> compila?</p>
+<label><input type="radio" name="q4"> <code>const int&amp; r = 10;</code></label>
+<label><input type="radio" name="q4"> <code>int x = 5; int&amp; r = x;</code></label>
+<label><input type="radio" name="q4"> <code>int&amp; r;</code></label>
+<label><input type="radio" name="q4"> <code>int x = 5; const int&amp; r = x;</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Uma função devolve <code>const int&amp;</code> para uma variável criada dentro dela. O que o g++ faz com <code>-Wall</code>?</p>
+<label><input type="radio" name="q5"> Compila, mas avisa <code>reference to local variable … returned [-Wreturn-local-addr]</code>; usar o resultado é comportamento indefinido</label>
+<label><input type="radio" name="q5"> Compila sem avisos e funciona sempre</label>
+<label><input type="radio" name="q5"> Copia a variável automaticamente para ela sobreviver</label>
+<label><input type="radio" name="q5"> Não compila de jeito nenhum, em nenhum padrão</label>
+</div>
+
+<h3>Missão final: o caixa da lojinha</h3>
+
+<div class="trycpp" data-goal="out:Caixa: 80,out:Vendas: 80,src:int\s*&amp;\s*caixa\s*=\s*vendas,compila">
+<p class="try-task"><strong>Missão:</strong> a lojinha da Ana já vendeu 50 reais (variável <code>vendas</code>). Crie uma referência chamada <code>caixa</code> que seja apelido de <code>vendas</code>. Depois, <strong>pelo apelido</strong>, some 30 (uma venda nova) e mostre as duas linhas abaixo:</p>
+<pre class="out">Caixa: 80
+Vendas: 80</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int vendas = 50;
+    // crie a referência caixa aqui
+
+    // some 30 pelo apelido
+
+    // mostre "Caixa: " e "Vendas: "
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int vendas = 50;
+    int&amp; caixa = vendas;
+
+    caixa = caixa + 30;
+
+    std::cout &lt;&lt; "Caixa: " &lt;&lt; caixa &lt;&lt; "\n";
+    std::cout &lt;&lt; "Vendas: " &lt;&lt; vendas &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<div class="trycpp" data-goal="erro:reference">
+<p class="try-task"><strong>Missão extra (provoque o erro):</strong> apague o <code> = preco</code> da linha da referência, deixando só <code>int&amp; valor;</code>, e clique em Rodar. Leia a mensagem: ela diz que toda referência precisa nascer ligada.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int preco = 12;
+    int&amp; valor = preco;
+    std::cout &lt;&lt; valor &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int preco = 12;
+    int&amp; valor;
+    std::cout &lt;&lt; valor &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma referência é um <strong>apelido</strong>: <code>int&amp; r = x;</code> cola uma segunda etiqueta na caixa de <code>x</code>. Não cria caixa nova.</li>
+  <li>Mudar pelo apelido muda o original, e vice-versa.</li>
+  <li>Toda referência precisa ser ligada na criação (<code>declared as reference but not initialized</code>).</li>
+  <li>Ela nunca troca de alvo: <code>r = y;</code> copia o <strong>valor</strong> de <code>y</code> para a caixa de <code>x</code>.</li>
+  <li><code>const int&amp;</code> é um apelido só de leitura; pode até apelidar um número solto como <code>10</code>.</li>
+  <li>Nunca devolva referência para uma variável local: ela morre no fim da função e a referência fica <strong>pendurada</strong> (<code>-Wreturn-local-addr</code>, comportamento indefinido).</li>
+  <li>Próxima aula: <a href="memoria.html">Como a Memória Funciona</a>, para entender <em>onde</em> moram as caixas e por que as locais morrem.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
