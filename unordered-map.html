@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ std::unordered_map — tabela de espalhamento, sem ordem | Guia C++</title>
+<meta name="description" content="std::unordered_map em C++ para quem nunca programou: o que é uma tabela de espalhamento (hash), por que a ordem sai bagunçada (saída real), por que é mais rápido em média, a mesma interface do std::map e uma tabela map × unordered_map para escolher, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">std::unordered_map</span></h1>
+
+<p class="intro">O <a href="map.html">std::map</a> guarda pares chave → valor sempre em ordem alfabética. Manter essa ordem tem um custo: a cada busca, ele compara a chave com várias outras. O <code>std::unordered_map</code> ("map não ordenado") abre mão da ordem e, em troca, acha a chave quase de uma vez só, com uma conta. Por fora, os dois se usam do mesmo jeito: <code>[]</code>, <code>at</code>, <code>find</code>, <code>contains</code>, <code>erase</code>. Por dentro, é outra máquina: uma <strong>tabela de espalhamento</strong>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma tabela de espalhamento (<em>hash table</em>) e o que é um <em>hash</em>.</li>
+  <li>Por que a ordem do <code>unordered_map</code> sai "bagunçada", com a saída real, e por que ela pode mudar.</li>
+  <li>Por que ele é mais rápido em média, com uma medição pequena.</li>
+  <li>Que a interface é a mesma do <code>map</code>: trocar um pelo outro costuma ser só trocar o nome.</li>
+  <li>O erro de quando a chave não sabe "se espalhar" (uma <code>struct</code> como chave).</li>
+  <li>Uma tabela <code>map</code> × <code>unordered_map</code> para escolher.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp/umap</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Leia antes a aula <a href="map.html">std::map</a>: esta aula se apoia nela.</p>
+
+<hr>
+
+<h2>A ideia: o vestiário com armários numerados</h2>
+<p>No clube, o vestiário tem 13 armários numerados de 0 a 12. A regra para escolher o armário é uma conta com o nome da pessoa: some o "valor" das letras do nome e pegue o resto da divisão por 13. A Ana sempre cai no armário 5, o Bruno sempre no 10. Para achar as coisas da Ana, ninguém procura armário por armário: faz a conta com "Ana", dá 5, abre o 5.</p>
+
+<p>Repare em três coisas:</p>
+<ul>
+  <li><strong>Achar é rápido</strong>: uma conta e um armário, não importa se há 10 ou 10 mil sócios.</li>
+  <li><strong>Não há ordem alfabética</strong>: olhando os armários do 0 ao 12, os nomes aparecem na ordem que a conta decidiu.</li>
+  <li><strong>Dois nomes podem cair no mesmo armário</strong> (uma "colisão"). Tudo bem: o armário guarda os dois, e você confere qual é qual. Se começar a encher demais, o clube constrói um vestiário maior e <strong>redistribui todo mundo</strong>, e aí cada um pode cair num número diferente.</li>
+</ul>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No vestiário</th><th>No <code>unordered_map</code></th></tr>
+<tr><td>A conta com o nome</td><td>A função de <strong>hash</strong> ("espalhamento", "picadinho"): transforma a chave num número grande</td></tr>
+<tr><td>Os armários</td><td>Os <strong>buckets</strong> ("baldes", "gavetas")</td></tr>
+<tr><td>O resto da divisão pelo número de armários</td><td>Qual gaveta: <code>hash % número_de_gavetas</code></td></tr>
+<tr><td>Dois nomes no mesmo armário</td><td>Uma <strong>colisão</strong></td></tr>
+<tr><td>Construir um vestiário maior e redistribuir</td><td><strong>Rehash</strong>: mais gavetas, e todo mundo muda de lugar</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. A ordem "bagunçada"</h2>
+<p>A Ana pôs o mesmo estoque num <code>map</code> e num <code>unordered_map</code> e mostrou as chaves dos dois:</p>
+
+<pre class="file" data-file="ordem.cpp">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+#include &lt;unordered_map&gt;
+
+int main() {
+    std::map&lt;std::string, int&gt; m{
+        {"maçã", 12}, {"banana", 30}, {"pera", 8}, {"uva", 40}, {"kiwi", 5}};
+    std::unordered_map&lt;std::string, int&gt; u{
+        {"maçã", 12}, {"banana", 30}, {"pera", 8}, {"uva", 40}, {"kiwi", 5}};
+
+    std::cout &lt;&lt; "map:           ";
+    for (const auto&amp; [nome, qtd] : m) {
+        std::cout &lt;&lt; nome &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; "\nunordered_map: ";
+    for (const auto&amp; [nome, qtd] : u) {
+        std::cout &lt;&lt; nome &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;unordered_map&gt;</dt><dd>O <code>unordered_map</code> tem cabeçalho próprio (não vem com o <code>&lt;map&gt;</code>).</dd>
+  <dt>std::unordered_map&lt;std::string, int&gt;</dt><dd>Os mesmos dois tipos do <code>map</code>: chave e valor.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/umap">$ g++ -std=c++23 -Wall -Wextra ordem.cpp -o ordem
+$ ./ordem
+map:           banana kiwi maçã pera uva
+unordered_map: uva pera banana kiwi maçã</pre>
+
+<p>O <code>map</code> saiu em ordem alfabética. O <code>unordered_map</code> saiu em uma ordem que não é alfabética, nem a de inserção, nem a contrária: é a ordem das gavetas. Dá para espiar as contas:</p>
+
+<pre class="file" data-file="gavetas.cpp">#include &lt;functional&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;unordered_map&gt;
+
+int main() {
+    std::unordered_map&lt;std::string, int&gt; estoque{
+        {"maçã", 12}, {"banana", 30}, {"pera", 8}};
+
+    std::cout &lt;&lt; "gavetas: " &lt;&lt; estoque.bucket_count() &lt;&lt; '\n';
+
+    std::hash&lt;std::string&gt; espalhar;
+    for (const auto&amp; [nome, qtd] : estoque) {
+        std::cout &lt;&lt; nome &lt;&lt; ": hash = " &lt;&lt; espalhar(nome)
+                  &lt;&lt; ", gaveta " &lt;&lt; estoque.bucket(nome) &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/umap">$ g++ -std=c++23 -Wall -Wextra gavetas.cpp -o gavetas
+$ ./gavetas
+gavetas: 13
+pera: hash = 12384757184466199296, gaveta 10
+banana: hash = 4209850087293805843, gaveta 5
+maçã: hash = 13674847098208160434, gaveta 11</pre>
+
+<dl class="anatomy">
+  <dt>bucket_count()</dt><dd>Quantas gavetas a tabela tem agora: 13.</dd>
+  <dt>std::hash&lt;std::string&gt;</dt><dd>A função de hash que o <code>unordered_map</code> usa para textos (cabeçalho <code>&lt;functional&gt;</code>). Ela transforma <code>"pera"</code> num número enorme. O mesmo texto dá sempre o mesmo número; textos parecidos dão números bem diferentes ("espalhados").</dd>
+  <dt>bucket(nome)</dt><dd>Em qual gaveta a chave está. Confira: 12384757184466199296 dividido por 13 deixa resto 10, e a pera está na gaveta 10.</dd>
+</dl>
+
+<p>E quando a tabela enche, ela cresce e redistribui tudo. A Ana acrescentou 11 frutas às 3 que já havia:</p>
+
+<pre class="term" data-cwd="~/cpp/umap">$ g++ -std=c++23 -Wall -Wextra muda.cpp -o muda
+$ ./muda
+pera banana maçã (13 gavetas)
+acerola kiwi jaca maçã banana pera melão abacate uva limão caqui manga goiaba figo (29 gavetas)</pre>
+
+<p>Com 14 itens em 13 gavetas, a tabela passou para 29 gavetas e reorganizou tudo. Repare que até a ordem de <code>pera</code>, <code>banana</code> e <code>maçã</code> entre si mudou.</p>
+
+<div class="warning">
+<strong>Nunca dependa da ordem de um <code>unordered_map</code></strong>
+<p>A ordem muda quando você insere itens, pode mudar com outra versão do compilador e <strong>muda de biblioteca para biblioteca</strong>: no editor do guia, que usa outra biblioteca padrão, as mesmas frutas podem sair em outra ordem. Se a saída do seu programa precisa estar em ordem, use <code>std::map</code>, ou copie os itens para um <code>vector</code> e ordene (aula <a href="algoritmos.html">Algoritmos</a>).</p>
+</div>
+
+<hr>
+
+<h2>2. A mesma interface do <code>map</code></h2>
+<p>Tudo o que você aprendeu na aula <a href="map.html">std::map</a> vale aqui: <code>[]</code> (que cria a chave), <code>at</code> (que lança <code>std::out_of_range</code>), <code>contains</code>, <code>find</code>, <code>count</code>, <code>erase</code>, <code>insert</code>, <code>emplace</code>, <code>size</code>. O contador de palavras da aula anterior, trocando só o tipo:</p>
+
+<pre class="file" data-file="contar.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;unordered_map&gt;
+
+int main() {
+    std::unordered_map&lt;std::string, int&gt; contagem;
+    std::string palavra;
+
+    while (std::cin &gt;&gt; palavra) {
+        ++contagem[palavra];
+    }
+
+    std::cout &lt;&lt; "Quantos \"o\"? " &lt;&lt; contagem.at("o") &lt;&lt; '\n';
+    std::cout &lt;&lt; std::boolalpha &lt;&lt; "Tem \"cão\"? " &lt;&lt; contagem.contains("cão") &lt;&lt; '\n';
+
+    for (const auto&amp; [p, vezes] : contagem) {
+        std::cout &lt;&lt; p &lt;&lt; ": " &lt;&lt; vezes &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/umap">$ g++ -std=c++23 -Wall -Wextra contar.cpp -o contar
+$ echo "o gato e o rato e o queijo" | ./contar
+Quantos "o"? 3
+Tem "cão"? false
+queijo: 1                « as mesmas contagens do map, em outra ordem
+rato: 1
+e: 2
+gato: 1
+o: 3</pre>
+
+<div class="trycpp" data-goal="out:Ana: 9999-1111,out:Bruno não está na agenda,src:std::unordered_map">
+<p class="try-task"><strong>Missão:</strong> esta agenda usa <code>std::map</code>. Troque para <code>std::unordered_map</code> (o tipo <strong>e</strong> o <code>#include</code>) e rode: o resto do programa funciona sem mudar nada.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::map&lt;std::string, std::string&gt; agenda;
+    agenda["Ana"] = "9999-1111";
+    agenda["Carla"] = "9888-2222";
+
+    std::cout &lt;&lt; "Ana: " &lt;&lt; agenda.at("Ana") &lt;&lt; '\n';
+    if (!agenda.contains("Bruno")) {
+        std::cout &lt;&lt; "Bruno não está na agenda\n";
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;unordered_map&gt;
+
+int main() {
+    std::unordered_map&lt;std::string, std::string&gt; agenda;
+    agenda["Ana"] = "9999-1111";
+    agenda["Carla"] = "9888-2222";
+
+    std::cout &lt;&lt; "Ana: " &lt;&lt; agenda.at("Ana") &lt;&lt; '\n';
+    if (!agenda.contains("Bruno")) {
+        std::cout &lt;&lt; "Bruno não está na agenda\n";
+    }
+}
+</pre>
+</div>
+
+<p>O que o <code>unordered_map</code> tem a mais são os métodos das gavetas (<code>bucket_count</code>, <code>bucket</code>, <code>load_factor</code>, <code>reserve</code>). O que ele tem a menos: as buscas por faixa que dependem de ordem, como <code>lower_bound</code> ("a primeira chave a partir de <code>"m"</code>"), que só o <code>map</code> tem.</p>
+
+<hr>
+
+<h2>3. Mais rápido em média</h2>
+<p>Para achar uma chave, o <code>map</code> desce por uma árvore ordenada: compara com a chave do meio, vai para a esquerda ou para a direita, compara de novo… Com 100 mil chaves, são umas 17 comparações de texto por busca. O <code>unordered_map</code> faz <strong>uma</strong> conta de hash, vai na gaveta e compara com o que estiver lá (normalmente um ou dois itens). A Ana mediu 100 mil buscas em cada um:</p>
+
+<pre class="file" data-file="rapidez.cpp">#include &lt;chrono&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+#include &lt;unordered_map&gt;
+#include &lt;vector&gt;
+
+int main() {
+    const int N = 100000;
+    std::vector&lt;std::string&gt; nomes;
+    for (int i = 0; i &lt; N; ++i) {
+        nomes.push_back("produto" + std::to_string(i));
+    }
+
+    std::map&lt;std::string, int&gt; m;
+    std::unordered_map&lt;std::string, int&gt; u;
+    for (const auto&amp; n : nomes) {
+        m[n] = 1;
+        u[n] = 1;
+    }
+
+    using relogio = std::chrono::steady_clock;
+    using ms = std::chrono::duration&lt;double, std::milli&gt;;
+    long long achados = 0;
+
+    auto t0 = relogio::now();
+    for (const auto&amp; n : nomes) achados += m.count(n);
+    auto t1 = relogio::now();
+    for (const auto&amp; n : nomes) achados += u.count(n);
+    auto t2 = relogio::now();
+
+    std::cout &lt;&lt; "100 mil buscas no map:           " &lt;&lt; ms(t1 - t0).count() &lt;&lt; " ms\n";
+    std::cout &lt;&lt; "100 mil buscas no unordered_map: " &lt;&lt; ms(t2 - t1).count() &lt;&lt; " ms\n";
+    std::cout &lt;&lt; "achados: " &lt;&lt; achados &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/umap">$ g++ -std=c++23 -Wall -Wextra rapidez.cpp -o rapidez
+$ ./rapidez
+100 mil buscas no map:           176.942 ms
+100 mil buscas no unordered_map: 36.7346 ms
+achados: 200000</pre>
+
+<p>Umas 5 vezes mais rápido, nessa máquina, sem otimização (<code>-O2</code> deixaria os dois mais rápidos). Os tempos mudam a cada execução; o que vale é a proporção. Em termos de custo (aula <a href="list-deque.html">list e deque</a>): o <code>map</code> busca em tempo <strong>logarítmico</strong>, O(log n), que cresce bem devagar; o <code>unordered_map</code> busca em tempo <strong>constante em média</strong>, O(1).</p>
+
+<div class="note">
+<strong>"Em média"</strong>
+<p>Se muitas chaves caírem na mesma gaveta (por azar ou de propósito, com chaves escolhidas por um atacante), as buscas nessa gaveta viram uma procura item por item. É raro com chaves comuns, mas é por isso que se diz "rápido <strong>em média</strong>", e não "sempre". O <code>map</code> é um pouco mais lento, mas tem o mesmo desempenho sempre.</p>
+</div>
+
+<hr>
+
+<h2>4. A chave precisa saber "se espalhar"</h2>
+<p>O <code>map</code> exige que a chave saiba fazer <code>&lt;</code> (para ordenar). O <code>unordered_map</code> exige outra coisa: que exista um <code>std::hash</code> para o tipo da chave (para calcular a gaveta), e que ela saiba fazer <code>==</code> (para conferir dentro da gaveta). Textos, números, <code>char</code> e <code>bool</code> já vêm com hash. Uma <code>struct</code> sua, não:</p>
+
+<pre class="file" data-file="chave-struct.cpp">#include &lt;string&gt;
+#include &lt;unordered_map&gt;
+
+struct Produto {
+    std::string nome;
+    int lote;
+};
+
+int main() {
+    std::unordered_map&lt;Produto, int&gt; estoque;
+    estoque[Produto{"maçã", 1}] = 12;
+}
+</pre>
+
+<p>Esse erro tem 84 linhas. Aqui estão as 13 primeiras, que são as que importam:</p>
+
+<pre class="term" data-cwd="~/cpp/umap">$ g++ -std=c++23 -Wall -Wextra chave-struct.cpp -o chave-struct 2&gt;&amp;1 | head -n 13
+In file included from /usr/include/c++/15/bits/unordered_map.h:33,
+                 from /usr/include/c++/15/unordered_map:43,
+                 from chave-struct.cpp:2:
+/usr/include/c++/15/bits/hashtable.h: In instantiation of ‘class std::_Hashtable&lt;Produto, std::pair&lt;const Produto, int&gt;, std::allocator&lt;std::pair&lt;const Produto, int&gt; &gt;, std::__detail::_Select1st, std::equal_to&lt;Produto&gt;, std::hash&lt;Produto&gt;, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits&lt;true, false, true&gt; &gt;’:
+/usr/include/c++/15/bits/unordered_map.h:115:18:   required from ‘class std::unordered_map&lt;Produto, int&gt;’
+  115 |       _Hashtable _M_h;
+      |                  ^~~~
+chave-struct.cpp:10:38:   required from here
+   10 |     std::unordered_map&lt;Produto, int&gt; estoque;
+      |                                      ^~~~~~~
+/usr/include/c++/15/bits/hashtable.h:210:51: error: static assertion failed: hash function must be copy constructible
+  210 |       static_assert(is_copy_constructible&lt;_Hash&gt;::value,
+      |                                                   ^~~~~</pre>
+
+<ol class="passo">
+  <li><strong><code>required from here</code></strong>: linha 10, a criação do <code>std::unordered_map&lt;Produto, int&gt;</code>.</li>
+  <li><strong>O primeiro <code>error:</code></strong>: <code>static assertion failed: hash function must be copy constructible</code> ("a função de hash precisa poder ser copiada"). Por trás da frase técnica: o <code>std::hash&lt;Produto&gt;</code> não existe de verdade (a biblioteca deixa um "hash desligado" no lugar), então não há hash para copiar.</li>
+  <li><strong>O resto</strong> são <code>use of deleted function</code> em cascata, consequência da primeira.</li>
+</ol>
+
+<p><strong>Como consertar</strong>, do mais simples ao mais trabalhoso: (1) use como chave um tipo que já tem hash, como um <code>std::string</code> com <code>"maçã-1"</code>; (2) use <code>std::map</code>, ensinando o <code>Produto</code> a fazer <code>&lt;</code> (aula <a href="sobrecarga-operadores.html">Sobrecarga de Operadores</a>); (3) escreva o seu próprio hash, um assunto mais avançado, que fica para depois.</p>
+
+<hr>
+
+<h2>5. <code>map</code> × <code>unordered_map</code>: qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>std::map</code></th><th><code>std::unordered_map</code></th></tr>
+<tr><td>Cabeçalho</td><td><code>&lt;map&gt;</code></td><td><code>&lt;unordered_map&gt;</code></td></tr>
+<tr><td>Por dentro</td><td>Árvore ordenada (rubro-negra)</td><td>Tabela de espalhamento (gavetas)</td></tr>
+<tr><td>Ordem ao percorrer</td><td><strong>Sempre em ordem de chave</strong></td><td>Nenhuma garantida; pode mudar</td></tr>
+<tr><td>Buscar, inserir, apagar</td><td>Logarítmico, O(log n): rápido e previsível</td><td>Constante em média, O(1): mais rápido, com pior caso raro</td></tr>
+<tr><td>A chave precisa de</td><td><code>&lt;</code></td><td><code>std::hash</code> e <code>==</code></td></tr>
+<tr><td>Busca por faixa (<code>lower_bound</code>, "de A até M")</td><td>Sim</td><td>Não</td></tr>
+<tr><td>Memória</td><td>Um nó por item</td><td>Um nó por item, mais o vetor de gavetas</td></tr>
+<tr><td>Iteradores após inserir</td><td>Continuam válidos</td><td>Invalidados se houver <em>rehash</em></td></tr>
+</table>
+</div>
+
+<p><strong>Regra prática:</strong> se você precisa dos itens <strong>em ordem</strong> (um relatório, uma lista alfabética), ou de buscas por faixa, use <code>map</code>. Se só vai guardar e procurar por chave, e há muitos itens, use <code>unordered_map</code>. Com poucas dezenas de itens, a diferença de velocidade não aparece; escolha pela ordem.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"A saída mudou de ordem" / "no meu computador saiu diferente"</strong>
+<p><strong>O que significa:</strong> o programa mostra os itens de um <code>unordered_map</code> e conta com uma ordem que não existe.</p>
+<p><strong>Como consertar:</strong> use <code>std::map</code>, ou copie as chaves para um <code>std::vector</code> e ordene antes de mostrar.</p>
+</div>
+
+<div class="cenario">
+<strong><code>static assertion failed: hash function must be copy constructible</code> (e dezenas de <code>use of deleted function</code>)</strong>
+<p><strong>O que significa:</strong> o tipo da chave não tem <code>std::hash</code>.</p>
+<p><strong>Como consertar:</strong> mude a chave para um tipo com hash (<code>std::string</code>, <code>int</code>…) ou use <code>std::map</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: ‘unordered_map’ is not a member of ‘std’</code></strong>
+<p><strong>O que significa:</strong> faltou o <code>#include &lt;unordered_map&gt;</code>. O <code>&lt;map&gt;</code> não o traz.</p>
+<p><strong>Como consertar:</strong> inclua <code>&lt;unordered_map&gt;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Chaves aparecendo com valor 0 sem ninguém ter cadastrado</strong>
+<p><strong>O que significa:</strong> o mesmo problema do <code>map</code>: ler com <code>[]</code> cria a chave.</p>
+<p><strong>Como consertar:</strong> para ler, <code>contains</code>, <code>find</code> ou <code>at</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>std::unordered_map&lt;K, V&gt; u;</code></td><td>Cria vazio (<code>&lt;unordered_map&gt;</code>)</td></tr>
+<tr><td><code>u[k] = v</code>, <code>insert</code>, <code>emplace</code>, <code>insert_or_assign</code></td><td>Iguais aos do <code>map</code></td></tr>
+<tr><td><code>u.at(k)</code>, <code>u.contains(k)</code>, <code>u.find(k)</code>, <code>u.count(k)</code></td><td>Iguais aos do <code>map</code></td></tr>
+<tr><td><code>u.erase(k)</code>, <code>u.size()</code>, <code>u.clear()</code></td><td>Iguais aos do <code>map</code></td></tr>
+<tr><td><code>u.bucket_count()</code></td><td>Quantas gavetas há</td></tr>
+<tr><td><code>u.bucket(k)</code></td><td>Em qual gaveta está a chave</td></tr>
+<tr><td><code>u.load_factor()</code></td><td>Itens por gaveta, em média</td></tr>
+<tr><td><code>u.reserve(n)</code></td><td>Prepara gavetas para <code>n</code> itens (evita rehash no meio)</td></tr>
+<tr><td><code>std::hash&lt;T&gt;{}(x)</code></td><td>O número de hash de <code>x</code> (<code>&lt;functional&gt;</code>)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O cabeçalho</h3>
+<div class="ex-code">#include &lt;<input data-answer="unordered_map" aria-label="cabeçalho">&gt;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Quantas gavetas?</h3>
+<p>Complete para mostrar quantas gavetas (buckets) a tabela <code>u</code> tem:</p>
+<div class="ex-code">std::cout &lt;&lt; u.<input data-answer="bucket_count()" aria-label="método">;</div>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">3. Em que ordem um <code>for</code> percorre um <code>std::unordered_map</code>?</p>
+<label><input type="radio" name="q3"> Alfabética</label>
+<label><input type="radio" name="q3"> Na ordem de inserção</label>
+<label><input type="radio" name="q3"> Na ordem contrária à de inserção</label>
+<label><input type="radio" name="q3"> Na ordem das gavetas, sem garantia, e pode mudar</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. A Ana precisa imprimir a lista de alunos com as notas, em ordem alfabética. Qual escolher?</p>
+<label><input type="radio" name="q4"> <code>std::map</code></label>
+<label><input type="radio" name="q4"> <code>std::unordered_map</code></label>
+<label><input type="radio" name="q4"> Tanto faz, os dois saem em ordem</label>
+<label><input type="radio" name="q4"> Nenhum dos dois serve</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. O que o tipo da chave precisa ter para ser usado num <code>unordered_map</code>?</p>
+<label><input type="radio" name="q5"> Só o operador <code>&lt;</code></label>
+<label><input type="radio" name="q5"> Um construtor sem parâmetros</label>
+<label><input type="radio" name="q5"> Um <code>std::hash</code> e o operador <code>==</code></label>
+<label><input type="radio" name="q5"> Um método <code>size()</code></label>
+</div>
+
+<h3>Missão final: a votação da cor da camiseta</h3>
+
+<div class="trycpp" data-stdin="azul verde azul rosa azul verde" data-goal="out:azul: 3,out:verde: 2,out:rosa: 1,out:amarelo: 0,out:cores votadas: 3,src:unordered_map">
+<p class="try-task"><strong>Missão:</strong> a entrada tem os votos da turma. Conte-os num <code>std::unordered_map&lt;std::string, int&gt;</code> e mostre os votos de <code>azul</code>, <code>verde</code>, <code>rosa</code> e <code>amarelo</code>, <strong>nesta ordem</strong> (a ordem do <code>unordered_map</code> não serve aqui). Ninguém votou em amarelo: mostre 0 <strong>sem criar</strong> a chave, para a última linha dizer <code>cores votadas: 3</code>. Saída esperada:</p>
+<pre class="out">azul: 3
+verde: 2
+rosa: 1
+amarelo: 0
+cores votadas: 3</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;unordered_map&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::string voto;
+    while (std::cin &gt;&gt; voto) {
+        // conte o voto aqui
+    }
+
+    std::vector&lt;std::string&gt; cores{"azul", "verde", "rosa", "amarelo"};
+    for (const auto&amp; cor : cores) {
+        // mostre "cor: votos" sem criar chaves novas
+    }
+
+    // mostre "cores votadas: N"
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;unordered_map&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::unordered_map&lt;std::string, int&gt; votos;
+    std::string voto;
+    while (std::cin &gt;&gt; voto) {
+        ++votos[voto];
+    }
+
+    std::vector&lt;std::string&gt; cores{"azul", "verde", "rosa", "amarelo"};
+    for (const auto&amp; cor : cores) {
+        int n = votos.contains(cor) ? votos.at(cor) : 0;
+        std::cout &lt;&lt; cor &lt;&lt; ": " &lt;&lt; n &lt;&lt; '\n';
+    }
+
+    std::cout &lt;&lt; "cores votadas: " &lt;&lt; votos.size() &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>std::unordered_map</code> é uma <strong>tabela de espalhamento</strong>: um <em>hash</em> da chave decide a gaveta (<em>bucket</em>) onde o par fica.</li>
+  <li><strong>Sem ordem</strong>: os itens saem na ordem das gavetas, que muda com inserções (<em>rehash</em>) e de uma biblioteca para outra.</li>
+  <li><strong>Mais rápido em média</strong> (O(1)) que o <code>map</code> (O(log n)) para buscar, inserir e apagar.</li>
+  <li><strong>Mesma interface</strong> do <code>map</code>: <code>[]</code> (cria a chave!), <code>at</code>, <code>contains</code>, <code>find</code>, <code>erase</code>…</li>
+  <li>A chave precisa de <code>std::hash</code> e <code>==</code>; textos e números já têm.</li>
+  <li>Precisa de ordem: <code>map</code>. Só guardar e achar: <code>unordered_map</code>.</li>
+  <li>Próximo passo: guardar só chaves, sem valores, em <a href="set.html">std::set</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
