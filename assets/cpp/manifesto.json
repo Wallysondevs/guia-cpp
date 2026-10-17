@@ -1,0 +1,42 @@
+{
+ "versao": "fc9ddd157d",
+ "pacote": "22.0.0-git20542-10",
+ "wasm": {
+  "arquivo": "llvm.core.wasm",
+  "bytes": 75532134,
+  "bytesGz": 22804749,
+  "sha1": "ccbbb88fc9a1"
+ },
+ "sysroot": {
+  "arquivo": "sysroot.tar",
+  "bytes": 12900352,
+  "bytesGz": 2165151,
+  "sha1": "3288acd8e094"
+ },
+ "pchs": [
+  {
+   "arquivo": "pch/iostream.pch",
+   "bytes": 12613232,
+   "bytesGz": 7574569,
+   "sha1": "0d4f8e2afae7",
+   "nome": "iostream",
+   "cabecalhos": [
+    "iostream"
+   ],
+   "assinatura": "clang++\u0001-cc1\u0001-triple\u0001wasm32-unknown-wasip1\u0001-disable-free\u0001-clear-ast-before-backend\u0001-mrelocation-model\u0001static\u0001-mframe-pointer=none\u0001-ffp-contract=on\u0001-fno-rounding-math\u0001-mconstructor-aliases\u0001-target-feature\u0001+exception-handling\u0001-target-feature\u0001+multivalue\u0001-target-feature\u0001+reference-types\u0001-exception-model=wasm\u0001-mllvm\u0001-wasm-enable-eh\u0001-target-cpu\u0001generic\u0001-fvisibility=hidden\u0001-debugger-tuning=gdb\u0001-fdebug-compilation-dir=/\u0001-fcoverage-compilation-dir=/\u0001-resource-dir\u0001/usr\u0001-isysroot\u0001/usr\u0001-internal-isystem\u0001/usr/include/wasm32-wasip1/c++/v1\u0001-internal-isystem\u0001/usr/include/c++/v1\u0001-internal-isystem\u0001/usr/include\u0001-internal-isystem\u0001/usr/include/wasm32-wasip1\u0001-internal-isystem\u0001/usr/include\u0001-std=c++23\u0001-fdeprecated-macro\u0001-fgnuc-version=4.2.1\u0001-fno-implicit-modules\u0001-fskip-odr-check-in-gmf\u0001-fcxx-exceptions\u0001-fexceptions\u0001-exception-model=wasm",
+   "ansioso": true
+  },
+  {
+   "arquivo": "pch/print.pch",
+   "bytes": 9713580,
+   "bytesGz": 5791644,
+   "sha1": "075cd90032b0",
+   "nome": "print",
+   "cabecalhos": [
+    "print"
+   ],
+   "assinatura": "clang++\u0001-cc1\u0001-triple\u0001wasm32-unknown-wasip1\u0001-disable-free\u0001-clear-ast-before-backend\u0001-mrelocation-model\u0001static\u0001-mframe-pointer=none\u0001-ffp-contract=on\u0001-fno-rounding-math\u0001-mconstructor-aliases\u0001-target-feature\u0001+exception-handling\u0001-target-feature\u0001+multivalue\u0001-target-feature\u0001+reference-types\u0001-exception-model=wasm\u0001-mllvm\u0001-wasm-enable-eh\u0001-target-cpu\u0001generic\u0001-fvisibility=hidden\u0001-debugger-tuning=gdb\u0001-fdebug-compilation-dir=/\u0001-fcoverage-compilation-dir=/\u0001-resource-dir\u0001/usr\u0001-isysroot\u0001/usr\u0001-internal-isystem\u0001/usr/include/wasm32-wasip1/c++/v1\u0001-internal-isystem\u0001/usr/include/c++/v1\u0001-internal-isystem\u0001/usr/include\u0001-internal-isystem\u0001/usr/include/wasm32-wasip1\u0001-internal-isystem\u0001/usr/include\u0001-std=c++23\u0001-fdeprecated-macro\u0001-fgnuc-version=4.2.1\u0001-fno-implicit-modules\u0001-fskip-odr-check-in-gmf\u0001-fcxx-exceptions\u0001-fexceptions\u0001-exception-model=wasm",
+   "ansioso": false
+  }
+ ]
+}

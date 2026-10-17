@@ -1,0 +1,19 @@
+{
+  "name": "guia-cpp-tools",
+  "private": true,
+  "description": "Ferramentas do Guia C++: testar-missoes.js e sim.js compilam e rodam com o MESMO Clang 22 (WebAssembly) do navegador, no Node. Reinstale com: cd tools && npm install",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@yowasp/clang": "22.0.0-git20542-10"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.0"
+  },
+  "scripts": {
+    "construir": "node construir-cpp.mjs",
+    "testar": "node testar-missoes.js"
+  }
+}
