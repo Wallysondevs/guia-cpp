@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Tipos e Limites — sizeof, mínimos, máximos, literais e cstdint | Guia C++</title>
+<meta name="description" content="Referência dos tipos fundamentais do C++: tamanho (sizeof), mínimo e máximo de cada inteiro, caractere e ponto flutuante medidos no Linux x86-64 com g++ 15, diferenças no Windows e no macOS, literais e sufixos, std::int32_t e os tipos de cstdint, e std::numeric_limits.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Tipos e Limites</span></h1>
+
+<p class="intro">Quantos bytes tem um <code>int</code>? Qual o maior número que cabe num <code>short</code>? Que tipo tem o literal <code>42ul</code>? Esta página responde de uma vez, em tabelas. Todos os valores foram <strong>medidos</strong> na máquina da Ana (Linux x86-64, g++ 15.2) com <code>sizeof</code> e <code>std::numeric_limits</code>. Para aprender com calma, veja <a href="tipos-dados.html">Tipos de Dados</a>, <a href="inteiros.html">Inteiros</a>, <a href="ponto-flutuante.html">float e double</a>, <a href="char.html">char</a> e <a href="bool.html">bool</a>.</p>
+
+<div class="note">
+<strong>Como ler as tabelas</strong>
+<ul>
+  <li><strong>Bytes</strong> é o resultado de <code>sizeof(tipo)</code>. Um byte tem 8 bits.</li>
+  <li>O padrão do C++ só garante <strong>tamanhos mínimos</strong> (um <code>int</code> tem pelo menos 16 bits, um <code>long</code> pelo menos 32…). Os tamanhos exatos dependem do sistema: as tabelas valem para o <strong>Linux x86-64</strong> (e quase todas para o macOS). As diferenças estão em <a href="#plataformas">Outros sistemas</a>.</li>
+  <li><strong>No Windows, <code>long</code> tem 4 bytes</strong>, não 8. Se o número pode passar de 2 bilhões, use <code>long long</code> ou <code>std::int64_t</code>.</li>
+  <li>O editor do guia gera WebAssembly de 32 bits: lá, <code>long</code>, ponteiros e <code>size_t</code> têm 4 bytes.</li>
+</ul>
+</div>
+
+<p>Atalhos: <a href="#inteiros">Inteiros</a> · <a href="#caracteres">Caracteres e bool</a> · <a href="#flutuante">Ponto flutuante</a> · <a href="#cstdint">&lt;cstdint&gt;</a> · <a href="#literais">Literais e sufixos</a> · <a href="#limits">numeric_limits</a> · <a href="#plataformas">Outros sistemas</a> · <a href="#armadilhas">Armadilhas</a></p>
+
+<h3>Para conferir no seu computador</h3>
+<pre class="file" data-file="tamanhos.cpp">#include &lt;cstdint&gt;
+#include &lt;iostream&gt;
+#include &lt;limits&gt;
+
+int main() {
+    std::cout &lt;&lt; "int: " &lt;&lt; sizeof(int) &lt;&lt; " bytes, de "
+              &lt;&lt; std::numeric_limits&lt;int&gt;::min() &lt;&lt; " a "
+              &lt;&lt; std::numeric_limits&lt;int&gt;::max() &lt;&lt; '\n';
+    std::cout &lt;&lt; "long: " &lt;&lt; sizeof(long) &lt;&lt; " bytes\n";
+    std::cout &lt;&lt; "int64_t até " &lt;&lt; std::numeric_limits&lt;std::int64_t&gt;::max() &lt;&lt; '\n';
+    std::cout &lt;&lt; "double: " &lt;&lt; std::numeric_limits&lt;double&gt;::digits10
+              &lt;&lt; " dígitos garantidos\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/ref">$ g++ -std=c++23 -Wall -Wextra tamanhos.cpp -o tamanhos
+$ ./tamanhos
+int: 4 bytes, de -2147483648 a 2147483647
+long: 8 bytes
+int64_t até 9223372036854775807
+double: 15 dígitos garantidos</pre>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode e compare com as tabelas. Aqui no editor (WebAssembly de 32 bits) o <code>long</code> deve aparecer com 4 bytes. Troque <code>int</code> por outros tipos para medir.</p>
+<pre class="script">#include &lt;cstdint&gt;
+#include &lt;iostream&gt;
+#include &lt;limits&gt;
+
+int main() {
+    std::cout &lt;&lt; "int: " &lt;&lt; sizeof(int) &lt;&lt; " bytes, de "
+              &lt;&lt; std::numeric_limits&lt;int&gt;::min() &lt;&lt; " a "
+              &lt;&lt; std::numeric_limits&lt;int&gt;::max() &lt;&lt; '\n';
+    std::cout &lt;&lt; "long: " &lt;&lt; sizeof(long) &lt;&lt; " bytes\n";
+    std::cout &lt;&lt; "int64_t até " &lt;&lt; std::numeric_limits&lt;std::int64_t&gt;::max() &lt;&lt; '\n';
+    std::cout &lt;&lt; "double: " &lt;&lt; std::numeric_limits&lt;double&gt;::digits10
+              &lt;&lt; " dígitos garantidos\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h3 id="inteiros">Inteiros</h3>
+<p>Com sinal (<em>signed</em>) guardam negativos; sem sinal (<em>unsigned</em>) só zero e positivos, mas vão duas vezes mais longe. <code>short</code> = <code>short int</code>, <code>long</code> = <code>long int</code>, <code>unsigned</code> = <code>unsigned int</code>. Aula: <a href="inteiros.html">Inteiros</a>.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Bytes</th><th>Mínimo</th><th>Máximo</th><th>Literal</th></tr>
+<tr><td><code>short</code></td><td>2</td><td>−32768</td><td>32767</td><td>(não tem)</td></tr>
+<tr><td><code>unsigned short</code></td><td>2</td><td>0</td><td>65535</td><td>(não tem)</td></tr>
+<tr><td><code>int</code></td><td>4</td><td>−2147483648</td><td>2147483647</td><td><code>42</code></td></tr>
+<tr><td><code>unsigned</code></td><td>4</td><td>0</td><td>4294967295</td><td><code>42u</code></td></tr>
+<tr><td><code>long</code></td><td>8 (Windows: 4)</td><td>−9223372036854775808</td><td>9223372036854775807</td><td><code>42l</code></td></tr>
+<tr><td><code>unsigned long</code></td><td>8 (Windows: 4)</td><td>0</td><td>18446744073709551615</td><td><code>42ul</code></td></tr>
+<tr><td><code>long long</code></td><td>8</td><td>−9223372036854775808</td><td>9223372036854775807</td><td><code>42ll</code></td></tr>
+<tr><td><code>unsigned long long</code></td><td>8</td><td>0</td><td>18446744073709551615</td><td><code>42ull</code></td></tr>
+<tr><td><code>std::size_t</code></td><td>8</td><td>0</td><td>18446744073709551615</td><td><code>42uz</code> <span class="versao">C++23</span></td></tr>
+<tr><td><code>std::ptrdiff_t</code></td><td>8</td><td>−9223372036854775808</td><td>9223372036854775807</td><td><code>42z</code> <span class="versao">C++23</span></td></tr>
+</table>
+</div>
+<p>Para ter uma ideia: o <code>int</code> vai até uns 2,1 bilhões; o <code>long long</code>, até uns 9,2 quintilhões (9,2 × 10<sup>18</sup>). <code>std::size_t</code> é o tipo que <code>sizeof</code> e <code>.size()</code> devolvem; <code>std::ptrdiff_t</code>, o da diferença entre dois ponteiros. No Linux x86-64, são <code>unsigned long</code> e <code>long</code>.</p>
+
+<h3 id="caracteres">Caracteres e bool</h3>
+<p>Aulas: <a href="char.html">char</a>, <a href="bool.html">bool</a> e <a href="acentos-utf8.html">Acentos e UTF-8</a>.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Bytes</th><th>Faixa</th><th>Literal</th><th>Para quê</th></tr>
+<tr><td><code>bool</code></td><td>1</td><td><code>false</code> (0), <code>true</code> (1)</td><td><code>true</code></td><td>Verdadeiro ou falso.</td></tr>
+<tr><td><code>char</code></td><td>1</td><td>−128 a 127 (com sinal no x86-64)</td><td><code>'A'</code></td><td>Um byte de texto. Um <code>é</code> em UTF-8 ocupa <strong>dois</strong> <code>char</code>.</td></tr>
+<tr><td><code>signed char</code></td><td>1</td><td>−128 a 127</td><td>(não tem)</td><td>Um número pequeno com sinal.</td></tr>
+<tr><td><code>unsigned char</code></td><td>1</td><td>0 a 255</td><td>(não tem)</td><td>Um byte "cru" (arquivos, rede, UTF-8).</td></tr>
+<tr><td><code>char8_t</code> <span class="versao">C++20</span></td><td>1</td><td>0 a 255</td><td><code>u8'A'</code></td><td>Um byte de UTF-8, marcado como tal.</td></tr>
+<tr><td><code>char16_t</code></td><td>2</td><td>0 a 65535</td><td><code>u'A'</code></td><td>Uma unidade de UTF-16.</td></tr>
+<tr><td><code>char32_t</code></td><td>4</td><td>0 a 4294967295</td><td><code>U'é'</code></td><td>Um caractere Unicode inteiro (UTF-32).</td></tr>
+<tr><td><code>wchar_t</code></td><td>4 (Windows: 2)</td><td>−2147483648 a 2147483647</td><td><code>L'A'</code></td><td>"Caractere largo". Varia demais entre sistemas: evite.</td></tr>
+</table>
+</div>
+<p><code>char</code>, <code>signed char</code> e <code>unsigned char</code> são <strong>três tipos diferentes</strong>. Se o <code>char</code> puro tem sinal ou não depende da plataforma: tem no x86-64 e no macOS, não tem no Linux em ARM (Raspberry Pi, por exemplo). Por isso, para examinar bytes, use <code>unsigned char</code>.</p>
+
+<h3 id="flutuante">Ponto flutuante</h3>
+<p>Aula: <a href="ponto-flutuante.html">float e double</a>. "Dígitos" é <code>digits10</code>: quantos dígitos decimais sempre sobrevivem à ida e volta.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Bytes</th><th>Dígitos</th><th>Menor positivo normal (<code>min</code>)</th><th>Máximo</th><th>Epsilon</th><th>Literal</th></tr>
+<tr><td><code>float</code></td><td>4</td><td>6</td><td>1.1754944e-38</td><td>3.4028235e+38</td><td>1.1920929e-07</td><td><code>3.14f</code></td></tr>
+<tr><td><code>double</code></td><td>8</td><td>15</td><td>2.2250738585072014e-308</td><td>1.7976931348623157e+308</td><td>2.220446049250313e-16</td><td><code>3.14</code></td></tr>
+<tr><td><code>long double</code></td><td>16 (Windows MSVC e macOS ARM: 8)</td><td>18</td><td>3.3621031431120935063e-4932</td><td>1.189731495357231765e+4932</td><td>1.084202172485504434e-19</td><td><code>3.14L</code></td></tr>
+</table>
+</div>
+<ul>
+  <li>O mais negativo é <code>lowest()</code>, igual a −<code>max()</code> (por exemplo, −1.7976931348623157e+308). Atenção: <code>min()</code> de ponto flutuante é o <strong>menor positivo</strong>, não o mais negativo.</li>
+  <li><strong>Epsilon</strong> é a distância entre 1 e o próximo número representável: a "resolução" do tipo perto de 1.</li>
+  <li>Use <code>double</code> como padrão. <code>float</code> só quando a memória importa muito (gráficos, milhões de valores).</li>
+  <li>No x86-64 Linux, o <code>long double</code> ocupa 16 bytes, mas usa 80 bits de precisão (o resto é enchimento).</li>
+</ul>
+<p>Nenhum deles guarda 0,1 exatamente. Com 20 casas (<code>std::format("{:.20f}", …)</code>): <code>0.1f</code> → <code>0.10000000149011611938</code> e <code>0.1</code> → <code>0.10000000000000000555</code>. E <code>0.1 + 0.2 == 0.3</code> é <code>false</code>: a soma dá <code>0.30000000000000004</code>.</p>
+
+<h3 id="cstdint">Inteiros de tamanho fixo: &lt;cstdint&gt;</h3>
+<p>Quando o tamanho exato importa (arquivos binários, rede, ou só para não depender do sistema), use os tipos de <code>&lt;cstdint&gt;</code>. Eles são apelidos para os tipos acima: no Linux x86-64, <code>std::int64_t</code> é <code>long</code>; no Windows, <code>long long</code>. O nome diz o tamanho em todo lugar.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Bytes</th><th>Mínimo</th><th>Máximo</th><th>Observação</th></tr>
+<tr><td><code>std::int8_t</code></td><td>1</td><td>−128</td><td>127</td><td>É um <code>signed char</code>: o <code>cout</code> o mostra como letra (veja <a href="#armadilhas">Armadilhas</a>).</td></tr>
+<tr><td><code>std::uint8_t</code></td><td>1</td><td>0</td><td>255</td><td>É um <code>unsigned char</code>: mesmo cuidado.</td></tr>
+<tr><td><code>std::int16_t</code></td><td>2</td><td>−32768</td><td>32767</td><td></td></tr>
+<tr><td><code>std::uint16_t</code></td><td>2</td><td>0</td><td>65535</td><td></td></tr>
+<tr><td><code>std::int32_t</code></td><td>4</td><td>−2147483648</td><td>2147483647</td><td></td></tr>
+<tr><td><code>std::uint32_t</code></td><td>4</td><td>0</td><td>4294967295</td><td></td></tr>
+<tr><td><code>std::int64_t</code></td><td>8</td><td>−9223372036854775808</td><td>9223372036854775807</td><td>Em qualquer sistema. Bom para dinheiro em centavos.</td></tr>
+<tr><td><code>std::uint64_t</code></td><td>8</td><td>0</td><td>18446744073709551615</td><td></td></tr>
+<tr><td><code>std::intptr_t</code></td><td>8</td><td colspan="2">igual a <code>int64_t</code> aqui</td><td>Inteiro do tamanho de um ponteiro (4 bytes no editor do guia).</td></tr>
+<tr><td><code>std::intmax_t</code></td><td>8</td><td colspan="2">igual a <code>int64_t</code> aqui</td><td>O maior inteiro com sinal do sistema.</td></tr>
+<tr><td><code>std::int_least16_t</code></td><td>2</td><td>−32768</td><td>32767</td><td>"Pelo menos 16 bits", o menor que der.</td></tr>
+<tr><td><code>std::int_fast16_t</code></td><td>8</td><td colspan="2">igual a <code>int64_t</code> aqui</td><td>"Pelo menos 16 bits", o mais rápido. No Linux x86-64 o g++ escolheu 8 bytes; <code>int_fast8_t</code> ficou com 1.</td></tr>
+</table>
+</div>
+<p>Os nomes também existem sem o <code>std::</code> (<code>int32_t</code>), herança do C; com <code>&lt;cstdint&gt;</code>, prefira escrever o <code>std::</code>.</p>
+
+<h3 id="literais">Literais e sufixos</h3>
+<p>Um <strong>literal</strong> é um valor escrito direto no código. O tipo dele vem da forma e do sufixo (maiúsculo ou minúsculo dá no mesmo: <code>42UL</code> = <code>42ul</code>; prefira <code>L</code> maiúsculo, que não se confunde com <code>1</code>). Todos os tipos desta tabela foram confirmados com <code>static_assert</code> no g++ 15.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Literal</th><th>Tipo</th><th>Valor / observação</th></tr>
+<tr><td><code>42</code></td><td><code>int</code></td><td>Decimal.</td></tr>
+<tr><td><code>3000000000</code></td><td><code>long</code></td><td>Não cabe em <code>int</code>: o compilador sobe sozinho para o primeiro tipo que cabe.</td></tr>
+<tr><td><code>42u</code> · <code>42l</code> · <code>42ll</code></td><td><code>unsigned</code> · <code>long</code> · <code>long long</code></td><td><code>u</code> = sem sinal, <code>l</code> = long, <code>ll</code> = long long.</td></tr>
+<tr><td><code>42ul</code> · <code>42ull</code></td><td><code>unsigned long</code> · <code>unsigned long long</code></td><td>Combinações.</td></tr>
+<tr><td><code>42uz</code> · <code>42z</code> <span class="versao">C++23</span></td><td><code>std::size_t</code> · <code>std::ptrdiff_t</code></td><td>Útil em <code>for (auto i = 0uz; i &lt; v.size(); ++i)</code>.</td></tr>
+<tr><td><code>0x2A</code></td><td><code>int</code></td><td>Hexadecimal: 42.</td></tr>
+<tr><td><code>052</code></td><td><code>int</code></td><td><strong>Octal</strong> (zero na frente!): 42. Cuidado com <code>010</code>, que vale 8.</td></tr>
+<tr><td><code>0b101010</code> <span class="versao">C++14</span></td><td><code>int</code></td><td>Binário: 42.</td></tr>
+<tr><td><code>1'000'000</code> <span class="versao">C++14</span></td><td><code>int</code></td><td>O apóstrofo separa dígitos, só para leitura: 1000000.</td></tr>
+<tr><td><code>3.14</code> · <code>.5</code> · <code>1e3</code></td><td><code>double</code></td><td><code>1e3</code> = 1 × 10³ = 1000.</td></tr>
+<tr><td><code>3.14f</code></td><td><code>float</code></td><td>Sem o <code>f</code>, é <code>double</code>.</td></tr>
+<tr><td><code>3.14L</code></td><td><code>long double</code></td><td></td></tr>
+<tr><td><code>0x1p4</code> <span class="versao">C++17</span></td><td><code>double</code></td><td>Hexadecimal de ponto flutuante: 1 × 2⁴ = 16.</td></tr>
+<tr><td><code>'A'</code></td><td><code>char</code></td><td>Aspas <strong>simples</strong>: um caractere.</td></tr>
+<tr><td><code>u8'A'</code> · <code>u'A'</code> · <code>U'A'</code> · <code>L'A'</code></td><td><code>char8_t</code> · <code>char16_t</code> · <code>char32_t</code> · <code>wchar_t</code></td><td></td></tr>
+<tr><td><code>"oi"</code></td><td><code>const char[3]</code></td><td>Aspas <strong>duplas</strong>: um array de caracteres com um <code>'\0'</code> no fim (<code>sizeof("oi")</code> = 3).</td></tr>
+<tr><td><code>"oi"s</code></td><td><code>std::string</code></td><td>Precisa de <code>using namespace std::literals;</code>. Veja <a href="strings.html">Strings</a>.</td></tr>
+<tr><td><code>"oi"sv</code></td><td><code>std::string_view</code></td><td>Idem. Veja <a href="string-view.html">string_view</a>.</td></tr>
+<tr><td><code>R"(C:\pasta)"</code></td><td><code>const char[…]</code></td><td>Raw string: as barras não são escapes. Veja <a href="escapes.html">Caracteres Especiais</a>.</td></tr>
+<tr><td><code>true</code> · <code>false</code></td><td><code>bool</code></td><td></td></tr>
+<tr><td><code>nullptr</code></td><td><code>std::nullptr_t</code></td><td>O "ponteiro nenhum". Veja <a href="nullptr.html">nullptr</a>.</td></tr>
+</table>
+</div>
+
+<h3 id="limits">std::numeric_limits</h3>
+<p>De <code>&lt;limits&gt;</code>. Pergunte ao compilador em vez de decorar: <code>std::numeric_limits&lt;T&gt;::membro</code>. Os <code>INT_MAX</code>, <code>LLONG_MIN</code>… de <code>&lt;climits&gt;</code> são a versão antiga, do C.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Membro</th><th>O que é</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>max()</code></td><td>O maior valor.</td><td><code>numeric_limits&lt;int&gt;::max()</code></td><td><code>2147483647</code></td></tr>
+<tr><td><code>min()</code></td><td>Inteiros: o menor. Ponto flutuante: o menor <strong>positivo</strong> normal.</td><td><code>numeric_limits&lt;int&gt;::min()</code><br><code>numeric_limits&lt;double&gt;::min()</code></td><td><code>-2147483648</code><br><code>2.2250738585072014e-308</code></td></tr>
+<tr><td><code>lowest()</code></td><td>O mais negativo, em qualquer tipo.</td><td><code>numeric_limits&lt;double&gt;::lowest()</code></td><td><code>-1.7976931348623157e+308</code></td></tr>
+<tr><td><code>digits</code></td><td>Bits de valor (sem o de sinal).</td><td><code>numeric_limits&lt;int&gt;::digits</code><br><code>numeric_limits&lt;unsigned&gt;::digits</code></td><td><code>31</code><br><code>32</code></td></tr>
+<tr><td><code>digits10</code></td><td>Dígitos decimais garantidos.</td><td><code>numeric_limits&lt;float&gt;::digits10</code></td><td><code>6</code></td></tr>
+<tr><td><code>is_signed</code></td><td>Tem sinal?</td><td><code>numeric_limits&lt;char&gt;::is_signed</code></td><td><code>true</code> (x86-64)</td></tr>
+<tr><td><code>epsilon()</code></td><td>Distância entre 1 e o próximo valor.</td><td><code>numeric_limits&lt;double&gt;::epsilon()</code></td><td><code>2.220446049250313e-16</code></td></tr>
+<tr><td><code>infinity()</code></td><td>Infinito.</td><td><code>numeric_limits&lt;double&gt;::infinity()</code></td><td><code>inf</code></td></tr>
+<tr><td><code>quiet_NaN()</code></td><td>"Não é um número" (<em>Not a Number</em>).</td><td><code>numeric_limits&lt;double&gt;::quiet_NaN()</code></td><td><code>nan</code></td></tr>
+<tr><td><code>denorm_min()</code></td><td>O menor positivo de todos (subnormal).</td><td><code>numeric_limits&lt;double&gt;::denorm_min()</code></td><td><code>5e-324</code></td></tr>
+</table>
+</div>
+
+<div class="trycpp" data-goal="out:65535,out:32767,src:numeric_limits">
+<p class="try-task"><strong>Missão:</strong> usando <code>std::numeric_limits</code> (nada de escrever os números à mão), mostre o máximo de <code>std::uint16_t</code> e o de <code>std::int16_t</code>, um por linha. A saída deve ser:</p>
+<pre class="out">65535
+32767</pre>
+<pre class="script">#include &lt;cstdint&gt;
+#include &lt;iostream&gt;
+#include &lt;limits&gt;
+
+int main() {
+    // seu código aqui
+}
+</pre>
+<pre class="solucao">#include &lt;cstdint&gt;
+#include &lt;iostream&gt;
+#include &lt;limits&gt;
+
+int main() {
+    std::cout &lt;&lt; std::numeric_limits&lt;std::uint16_t&gt;::max() &lt;&lt; '\n';
+    std::cout &lt;&lt; std::numeric_limits&lt;std::int16_t&gt;::max() &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<h3 id="plataformas">Outros sistemas</h3>
+<p>As diferenças que importam, conferidas com o <code>clang++</code> 21 do laboratório apontado para cada sistema (<code>--target=…</code>, com <code>static_assert</code>):</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Linux x86-64</th><th>Windows (MSVC)</th><th>Windows (MinGW)</th><th>macOS ARM</th><th>Linux ARM</th><th>Editor do guia (wasm32)</th></tr>
+<tr><td><code>long</code></td><td>8</td><td><strong>4</strong></td><td><strong>4</strong></td><td>8</td><td>8</td><td><strong>4</strong></td></tr>
+<tr><td>ponteiro, <code>size_t</code></td><td>8</td><td>8</td><td>8</td><td>8</td><td>8</td><td><strong>4</strong></td></tr>
+<tr><td><code>long double</code></td><td>16</td><td><strong>8</strong></td><td>16</td><td><strong>8</strong></td><td>16</td><td>16</td></tr>
+<tr><td><code>wchar_t</code></td><td>4</td><td><strong>2</strong></td><td><strong>2</strong></td><td>4</td><td>4</td><td>4</td></tr>
+<tr><td><code>char</code> tem sinal?</td><td>sim</td><td>sim</td><td>sim</td><td>sim</td><td><strong>não</strong></td><td>sim</td></tr>
+</table>
+</div>
+<p><code>short</code> (2), <code>int</code> (4), <code>long long</code> (8), <code>float</code> (4) e <code>double</code> (8) são iguais em todos eles. Moral: para inteiros grandes, <code>long long</code> ou <code>std::int64_t</code>, nunca <code>long</code>.</p>
+
+<h3 id="armadilhas">Armadilhas</h3>
+
+<p><strong>1. <code>std::uint8_t</code> sai como letra.</strong> Ele é um <code>unsigned char</code>, e o <code>cout</code> mostra <code>char</code> como caractere:</p>
+<pre class="file" data-file="uint8.cpp">#include &lt;cstdint&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::uint8_t idade = 65;
+    std::cout &lt;&lt; "Idade: " &lt;&lt; idade &lt;&lt; '\n';
+    std::cout &lt;&lt; "Idade: " &lt;&lt; +idade &lt;&lt; '\n';
+    std::cout &lt;&lt; "Idade: " &lt;&lt; static_cast&lt;int&gt;(idade) &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/ref">$ g++ -std=c++23 -Wall -Wextra uint8.cpp -o uint8
+$ ./uint8
+Idade: A
+Idade: 65
+Idade: 65</pre>
+<p>65 é o código do <code>A</code>. O <code>+</code> na frente promove para <code>int</code>; o <code>static_cast&lt;int&gt;</code> diz o mesmo de forma explícita. O <code>std::format("{}", idade)</code> mostra <code>65</code>.</p>
+
+<p><strong>2. Estouro: o valor não cabe.</strong></p>
+<pre class="file" data-file="estouro.cpp">#include &lt;climits&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    int a = 3000000000;
+    int b = INT_MAX + 1;
+    unsigned c = -1;
+    short d = 70000;
+    std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; b &lt;&lt; ' ' &lt;&lt; c &lt;&lt; ' ' &lt;&lt; d &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/ref">$ g++ -std=c++23 -Wall -Wextra estouro.cpp -o estouro
+estouro.cpp: In function ‘int main()’:
+estouro.cpp:6:21: warning: integer overflow in expression of type ‘int’ results in ‘-2147483648’ [-Woverflow]
+    6 |     int b = INT_MAX + 1;
+      |                     ^
+estouro.cpp:8:15: warning: overflow in conversion from ‘int’ to ‘short int’ changes value from ‘70000’ to ‘4464’ [-Woverflow]
+    8 |     short d = 70000;
+      |               ^~~~~
+$ ./estouro
+-1294967296 -2147483648 4294967295 4464</pre>
+<ul>
+  <li><code>int a = 3000000000;</code> virou −1294967296 <strong>sem aviso</strong> com <code>-Wall -Wextra</code>. Só a opção <code>-Wconversion</code> pega: <code>warning: conversion from ‘long int’ to ‘int’ changes value from ‘3000000000’ to ‘-1294967296’ [-Wconversion]</code>.</li>
+  <li><code>INT_MAX + 1</code> com <code>int</code> é <a href="comportamento-indefinido.html">comportamento indefinido</a>. Aqui, como é uma conta feita na compilação, o g++ avisou (<code>-Woverflow</code>); numa conta com variáveis, não avisaria.</li>
+  <li><code>unsigned c = -1;</code> vale 4294967295, sem aviso: em <code>unsigned</code> as contas "dão a volta" (aritmética módulo 2³²), e isso é <strong>definido</strong>. Do mesmo jeito, <code>0u - 1</code> dá 4294967295.</li>
+  <li><code>short d = 70000;</code> virou 4464 (70000 − 65536), com aviso.</li>
+</ul>
+
+<p><strong>3. Com chaves, o compilador recusa.</strong> A inicialização com <code>{}</code> não aceita conversões que perdem valor (<em>narrowing</em>, "estreitamento"):</p>
+<pre class="file" data-file="chaves.cpp">int main() {
+    int a{3000000000};
+    return a;
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/ref">$ g++ -std=c++23 -Wall -Wextra chaves.cpp -o chaves
+chaves.cpp: In function ‘int main()’:
+chaves.cpp:2:11: error: narrowing conversion of ‘3000000000’ from ‘long int’ to ‘int’ [-Wnarrowing]
+    2 |     int a{3000000000};
+      |           ^~~~~~~~~~</pre>
+<p>Um bom motivo para preferir <code>int a{…};</code>. Veja <a href="variaveis.html">Variáveis</a> e <a href="conversao-tipos.html">Conversão de Tipos</a>.</p>
+
+<p><strong>4. Divisão de inteiros.</strong> <code>7 / 2</code> dá <code>3</code>, e <code>-7 / 2</code> dá <code>-3</code> (corta para o lado do zero); <code>-7 % 2</code> dá <code>-1</code>. Com um dos lados <code>double</code>, <code>7 / 2.0</code> dá <code>3.5</code>. Veja <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>.</p>
+
+<p><strong>5. Comparar com e sem sinal.</strong> <code>-1 &lt; 0u</code> é <code>false</code>: o −1 é convertido para <code>unsigned</code> e vira 4294967295. Por isso o <code>-Wall</code> avisa em <code>i &lt; v.size()</code> com <code>int i</code> (<code>-Wsign-compare</code>).</p>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
