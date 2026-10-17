@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Sanitizers — -fsanitize=address, undefined e leak | Guia C++</title>
+<meta name="description" content="Sanitizers em C++ para quem nunca programou: -fsanitize=address para achar estouro de array e uso de memória já liberada, -fsanitize=undefined para estouro de inteiro e divisão por zero, -fsanitize=leak para vazamentos de memória, como ler os relatórios reais, quanto custam e quando usar, além do Valgrind.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Sanitizers (-fsanitize)</span></h1>
+
+<p class="intro">Na aula de <a href="comportamento-indefinido.html">Comportamento Indefinido</a> você viu erros que passam calados: um índice fora do array que soma lixo, um estouro de <code>int</code> que vira negativo. Os <strong>sanitizers</strong> ("higienizadores") são opções do compilador que colocam um <strong>fiscal</strong> dentro do seu programa. Toda vez que ele lê ou escreve memória, ou faz uma conta perigosa, o fiscal confere. Achou um erro? O programa para na hora e mostra um relatório com o tipo do erro, o arquivo e a linha. Nesta aula você vai ligar os três sanitizers mais úteis e aprender a ler os relatórios.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O <strong>AddressSanitizer</strong> (<code>-fsanitize=address</code>): estouro de array e uso de memória já liberada.</li>
+  <li>O <strong>UndefinedBehaviorSanitizer</strong> (<code>-fsanitize=undefined</code>): estouro de inteiro, divisão por zero e outros UBs.</li>
+  <li>O <strong>LeakSanitizer</strong> (<code>-fsanitize=leak</code>): memória que nunca foi devolvida.</li>
+  <li>Como ler um relatório: onde está a linha que importa.</li>
+  <li>O custo (o programa fica mais lento) e quando usar: <strong>sempre durante o desenvolvimento</strong>.</li>
+  <li>O que é o Valgrind, uma alternativa sem recompilar.</li>
+</ul>
+</div>
+
+<p>Todos os relatórios desta aula são reais, gerados com o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp/san</code>. Os relatórios são longos; quando cortamos um pedaço, marcamos com <code>«…»</code>. Os números em hexadecimal (<code>0x7aa6…</code>) são endereços de memória e mudam a cada execução. <strong>Os sanitizers não existem no editor do guia</strong>: lá, esses mesmos erros passam calados. As missões desta página corrigem, no editor, os erros que os sanitizers acharam no terminal.</p>
+
+<hr>
+
+<h2>A ideia: o fiscal da obra</h2>
+<p>Numa obra sem fiscal, um pedreiro pode levantar a parede 10 centímetros para dentro do terreno do vizinho e ninguém percebe até o dia em que o vizinho reclama, anos depois. Com um fiscal, o erro é apontado no mesmo dia, com a medida exata.</p>
+
+<p>O sanitizer é esse fiscal. Ao compilar com <code>-fsanitize=…</code>, o g++ acrescenta conferências em volta de cada acesso à memória e de cada conta perigosa. O programa fica maior e mais lento, mas cada UB vira uma mensagem clara, no momento em que acontece.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sanitizer</th><th>Opção</th><th>Acha</th></tr>
+<tr><td>AddressSanitizer (ASan)</td><td><code>-fsanitize=address</code></td><td>Índice fora de arrays e vetores, uso de memória já liberada, <code>delete</code> duas vezes, e também vazamentos.</td></tr>
+<tr><td>UndefinedBehaviorSanitizer (UBSan)</td><td><code>-fsanitize=undefined</code></td><td>Estouro de inteiro com sinal, divisão por zero, ponteiro nulo, deslocamentos inválidos…</td></tr>
+<tr><td>LeakSanitizer (LSan)</td><td><code>-fsanitize=leak</code></td><td>Memória pedida com <code>new</code> e nunca devolvida (vazamento).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. AddressSanitizer: <code>-fsanitize=address</code></h2>
+
+<h3>Estouro de array</h3>
+<p>Lembra do <code>fora.cpp</code>, que somava uma posição a mais e mostrava <code>Soma: 73762</code>, sem erro nenhum?</p>
+
+<pre class="file" data-file="fora.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int notas[4] = {7, 8, 9, 10};
+    int soma = 0;
+    for (int i = 0; i &lt;= 4; ++i) {
+        soma += notas[i];
+    }
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+
+<p>Compile com <code>-fsanitize=address</code> e <code>-g</code> (o <code>-g</code> faz o relatório mostrar arquivo e linha, como no <a href="depuracao-gdb.html">GDB</a>):</p>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra -g -fsanitize=address fora.cpp -o fora-asan
+$ ./fora-asan
+=================================================================
+==4==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x6ecb514f0030 at pc 0x61f87bf8e465 bp 0x7ffea08f3dd0 sp 0x7ffea08f3dc0
+READ of size 4 at 0x6ecb514f0030 thread T0
+    #0 0x61f87bf8e464 in main /home/ana/cpp/san/fora.cpp:7
+    #1 0x72cb5362a600 in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+    #2 0x72cb5362a717 in __libc_start_main_impl ../csu/libc-start.c:360
+    #3 0x61f87bf8e1c4 in _start (/home/ana/cpp/san/fora-asan+0x11c4) (BuildId: 0ce73ab15d571af2144acce51e60052160266485)
+
+Address 0x6ecb514f0030 is located in stack of thread T0 at offset 48 in frame
+    #0 0x61f87bf8e298 in main /home/ana/cpp/san/fora.cpp:3
+
+  This frame has 1 object(s):
+    [32, 48) 'notas' (line 4) &lt;== Memory access at offset 48 overflows this variable
+HINT: this may be a false positive if your program uses some custom stack unwind mechanism, swapcontext or vfork
+      (longjmp and C++ exceptions *are* supported)
+SUMMARY: AddressSanitizer: stack-buffer-overflow /home/ana/cpp/san/fora.cpp:7 in main
+Shadow bytes around the buggy address:
+«… 30 linhas com um mapa da memória e a legenda dele …»
+==4==ABORTING
+$ echo $?
+1</pre>
+
+<p>Assusta, mas só quatro pedaços importam. Leia nesta ordem:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pedaço</th><th>O que diz</th></tr>
+<tr><td><code>ERROR: AddressSanitizer: stack-buffer-overflow</code></td><td>O <strong>tipo</strong> do erro: estouro (<em>overflow</em>) de um bloco de memória (<em>buffer</em>) na pilha (<em>stack</em>, onde ficam as variáveis locais; veja <a href="memoria.html">Como a Memória Funciona</a>).</td></tr>
+<tr><td><code>READ of size 4</code></td><td>Foi uma <strong>leitura</strong> de 4 bytes (um <code>int</code>). <code>WRITE</code> seria uma escrita, ainda mais perigosa.</td></tr>
+<tr><td><code>#0 … in main /home/ana/cpp/san/fora.cpp:7</code></td><td><strong>Onde</strong>: linha 7, a do <code>soma += notas[i];</code>. É a pilha de chamadas, como o <code>backtrace</code> do GDB; a primeira linha com um arquivo seu é a pista. As linhas <code>__libc_start…</code> e <code>_start</code> são o código que chama o <code>main</code>; ignore.</td></tr>
+<tr><td><code>'notas' (line 4) &lt;== Memory access at offset 48 overflows this variable</code></td><td><strong>Qual variável</strong>: o acesso passou do fim de <code>notas</code>, declarada na linha 4. O array ocupa os bytes 32 a 48 (16 bytes = 4 <code>int</code>), e o acesso foi no byte 48, logo depois.</td></tr>
+</table>
+</div>
+
+<p>O <code>SUMMARY</code> repete o essencial numa linha só. O resto (o "mapa de sombra", <em>shadow bytes</em>) mostra como o ASan marca a memória por dentro; pode pular. Repare também: o programa <strong>parou</strong> no erro (<code>ABORTING</code>), com código 1, e nunca mostrou a soma errada.</p>
+
+<h3>Uso de memória já liberada (<em>use-after-free</em>)</h3>
+<p>Este é traiçoeiro, porque o código parece inocente. A Ana guarda uma referência para o primeiro da fila e depois acrescenta mais uma pessoa:</p>
+
+<pre class="file" data-file="depois.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; fila = {10, 20, 30};
+    int&amp; primeiro = fila[0];
+    fila.push_back(40);
+    std::cout &lt;&lt; "Primeiro da fila: " &lt;&lt; primeiro &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ ./depois
+Primeiro da fila: 662828488</pre>
+
+<p>Por que lixo? Quando o <code>push_back</code> não tem mais espaço, o <code>std::vector</code> pede um bloco de memória maior, copia os elementos para lá e <strong>devolve o bloco antigo</strong> (veja <a href="vector.html">std::vector</a>). A referência <code>primeiro</code> continuou apontando para o bloco antigo, que já não pertence ao programa. O ASan mostra a história inteira:</p>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra -g -fsanitize=address depois.cpp -o depois-asan
+$ ./depois-asan
+=================================================================
+==6==ERROR: AddressSanitizer: heap-use-after-free on address 0x6df385de0010 at pc 0x5de7e199b619 bp 0x7ffed16b7b60 sp 0x7ffed16b7b50
+READ of size 4 at 0x6df385de0010 thread T0
+    #0 0x5de7e199b618 in main /home/ana/cpp/san/depois.cpp:8
+«…»
+0x6df385de0010 is located 0 bytes inside of 12-byte region [0x6df385de0010,0x6df385de001c)
+freed by thread T0 here:
+    #0 0x71d38732d89f in operator delete(void*, unsigned long) ../../../../src/libsanitizer/asan/asan_new_delete.cpp:190
+«… 8 linhas de dentro do std::vector …»
+    #9 0x5de7e199b5b0 in main /home/ana/cpp/san/depois.cpp:7
+«…»
+previously allocated by thread T0 here:
+    #0 0x71d38732c73f in operator new(unsigned long) ../../../../src/libsanitizer/asan/asan_new_delete.cpp:109
+«… 6 linhas de dentro do std::vector …»
+    #7 0x5de7e199b52c in main /home/ana/cpp/san/depois.cpp:5
+«…»
+SUMMARY: AddressSanitizer: heap-use-after-free /home/ana/cpp/san/depois.cpp:8 in main
+«… o mapa da memória …»
+==6==ABORTING</pre>
+
+<p>Três blocos, três linhas do seu arquivo, contando a história de trás para a frente:</p>
+<ul>
+  <li><strong><code>heap-use-after-free</code> … <code>depois.cpp:8</code></strong>: na linha 8, o programa leu uma memória (do <em>heap</em>, a memória dinâmica) <strong>depois de ela ter sido liberada</strong>.</li>
+  <li><strong><code>freed by</code> … <code>depois.cpp:7</code></strong>: quem liberou foi a linha 7, o <code>push_back</code> (por dentro, o <code>operator delete</code> do vetor).</li>
+  <li><strong><code>previously allocated by</code> … <code>depois.cpp:5</code></strong>: e ela tinha sido pedida na linha 5, quando o vetor foi criado com 3 elementos (12 bytes).</li>
+</ul>
+
+<div class="trycpp" data-goal="out:Primeiro da fila: 10,src:int\s+primeiro\s*=\s*fila\[0\]|push_back\(40\);\s*\n\s*int&amp;\s*primeiro">
+<p class="try-task"><strong>Missão:</strong> corrija o <code>depois.cpp</code>. Há dois jeitos: guardar uma <strong>cópia</strong> do valor (<code>int primeiro = fila[0];</code>, sem o <code>&amp;</code>) ou pegar a referência só <strong>depois</strong> do <code>push_back</code>. No editor, o erro original passa calado (pode até aparecer o 10 certo, por sorte); a missão confere a correção no código.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; fila = {10, 20, 30};
+    int&amp; primeiro = fila[0];
+    fila.push_back(40);
+    std::cout &lt;&lt; "Primeiro da fila: " &lt;&lt; primeiro &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; fila = {10, 20, 30};
+    int primeiro = fila[0];
+    fila.push_back(40);
+    std::cout &lt;&lt; "Primeiro da fila: " &lt;&lt; primeiro &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. UndefinedBehaviorSanitizer: <code>-fsanitize=undefined</code></h2>
+<p>O UBSan cuida dos UBs que não são de memória: contas que estouram, divisão por zero, deslocamentos de bits inválidos, entre outros. Este programa tem dois:</p>
+
+<pre class="file" data-file="ub.cpp">#include &lt;climits&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    int pontos = INT_MAX;
+    pontos = pontos + 1;
+    std::cout &lt;&lt; "Pontos: " &lt;&lt; pontos &lt;&lt; '\n';
+
+    int pessoas = 0;
+    int pizza = 8;
+    std::cout &lt;&lt; "Fatias por pessoa: " &lt;&lt; pizza / pessoas &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra -g -fsanitize=undefined ub.cpp -o ub-ubsan
+$ ./ub-ubsan
+ub.cpp:6:12: runtime error: signed integer overflow: 2147483647 + 1 cannot be represented in type 'int'
+Pontos: -2147483648
+ub.cpp:11:49: runtime error: division by zero
+Exceção de ponto flutuante (imagem do núcleo gravada) ./ub-ubsan
+$ echo $?
+136</pre>
+
+<p>As mensagens do UBSan são curtas e no formato que você já conhece dos erros de compilação: <code>arquivo:linha:coluna: runtime error: …</code> ("erro em tempo de execução").</p>
+<ul>
+  <li><em>signed integer overflow: 2147483647 + 1 cannot be represented in type 'int'</em> = "estouro de inteiro com sinal: 2147483647 + 1 não cabe no tipo <code>int</code>". Repare que o programa <strong>continuou</strong> (mostrou <code>Pontos: -2147483648</code>): por padrão, o UBSan avisa e segue.</li>
+  <li><em>division by zero</em> = "divisão por zero". Depois do aviso, a divisão aconteceu de verdade, e o processador a recusou: o sistema matou o programa com o sinal <code>SIGFPE</code> ("Exceção de ponto flutuante", um nome histórico, já que aqui a conta era de inteiros). Código 136 = 128 + 8.</li>
+</ul>
+
+<p>Para o UBSan <strong>parar</strong> no primeiro erro, como o ASan, acrescente <code>-fno-sanitize-recover=undefined</code> ("não se recupere").</p>
+
+<div class="trycpp" data-goal="out:Pontos: 2147483648,out:Sem ninguém para dividir a pizza.,exit:0">
+<p class="try-task"><strong>Missão:</strong> corrija os dois erros que o UBSan achou. Para o estouro, troque o tipo de <code>pontos</code> por um que caiba o resultado (a saída deve ser <code>Pontos: 2147483648</code>). Para a divisão, confira antes: se <code>pessoas</code> for 0, mostre <code>Sem ninguém para dividir a pizza.</code>. No editor, a divisão por zero encerra o programa sem mensagem, com o código 136.</p>
+<pre class="script">#include &lt;climits&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    int pontos = INT_MAX;
+    pontos = pontos + 1;
+    std::cout &lt;&lt; "Pontos: " &lt;&lt; pontos &lt;&lt; '\n';
+
+    int pessoas = 0;
+    int pizza = 8;
+    std::cout &lt;&lt; "Fatias por pessoa: " &lt;&lt; pizza / pessoas &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;climits&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    long long pontos = INT_MAX;
+    pontos = pontos + 1;
+    std::cout &lt;&lt; "Pontos: " &lt;&lt; pontos &lt;&lt; '\n';
+
+    int pessoas = 0;
+    int pizza = 8;
+    if (pessoas == 0) {
+        std::cout &lt;&lt; "Sem ninguém para dividir a pizza.\n";
+    } else {
+        std::cout &lt;&lt; "Fatias por pessoa: " &lt;&lt; pizza / pessoas &lt;&lt; '\n';
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. LeakSanitizer: <code>-fsanitize=leak</code></h2>
+<p>Um <strong>vazamento de memória</strong> (<em>memory leak</em>) é memória pedida com <code>new</code> e nunca devolvida com <code>delete</code> (veja <a href="new-delete.html">Memória Dinâmica</a>). O programa não quebra; só vai ocupando cada vez mais memória, o que num programa que roda por dias (um servidor, um jogo aberto) vira um problema sério.</p>
+
+<pre class="file" data-file="vazamento.cpp">#include &lt;iostream&gt;
+
+int* criar_placar() {
+    int* p = new int[100];
+    p[0] = 42;
+    return p;
+}
+
+int main() {
+    int* placar = criar_placar();
+    std::cout &lt;&lt; "Placar: " &lt;&lt; placar[0] &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra -g -fsanitize=leak vazamento.cpp -o vaz-lsan
+$ ./vaz-lsan
+Placar: 42
+
+=================================================================
+==8==ERROR: LeakSanitizer: detected memory leaks
+
+Direct leak of 400 byte(s) in 1 object(s) allocated from:
+    #0 0x7bae83617708 in operator new[](unsigned long) ../../../../src/libsanitizer/lsan/lsan_interceptors.cpp:281
+    #1 0x5e3f513611be in criar_placar() /home/ana/cpp/san/vazamento.cpp:4
+    #2 0x5e3f513611e3 in main /home/ana/cpp/san/vazamento.cpp:10
+    #3 0x7bae82e2a600 in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+    #4 0x7bae82e2a717 in __libc_start_main_impl ../csu/libc-start.c:360
+    #5 0x5e3f513610e4 in _start (/home/ana/cpp/san/vaz-lsan+0x10e4) (BuildId: 672d1bffe70ea59d36e9c9026cc6d857db225edc)
+
+SUMMARY: LeakSanitizer: 400 byte(s) leaked in 1 allocation(s).
+$ echo $?
+23</pre>
+
+<p>O programa rodou inteiro (<code>Placar: 42</code>), e só no fim o LSan conferiu o que ficou sem devolver: <em>Direct leak of 400 byte(s) in 1 object(s) allocated from</em> = "vazamento direto de 400 bytes em 1 objeto, pedido em…" a linha 4 (<code>new int[100]</code>: 100 × 4 bytes), dentro de <code>criar_placar</code>, chamada pela linha 10. O código de saída 23 é o jeito do LSan dizer "achei vazamentos".</p>
+
+<p>Você não precisa ligar o LSan à parte: o <strong>ASan já inclui</strong> a busca por vazamentos no Linux. Compilado com <code>-fsanitize=address</code>, o mesmo programa mostra o mesmo relatório, terminando com <code>SUMMARY: AddressSanitizer: 400 byte(s) leaked in 1 allocation(s).</code> e código 1.</p>
+
+<p>A correção de verdade não é lembrar do <code>delete</code>: é não usar <code>new</code>. Um <code>std::vector</code> (ou um <a href="smart-pointers.html">ponteiro inteligente</a>) devolve a memória sozinho.</p>
+
+<hr>
+
+<h2>4. O custo, e quando usar</h2>
+<p>O fiscal trabalha, e isso custa. Um programa que faz 50 milhões de contas num vetor, compilado sem e com <code>-fsanitize=address,undefined</code> (os dois juntos, separados por vírgula):</p>
+
+<pre class="file" data-file="custo.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; v(1'000'000);
+    long long soma = 0;
+    for (int volta = 0; volta &lt; 50; ++volta) {
+        for (std::size_t i = 0; i &lt; v.size(); ++i) {
+            v[i] = volta + static_cast&lt;int&gt;(i % 7);
+            soma += v[i];
+        }
+    }
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra -g custo.cpp -o custo
+$ g++ -std=c++23 -Wall -Wextra -g -fsanitize=address,undefined custo.cpp -o custo-san
+$ ls -l custo custo-san
+-rwxrwxr-x 1 ana ana  80752 out 16 22:16 custo
+-rwxrwxr-x 1 ana ana 142456 out 16 22:16 custo-san
+$ time ./custo
+Soma: 1374999850
+
+real	0m1,160s
+user	0m1,156s
+sys	0m0,004s
+$ time ./custo-san
+Soma: 1374999850
+
+real	0m2,220s
+user	0m2,209s
+sys	0m0,012s</pre>
+
+<p>O <code>time</code> do Bash mede quanto o comando demorou (a linha <code>real</code> é o tempo de relógio). Com os sanitizers, o programa ficou quase duas vezes mais lento e o executável, quase duas vezes maior. O ASan também usa bem mais memória. Em geral, conte com um programa de 2 a 3 vezes mais lento.</p>
+
+<p>Por isso a regra é:</p>
+<ul>
+  <li><strong>Durante o desenvolvimento e nos testes: sempre com sanitizers.</strong> Um bom comando do dia a dia é <code>g++ -std=c++23 -Wall -Wextra -g -fsanitize=address,undefined arquivo.cpp -o programa</code>.</li>
+  <li><strong>Na versão final, que vai para os usuários: sem sanitizers</strong>, com otimização (<code>-O2</code>).</li>
+</ul>
+<p>Esses dois "jeitos de compilar" costumam ganhar nomes, <em>Debug</em> e <em>Release</em>, que você vai reencontrar no <a href="cmake.html">CMake</a>.</p>
+
+<div class="warning">
+<strong>Os sanitizers só acham o que acontece</strong>
+<p>O fiscal só confere o que o programa <strong>de fato executou</strong>. Se o erro está num <code>if</code> que não rodou no seu teste, o sanitizer não vê. Teste os caminhos do programa (entradas erradas, listas vazias, o último elemento) com os sanitizers ligados. E nem todo par de sanitizers combina: o <code>-fsanitize=thread</code>, para erros com <a href="threads.html">threads</a>, não pode ser usado junto com o <code>address</code>.</p>
+</div>
+
+<hr>
+
+<h2>5. Valgrind: o fiscal sem recompilar</h2>
+<p>O <strong>Valgrind</strong> é um programa que roda o seu executável numa espécie de máquina simulada e confere cada acesso à memória. A vantagem: não precisa recompilar; funciona até com programas que você não compilou. O uso é <code>valgrind ./programa</code> (ou <code>valgrind --leak-check=full ./programa</code> para vazamentos), e ele também mostra o arquivo e a linha se o programa tiver <code>-g</code>. A desvantagem: o programa fica muito mais lento que com os sanitizers (dezenas de vezes). Ele não vem instalado no Ubuntu (<code>sudo apt install valgrind</code>) e não está na máquina da Ana, por isso não há saída dele aqui. Para quem compila o próprio código, os sanitizers costumam ser a primeira escolha.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>O relatório não mostra arquivo e linha, só endereços</strong>
+<p><strong>O que aconteceu:</strong> faltou o <code>-g</code>.</p>
+<p><strong>Como resolver:</strong> compile com <code>-g -fsanitize=…</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Compilei com o sanitizer e não apareceu nada, mas o programa continua errado</strong>
+<p><strong>O que aconteceu:</strong> o erro não está no caminho que rodou, ou não é do tipo que aquele sanitizer procura (um erro de lógica, como dividir errado, não é UB).</p>
+<p><strong>Como resolver:</strong> teste outras entradas; ligue também o outro sanitizer (<code>address,undefined</code>); para erros de lógica, use o <a href="depuracao-gdb.html">GDB</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>"runtime error: …" aparece e o programa continua</strong>
+<p><strong>O que aconteceu:</strong> é o comportamento padrão do UBSan: avisa e segue.</p>
+<p><strong>Como resolver:</strong> trate como erro do mesmo jeito. Para parar no primeiro, compile com <code>-fno-sanitize-recover=undefined</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Opção / mensagem</th><th>Significado</th></tr>
+<tr><td><code>-fsanitize=address</code></td><td>ASan: memória (estouro, use-after-free, double free) e vazamentos.</td></tr>
+<tr><td><code>-fsanitize=undefined</code></td><td>UBSan: estouro de inteiro, divisão por zero e outros UBs.</td></tr>
+<tr><td><code>-fsanitize=leak</code></td><td>LSan: só vazamentos (o ASan já inclui).</td></tr>
+<tr><td><code>-fsanitize=address,undefined</code></td><td>Os dois juntos: a combinação do dia a dia.</td></tr>
+<tr><td><code>-fno-sanitize-recover=undefined</code></td><td>Faz o UBSan parar no primeiro erro.</td></tr>
+<tr><td><code>stack-buffer-overflow</code> / <code>heap-buffer-overflow</code></td><td>Acesso além do fim (ou antes do começo) de um array/vetor, na pilha ou no heap.</td></tr>
+<tr><td><code>heap-use-after-free</code></td><td>Uso de memória já liberada.</td></tr>
+<tr><td><code>detected memory leaks</code></td><td>Memória que nunca foi devolvida.</td></tr>
+<tr><td><code>runtime error: signed integer overflow</code></td><td>Estouro de inteiro com sinal.</td></tr>
+<tr><td><code>runtime error: division by zero</code></td><td>Divisão por zero.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Ligar o AddressSanitizer</h3>
+<p>Complete a opção:</p>
+<div class="ex-code">g++ -std=c++23 -Wall -Wextra -g <input data-answer="-fsanitize=address" aria-label="opção"> prog.cpp -o prog</div>
+</div>
+
+<div class="exercise">
+<h3>2. Os dois juntos</h3>
+<p>Escreva uma única opção que liga o ASan e o UBSan:</p>
+<div class="ex-code"><input data-answer="-fsanitize=address,undefined|-fsanitize=undefined,address" aria-label="opção"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. O relatório diz <code>ERROR: AddressSanitizer: heap-use-after-free</code>. O que aconteceu?</p>
+<label><input type="radio" name="q3"> O programa pediu memória demais.</label>
+<label><input type="radio" name="q3"> O programa usou uma memória que já tinha sido liberada.</label>
+<label><input type="radio" name="q3"> O programa dividiu por zero.</label>
+<label><input type="radio" name="q3"> O programa esqueceu um <code>delete</code>.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Quando usar os sanitizers?</p>
+<label><input type="radio" name="q4"> Só na versão final, entregue aos usuários.</label>
+<label><input type="radio" name="q4"> Só quando o programa já está quebrando.</label>
+<label><input type="radio" name="q4"> Sempre durante o desenvolvimento e os testes; sem eles na versão final.</label>
+<label><input type="radio" name="q4"> Nunca: eles deixam o programa lento.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. No relatório do ASan, qual linha diz onde está o erro no seu código?</p>
+<label><input type="radio" name="q5"> A primeira linha da pilha (<code>#0</code>, <code>#1</code>…) que cita um arquivo seu, como <code>/home/ana/cpp/san/fora.cpp:7</code>.</label>
+<label><input type="radio" name="q5"> A linha <code>__libc_start_main_impl</code>.</label>
+<label><input type="radio" name="q5"> A legenda dos <em>shadow bytes</em>.</label>
+<label><input type="radio" name="q5"> A linha <code>==4==ABORTING</code>.</label>
+</div>
+
+<h3>Missão final: o placar sem vazamento</h3>
+<div class="trycpp" data-goal="out:Placar: 42,src:std::vector">
+<p class="try-task"><strong>Missão:</strong> o LeakSanitizer achou 400 bytes vazados neste programa. Em vez de acrescentar um <code>delete[]</code>, troque o <code>new int[100]</code> por um <code>std::vector&lt;int&gt;</code> de 100 posições, que a função devolve por valor (e o <code>main</code> guarda num <code>std::vector&lt;int&gt;</code>). A saída continua <code>Placar: 42</code>, agora sem nenhum <code>new</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int* criar_placar() {
+    int* p = new int[100];
+    p[0] = 42;
+    return p;
+}
+
+int main() {
+    int* placar = criar_placar();
+    std::cout &lt;&lt; "Placar: " &lt;&lt; placar[0] &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+std::vector&lt;int&gt; criar_placar() {
+    std::vector&lt;int&gt; p(100);
+    p[0] = 42;
+    return p;
+}
+
+int main() {
+    std::vector&lt;int&gt; placar = criar_placar();
+    std::cout &lt;&lt; "Placar: " &lt;&lt; placar[0] &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Sanitizers são fiscais que o compilador põe dentro do programa: o UB vira uma mensagem clara, com arquivo e linha, na hora em que acontece.</li>
+  <li><code>-fsanitize=address</code> (ASan): estouro de array/vetor, uso de memória liberada e vazamentos.</li>
+  <li><code>-fsanitize=undefined</code> (UBSan): estouro de inteiro, divisão por zero e outros UBs; avisa e segue, a menos que você use <code>-fno-sanitize-recover=undefined</code>.</li>
+  <li><code>-fsanitize=leak</code> (LSan): vazamentos, no fim do programa.</li>
+  <li>Compile com <code>-g</code>; no relatório, procure o tipo do erro e a primeira linha com um arquivo seu.</li>
+  <li>Custam tempo e memória (o programa ficou 2× mais lento): use sempre no desenvolvimento, nunca na versão final.</li>
+  <li>O Valgrind faz um trabalho parecido sem recompilar, só que bem mais devagar.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
