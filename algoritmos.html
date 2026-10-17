@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Algoritmos — sort, find, count, accumulate e companhia | Guia C++</title>
+<meta name="description" content="Os algoritmos mais usados de &lt;algorithm&gt; e &lt;numeric&gt; para quem está começando: sort com e sem lambda, find, find_if, count, min_element, max_element, accumulate (e a armadilha do 0 com double), reverse, unique com erase, transform, any_of e all_of, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Algoritmos</span></h1>
+
+<p class="intro">Ordenar as notas da turma, achar um item na lista de compras, contar quantas vezes saiu 6 no dado, somar os preços do carrinho. Você já sabe fazer tudo isso com um <code>for</code>. Mas são tarefas tão comuns que a biblioteca padrão traz cada uma pronta, testada e rápida, no cabeçalho <code>&lt;algorithm&gt;</code> (e algumas em <code>&lt;numeric&gt;</code>). Nesta aula você vai conhecer os algoritmos que aparecem em quase todo programa C++ e aprender a ler o "par de iteradores" que todos eles recebem.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O padrão <code>algoritmo(v.begin(), v.end(), …)</code> que todos seguem.</li>
+  <li>Ordenar com <code>std::sort</code>, do jeito normal e com uma lambda (decrescente, por campo de struct).</li>
+  <li>Buscar com <code>std::find</code> e <code>std::find_if</code>, e conferir se achou.</li>
+  <li>Contar com <code>std::count</code> e <code>std::count_if</code>.</li>
+  <li>Achar o menor e o maior com <code>std::min_element</code> e <code>std::max_element</code>.</li>
+  <li>Somar com <code>std::accumulate</code>, e a armadilha do <code>0</code> × <code>0.0</code> que dá resultado errado sem aviso.</li>
+  <li><code>std::reverse</code>, <code>std::unique</code> + <code>erase</code>, <code>std::transform</code>, <code>std::any_of</code>/<code>all_of</code>/<code>none_of</code>.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Você vai precisar de <a href="vector.html">std::vector</a>, <a href="iteradores.html">Iteradores</a> e <a href="lambdas.html">Lambdas</a>. A lista completa de algoritmos fica em <a href="ref-algoritmos.html">Referência: Algoritmos</a>; aqui estão os que você vai usar toda semana.</p>
+
+<hr>
+
+<h2>A ideia: ferramentas prontas na caixa</h2>
+<p>Imagine que a Ana precisa apertar parafusos. Ela pode fabricar uma chave de fenda (escrever o <code>for</code> na mão) ou pegar a que está na caixa de ferramentas. A da caixa já foi usada por milhões de pessoas, não tem defeito e tem um <strong>nome</strong>: quem lê <code>std::sort(…)</code> entende na hora "aqui se ordena", enquanto um <code>for</code> com dois índices obriga a ler linha por linha.</p>
+
+<p>Quase todos os algoritmos recebem um <strong>intervalo</strong>: dois iteradores que dizem "de onde até onde" trabalhar.</p>
+
+<dl class="anatomy">
+  <dt>std::sort(</dt><dd>O nome do algoritmo, sempre com <code>std::</code>.</dd>
+  <dt>v.begin(),</dt><dd>Onde o trabalho <strong>começa</strong>: o primeiro elemento.</dd>
+  <dt>v.end()</dt><dd>Onde o trabalho <strong>termina</strong>: uma posição <em>depois</em> do último (o "fim", que não é um elemento).</dd>
+  <dt>, …)</dt><dd>Alguns algoritmos recebem mais coisas: um valor para procurar, uma lambda com uma regra.</dd>
+</dl>
+
+<p>Como recebem um intervalo, os algoritmos funcionam em <code>vector</code>, <code>std::array</code>, <code>string</code>, <code>deque</code> e até numa parte de um vetor (<code>v.begin() + 1</code> até <code>v.end()</code>). Existe uma forma mais curta, <code>std::ranges::sort(v)</code>, sem <code>begin</code>/<code>end</code>; ela é o assunto da próxima aula, <a href="ranges.html">Ranges</a>. Vale aprender a forma clássica primeiro: ela está em todo o código C++ que você vai ler.</p>
+
+<hr>
+
+<h2>1. <code>std::sort</code>: ordenar</h2>
+
+<pre class="file" data-file="ordenar.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas = {7, 10, 4, 8, 6};
+    std::sort(notas.begin(), notas.end());
+    for (int n : notas) {
+        std::cout &lt;&lt; n &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+
+    std::vector&lt;std::string&gt; nomes = {"Carla", "ana", "Bruno", "Ana"};
+    std::sort(nomes.begin(), nomes.end());
+    for (const auto&amp; nome : nomes) {
+        std::cout &lt;&lt; nome &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ordenar.cpp -o ordenar
+$ ./ordenar
+4 6 7 8 10
+Ana Bruno Carla ana                  « "ana" minúsculo foi para o fim!</pre>
+
+<p>O <code>std::sort</code> <strong>muda o próprio vetor</strong>: não cria outro. Números ficam do menor para o maior. Textos ficam em ordem "de dicionário", mas com um detalhe: o computador compara os códigos das letras, e <strong>todas as maiúsculas vêm antes de todas as minúsculas</strong> (por isso <code>ana</code> ficou depois de <code>Carla</code>). Letras acentuadas também caem no fim (veja <a href="acentos-utf8.html">Acentos e UTF-8</a>).</p>
+
+<h3>Com uma regra sua: a lambda de comparação</h3>
+<p>O terceiro argumento do <code>sort</code> é opcional: uma função que recebe dois elementos <code>a</code> e <code>b</code> e responde <code>true</code> se <strong><code>a</code> deve vir antes de <code>b</code></strong>. A forma mais prática de escrever essa função é uma <a href="lambdas.html">lambda</a>:</p>
+
+<pre class="file" data-file="decrescente.cpp">#include &lt;algorithm&gt;
+#include &lt;functional&gt;
+#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas = {7, 10, 4, 8, 6};
+
+    std::sort(notas.begin(), notas.end(), [](int a, int b) {
+        return a &gt; b;
+    });
+    for (int n : notas) std::cout &lt;&lt; n &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+
+    std::sort(notas.begin(), notas.end(), std::greater&lt;int&gt;());
+    for (int n : notas) std::cout &lt;&lt; n &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra decrescente.cpp -o decrescente
+$ ./decrescente
+10 8 7 6 4
+10 8 7 6 4                           « std::greater faz a mesma coisa que a lambda</pre>
+
+<dl class="anatomy">
+  <dt>[](int a, int b) { return a &gt; b; }</dt><dd>"<code>a</code> vem antes de <code>b</code> quando <code>a</code> é <strong>maior</strong>": ordem decrescente. Com <code>a &lt; b</code>, seria a ordem normal.</dd>
+  <dt>std::greater&lt;int&gt;()</dt><dd>Uma comparação pronta, de <code>&lt;functional&gt;</code>, que faz <code>a &gt; b</code>. Útil para o caso simples; a lambda serve para qualquer regra.</dd>
+</dl>
+
+<p>Onde a lambda brilha é em ordenar <a href="structs.html">structs</a> por um campo:</p>
+
+<pre class="file" data-file="alunos.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Aluno {
+    std::string nome;
+    double nota;
+};
+
+int main() {
+    std::vector&lt;Aluno&gt; turma = {
+        {"Bruno", 7.5}, {"Ana", 9.0}, {"Carla", 6.0}, {"Davi", 9.0}
+    };
+
+    // da maior nota para a menor
+    std::sort(turma.begin(), turma.end(), [](const Aluno&amp; a, const Aluno&amp; b) {
+        return a.nota &gt; b.nota;
+    });
+
+    for (const auto&amp; aluno : turma) {
+        std::cout &lt;&lt; aluno.nome &lt;&lt; ": " &lt;&lt; aluno.nota &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra alunos.cpp -o alunos
+$ ./alunos
+Ana: 9
+Davi: 9
+Bruno: 7.5
+Carla: 6</pre>
+
+<p>Os parâmetros são <code>const Aluno&amp;</code> (referência constante, aula <a href="passagem-referencia.html">Por Valor × Por Referência</a>) para não copiar cada aluno a cada comparação. Um detalhe: Ana e Davi empataram em 9. O <code>std::sort</code> <strong>não promete</strong> manter a ordem original entre empatados; aqui saiu Ana antes, mas poderia ser o contrário. Se a ordem dos empatados importar, use <code>std::stable_sort</code> ("ordenação estável"), com os mesmos argumentos.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode e veja a turma ordenada pela nota. Depois mude a lambda para ordenar pelo <strong>nome</strong> (<code>a.nome &lt; b.nome</code>). Por fim, tente ordenar pela nota do <strong>menor</strong> para o maior.</p>
+<pre class="script">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Aluno {
+    std::string nome;
+    double nota;
+};
+
+int main() {
+    std::vector&lt;Aluno&gt; turma = {
+        {"Bruno", 7.5}, {"Ana", 9.0}, {"Carla", 6.0}, {"Davi", 8.0}
+    };
+
+    std::sort(turma.begin(), turma.end(), [](const Aluno&amp; a, const Aluno&amp; b) {
+        return a.nota &gt; b.nota;
+    });
+
+    for (const auto&amp; aluno : turma) {
+        std::cout &lt;&lt; aluno.nome &lt;&lt; ": " &lt;&lt; aluno.nota &lt;&lt; '\n';
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. <code>std::find</code> e <code>std::find_if</code>: buscar</h2>
+<p><code>std::find</code> procura um valor e devolve um <strong>iterador</strong> (aula <a href="iteradores.html">Iteradores</a>) apontando para ele. E se não achar? Ele devolve o <code>end()</code>, o "fim". Por isso, <strong>sempre compare com <code>end()</code></strong> antes de usar o resultado.</p>
+
+<pre class="file" data-file="buscar.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; compras = {"arroz", "feijão", "café", "leite"};
+
+    auto it = std::find(compras.begin(), compras.end(), "café");
+    if (it != compras.end()) {
+        std::cout &lt;&lt; "Achei " &lt;&lt; *it &lt;&lt; " na posição "
+                  &lt;&lt; (it - compras.begin()) &lt;&lt; '\n';
+    } else {
+        std::cout &lt;&lt; "Não está na lista\n";
+    }
+
+    auto it2 = std::find(compras.begin(), compras.end(), "chocolate");
+    if (it2 == compras.end()) {
+        std::cout &lt;&lt; "chocolate não está na lista\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra buscar.cpp -o buscar
+$ ./buscar
+Achei café na posição 2              « posições contam a partir de 0
+chocolate não está na lista</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>auto it = std::find(…, "café");</code></td><td>Procura do começo ao fim. <code>auto</code> evita escrever o tipo comprido do iterador (aula <a href="auto.html">auto</a>).</td></tr>
+<tr><td><code>it != compras.end()</code></td><td>"Achou?" Se o resultado não é o fim, achou.</td></tr>
+<tr><td><code>*it</code></td><td>O elemento encontrado (o <code>*</code> "abre" o iterador).</td></tr>
+<tr><td><code>it - compras.begin()</code></td><td>A distância desde o começo, ou seja, a posição (índice).</td></tr>
+</table>
+</div>
+
+<p><code>std::find_if</code> procura o primeiro elemento que <strong>satisfaz uma condição</strong>, escrita numa lambda que responde <code>true</code>/<code>false</code>:</p>
+
+<pre class="file" data-file="buscar_if.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas = {7, 10, 4, 8, 3, 6};
+
+    auto it = std::find_if(notas.begin(), notas.end(), [](int n) {
+        return n &lt; 5;
+    });
+    if (it != notas.end()) {
+        std::cout &lt;&lt; "Primeira nota abaixo de 5: " &lt;&lt; *it &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra buscar_if.cpp -o buscar_if
+$ ./buscar_if
+Primeira nota abaixo de 5: 4         « o 3 também é, mas o find_if para no primeiro</pre>
+
+<p>Uma lambda que responde sim ou não tem um nome técnico: <strong>predicado</strong>. Você vai ver essa palavra na documentação de vários algoritmos com <code>_if</code> no nome.</p>
+
+<hr>
+
+<h2>3. <code>std::count</code> e <code>std::count_if</code>: contar</h2>
+
+<pre class="file" data-file="contar.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; dados = {3, 6, 6, 1, 6, 2, 5};
+
+    auto seis = std::count(dados.begin(), dados.end(), 6);
+    std::cout &lt;&lt; "Saiu 6: " &lt;&lt; seis &lt;&lt; " vezes\n";
+
+    auto altos = std::count_if(dados.begin(), dados.end(), [](int d) {
+        return d &gt;= 5;
+    });
+    std::cout &lt;&lt; "5 ou mais: " &lt;&lt; altos &lt;&lt; " vezes\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra contar.cpp -o contar
+$ ./contar
+Saiu 6: 3 vezes
+5 ou mais: 4 vezes                   « 6, 6, 6 e 5</pre>
+
+<p><code>count</code> conta quantos são <strong>iguais</strong> a um valor; <code>count_if</code> conta quantos satisfazem a lambda. O resultado é um número inteiro com sinal (por isso o <code>auto</code>; se quiser, guarde num <code>long</code>).</p>
+
+<hr>
+
+<h2>4. <code>std::min_element</code> e <code>std::max_element</code>: o menor e o maior</h2>
+<p>Assim como o <code>find</code>, eles devolvem um <strong>iterador</strong>, não o valor. Use <code>*</code> para ver o valor e a subtração para saber a posição:</p>
+
+<pre class="file" data-file="extremos.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;double&gt; precos = {4.5, 12.9, 2.75, 8.0};
+
+    auto menor = std::min_element(precos.begin(), precos.end());
+    auto maior = std::max_element(precos.begin(), precos.end());
+
+    std::cout &lt;&lt; "Mais barato: " &lt;&lt; *menor &lt;&lt; '\n';
+    std::cout &lt;&lt; "Mais caro: " &lt;&lt; *maior &lt;&lt; '\n';
+    std::cout &lt;&lt; "O mais caro está na posição " &lt;&lt; (maior - precos.begin()) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra extremos.cpp -o extremos
+$ ./extremos
+Mais barato: 2.75
+Mais caro: 12.9
+O mais caro está na posição 1</pre>
+
+<p>Eles também aceitam uma lambda de comparação, igual à do <code>sort</code>: <code>std::max_element(turma.begin(), turma.end(), [](const Aluno&amp; a, const Aluno&amp; b) { return a.nota &lt; b.nota; })</code> acha o aluno de maior nota. Cuidado com o vetor <strong>vazio</strong>: aí o resultado é o <code>end()</code>, e usar <code>*</code> nele é um erro grave (veja "Quando dá errado"). Para comparar só dois valores soltos, existem <code>std::min(a, b)</code> e <code>std::max(a, b)</code>.</p>
+
+<hr>
+
+<h2>5. <code>std::accumulate</code>: somar (e a armadilha do <code>0</code>)</h2>
+<p>O <code>accumulate</code> ("acumular") fica em outro cabeçalho, <code>&lt;numeric&gt;</code>. Ele recebe o intervalo e um <strong>valor inicial</strong>, e soma tudo a partir dele:</p>
+
+<pre class="file" data-file="somar.cpp">#include &lt;iostream&gt;
+#include &lt;numeric&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; quantidades = {3, 5, 2};
+    int total = std::accumulate(quantidades.begin(), quantidades.end(), 0);
+    std::cout &lt;&lt; "Itens: " &lt;&lt; total &lt;&lt; '\n';
+
+    std::vector&lt;double&gt; precos = {4.5, 12.9, 2.75};
+    double errado = std::accumulate(precos.begin(), precos.end(), 0);
+    double certo = std::accumulate(precos.begin(), precos.end(), 0.0);
+    std::cout &lt;&lt; "Com 0:   " &lt;&lt; errado &lt;&lt; '\n';
+    std::cout &lt;&lt; "Com 0.0: " &lt;&lt; certo &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra somar.cpp -o somar      « nenhum aviso!
+$ ./somar
+Itens: 10
+Com 0:   18                          « ERRADO: 4.5 + 12.9 + 2.75 = 20.15
+Com 0.0: 20.15</pre>
+
+<p>O que aconteceu? O <code>accumulate</code> usa o <strong>tipo do valor inicial</strong> para guardar a soma parcial. <code>0</code> é um <code>int</code>, então a soma é guardada num <code>int</code>, e a cada passo a parte decimal é <strong>jogada fora</strong> (conversão de <code>double</code> para <code>int</code>, aula <a href="conversao-tipos.html">Conversão de Tipos</a>):</p>
+
+<ol class="passo">
+  <li>Começa com <code>0</code> (int).</li>
+  <li><code>0 + 4.5 = 4.5</code> → guardado como int: <strong>4</strong>.</li>
+  <li><code>4 + 12.9 = 16.9</code> → <strong>16</strong>.</li>
+  <li><code>16 + 2.75 = 18.75</code> → <strong>18</strong>. O resultado final, <code>18</code>, é convertido para o <code>double errado</code>.</li>
+</ol>
+
+<div class="warning">
+<strong>O compilador não avisa</strong>
+<p>Nem com <code>-Wall -Wextra</code>, nem acrescentando <code>-Wconversion</code> (testamos): a conversão acontece dentro do código da biblioteca padrão, e o g++ não mostra avisos de lá. Regra prática: <strong>o valor inicial tem o mesmo tipo dos elementos</strong>. Para <code>double</code>, escreva <code>0.0</code>; para <code>long long</code>, <code>0LL</code>; para textos, <code>std::string{}</code>.</p>
+</div>
+
+<p>O <code>accumulate</code> também aceita uma lambda no fim, para "acumular" de outro jeito (multiplicar, juntar textos com vírgula). Para médias, divida a soma pelo <code>size()</code>, como na missão final.</p>
+
+<hr>
+
+<h2>6. <code>std::reverse</code>: inverter</h2>
+
+<pre class="file" data-file="inverter.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; v = {1, 2, 3, 4, 5};
+    std::reverse(v.begin(), v.end());
+    for (int x : v) std::cout &lt;&lt; x &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+
+    std::string palavra = "socorram";
+    std::reverse(palavra.begin(), palavra.end());
+    std::cout &lt;&lt; palavra &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra inverter.cpp -o inverter
+$ ./inverter
+5 4 3 2 1
+marrocos                             « "socorram" de trás para frente</pre>
+
+<p>Funciona em vetores e em strings, porque os dois têm <code>begin()</code> e <code>end()</code>. Em textos com acento, cuidado: em UTF-8 uma letra como "ã" ocupa 2 bytes, e inverter byte a byte estraga a letra (aula <a href="acentos-utf8.html">Acentos e UTF-8</a>).</p>
+
+<hr>
+
+<h2>7. <code>std::unique</code> + <code>erase</code>: tirar repetidos</h2>
+<p>Este é o algoritmo mais traiçoeiro da lista. Veja três tentativas:</p>
+
+<pre class="file" data-file="repetidos.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+void mostrar(const std::vector&lt;int&gt;&amp; v) {
+    for (int x : v) std::cout &lt;&lt; x &lt;&lt; ' ';
+    std::cout &lt;&lt; "(tamanho " &lt;&lt; v.size() &lt;&lt; ")\n";
+}
+
+int main() {
+    std::vector&lt;int&gt; v = {5, 1, 5, 3, 1, 5};
+
+    std::vector&lt;int&gt; a = v;
+    std::unique(a.begin(), a.end());
+    std::cout &lt;&lt; "unique sem sort:      ";
+    mostrar(a);
+
+    std::vector&lt;int&gt; b = v;
+    std::sort(b.begin(), b.end());
+    auto novo_fim = std::unique(b.begin(), b.end());
+    std::cout &lt;&lt; "sort + unique:        ";
+    mostrar(b);
+
+    b.erase(novo_fim, b.end());
+    std::cout &lt;&lt; "sort + unique + erase: ";
+    mostrar(b);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra repetidos.cpp -o repetidos
+repetidos.cpp: In function ‘int main()’:
+repetidos.cpp:14:16: warning: ignoring return value of ‘constexpr _FIter std::unique(_FIter, _FIter) [with _FIter = __gnu_cxx::__normal_iterator&lt;int*, vector&lt;int&gt; &gt;]’, declared with attribute ‘nodiscard’ [-Wunused-result]
+   14 |     std::unique(a.begin(), a.end());
+      |     ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/c++/15/algorithm:63,
+                 from repetidos.cpp:1:
+/usr/include/c++/15/bits/stl_algo.h:875:5: note: declared here
+  875 |     unique(_ForwardIterator __first, _ForwardIterator __last)
+      |     ^~~~~~
+$ ./repetidos
+unique sem sort:      5 1 5 3 1 5 (tamanho 6)       « nada mudou!
+sort + unique:        1 3 5 5 5 5 (tamanho 6)       « 1 3 5 na frente, sobras atrás
+sort + unique + erase: 1 3 5 (tamanho 3)            « agora sim</pre>
+
+<p>Duas lições:</p>
+<ul>
+  <li><strong><code>unique</code> só junta repetidos que estão lado a lado.</strong> Em <code>5 1 5 3 1 5</code>, nenhum número se repete encostado no outro, então nada mudou. Por isso, quase sempre se faz <code>sort</code> antes: ordenado, os iguais ficam juntos.</li>
+  <li><strong><code>unique</code> não apaga nada.</strong> Um algoritmo recebe só iteradores e não consegue mudar o tamanho do vetor. Ele empurra os valores únicos para a frente e devolve um iterador para o "novo fim". O que fica depois dele são sobras (aqui, <code>5 5 5</code>, mas podem ser quaisquer valores). Quem apaga de verdade é o <code>erase</code> do próprio vetor, do novo fim até o fim.</li>
+</ul>
+
+<p>O g++ ajudou: o <code>unique</code> é marcado como <code>nodiscard</code> ("não descarte"), e ignorar o que ele devolve dá o aviso <em>ignoring return value</em> ("ignorando o valor de retorno"). Se aparecer esse aviso, quase certamente falta o <code>erase</code>. A receita completa, numa linha, é:</p>
+
+<pre class="file" data-file="receita.cpp">std::sort(v.begin(), v.end());
+v.erase(std::unique(v.begin(), v.end()), v.end());
+</pre>
+
+<div class="tip">
+<strong>Para apagar um valor específico</strong>
+<p>Para tirar todos os <code>5</code> de um vetor, o C++20 tem <code>std::erase(v, 5);</code>, e para tirar os que satisfazem uma condição, <code>std::erase_if(v, lambda);</code>. Os dois já apagam de verdade, sem precisar de <code>erase</code> separado.</p>
+</div>
+
+<hr>
+
+<h2>8. <code>std::transform</code>: aplicar uma conta em cada elemento</h2>
+<p>O <code>transform</code> ("transformar") passa cada elemento por uma lambda e escreve o resultado em outro lugar (ou no mesmo):</p>
+
+<pre class="file" data-file="transformar.cpp">#include &lt;algorithm&gt;
+#include &lt;cctype&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;double&gt; precos = {10.0, 25.0, 4.0};
+    std::vector&lt;double&gt; com_desconto(precos.size());
+
+    std::transform(precos.begin(), precos.end(), com_desconto.begin(),
+                   [](double p) { return p * 0.9; });
+
+    for (double p : com_desconto) std::cout &lt;&lt; p &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+
+    std::string nome = "ana maria";
+    std::transform(nome.begin(), nome.end(), nome.begin(),
+                   [](unsigned char c) { return std::toupper(c); });
+    std::cout &lt;&lt; nome &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra transformar.cpp -o transformar
+$ ./transformar
+9 22.5 3.6                           « 10% de desconto em cada preço
+ANA MARIA</pre>
+
+<dl class="anatomy">
+  <dt>precos.begin(), precos.end()</dt><dd>De onde ler.</dd>
+  <dt>com_desconto.begin()</dt><dd>Onde começar a escrever. O destino <strong>precisa ter espaço</strong>: por isso o vetor foi criado com <code>precos.size()</code> elementos.</dd>
+  <dt>[](double p) { return p * 0.9; }</dt><dd>O que fazer com cada elemento.</dd>
+  <dt>nome.begin() como destino</dt><dd>No segundo exemplo, origem e destino são a mesma string: ela é transformada "no lugar". O <code>unsigned char</code> evita um problema do <code>std::toupper</code> com bytes de letras acentuadas (aula <a href="char.html">Caracteres</a>).</dd>
+</dl>
+
+<hr>
+
+<h2>9. <code>std::any_of</code>, <code>std::all_of</code> e <code>std::none_of</code>: perguntas de sim ou não</h2>
+
+<pre class="file" data-file="perguntas.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas = {7, 10, 4, 8, 6};
+    auto aprovada = [](int n) { return n &gt;= 6; };
+
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "Alguém passou?      " &lt;&lt; std::any_of(notas.begin(), notas.end(), aprovada) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Todos passaram?     " &lt;&lt; std::all_of(notas.begin(), notas.end(), aprovada) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Ninguém passou?     " &lt;&lt; std::none_of(notas.begin(), notas.end(), aprovada) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra perguntas.cpp -o perguntas
+$ ./perguntas
+Alguém passou?      true
+Todos passaram?     false             « o 4 não passou
+Ninguém passou?     false</pre>
+
+<p>Repare que a lambda foi guardada numa variável (<code>aprovada</code>) e reaproveitada nas três chamadas. <em>Any</em> = "algum", <em>all</em> = "todos", <em>none</em> = "nenhum". Eles param assim que sabem a resposta: o <code>all_of</code> desistiu no 4, sem olhar o resto.</p>
+
+<hr>
+
+<h2>Algoritmo ou <code>for</code>? Qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tarefa</th><th>Com <code>for</code></th><th>Com algoritmo</th></tr>
+<tr><td>Ordenar</td><td>Dezenas de linhas, fácil errar</td><td><code>std::sort</code>: sempre use o algoritmo</td></tr>
+<tr><td>Contar os aprovados</td><td>Variável contadora + <code>if</code></td><td><code>std::count_if</code>: o nome já diz o que é</td></tr>
+<tr><td>Somar</td><td><code>double soma = 0; for (…) soma += x;</code></td><td><code>std::accumulate(…, 0.0)</code>; os dois são bons</td></tr>
+<tr><td>Mostrar cada elemento</td><td><code>for (auto x : v)</code></td><td>Não precisa de algoritmo: o <a href="for-range.html">range-for</a> é o mais claro</td></tr>
+<tr><td>Uma tarefa com várias etapas misturadas</td><td>Às vezes mais claro</td><td>Se precisar de muitas lambdas encadeadas, veja <a href="ranges.html">Ranges</a></td></tr>
+</table>
+</div>
+<p>Regra de bolso: se existe um algoritmo com o nome exato do que você quer fazer, use-o. Ele documenta a intenção e não tem o erro de "um a mais" do <code>for</code> com índice.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>A soma de números com vírgula sai "redonda" e errada</strong>
+<p><strong>O que significa:</strong> <code>std::accumulate(…, 0)</code> com elementos <code>double</code>. O <code>0</code> é <code>int</code> e a soma perde as casas decimais a cada passo, sem nenhum aviso.</p>
+<p><strong>Como consertar:</strong> use <code>0.0</code> como valor inicial.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: ‘accumulate’ is not a member of ‘std’</code></strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sem_numeric.cpp -o sem_numeric
+sem_numeric.cpp: In function ‘int main()’:
+sem_numeric.cpp:6:23: error: ‘accumulate’ is not a member of ‘std’
+    6 |     std::cout &lt;&lt; std::accumulate(v.begin(), v.end(), 0) &lt;&lt; '\n';
+      |                       ^~~~~~~~~~</pre>
+<p><strong>O que significa:</strong> "<code>accumulate</code> não é membro de <code>std</code>": o compilador não conhece esse nome porque o cabeçalho não foi incluído.</p>
+<p><strong>Como consertar:</strong> <code>#include &lt;numeric&gt;</code> (para <code>accumulate</code>) ou <code>#include &lt;algorithm&gt;</code> (para <code>sort</code>, <code>find</code>, <code>count</code> e a maioria). Às vezes o programa compila sem o include porque outro cabeçalho o trouxe "de carona"; não conte com isso, inclua sempre.</p>
+</div>
+
+<div class="cenario">
+<strong>Usar o resultado do <code>find</code> sem conferir</strong>
+<pre class="file" data-file="fim.cpp">std::vector&lt;int&gt; v = {1, 2, 3};
+auto it = std::find(v.begin(), v.end(), 99);
+std::cout &lt;&lt; "Achei: " &lt;&lt; *it &lt;&lt; '\n';
+</pre>
+<pre class="term" data-cwd="~/cpp">$ ./fim
+Achei: 0                             « 99 não existe; esse 0 é lixo da memória</pre>
+<p><strong>O que significa:</strong> o 99 não estava lá, o <code>find</code> devolveu <code>end()</code>, e <code>*end()</code> é <a href="comportamento-indefinido.html">comportamento indefinido</a>: aqui mostrou um 0 inventado, sem erro nenhum. Com o <code>max_element</code> de um vetor <strong>vazio</strong>, o mesmo engano derrubou o programa:</p>
+<pre class="term" data-cwd="~/cpp">$ ./vazio_max
+Falha de segmentação     (imagem do núcleo gravada) ./vazio_max
+$ echo $?
+139</pre>
+<p><strong>Como consertar:</strong> sempre <code>if (it != v.end())</code> antes de usar <code>*it</code>; antes de <code>min_element</code>/<code>max_element</code>, confira <code>!v.empty()</code>. Os <a href="sanitizers.html">sanitizers</a> ajudam a achar esse tipo de erro.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: no match for ‘operator-’</code> ao ordenar uma <code>std::list</code></strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra lista_sort.cpp -o lista_sort
+In file included from /usr/include/c++/15/algorithm:63,
+                 from lista_sort.cpp:1:
+/usr/include/c++/15/bits/stl_algo.h: In instantiation of ‘constexpr void std::__sort(_RandomAccessIterator, _RandomAccessIterator, _Compare) [with _RandomAccessIterator = _List_iterator&lt;int&gt;; _Compare = __gnu_cxx::__ops::_Iter_less_iter]’:
+/usr/include/c++/15/bits/stl_algo.h:4841:18:   required from ‘constexpr void std::sort(_RAIter, _RAIter) [with _RAIter = _List_iterator&lt;int&gt;]’
+ 4841 |       std::__sort(__first, __last, __gnu_cxx::__ops::__iter_less_iter());
+      |       ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lista_sort.cpp:6:14:   required from here
+    6 |     std::sort(numeros.begin(), numeros.end());
+      |     ~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/c++/15/bits/stl_algo.h:1907:50: error: no match for ‘operator-’ (operand types are ‘std::_List_iterator&lt;int&gt;’ and ‘std::_List_iterator&lt;int&gt;’)
+ 1907 |                                 std::__lg(__last - __first) * 2,
+      |                                           ~~~~~~~^~~~~~~~~
+                                     « … e mais umas 15 linhas de notes</pre>
+<p><strong>O que significa:</strong> a mensagem fala do código interno da biblioteca, mas a pista está na linha <code>lista_sort.cpp:6:14: required from here</code> ("exigido a partir daqui"): o problema começou na <strong>sua</strong> linha 6. O <code>std::sort</code> precisa pular para qualquer posição (iteradores de "acesso aleatório"), e a <code>std::list</code> só anda de um em um (aula <a href="list-deque.html">list e deque</a>).</p>
+<p><strong>Como consertar:</strong> a lista tem o próprio método: <code>numeros.sort();</code>. Ou use um <code>std::vector</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>warning: ignoring return value of … std::unique …</code></strong>
+<p><strong>O que significa:</strong> você chamou <code>unique</code> e jogou fora o novo fim. Os repetidos não foram apagados.</p>
+<p><strong>Como consertar:</strong> <code>v.erase(std::unique(v.begin(), v.end()), v.end());</code>, com um <code>sort</code> antes.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Algoritmo</th><th>Cabeçalho</th><th>O que faz</th><th>Devolve</th></tr>
+<tr><td><code>std::sort(b, e)</code> / <code>(b, e, comp)</code></td><td><code>&lt;algorithm&gt;</code></td><td>Ordena no lugar</td><td>nada</td></tr>
+<tr><td><code>std::stable_sort(b, e, comp)</code></td><td><code>&lt;algorithm&gt;</code></td><td>Ordena mantendo a ordem dos empatados</td><td>nada</td></tr>
+<tr><td><code>std::find(b, e, valor)</code></td><td><code>&lt;algorithm&gt;</code></td><td>Primeiro igual a <code>valor</code></td><td>iterador (ou <code>e</code>)</td></tr>
+<tr><td><code>std::find_if(b, e, pred)</code></td><td><code>&lt;algorithm&gt;</code></td><td>Primeiro que satisfaz <code>pred</code></td><td>iterador (ou <code>e</code>)</td></tr>
+<tr><td><code>std::count(b, e, valor)</code></td><td><code>&lt;algorithm&gt;</code></td><td>Quantos iguais</td><td>número</td></tr>
+<tr><td><code>std::count_if(b, e, pred)</code></td><td><code>&lt;algorithm&gt;</code></td><td>Quantos satisfazem</td><td>número</td></tr>
+<tr><td><code>std::min_element</code> / <code>max_element(b, e)</code></td><td><code>&lt;algorithm&gt;</code></td><td>Menor / maior</td><td>iterador (ou <code>e</code> se vazio)</td></tr>
+<tr><td><code>std::accumulate(b, e, inicial)</code></td><td><code>&lt;numeric&gt;</code></td><td>Soma a partir de <code>inicial</code> (no tipo dele!)</td><td>valor</td></tr>
+<tr><td><code>std::reverse(b, e)</code></td><td><code>&lt;algorithm&gt;</code></td><td>Inverte no lugar</td><td>nada</td></tr>
+<tr><td><code>std::unique(b, e)</code></td><td><code>&lt;algorithm&gt;</code></td><td>Junta repetidos <em>vizinhos</em> na frente</td><td>novo fim (use com <code>erase</code>)</td></tr>
+<tr><td><code>std::transform(b, e, destino, f)</code></td><td><code>&lt;algorithm&gt;</code></td><td>Aplica <code>f</code> em cada um</td><td>fim do destino</td></tr>
+<tr><td><code>std::any_of</code> / <code>all_of</code> / <code>none_of(b, e, pred)</code></td><td><code>&lt;algorithm&gt;</code></td><td>Algum / todos / nenhum satisfaz?</td><td><code>bool</code></td></tr>
+</table>
+</div>
+<p>Mais de cem outros (<code>binary_search</code>, <code>fill</code>, <code>copy_if</code>, <code>remove_if</code>, <code>shuffle</code>…) estão em <a href="ref-algoritmos.html">Referência: Algoritmos</a>.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Ordenar</h3>
+<p>Complete para ordenar o vetor <code>v</code>:</p>
+<div class="ex-code">std::sort(v.begin(), v.<input data-answer="end()" aria-label="fim">);</div>
+</div>
+
+<div class="exercise">
+<h3>2. O valor inicial certo</h3>
+<p>Complete para somar um <code>std::vector&lt;double&gt; precos</code> sem perder os centavos:</p>
+<div class="ex-code">double total = std::accumulate(precos.begin(), precos.end(), <input data-answer="0.0|0.|double{}|double(0)" aria-label="valor inicial">);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Contar com condição</h3>
+<p>Complete o nome do algoritmo que conta quantos elementos satisfazem uma lambda:</p>
+<div class="ex-code">auto n = std::<input data-answer="count_if" aria-label="algoritmo">(v.begin(), v.end(), [](int x) { return x &gt; 0; });</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. <code>std::find</code> não encontrou o valor. O que ele devolveu?</p>
+<label><input type="radio" name="q4"> <code>-1</code></label>
+<label><input type="radio" name="q4"> <code>0</code></label>
+<label><input type="radio" name="q4"> O iterador <code>end()</code></label>
+<label><input type="radio" name="q4"> Ele lança uma exceção</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Depois de <code>std::vector&lt;int&gt; v = {2, 1, 2};</code> e <code>v.erase(std::unique(v.begin(), v.end()), v.end());</code> (sem <code>sort</code>), como fica <code>v</code>?</p>
+<label><input type="radio" name="q5"> <code>1 2</code></label>
+<label><input type="radio" name="q5"> <code>2 1 2</code>, porque os dois 2 não estão lado a lado</label>
+<label><input type="radio" name="q5"> <code>2 1</code></label>
+<label><input type="radio" name="q5"> Erro de compilação</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Qual lambda faz o <code>std::sort</code> ordenar do maior para o menor?</p>
+<label><input type="radio" name="q6"> <code>[](int a, int b) { return a &gt; b; }</code></label>
+<label><input type="radio" name="q6"> <code>[](int a, int b) { return a &lt; b; }</code></label>
+<label><input type="radio" name="q6"> <code>[](int a) { return -a; }</code></label>
+<label><input type="radio" name="q6"> <code>[](int a, int b) { return a == b; }</code></label>
+</div>
+
+<h3>Missão: o total do carrinho</h3>
+
+<div class="trycpp" data-goal="out:Total: 7.25">
+<p class="try-task"><strong>Missão:</strong> o carrinho tem 2,50 + 3,50 + 1,25 = 7,25, mas o programa mostra <code>Total: 6</code>. Rode, descubra o erro e conserte mudando <strong>um só caractere ou dois</strong>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;numeric&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;double&gt; precos = {2.5, 3.5, 1.25};
+    double total = std::accumulate(precos.begin(), precos.end(), 0);
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;numeric&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;double&gt; precos = {2.5, 3.5, 1.25};
+    double total = std::accumulate(precos.begin(), precos.end(), 0.0);
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<h3>Missão final: o boletim da turma</h3>
+
+<div class="trycpp" data-goal="out:Maior: 9.5,out:Média: 7.25,out:Aprovados: 3,src:max_element,src:accumulate,src:count_if">
+<p class="try-task"><strong>Missão:</strong> sem escrever nenhum <code>for</code>, use <code>std::max_element</code>, <code>std::accumulate</code> e <code>std::count_if</code> para mostrar a maior nota, a média (soma dividida por <code>notas.size()</code>) e quantos tiraram 6 ou mais:</p>
+<pre class="out">Maior: 9.5
+Média: 7.25
+Aprovados: 3</pre>
+<pre class="script">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;numeric&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;double&gt; notas = {6.5, 9.5, 4.0, 9.0};
+
+    // sua vez: maior, média e aprovados
+
+}
+</pre>
+<pre class="solucao">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;numeric&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;double&gt; notas = {6.5, 9.5, 4.0, 9.0};
+
+    auto maior = std::max_element(notas.begin(), notas.end());
+    double soma = std::accumulate(notas.begin(), notas.end(), 0.0);
+    double media = soma / notas.size();
+    auto aprovados = std::count_if(notas.begin(), notas.end(), [](double n) {
+        return n &gt;= 6.0;
+    });
+
+    std::cout &lt;&lt; "Maior: " &lt;&lt; *maior &lt;&lt; '\n';
+    std::cout &lt;&lt; "Média: " &lt;&lt; media &lt;&lt; '\n';
+    std::cout &lt;&lt; "Aprovados: " &lt;&lt; aprovados &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Os algoritmos recebem um intervalo: <code>v.begin(), v.end()</code>. Estão em <code>&lt;algorithm&gt;</code>; <code>accumulate</code> está em <code>&lt;numeric&gt;</code>.</li>
+  <li><code>std::sort</code> ordena no lugar; com uma lambda <code>(a, b)</code> que diz "a vem antes de b?", você escolhe a ordem.</li>
+  <li><code>find</code>, <code>find_if</code>, <code>min_element</code> e <code>max_element</code> devolvem iteradores: compare com <code>end()</code> antes de usar <code>*</code>.</li>
+  <li><code>count</code>/<code>count_if</code> contam; <code>any_of</code>/<code>all_of</code>/<code>none_of</code> respondem sim ou não.</li>
+  <li><code>accumulate</code> soma no tipo do valor inicial: <code>0.0</code> para <code>double</code>, senão perde os decimais sem aviso.</li>
+  <li><code>unique</code> só junta vizinhos e não apaga: <code>sort</code> + <code>unique</code> + <code>erase</code>.</li>
+  <li><code>transform</code> aplica uma lambda em cada elemento; <code>reverse</code> inverte.</li>
+  <li>Próxima aula: <a href="ranges.html">Ranges</a>, a forma do C++20 que dispensa o <code>begin</code>/<code>end</code> e encadeia etapas.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

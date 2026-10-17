@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ stack e queue — pilha, fila e fila de prioridade | Guia C++</title>
+<meta name="description" content="std::stack, std::queue e std::priority_queue em C++ para quem está começando: push, top, front e pop, por que pop não devolve o valor, desfazer ações com uma pilha, fila de atendimento, com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">stack e queue</span></h1>
+
+<p class="intro">Algumas listas têm uma regra de quem sai primeiro. Na pilha de pratos da cozinha da Ana, você sempre pega o prato de <strong>cima</strong>, o último que foi colocado. Na fila do banco, quem é atendido é quem chegou <strong>primeiro</strong>. O C++ tem uma "caixa" pronta para cada uma dessas regras: <code>std::stack</code> (pilha) e <code>std::queue</code> (fila). Elas fazem <strong>menos</strong> coisas que um <code>std::vector</code>, e é exatamente por isso que são úteis: não deixam você quebrar a regra sem querer.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma pilha (<em>o último a entrar é o primeiro a sair</em>) e uma fila (<em>o primeiro a entrar é o primeiro a sair</em>).</li>
+  <li>Como usar <code>std::stack</code>: <code>push</code>, <code>top</code>, <code>pop</code>, <code>size</code> e <code>empty</code>.</li>
+  <li>Por que <code>pop()</code> <strong>não devolve</strong> o valor, e o erro real que aparece quando você tenta.</li>
+  <li>Como montar um "desfazer" (Ctrl+Z) com uma pilha.</li>
+  <li>Como usar <code>std::queue</code>: <code>push</code>, <code>front</code>, <code>back</code> e <code>pop</code>, numa fila de atendimento.</li>
+  <li>O básico de <code>std::priority_queue</code>, a fila em que o "mais importante" sai primeiro.</li>
+</ul>
+</div>
+
+<p>Os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code> (veja <a href="compilar.html">Compilar com g++</a>). Antes desta aula, vale ter visto <a href="vector.html">std::vector</a> e <a href="list-deque.html">list e deque</a>.</p>
+
+<hr>
+
+<h2>A ideia: a pilha de pratos e a fila do banco</h2>
+<p>Pense em duas cenas do dia a dia:</p>
+<ul>
+  <li><strong>A pilha de pratos.</strong> A Ana lava um prato e coloca em cima da pilha. Quando precisa de um, pega o de cima. O prato que está lá embaixo, o primeiro que ela guardou, vai ser o <strong>último</strong> a sair.</li>
+  <li><strong>A fila do banco.</strong> Quem chega vai para o fim da fila. O caixa chama quem está na frente. Quem chegou primeiro é atendido primeiro.</li>
+</ul>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Pilha (<code>std::stack</code>)</th><th>Fila (<code>std::queue</code>)</th></tr>
+<tr><td>Regra</td><td>O <strong>último</strong> a entrar é o primeiro a sair</td><td>O <strong>primeiro</strong> a entrar é o primeiro a sair</td></tr>
+<tr><td>Sigla em inglês</td><td>LIFO (<em>last in, first out</em>)</td><td>FIFO (<em>first in, first out</em>)</td></tr>
+<tr><td>Onde entra</td><td>No topo</td><td>No fim</td></tr>
+<tr><td>Onde sai</td><td>Do topo</td><td>Da frente</td></tr>
+<tr><td>Exemplos</td><td>Pratos, Ctrl+Z, botão "voltar" do navegador</td><td>Banco, impressora, senhas de atendimento</td></tr>
+</table>
+</div>
+
+<p><em>Stack</em> quer dizer "pilha" e <em>queue</em> (pronuncia-se "kiú") quer dizer "fila". As duas estão na biblioteca padrão (a STL, aula <a href="stl.html">O que é a STL</a>) e são chamadas de <strong>adaptadores de container</strong>: por baixo, elas guardam os elementos num <code>std::deque</code>, mas só mostram para você as operações que respeitam a regra.</p>
+
+<hr>
+
+<h2>1. <code>std::stack</code>: a pilha</h2>
+<p>Para usar a pilha, inclua o cabeçalho <code>&lt;stack&gt;</code>. Entre os sinais <code>&lt; &gt;</code> você diz o tipo do que vai guardar, como no <code>std::vector</code>:</p>
+
+<pre class="file" data-file="pilha.cpp">#include &lt;iostream&gt;
+#include &lt;stack&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::stack&lt;std::string&gt; pratos;
+
+    pratos.push("prato azul");
+    pratos.push("prato verde");
+    pratos.push("prato vermelho");
+
+    std::cout &lt;&lt; "Pratos na pilha: " &lt;&lt; pratos.size() &lt;&lt; '\n';
+    std::cout &lt;&lt; "No topo: " &lt;&lt; pratos.top() &lt;&lt; '\n';
+
+    pratos.pop();
+    std::cout &lt;&lt; "Depois do pop, no topo: " &lt;&lt; pratos.top() &lt;&lt; '\n';
+    std::cout &lt;&lt; "Pratos na pilha: " &lt;&lt; pratos.size() &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;stack&gt;</dt><dd>Traz a <code>std::stack</code> para o programa.</dd>
+  <dt>std::stack&lt;std::string&gt; pratos;</dt><dd>Cria uma pilha <strong>vazia</strong> chamada <code>pratos</code>, que guarda textos.</dd>
+  <dt>pratos.push("prato azul");</dt><dd><em>Push</em> = "empurrar". Coloca um elemento <strong>no topo</strong>. Depois dos três <code>push</code>, o vermelho está em cima e o azul está embaixo.</dd>
+  <dt>pratos.size()</dt><dd>Quantos elementos a pilha tem agora.</dd>
+  <dt>pratos.top()</dt><dd><em>Top</em> = "topo". <strong>Olha</strong> o elemento de cima, sem tirá-lo.</dd>
+  <dt>pratos.pop();</dt><dd><em>Pop</em> = "estourar", "tirar". <strong>Remove</strong> o elemento de cima e não devolve nada.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra pilha.cpp -o pilha
+$ ./pilha
+Pratos na pilha: 3
+No topo: prato vermelho              « o último que entrou
+Depois do pop, no topo: prato verde
+Pratos na pilha: 2</pre>
+
+<p>Desenhando a pilha a cada passo (o topo está à direita):</p>
+<ol class="passo">
+  <li><code>push("prato azul")</code> → azul</li>
+  <li><code>push("prato verde")</code> → azul, verde</li>
+  <li><code>push("prato vermelho")</code> → azul, verde, <strong>vermelho</strong></li>
+  <li><code>top()</code> → olha o vermelho; a pilha não muda.</li>
+  <li><code>pop()</code> → tira o vermelho: azul, <strong>verde</strong></li>
+</ol>
+
+<h3>Tirar tudo, do topo até o fundo</h3>
+<p>O jeito clássico de "percorrer" uma pilha é olhar o topo e tirá-lo, repetindo enquanto ela não estiver vazia. O <code>empty()</code> ("vazia?") responde <code>true</code> ou <code>false</code>:</p>
+
+<pre class="file" data-file="esvaziar.cpp">#include &lt;iostream&gt;
+#include &lt;stack&gt;
+
+int main() {
+    std::stack&lt;int&gt; pilha;
+    for (int i = 1; i &lt;= 4; ++i) {
+        pilha.push(i * 10);
+    }
+
+    while (!pilha.empty()) {
+        std::cout &lt;&lt; pilha.top() &lt;&lt; ' ';
+        pilha.pop();
+    }
+    std::cout &lt;&lt; '\n';
+    std::cout &lt;&lt; "Vazia? " &lt;&lt; std::boolalpha &lt;&lt; pilha.empty() &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra esvaziar.cpp -o esvaziar
+$ ./esvaziar
+40 30 20 10                          « entrou 10, 20, 30, 40; saiu ao contrário
+Vazia? true</pre>
+
+<p>Repare: os números <strong>saíram na ordem inversa</strong> da que entraram. Essa é a "assinatura" da pilha. O <code>std::boolalpha</code> só faz o <code>cout</code> escrever <code>true</code> em vez de <code>1</code> (aula <a href="bool.html">Booleanos</a>). E perceba que, para ler a pilha inteira, você precisou <strong>destruí-la</strong>: a pilha não deixa olhar o meio. Se precisar ver todos os elementos sem tirá-los, a estrutura certa é um <code>std::vector</code>.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode como está. Depois coloque um quarto prato com <code>push</code> e veja quem fica no topo. Por fim, troque o <code>pop()</code> de lugar: chame-o <strong>antes</strong> de mostrar o primeiro <code>top()</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;stack&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::stack&lt;std::string&gt; pratos;
+    pratos.push("prato azul");
+    pratos.push("prato verde");
+    pratos.push("prato vermelho");
+
+    std::cout &lt;&lt; "No topo: " &lt;&lt; pratos.top() &lt;&lt; '\n';
+    pratos.pop();
+    std::cout &lt;&lt; "Agora no topo: " &lt;&lt; pratos.top() &lt;&lt; '\n';
+    std::cout &lt;&lt; "Restam " &lt;&lt; pratos.size() &lt;&lt; " pratos\n";
+}
+</pre>
+</div>
+
+<h3><code>pop()</code> não devolve o valor</h3>
+<p>Quem vem de outras linguagens (Python, Java, JavaScript) costuma escrever <code>x = pilha.pop()</code>, porque lá o <code>pop</code> tira o elemento <strong>e</strong> devolve. Em C++, não. Veja o que o g++ diz:</p>
+
+<pre class="file" data-file="pop_valor.cpp">#include &lt;iostream&gt;
+#include &lt;stack&gt;
+
+int main() {
+    std::stack&lt;int&gt; pilha;
+    pilha.push(7);
+    int x = pilha.pop();
+    std::cout &lt;&lt; x &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra pop_valor.cpp -o pop_valor
+pop_valor.cpp: In function ‘int main()’:
+pop_valor.cpp:7:22: error: void value not ignored as it ought to be
+    7 |     int x = pilha.pop();
+      |             ~~~~~~~~~^~</pre>
+
+<p><em>Void value not ignored as it ought to be</em> = "um valor <code>void</code> não foi ignorado, como deveria ser". <code>void</code> quer dizer "nada" (aula <a href="retorno.html">Retorno</a>): o <code>pop()</code> devolve nada, e você tentou guardar esse nada num <code>int</code>. O jeito certo são <strong>duas</strong> linhas: primeiro olhe, depois tire.</p>
+
+<pre class="file" data-file="pop_certo.cpp">int x = pilha.top();   // 1. copia o valor do topo
+pilha.pop();           // 2. tira o elemento da pilha
+</pre>
+
+<div class="note">
+<strong>Por que o C++ separou as duas coisas?</strong>
+<p>Para devolver o valor, o <code>pop</code> teria de <strong>copiá-lo</strong> para fora da pilha. Copiar pode falhar (por exemplo, faltar memória para copiar um texto enorme). Se o elemento já tivesse sido removido e a cópia falhasse, o valor se perderia para sempre. Separando em <code>top()</code> (copia, e se falhar a pilha continua intacta) e <code>pop()</code> (remove, o que não falha), nada se perde. É uma decisão de segurança dos anos 1990 que continua até hoje em <code>stack</code>, <code>queue</code> e <code>priority_queue</code>.</p>
+</div>
+
+<h3><code>top()</code> numa pilha vazia</h3>
+<p>Se a pilha está vazia, não existe topo. O que acontece se você pedir mesmo assim?</p>
+
+<pre class="file" data-file="topo_vazio.cpp">#include &lt;iostream&gt;
+#include &lt;stack&gt;
+
+int main() {
+    std::stack&lt;int&gt; pilha;
+    std::cout &lt;&lt; "Topo: " &lt;&lt; pilha.top() &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra topo_vazio.cpp -o topo_vazio
+$ ./topo_vazio
+/usr/include/c++/15/bits/stl_stack.h:260: std::stack&lt;_Tp, _Sequence&gt;::reference std::stack&lt;_Tp, _Sequence&gt;::top() [with _Tp = int; _Sequence = std::deque&lt;int, std::allocator&lt;int&gt; &gt;; reference = int&amp;]: Assertion '!this-&gt;empty()' failed.
+Abortado                   (imagem do núcleo gravada) ./topo_vazio
+$ echo $?
+134                                  « 128 + 6: o programa foi abortado (sinal 6, SIGABRT)</pre>
+
+<p>Compilou sem nenhum aviso, mas o programa morreu ao rodar. Lendo a mensagem por partes:</p>
+<dl class="anatomy">
+  <dt>/usr/include/c++/15/bits/stl_stack.h:260</dt><dd>O arquivo da biblioteca padrão onde a <code>std::stack</code> está escrita, linha 260: é o código do <code>top()</code>.</dd>
+  <dt>[with _Tp = int; …]</dt><dd>Detalhes técnicos: era uma pilha de <code>int</code> guardada num <code>std::deque</code>.</dd>
+  <dt>Assertion '!this-&gt;empty()' failed.</dt><dd>"A conferência <em>a pilha não está vazia</em> falhou." Uma <strong>asserção</strong> é um teste que a biblioteca faz e que, se falhar, encerra o programa na hora.</dd>
+  <dt>Abortado (imagem do núcleo gravada)</dt><dd>Quem escreve isso é o terminal (o bash): o programa foi <strong>abortado</strong>.</dd>
+</dl>
+
+<div class="warning">
+<strong>Isso só aparece porque você compilou sem otimização</strong>
+<p>A partir do g++ 15, a biblioteca padrão liga essas conferências sozinha quando você compila <strong>sem</strong> <code>-O1</code>/<code>-O2</code>. Com <code>-O2</code> (o modo usado em programas "de verdade"), a conferência some, e o mesmo programa faz outra coisa:</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -O2 topo_vazio.cpp -o topo_vazio2
+$ ./topo_vazio2
+Falha de segmentação       (imagem do núcleo gravada) ./topo_vazio2</pre>
+<p>Pedir o topo de uma pilha vazia é <strong>comportamento indefinido</strong>: o C++ não promete nada (aula <a href="comportamento-indefinido.html">Comportamento Indefinido</a>). Pode travar, pode mostrar lixo, pode "funcionar" hoje e falhar amanhã. No editor do guia, que usa outro compilador e outra biblioteca, o resultado também pode ser diferente. A regra é uma só: <strong>confira <code>empty()</code> antes de <code>top()</code> e de <code>pop()</code></strong>.</p>
+</div>
+
+<hr>
+
+<h2>2. Uso real: desfazer (Ctrl+Z)</h2>
+<p>Todo editor de texto tem o "desfazer". Por trás, quase sempre há uma pilha: antes de cada mudança, o programa guarda o estado antigo no topo. Quando você aperta Ctrl+Z, ele pega o estado do topo, que é o mais recente, e volta para ele.</p>
+
+<pre class="file" data-file="desfazer.cpp">#include &lt;iostream&gt;
+#include &lt;stack&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string texto;
+    std::stack&lt;std::string&gt; historico;
+
+    // Cada vez que a Ana digita, guardamos o texto ANTES da mudança
+    historico.push(texto);
+    texto += "Lista: ";
+    historico.push(texto);
+    texto += "arroz, ";
+    historico.push(texto);
+    texto += "feijão, ";
+    historico.push(texto);
+    texto += "chocolate";
+    std::cout &lt;&lt; "Texto: " &lt;&lt; texto &lt;&lt; '\n';
+
+    // Ctrl+Z duas vezes
+    for (int i = 1; i &lt;= 2; ++i) {
+        if (!historico.empty()) {
+            texto = historico.top();
+            historico.pop();
+        }
+        std::cout &lt;&lt; "Desfazer " &lt;&lt; i &lt;&lt; ": " &lt;&lt; texto &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra desfazer.cpp -o desfazer
+$ ./desfazer
+Texto: Lista: arroz, feijão, chocolate
+Desfazer 1: Lista: arroz, feijão,    « o chocolate, a última mudança, saiu primeiro
+Desfazer 2: Lista: arroz, </pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>historico.push(texto);</code></td><td>Antes de mudar, guarda uma <strong>cópia</strong> do texto atual no topo.</td></tr>
+<tr><td><code>texto += "…";</code></td><td>A mudança em si (<code>+=</code> junta texto no fim, aula <a href="concatenacao.html">Juntar Strings</a>).</td></tr>
+<tr><td><code>if (!historico.empty())</code></td><td>Só desfaz se houver o que desfazer. Sem isso, o terceiro, quarto, quinto Ctrl+Z chegariam numa pilha vazia.</td></tr>
+<tr><td><code>texto = historico.top(); historico.pop();</code></td><td>Volta para o estado guardado mais recente e o remove do histórico.</td></tr>
+</table>
+</div>
+
+<p>O botão "voltar" do navegador funciona igual: cada página visitada vai para o topo de uma pilha, e "voltar" tira a do topo.</p>
+
+<hr>
+
+<h2>3. <code>std::queue</code>: a fila</h2>
+<p>A fila fica no cabeçalho <code>&lt;queue&gt;</code>. Ela também tem <code>push</code>, <code>pop</code>, <code>size</code> e <code>empty</code>, mas no lugar do <code>top</code> tem duas "janelas": <code>front</code> (a frente, quem sai) e <code>back</code> (o fim, quem acabou de chegar).</p>
+
+<pre class="file" data-file="fila.cpp">#include &lt;iostream&gt;
+#include &lt;queue&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::queue&lt;std::string&gt; atendimento;
+
+    atendimento.push("Ana");
+    atendimento.push("Bruno");
+    atendimento.push("Carla");
+
+    std::cout &lt;&lt; "Pessoas na fila: " &lt;&lt; atendimento.size() &lt;&lt; '\n';
+    std::cout &lt;&lt; "Primeira: " &lt;&lt; atendimento.front() &lt;&lt; '\n';
+    std::cout &lt;&lt; "Última: " &lt;&lt; atendimento.back() &lt;&lt; '\n';
+
+    while (!atendimento.empty()) {
+        std::cout &lt;&lt; "Atendendo " &lt;&lt; atendimento.front() &lt;&lt; '\n';
+        atendimento.pop();
+    }
+    std::cout &lt;&lt; "Fila vazia.\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;queue&gt;</dt><dd>Traz a <code>std::queue</code> (e também a <code>std::priority_queue</code>, da seção 4).</dd>
+  <dt>atendimento.push("Ana");</dt><dd>Coloca a Ana <strong>no fim</strong> da fila.</dd>
+  <dt>atendimento.front()</dt><dd>Olha quem está <strong>na frente</strong> (o próximo a ser atendido), sem tirar.</dd>
+  <dt>atendimento.back()</dt><dd>Olha quem está <strong>no fim</strong> (o último que chegou).</dd>
+  <dt>atendimento.pop();</dt><dd>Tira quem está na frente. Como na pilha, não devolve nada.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra fila.cpp -o fila
+$ ./fila
+Pessoas na fila: 3
+Primeira: Ana
+Última: Carla
+Atendendo Ana                        « na ordem em que chegaram
+Atendendo Bruno
+Atendendo Carla
+Fila vazia.</pre>
+
+<p>Compare com a pilha: aqui, quem entrou primeiro (Ana) saiu primeiro. As regras de segurança são as mesmas: <code>front()</code>, <code>back()</code> e <code>pop()</code> numa fila vazia são comportamento indefinido, então confira <code>empty()</code> antes.</p>
+
+<h3>A fila não tem <code>top</code></h3>
+<p>Um tropeço comum é misturar os nomes da pilha com os da fila:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat fila_top.cpp
+#include &lt;queue&gt;
+
+int main() {
+    std::queue&lt;int&gt; fila;
+    fila.push(1);
+    return fila.top();
+}
+$ g++ -std=c++23 -Wall -Wextra fila_top.cpp -o fila_top
+fila_top.cpp: In function ‘int main()’:
+fila_top.cpp:6:17: error: ‘class std::queue&lt;int&gt;’ has no member named ‘top’; did you mean ‘pop’?
+    6 |     return fila.top();
+      |                 ^~~
+      |                 pop</pre>
+
+<p><em>Has no member named ‘top’</em> = "não tem um membro chamado <code>top</code>". O g++ ainda tenta ajudar com <em>did you mean ‘pop’?</em> ("você quis dizer <code>pop</code>?"), mas aqui a sugestão está errada: o que você quer é <code>front()</code>. Para lembrar: pilha tem <strong>topo</strong>; fila tem <strong>frente</strong>.</p>
+
+<div class="trycpp" data-stdin="Ana Bruno Carla Davi">
+<p class="try-task"><strong>Experimente:</strong> este programa lê nomes da entrada e distribui senhas na ordem de chegada. Rode e veja as senhas. Depois mude a entrada (ou o programa) para mostrar também quem é o <strong>último</strong> da fila antes de começar o atendimento, usando <code>back()</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;queue&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::queue&lt;std::string&gt; fila;
+    std::string nome;
+
+    while (std::cin &gt;&gt; nome) {
+        fila.push(nome);
+    }
+
+    int senha = 1;
+    while (!fila.empty()) {
+        std::cout &lt;&lt; "Senha " &lt;&lt; senha &lt;&lt; ": " &lt;&lt; fila.front() &lt;&lt; '\n';
+        fila.pop();
+        ++senha;
+    }
+}
+</pre>
+</div>
+
+<p>No laboratório, com três nomes na entrada:</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra atendimento.cpp -o atendimento
+$ printf "Ana Bruno Carla\n" | ./atendimento
+Senha 1: Ana
+Senha 2: Bruno
+Senha 3: Carla</pre>
+
+<hr>
+
+<h2>4. <code>std::priority_queue</code>: a fila com prioridade (só o básico)</h2>
+<p>No pronto-socorro, ninguém é atendido por ordem de chegada: quem está em estado mais grave passa na frente. A <code>std::priority_queue</code> ("fila de prioridade") faz isso: o <code>top()</code> é sempre o <strong>maior</strong> elemento, não importa a ordem em que entraram.</p>
+
+<pre class="file" data-file="prioridade.cpp">#include &lt;iostream&gt;
+#include &lt;queue&gt;
+
+int main() {
+    std::priority_queue&lt;int&gt; urgencia;
+
+    urgencia.push(3);
+    urgencia.push(9);
+    urgencia.push(1);
+    urgencia.push(5);
+
+    while (!urgencia.empty()) {
+        std::cout &lt;&lt; urgencia.top() &lt;&lt; ' ';
+        urgencia.pop();
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra prioridade.cpp -o prioridade
+$ ./prioridade
+9 5 3 1                              « do maior para o menor, não na ordem de entrada</pre>
+
+<p>Repare que ela usa <code>top()</code>, como a pilha, e não <code>front()</code>. Ela não guarda os elementos em ordem por dentro; só garante que o de cima é sempre o maior. Por isso é rápida para "pegar o mais importante", mas não serve para listar tudo em ordem sem esvaziá-la (para isso existe o <code>std::sort</code>, da aula <a href="algoritmos.html">Algoritmos</a>).</p>
+
+<h3>Menor primeiro</h3>
+<p>Para que o <strong>menor</strong> saia primeiro (por exemplo, a senha de número mais baixo), a declaração fica mais comprida. Você precisa dizer três coisas: o tipo, onde guardar por baixo (<code>std::vector&lt;int&gt;</code>) e como comparar (<code>std::greater&lt;int&gt;</code>, "maior que", de <code>&lt;functional&gt;</code>):</p>
+
+<pre class="file" data-file="prioridade_menor.cpp">#include &lt;functional&gt;
+#include &lt;iostream&gt;
+#include &lt;queue&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::priority_queue&lt;int, std::vector&lt;int&gt;, std::greater&lt;int&gt;&gt; senhas;
+
+    senhas.push(42);
+    senhas.push(17);
+    senhas.push(30);
+
+    while (!senhas.empty()) {
+        std::cout &lt;&lt; senhas.top() &lt;&lt; ' ';
+        senhas.pop();
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra prioridade_menor.cpp -o prioridade_menor
+$ ./prioridade_menor
+17 30 42</pre>
+
+<p>Não se preocupe em decorar essa linha agora. O que importa é a ideia: <strong>fila de prioridade = sempre sai o "melhor"</strong>, e você escolhe o que é "melhor". Prioridades com tipos próprios (structs com uma nota de gravidade, por exemplo) usam o mesmo mecanismo de comparação que você verá em <a href="sobrecarga-operadores.html">Sobrecarga de Operadores</a> e <a href="lambdas.html">Lambdas</a>.</p>
+
+<hr>
+
+<h2>Qual usar?</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você precisa…</th><th>Use</th></tr>
+<tr><td>Guardar e ver qualquer elemento, em qualquer ordem, percorrer com <code>for</code></td><td><code>std::vector</code> (<a href="vector.html">aula</a>)</td></tr>
+<tr><td>Sempre tratar o <strong>mais recente</strong> primeiro (desfazer, voltar, conferir parênteses)</td><td><code>std::stack</code></td></tr>
+<tr><td>Tratar na <strong>ordem de chegada</strong> (atendimento, tarefas, impressões)</td><td><code>std::queue</code></td></tr>
+<tr><td>Tratar sempre o <strong>maior</strong> (ou o menor) primeiro</td><td><code>std::priority_queue</code></td></tr>
+<tr><td>Pôr e tirar dos <strong>dois</strong> lados e ainda ver o meio</td><td><code>std::deque</code> (<a href="list-deque.html">aula</a>)</td></tr>
+</table>
+</div>
+
+<p>"Mas um <code>std::vector</code> com <code>push_back</code>, <code>back</code> e <code>pop_back</code> também faz uma pilha." Faz, e muita gente usa assim. A vantagem da <code>std::stack</code> é a <strong>intenção</strong>: quem lê <code>std::stack</code> sabe na hora que ali vale a regra do topo, e ninguém consegue mexer no meio por engano.</p>
+
+<div class="tip">
+<strong>Trocar o que fica por baixo</strong>
+<p>Por padrão, <code>stack</code> e <code>queue</code> guardam os elementos num <code>std::deque</code>. A pilha pode usar um vetor: <code>std::stack&lt;int, std::vector&lt;int&gt;&gt; p;</code>. O uso (<code>push</code>, <code>top</code>, <code>pop</code>) continua igual. Na dúvida, fique com o padrão.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: void value not ignored as it ought to be</code></strong>
+<pre class="term" data-cwd="~/cpp">pop_valor.cpp:7:22: error: void value not ignored as it ought to be
+    7 |     int x = pilha.pop();
+      |             ~~~~~~~~~^~</pre>
+<p><strong>O que significa:</strong> você tentou usar o resultado do <code>pop()</code>, mas ele não devolve nada (<code>void</code>).</p>
+<p><strong>Como consertar:</strong> leia com <code>top()</code> (pilha e fila de prioridade) ou <code>front()</code> (fila) e só depois chame <code>pop()</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Assertion '!this-&gt;empty()' failed.</code> ou <code>Falha de segmentação</code></strong>
+<p><strong>O que significa:</strong> o programa chamou <code>top()</code>, <code>front()</code>, <code>back()</code> ou <code>pop()</code> numa pilha ou fila <strong>vazia</strong>. Sem otimização, o g++ 15 confere e aborta com a mensagem de asserção; com <code>-O2</code>, é comportamento indefinido (o programa pode até continuar com lixo).</p>
+<p><strong>Como consertar:</strong> proteja cada acesso com <code>if (!pilha.empty())</code> ou use um laço <code>while (!pilha.empty())</code>. Para encontrar onde aconteceu, use o <a href="depuracao-gdb.html">GDB</a>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>has no member named ‘top’</code> (numa <code>queue</code>) ou <code>has no member named ‘front’</code> (numa <code>stack</code>)</strong>
+<p><strong>O que significa:</strong> nomes trocados. A pilha só tem <code>top()</code>; a fila tem <code>front()</code> e <code>back()</code>; a fila de prioridade tem <code>top()</code>.</p>
+<p><strong>Como consertar:</strong> confira a tabela de referência abaixo.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: no matching function for call to ‘begin(std::stack&lt;int&gt;&amp;)’</code></strong>
+<pre class="term" data-cwd="~/cpp">$ cat percorrer.cpp
+#include &lt;iostream&gt;
+#include &lt;stack&gt;
+
+int main() {
+    std::stack&lt;int&gt; pilha;
+    pilha.push(1);
+    pilha.push(2);
+    for (int x : pilha) {
+        std::cout &lt;&lt; x &lt;&lt; '\n';
+    }
+}
+$ g++ -std=c++23 -Wall -Wextra percorrer.cpp -o percorrer
+percorrer.cpp: In function ‘int main()’:
+percorrer.cpp:8:18: error: no matching function for call to ‘begin(std::stack&lt;int&gt;&amp;)’
+    8 |     for (int x : pilha) {
+      |                  ^~~~~
+percorrer.cpp:8:18: note: there are 6 candidates
+                                     « … e mais de 100 linhas de notes sobre os 6 candidatos,
+                                     « com erros como ‘class std::stack&lt;int&gt;’ has no member named ‘begin’</pre>
+<p><strong>O que significa:</strong> o <a href="for-range.html">for de intervalo</a> precisa de <code>begin()</code> e <code>end()</code> (aula <a href="iteradores.html">Iteradores</a>), e pilhas e filas não têm, de propósito: elas não deixam você passear pelo meio. Diante de uma mensagem gigante como essa, leia a <strong>primeira</strong> linha de <code>error:</code>; o resto são tentativas do compilador.</p>
+<p><strong>Como consertar:</strong> se você precisa percorrer, esvazie com <code>while (!p.empty()) { … p.top() …; p.pop(); }</code> (talvez numa cópia: <code>auto copia = pilha;</code>) ou troque a estrutura por um <code>std::vector</code>/<code>std::deque</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operação</th><th><code>std::stack</code></th><th><code>std::queue</code></th><th><code>std::priority_queue</code></th></tr>
+<tr><td>Cabeçalho</td><td><code>&lt;stack&gt;</code></td><td><code>&lt;queue&gt;</code></td><td><code>&lt;queue&gt;</code></td></tr>
+<tr><td>Colocar</td><td><code>push(x)</code> no topo</td><td><code>push(x)</code> no fim</td><td><code>push(x)</code> (vai para o lugar certo)</td></tr>
+<tr><td>Olhar quem sai</td><td><code>top()</code></td><td><code>front()</code></td><td><code>top()</code> (o maior)</td></tr>
+<tr><td>Olhar o último que entrou</td><td><code>top()</code></td><td><code>back()</code></td><td>(não tem)</td></tr>
+<tr><td>Tirar</td><td><code>pop()</code> (sem devolver)</td><td><code>pop()</code> (sem devolver)</td><td><code>pop()</code> (sem devolver)</td></tr>
+<tr><td>Tamanho / vazio?</td><td colspan="3"><code>size()</code> / <code>empty()</code></td></tr>
+<tr><td>Construir no lugar</td><td colspan="3"><code>emplace(argumentos…)</code>: como <code>push</code>, mas cria o elemento já lá dentro</td></tr>
+<tr><td>Percorrer com <code>for</code></td><td colspan="3">Não dá: esvazie com <code>while (!x.empty())</code></td></tr>
+</table>
+</div>
+<p>A tabela de todos os containers está em <a href="ref-containers.html">Referência: Containers</a>.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O cabeçalho da fila</h3>
+<p>Complete para poder usar <code>std::queue</code>:</p>
+<div class="ex-code">#include &lt;<input data-answer="queue" aria-label="cabeçalho">&gt;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Olhar a frente</h3>
+<p>Complete para mostrar quem é o próximo da fila <code>f</code>, sem tirá-lo:</p>
+<div class="ex-code">std::cout &lt;&lt; f.<input data-answer="front()" aria-label="método"> &lt;&lt; '\n';</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Numa <code>std::stack&lt;int&gt;</code>, você faz <code>push(1)</code>, <code>push(2)</code>, <code>push(3)</code>, <code>pop()</code> e mostra <code>top()</code>. O que aparece?</p>
+<label><input type="radio" name="q3"> 1</label>
+<label><input type="radio" name="q3"> 2</label>
+<label><input type="radio" name="q3"> 3</label>
+<label><input type="radio" name="q3"> Nada: <code>pop</code> esvazia a pilha</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. Numa <code>std::queue&lt;int&gt;</code>, você faz <code>push(1)</code>, <code>push(2)</code>, <code>push(3)</code>, <code>pop()</code> e mostra <code>front()</code>. O que aparece?</p>
+<label><input type="radio" name="q4"> 2</label>
+<label><input type="radio" name="q4"> 1</label>
+<label><input type="radio" name="q4"> 3</label>
+<label><input type="radio" name="q4"> Erro de compilação</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Por que <code>int x = pilha.pop();</code> não compila?</p>
+<label><input type="radio" name="q5"> Porque a pilha está vazia</label>
+<label><input type="radio" name="q5"> Porque faltou <code>#include &lt;stack&gt;</code></label>
+<label><input type="radio" name="q5"> Porque <code>pop()</code> devolve <code>void</code> (nada)</label>
+<label><input type="radio" name="q5"> Porque <code>pop</code> só existe na <code>queue</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Uma <code>std::priority_queue&lt;int&gt;</code> recebe 4, 8, 2. Qual é o <code>top()</code>?</p>
+<label><input type="radio" name="q6"> 4, o primeiro</label>
+<label><input type="radio" name="q6"> 2, o último</label>
+<label><input type="radio" name="q6"> 2, o menor</label>
+<label><input type="radio" name="q6"> 8, o maior</label>
+</div>
+
+<h3>Missão: o caixa do banco</h3>
+
+<div class="trycpp" data-goal="out:Atendida: Ana,out:Atendida: Bruno,out:Próxima: Carla,out:Ainda esperando: 2,src:\.front\(\)">
+<p class="try-task"><strong>Missão:</strong> a fila já tem quatro pessoas. Atenda as <strong>duas primeiras</strong> (mostre <code>Atendida: NOME</code> e tire da fila), depois mostre quem é a próxima e quantas pessoas ainda esperam. A saída deve ser:</p>
+<pre class="out">Atendida: Ana
+Atendida: Bruno
+Próxima: Carla
+Ainda esperando: 2</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;queue&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::queue&lt;std::string&gt; fila;
+    fila.push("Ana");
+    fila.push("Bruno");
+    fila.push("Carla");
+    fila.push("Davi");
+
+    // atenda duas pessoas aqui
+
+    // mostre a próxima e quantas faltam aqui
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;queue&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::queue&lt;std::string&gt; fila;
+    fila.push("Ana");
+    fila.push("Bruno");
+    fila.push("Carla");
+    fila.push("Davi");
+
+    // atenda duas pessoas
+    for (int i = 0; i &lt; 2; ++i) {
+        std::cout &lt;&lt; "Atendida: " &lt;&lt; fila.front() &lt;&lt; '\n';
+        fila.pop();
+    }
+
+    std::cout &lt;&lt; "Próxima: " &lt;&lt; fila.front() &lt;&lt; '\n';
+    std::cout &lt;&lt; "Ainda esperando: " &lt;&lt; fila.size() &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<h3>Missão final: ROMA ao contrário</h3>
+
+<div class="trycpp" data-goal="out:AMOR,src:std::stack,src:\.top\(\)">
+<p class="try-task"><strong>Missão:</strong> use uma <code>std::stack&lt;char&gt;</code> para inverter a palavra <code>ROMA</code>. Empilhe cada letra; depois, enquanto a pilha não estiver vazia, junte o <code>top()</code> na string <code>invertida</code> e faça <code>pop()</code>. O programa deve mostrar <code>AMOR</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;stack&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string palavra = "ROMA";
+    std::stack&lt;char&gt; pilha;
+
+    // 1. empilhe cada letra de palavra
+
+    std::string invertida;
+    // 2. desempilhe tudo, juntando em invertida
+
+    std::cout &lt;&lt; invertida &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;stack&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string palavra = "ROMA";
+    std::stack&lt;char&gt; pilha;
+
+    for (char letra : palavra) {
+        pilha.push(letra);
+    }
+
+    std::string invertida;
+    while (!pilha.empty()) {
+        invertida += pilha.top();
+        pilha.pop();
+    }
+    std::cout &lt;&lt; invertida &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<p>Resultado da solução no laboratório:</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra roma.cpp -o roma
+$ ./roma
+AMOR</pre>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>Pilha</strong> (<code>std::stack</code>, <code>&lt;stack&gt;</code>): o último a entrar sai primeiro. <code>push</code> põe no topo, <code>top</code> olha, <code>pop</code> tira.</li>
+  <li><strong>Fila</strong> (<code>std::queue</code>, <code>&lt;queue&gt;</code>): o primeiro a entrar sai primeiro. <code>push</code> põe no fim, <code>front</code> olha a frente, <code>back</code> olha o fim, <code>pop</code> tira da frente.</li>
+  <li><strong>Fila de prioridade</strong> (<code>std::priority_queue</code>, <code>&lt;queue&gt;</code>): <code>top</code> é sempre o maior; com <code>std::greater</code>, o menor.</li>
+  <li><code>pop()</code> não devolve nada: leia antes com <code>top()</code>/<code>front()</code>.</li>
+  <li>Olhar ou tirar de uma pilha/fila vazia é comportamento indefinido: confira <code>empty()</code> antes.</li>
+  <li>Pilhas e filas não têm <code>begin</code>/<code>end</code>: não dá para usar <code>for</code>. Se precisar ver o meio, use <code>vector</code> ou <code>deque</code>.</li>
+  <li>Próxima aula: <a href="algoritmos.html">Algoritmos</a>, para ordenar, buscar e contar dentro de um vetor sem escrever o laço na mão.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
