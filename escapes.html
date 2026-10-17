@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Caracteres Especiais e Raw Strings — \n, \t, \", \\ e R"(…)" | Guia C++</title>
+<meta name="description" content="Sequências de escape em C++ para quem nunca programou: \n, \t, \\, \&quot;, \' e \0, acentos no código, o aviso unknown escape sequence, raw strings R&quot;(…)&quot; para caminhos do Windows, expressões regulares e textos com aspas, o delimitador R&quot;x(…)x&quot; e textos em várias linhas com literais lado a lado, com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Caracteres Especiais e Raw Strings</span></h1>
+
+<p class="intro">Como escrever, dentro de um texto entre aspas, uma <strong>aspa</strong>? Ou um <strong>Tab</strong>, que você não consegue "ver"? Ou o caminho <code>C:\Users\ana</code>, cheio de barras invertidas? Desde a aula <a href="novas-linhas.html">Novas Linhas</a> você usa o <code>\n</code> para pular linha. Ele é o mais famoso de uma família: as <strong>sequências de escape</strong>. Nesta aula você vai conhecer a família inteira, o erro clássico do caminho do Windows, e as <strong>raw strings</strong> ("strings cruas"), que desligam os escapes de uma vez.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma sequência de escape e as mais usadas: <code>\n</code>, <code>\t</code>, <code>\\</code>, <code>\"</code>, <code>\'</code> e <code>\0</code>.</li>
+  <li>Por que <code>"C:\novos"</code> pula linha e o que é o aviso <code>unknown escape sequence</code>.</li>
+  <li>Acentos e símbolos no código (<code>ç</code>, <code>€</code>) e os escapes <code>\u</code> e <code>\x</code>.</li>
+  <li>Raw strings <code>R"(…)"</code> para caminhos do Windows, expressões regulares e textos com aspas.</li>
+  <li>O delimitador <code>R"x(…)x"</code>, para quando o texto contém <code>)"</code>.</li>
+  <li>Textos longos em várias linhas, com raw strings e com literais lado a lado <code>"a" "b"</code>.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com o comando padrão <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: a barra invertida "avisa" o compilador</h2>
+<p>Dentro de um texto entre aspas, alguns caracteres têm um <strong>papel</strong> para o compilador: a aspa <code>"</code> diz "o texto acabou". Outros caracteres não têm como ser digitados de forma visível, como a quebra de linha (se você apertar <kbd>Enter</kbd> no meio das aspas, o texto fica "aberto" e dá erro).</p>
+
+<p>A solução é um código de duas letras que começa com a <strong>barra invertida</strong> <code>\</code> (<em>backslash</em>). A barra é um aviso: "o próximo caractere não é ele mesmo; é um código". O nome técnico é <strong>escapar</strong> o caractere, tirá-lo do seu papel normal. Para o compilador, <code>\n</code> é <strong>um</strong> caractere só (a quebra de linha), embora você digite dois.</p>
+
+<hr>
+
+<h2>1. As sequências de escape mais usadas</h2>
+
+<pre class="file" data-file="escapes.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::cout &lt;&lt; "Linha 1\nLinha 2\n";
+    std::cout &lt;&lt; "Nome\tIdade\n";
+    std::cout &lt;&lt; "Ana\t30\n";
+    std::cout &lt;&lt; "Ela disse: \"oi\"\n";
+    std::cout &lt;&lt; "copo d'água e copo d\'água\n";
+    std::cout &lt;&lt; "C:\\Users\\ana\n";
+    std::cout &lt;&lt; '\'' &lt;&lt; ' ' &lt;&lt; '"' &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra escapes.cpp -o escapes
+$ ./escapes
+Linha 1
+Linha 2
+Nome	Idade
+Ana	30
+Ela disse: "oi"
+copo d'água e copo d'água
+C:\Users\ana
+' "</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escape</th><th>Vira</th><th>Nome em inglês</th><th>Quando usar</th></tr>
+<tr><td><code>\n</code></td><td>Quebra de linha</td><td><em>new line</em></td><td>Pular linha (aula <a href="novas-linhas.html">Novas Linhas</a>)</td></tr>
+<tr><td><code>\t</code></td><td>Tab (tabulação)</td><td><em>tab</em></td><td>Alinhar colunas simples. O terminal pula até a próxima "parada", de 8 em 8 colunas.</td></tr>
+<tr><td><code>\"</code></td><td><code>"</code></td><td><em>double quote</em></td><td>Uma aspa dupla <strong>dentro</strong> de <code>"…"</code></td></tr>
+<tr><td><code>\'</code></td><td><code>'</code></td><td><em>single quote</em></td><td>Obrigatório num <code>char</code>: <code>'\''</code>. Dentro de <code>"…"</code>, opcional: <code>"d'água"</code> funciona.</td></tr>
+<tr><td><code>\\</code></td><td><code>\</code></td><td><em>backslash</em></td><td>Uma barra invertida de verdade (caminhos do Windows)</td></tr>
+<tr><td><code>\0</code></td><td>Caractere nulo</td><td><em>null</em></td><td>Marca o fim dos textos da linguagem C (seção 3)</td></tr>
+<tr><td><code>\r</code></td><td>Volta ao começo da linha</td><td><em>carriage return</em></td><td>Arquivos do Windows terminam linhas com <code>\r\n</code>; barras de progresso no terminal</td></tr>
+<tr><td><code>\a</code></td><td>"Bip" do terminal</td><td><em>alert</em></td><td>Raramente; muitos terminais nem tocam</td></tr>
+</table>
+</div>
+
+<p>Repare na última linha do programa: num <code>char</code> (aspas simples), quem precisa de escape é a aspa <strong>simples</strong> (<code>'\''</code>); a dupla vai solta (<code>'"'</code>). Num texto (aspas duplas), é o contrário. A regra: <strong>só precisa escapar a aspa igual à que está "abraçando"</strong>.</p>
+
+<div class="trycpp" data-goal="out:Arquivo salvo em &quot;C:\Dados\notas.txt&quot;">
+<p class="try-task"><strong>Missão:</strong> faça o programa mostrar exatamente <code>Arquivo salvo em "C:\Dados\notas.txt"</code>, com as aspas e as barras. Use <code>\"</code> e <code>\\</code>. (Rode primeiro como está e leia o aviso do compilador.)</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Arquivo salvo em C:\Dados\notas.txt\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Arquivo salvo em \"C:\\Dados\\notas.txt\"\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. A armadilha do caminho do Windows</h2>
+<p>O Windows separa as pastas com barra invertida. Copie um caminho para dentro de aspas e veja:</p>
+
+<pre class="file" data-file="caminho.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string pasta = "C:\novos\testes";
+    std::cout &lt;&lt; pasta &lt;&lt; '\n';
+    std::string outra = "C:\pasta";
+    std::cout &lt;&lt; outra &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra caminho.cpp -o caminho
+caminho.cpp: In function ‘int main()’:
+caminho.cpp:7:25: warning: unknown escape sequence: ‘\p’
+    7 |     std::string outra = "C:\pasta";
+      |                         ^~~~~~~~~~
+$ ./caminho
+C:
+ovos	estes          « \n pulou linha e \t virou um Tab!
+C:pasta              « o \p "sumiu" com a barra</pre>
+
+<dl class="anatomy">
+  <dt>"C:\novos\testes"</dt><dd>O compilador leu <code>\n</code> (quebra de linha) + <code>ovos</code> + <code>\t</code> (Tab) + <code>estes</code>. Sem nenhum aviso, porque <code>\n</code> e <code>\t</code> são escapes <strong>válidos</strong>: para ele, você quis isso mesmo.</dd>
+  <dt>warning: unknown escape sequence: ‘\p’</dt><dd>"Sequência de escape desconhecida: <code>\p</code>". Não existe escape <code>\p</code>; o g++ avisa e usa só o <code>p</code>, jogando a barra fora.</dd>
+</dl>
+
+<p>Três formas de consertar:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Comentário</th></tr>
+<tr><td>Dobrar as barras</td><td><code>"C:\\novos\\testes"</code></td><td>Funciona sempre; fica difícil de ler com muitas barras.</td></tr>
+<tr><td>Raw string</td><td><code>R"(C:\novos\testes)"</code></td><td>O texto fica exatamente como no Windows. Seção 5.</td></tr>
+<tr><td>Barra normal</td><td><code>"C:/novos/testes"</code></td><td>O próprio Windows aceita <code>/</code> na maioria dos programas, e a biblioteca de arquivos do C++ também.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>3. O caractere nulo <code>\0</code></h2>
+<p>Você viu em <a href="strings.html">Strings</a> que um texto entre aspas termina com um <code>'\0'</code> escondido. Por isso, se você escrever um <code>\0</code> no meio de um literal, quem lê o literal acha que o texto acabou ali:</p>
+
+<pre class="file" data-file="nulo.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string a = "abc\0def";
+    std::cout &lt;&lt; a &lt;&lt; " tem " &lt;&lt; a.size() &lt;&lt; '\n';
+    std::string b("abc\0def", 7);
+    std::cout &lt;&lt; b &lt;&lt; " tem " &lt;&lt; b.size() &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra nulo.cpp -o nulo
+$ ./nulo | od -c
+0000000   a   b   c       t   e   m       3  \n   a   b   c  \0   d   e
+0000020   f       t   e   m       7  \n
+0000030</pre>
+
+<p>(O <code>od -c</code> mostra cada byte da saída, inclusive os invisíveis, como o <code>\0</code> e o <code>\n</code>.) A string <code>a</code> ficou só com <code>abc</code>: ao copiar o literal, o <code>std::string</code> parou no primeiro <code>\0</code>. A <code>b</code>, criada dizendo "copie 7 caracteres", guardou o <code>\0</code> no meio. Um <code>std::string</code> pode conter <code>\0</code>; os textos da linguagem C, não. Na prática, você quase nunca vai escrever <code>\0</code>; o importante é reconhecê-lo.</p>
+
+<hr>
+
+<h2>4. Acentos e símbolos no código</h2>
+<p>O código-fonte do guia é salvo em <strong>UTF-8</strong>, o formato de texto do Linux, do macOS e da web. Por isso você pode escrever <code>ç</code>, <code>ã</code>, <code>€</code> e até emojis direto entre as aspas. Também dá para escrever qualquer caractere pelo seu <strong>código</strong>:</p>
+
+<pre class="file" data-file="unicode.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string a = "maçã";
+    std::string b = "ma\u00e7\u00e3";
+    std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; b &lt;&lt; ' ' &lt;&lt; (a == b) &lt;&lt; '\n';
+    std::cout &lt;&lt; "\x41\x6e\x61" &lt;&lt; '\n';
+    std::cout &lt;&lt; "Preço: R$ 10\u20ac? Não, \u2764\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra unicode.cpp -o unicode
+$ ./unicode
+maçã maçã 1
+Ana
+Preço: R$ 10€? Não, ❤</pre>
+
+<dl class="anatomy">
+  <dt>\u00e7</dt><dd>O caractere de código Unicode <code>00e7</code> (em hexadecimal): o <code>ç</code>. <strong>Unicode</strong> é a grande tabela que dá um número a cada caractere de todas as línguas. <code>\u</code> recebe 4 dígitos hexadecimais; para códigos maiores, <code>\U</code> com 8.</dd>
+  <dt>(a == b)</dt><dd><code>1</code>: escrever <code>ç</code> ou <code>\u00e7</code> dá exatamente o mesmo texto.</dd>
+  <dt>\x41</dt><dd>Um <strong>byte</strong> pelo seu valor em hexadecimal: <code>41</code> é o <code>A</code> na tabela ASCII (veja <a href="char.html">Caracteres</a>).</dd>
+</dl>
+
+<p>Na prática, escreva os acentos direto: é mais legível. O <code>\u</code> é útil para caracteres invisíveis ou difíceis de digitar. Atenção: escrever acentos é fácil; <strong>medir e mexer</strong> em textos com acento tem surpresas (<code>"maçã"</code> tem 6 bytes). Isso é o assunto da próxima aula, <a href="acentos-utf8.html">Acentos e UTF-8</a>.</p>
+
+<hr>
+
+<h2>5. Raw strings: <code>R"(…)"</code></h2>
+<p>Quando o texto tem <strong>muitas</strong> barras ou aspas, escapar uma por uma vira uma sopa de <code>\\</code> e <code>\"</code>. A raw string <span class="versao">C++11</span> ("string crua") desliga os escapes: tudo entre <code>R"(</code> e <code>)"</code> é texto, exatamente como está.</p>
+
+<pre class="file" data-file="raw.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string pasta = R"(C:\Users\ana\novos\testes)";
+    std::string fala = R"(Ela disse: "oi" e foi embora)";
+    std::string padrao = R"(\d{3}\.\d{3}\.\d{3}-\d{2})";
+    std::cout &lt;&lt; pasta &lt;&lt; '\n' &lt;&lt; fala &lt;&lt; '\n' &lt;&lt; padrao &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra raw.cpp -o raw
+$ ./raw
+C:\Users\ana\novos\testes
+Ela disse: "oi" e foi embora
+\d{3}\.\d{3}\.\d{3}-\d{2}</pre>
+
+<dl class="anatomy">
+  <dt>R</dt><dd>De <em>raw</em>, "cru". Vem colado na aspa, sem espaço.</dd>
+  <dt>"(</dt><dd>Abre o texto cru. Os parênteses <strong>não</strong> fazem parte do texto: são as "bordas".</dd>
+  <dt>C:\Users\ana\novos\testes</dt><dd>O conteúdo. Nenhuma barra é escape: <code>\n</code> aqui são dois caracteres, <code>\</code> e <code>n</code>.</dd>
+  <dt>)"</dt><dd>Fecha. O texto só acaba quando aparece <code>)"</code> juntos, então aspas soltas no meio (<code>"oi"</code>) não atrapalham.</dd>
+</dl>
+
+<p>Os três usos clássicos estão no exemplo: <strong>caminhos do Windows</strong>, <strong>textos com aspas</strong> (como um pedaço de JSON ou de HTML) e <strong>expressões regulares</strong>. Uma expressão regular (ou <em>regex</em>) é um "molde" para procurar padrões em textos; a do exemplo é o molde de um CPF (<code>\d</code> = um dígito, <code>{3}</code> = três vezes, <code>\.</code> = um ponto). Regex usa muita barra invertida, e sem raw string cada <code>\d</code> teria de ser escrito <code>\\d</code>.</p>
+
+<h3>Textos em várias linhas</h3>
+<p>A raw string também aceita <kbd>Enter</kbd> de verdade: as quebras de linha que você digitar fazem parte do texto. É ótima para menus, ajudas e desenhos:</p>
+
+<pre class="file" data-file="rawlinhas.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string menu = R"(=== LOJINHA DA ANA ===
+1) Ver produtos
+2) Comprar
+3) Sair
+)";
+    std::cout &lt;&lt; menu;
+    std::cout &lt;&lt; R"(Aqui \n não pula linha)" &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra rawlinhas.cpp -o rawlinhas
+$ ./rawlinhas
+=== LOJINHA DA ANA ===
+1) Ver produtos
+2) Comprar
+3) Sair
+Aqui \n não pula linha</pre>
+
+<div class="warning">
+<strong>Tudo conta, inclusive os espaços do recuo</strong>
+<p>Numa raw string em várias linhas, os espaços no começo de cada linha também entram no texto. Por isso o menu do exemplo está "encostado" na margem do arquivo. Se você recuar as linhas para o código ficar bonito, o recuo aparece na tela.</p>
+</div>
+
+<hr>
+
+<h2>6. Quando o texto tem <code>)"</code>: o delimitador</h2>
+<p>A raw string acaba no primeiro <code>)"</code>. E se o próprio texto tiver <code>)"</code>?</p>
+
+<pre class="file" data-file="rawerro.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string s = R"(Ela escreveu "(sorriso)" no fim)";
+    std::cout &lt;&lt; s &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra rawerro.cpp -o rawerro
+rawerro.cpp:5:56: warning: missing terminating " character
+    5 |     std::string s = R"(Ela escreveu "(sorriso)" no fim)";
+      |                                                        ^
+rawerro.cpp:5:56: error: missing terminating " character
+    5 |     std::string s = R"(Ela escreveu "(sorriso)" no fim)";
+      |                                                        ^~
+rawerro.cpp: In function ‘int main()’:
+rawerro.cpp:5:49: error: expected ‘,’ or ‘;’ before ‘no’
+    5 |     std::string s = R"(Ela escreveu "(sorriso)" no fim)";
+      |                                                 ^~</pre>
+
+<p>A raw string terminou no <code>)"</code> depois de <code>sorriso</code>. Daí em diante, o compilador viu <code>no fim)</code> solto (por isso "esperava <code>,</code> ou <code>;</code> antes de <code>no</code>") e uma aspa no fim que abre um texto que nunca fecha ("faltando o caractere <code>"</code> de fechamento").</p>
+
+<p>A solução é um <strong>delimitador</strong>: uma palavrinha sua (até 16 caracteres, sem espaços, parênteses ou barras) entre a aspa e o parêntese, na abertura <strong>e</strong> no fechamento. O texto passa a acabar só em <code>)palavra"</code>:</p>
+
+<pre class="file" data-file="rawdelim.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string s = R"x(Ela escreveu "(sorriso)" no fim)x";
+    std::cout &lt;&lt; s &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra rawdelim.cpp -o rawdelim
+$ ./rawdelim
+Ela escreveu "(sorriso)" no fim</pre>
+
+<dl class="anatomy">
+  <dt>R"x(</dt><dd>Abre com o delimitador <code>x</code>.</dd>
+  <dt>)x"</dt><dd>Fecha. O <code>)"</code> no meio do texto agora é só texto, porque não tem o <code>x</code>.</dd>
+</dl>
+
+<p>Pode ser qualquer palavra: <code>R"json(…)json"</code>, <code>R"---(…)---"</code>. Escolha uma que não apareça no texto.</p>
+
+<hr>
+
+<h2>7. Literais lado a lado: <code>"a" "b"</code></h2>
+<p>Às vezes o texto é só <strong>comprido</strong>, sem barras nem aspas, e você quer quebrá-lo em várias linhas do código para não precisar rolar a tela. Basta escrever vários literais seguidos, sem nada entre eles: o compilador <strong>cola</strong> todos num só, antes de compilar.</p>
+
+<pre class="file" data-file="adjacentes.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string aviso = "Atenção: este programa apaga arquivos. "
+                        "Confira a pasta antes de continuar. "
+                        "Digite S para seguir.";
+    std::cout &lt;&lt; aviso &lt;&lt; '\n';
+    std::cout &lt;&lt; "linha 1\n"
+                 "linha 2\n"
+                 "linha 3\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra adjacentes.cpp -o adjacentes
+$ ./adjacentes
+Atenção: este programa apaga arquivos. Confira a pasta antes de continuar. Digite S para seguir.
+linha 1
+linha 2
+linha 3</pre>
+
+<dl class="anatomy">
+  <dt>"…arquivos. " "Confira…"</dt><dd>Dois literais vizinhos viram um só: <code>"…arquivos. Confira…"</code>. Não há <code>+</code>, e por isso não há o erro <code>invalid operands</code> da aula <a href="concatenacao.html">Juntar Strings</a>: a colagem acontece antes de existir qualquer tipo.</dd>
+  <dt>O espaço no fim de cada pedaço</dt><dd>O compilador cola os pedaços <strong>sem</strong> pôr nada no meio. Esqueça o espaço e as palavras grudam: <code>arquivos.Confira</code>.</dd>
+  <dt>Sem <code>\n</code></dt><dd>Quebrar a linha <strong>no código</strong> não quebra a linha <strong>na tela</strong>. Para isso, coloque <code>\n</code> dentro dos pedaços, como no segundo exemplo.</dd>
+</dl>
+
+<h3>Qual usar para texto comprido?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Quando usar</th></tr>
+<tr><td>Literais lado a lado</td><td>Texto longo de <strong>uma</strong> linha na tela, ou linhas com <code>\n</code>, mantendo o recuo do código bonito.</td></tr>
+<tr><td>Raw string em várias linhas</td><td>Texto que já é um "bloco" (menu, ajuda, desenho, JSON), sem precisar de <code>\n</code>; o recuo entra no texto.</td></tr>
+<tr><td><code>+</code> ou <code>+=</code></td><td>Quando algum pedaço é uma <strong>variável</strong> (aula <a href="concatenacao.html">Juntar Strings</a>).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>warning: unknown escape sequence: ‘\p’</code></strong>
+<p><strong>O que significa:</strong> há uma barra invertida seguida de um caractere que não forma escape nenhum. Quase sempre é um caminho do Windows. O g++ joga a barra fora. E cuidado com o que ele <strong>não</strong> avisa: <code>\n</code>, <code>\t</code>, <code>\r</code>, <code>\a</code>, <code>\b</code>, <code>\f</code> e <code>\v</code> são válidos, e viram caracteres especiais em silêncio.</p>
+<p><strong>Como consertar:</strong> <code>\\</code>, raw string <code>R"(…)"</code> ou barras normais <code>/</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: unable to find string literal operator ‘operator""oi’</code></strong>
+<pre class="file" data-file="aspa.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Ela disse "oi"\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra aspa.cpp -o aspa
+aspa.cpp: In function ‘int main()’:
+aspa.cpp:4:32: error: unable to find string literal operator ‘operator""oi’ with ‘const char [12]’, ‘long unsigned int’ arguments
+    4 |     std::cout &lt;&lt; "Ela disse "oi"\n";
+      |                                ^~~~</pre>
+<p><strong>O que significa:</strong> a aspa antes de <code>oi</code> <strong>fechou</strong> o texto <code>"Ela disse "</code>. O <code>oi</code> colado depois da aspa pareceu um <strong>sufixo</strong> (como o <code>s</code> de <code>"a"s</code>, da aula <a href="concatenacao.html">Juntar Strings</a>), e o compilador procurou um sufixo chamado <code>oi</code>, que não existe. A mensagem é estranha, mas a causa é simples.</p>
+<p><strong>Como consertar:</strong> escape as aspas internas, <code>"Ela disse \"oi\"\n"</code>, ou use <code>R"(Ela disse "oi")"</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: missing terminating " character</code></strong>
+<pre class="file" data-file="aberta.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!\n;
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra aberta.cpp -o aberta
+aberta.cpp:4:18: warning: missing terminating " character
+    4 |     std::cout &lt;&lt; "Olá, mundo!\n;
+      |                  ^
+aberta.cpp:4:18: error: missing terminating " character
+    4 |     std::cout &lt;&lt; "Olá, mundo!\n;
+      |                  ^~~~~~~~~~~~~~~
+aberta.cpp: In function ‘int main()’:
+aberta.cpp:5:1: error: expected primary-expression before ‘}’ token
+    5 | }
+      | ^</pre>
+<p><strong>O que significa:</strong> "falta o caractere <code>"</code> de fechamento". O texto foi aberto e a linha acabou sem fechar. O segundo erro (na linha 5) é consequência: o compilador chegou no <code>}</code> ainda esperando o resto do comando.</p>
+<p><strong>Como consertar:</strong> feche a aspa: <code>"Olá, mundo!\n";</code>. Se você queria um texto em várias linhas, use uma raw string ou literais lado a lado. Também aparece quando uma raw string termina antes da hora (seção 6).</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Resultado</th></tr>
+<tr><td><code>"\n"</code> / <code>"\t"</code></td><td>Quebra de linha / Tab</td></tr>
+<tr><td><code>"\""</code> / <code>'\''</code></td><td>Aspa dupla num texto / aspa simples num <code>char</code></td></tr>
+<tr><td><code>"\\"</code></td><td>Uma barra invertida</td></tr>
+<tr><td><code>"\0"</code></td><td>Caractere nulo (fim de texto no estilo C)</td></tr>
+<tr><td><code>"\r"</code> / <code>"\a"</code></td><td>Volta ao começo da linha / bip</td></tr>
+<tr><td><code>"\x41"</code></td><td>Byte pelo valor hexadecimal (<code>A</code>)</td></tr>
+<tr><td><code>"\u00e7"</code> / <code>"\U0001F600"</code></td><td>Caractere Unicode pelo código (<code>ç</code> / 😀)</td></tr>
+<tr><td><code>R"(…)"</code></td><td>Raw string: sem escapes, pode ter várias linhas <span class="versao">C++11</span></td></tr>
+<tr><td><code>R"x(…)x"</code></td><td>Raw string com delimitador, para textos com <code>)"</code></td></tr>
+<tr><td><code>"abc" "def"</code></td><td>Literais lado a lado: <code>"abcdef"</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Tab</h3>
+<p>Complete para separar <code>Produto</code> e <code>Preço</code> com um Tab:</p>
+<div class="ex-code">std::cout &lt;&lt; "Produto<input data-answer="\t" aria-label="escape">Preço\n";</div>
+</div>
+
+<div class="exercise">
+<h3>2. Barra invertida</h3>
+<p>Complete o escape para mostrar <code>C:\Temp</code>:</p>
+<div class="ex-code">std::cout &lt;&lt; "C:<input data-answer="\\" aria-label="escape">Temp\n";</div>
+</div>
+
+<div class="exercise">
+<h3>3. Raw string</h3>
+<p>Complete a abertura da raw string que guarda <code>C:\novos</code> sem escapes:</p>
+<div class="ex-code">std::string p = <input data-answer="R&quot;(" aria-label="abertura">C:\novos)";</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O que <code>std::cout &lt;&lt; "C:\novos";</code> mostra?</p>
+<label><input type="radio" name="q4"> <code>C:\novos</code></label>
+<label><input type="radio" name="q4"> Erro de compilação</label>
+<label><input type="radio" name="q4"> <code>C:</code>, uma quebra de linha e <code>ovos</code></label>
+<label><input type="radio" name="q4"> <code>C:novos</code>, com um aviso</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Quanto vale <code>std::string("a\tb").size()</code>?</p>
+<label><input type="radio" name="q5"> 3: o <code>\t</code> é um caractere só</label>
+<label><input type="radio" name="q5"> 4</label>
+<label><input type="radio" name="q5"> 2</label>
+<label><input type="radio" name="q5"> 8, por causa da tabulação</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">6. Qual o resultado de <code>std::string s = "Bom" "dia";</code>?</p>
+<label><input type="radio" name="q6"> Erro: falta o <code>+</code></label>
+<label><input type="radio" name="q6"> <code>"Bomdia"</code></label>
+<label><input type="radio" name="q6"> <code>"Bom dia"</code></label>
+<label><input type="radio" name="q6"> Erro <code>invalid operands</code></label>
+</div>
+
+<h3>Missão final: o gato da lojinha</h3>
+
+<div class="trycpp" data-goal="out:/\_/,out:( o.o ),out:&gt; ^ &lt;,src:R&quot;\(,semaviso">
+<p class="try-task"><strong>Missão:</strong> a Ana quer um gatinho no topo do programa, mas as barras invertidas bagunçaram o desenho (rode e veja o aviso). Reescreva usando <strong>uma raw string</strong> <code>R"(…)"</code> em várias linhas, sem nenhum aviso, para aparecer:</p>
+<pre class="out"> /\_/\
+( o.o )
+ &gt; ^ &lt;</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; " /\_/\\n";
+    std::cout &lt;&lt; "( o.o )\n";
+    std::cout &lt;&lt; " &gt; ^ &lt;\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; R"( /\_/\
+( o.o )
+ &gt; ^ &lt;
+)";
+}
+</pre>
+</div>
+
+<p>Para comparar, o programa original, compilado no laboratório:</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra gato2.cpp -o gato2
+gato2.cpp: In function ‘int main()’:
+gato2.cpp:4:18: warning: unknown escape sequence: ‘\_’
+    4 |     std::cout &lt;&lt; " /\_/\\n";
+      |                  ^~~~~~~~~~
+$ ./gato2
+ /_/\n( o.o )
+ &gt; ^ &lt;</pre>
+<p>O <code>\_</code> perdeu a barra, e o <code>\\n</code> do fim virou <code>\\</code> (uma barra) + <code>n</code>, então a linha não pulou.</p>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>A barra invertida começa uma <strong>sequência de escape</strong>: <code>\n</code> (linha), <code>\t</code> (Tab), <code>\"</code>, <code>\'</code>, <code>\\</code>, <code>\0</code>. Cada uma vira <strong>um</strong> caractere.</li>
+  <li>Caminhos do Windows entre aspas quebram: <code>\n</code> e <code>\t</code> viram especiais em silêncio; escapes desconhecidos dão <code>unknown escape sequence</code>.</li>
+  <li>Acentos podem ir direto no código (UTF-8); <code>\u00e7</code> e <code>\x41</code> escrevem pelo código.</li>
+  <li><code>R"(…)"</code> desliga os escapes e aceita várias linhas: ideal para caminhos, regex, aspas e desenhos. Se o texto tiver <code>)"</code>, use <code>R"x(…)x"</code>.</li>
+  <li>Literais lado a lado (<code>"a" "b"</code>) são colados pelo compilador: bom para quebrar textos longos no código.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
