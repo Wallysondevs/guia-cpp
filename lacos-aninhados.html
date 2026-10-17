@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Laços Aninhados — um laço dentro de outro | Guia C++</title>
+<meta name="description" content="Laços aninhados em C++ para quem nunca programou: um laço dentro de outro, a ordem das voltas, todas as combinações de duas listas, a tabuada completa em tabela, desenhar um retângulo e um triângulo de asteriscos e quantas vezes o corpo roda (n × m), com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Laços Aninhados</span></h1>
+
+<p class="intro">O corpo de um laço pode ter qualquer coisa: um <code>if</code>, um <code>std::cin</code>… e também <strong>outro laço</strong>. Um laço dentro de outro se chama <strong>laço aninhado</strong> (como um ninho, uma coisa dentro da outra). É assim que se percorre qualquer coisa que tenha <strong>linhas e colunas</strong>: uma tabela, um tabuleiro, uma planilha de notas, um desenho na tela.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como o laço de dentro roda <strong>inteiro</strong> a cada volta do laço de fora.</li>
+  <li>Como gerar todas as combinações de duas listas.</li>
+  <li>Como montar a tabuada completa, do 1 ao 10, em forma de tabela.</li>
+  <li>Como desenhar um retângulo e um triângulo de <code>*</code>.</li>
+  <li>Como calcular quantas vezes o corpo de dentro roda (<code>n × m</code>).</li>
+  <li>Os erros típicos: a quebra de linha no lugar errado, o contador que não é zerado e a mesma variável nos dois laços.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Antes desta aula, é bom conhecer o <a href="for.html">for</a> e o <a href="for-range.html">for de intervalo</a>.</p>
+
+<hr>
+
+<h2>A ideia: o relógio</h2>
+<p>Olhe para um relógio digital. O ponteiro das <strong>horas</strong> anda devagar; o dos <strong>minutos</strong> anda rápido. Para cada hora, os minutos dão uma volta <strong>completa</strong>, de 00 a 59. Só depois disso a hora avança uma vez, e os minutos recomeçam do 00.</p>
+<ul>
+  <li>O laço <strong>de fora</strong> é o das horas: anda devagar.</li>
+  <li>O laço <strong>de dentro</strong> é o dos minutos: dá todas as voltas dele a cada passo do de fora, e <strong>recomeça do zero</strong> na próxima.</li>
+</ul>
+<p>Em 24 horas, os minutos mudam 24 × 60 = 1440 vezes. Guarde essa multiplicação: ela volta na seção 5.</p>
+
+<hr>
+
+<h2>1. O primeiro laço aninhado</h2>
+<p>A Ana dá aula para 3 turmas, e cada turma fará 2 provas. O programa lista as provas de cada turma:</p>
+
+<pre class="file" data-file="turmas.cpp">#include &lt;iostream&gt;
+
+int main() {
+    for (int turma = 1; turma &lt;= 3; turma++) {
+        std::cout &lt;&lt; "Turma " &lt;&lt; turma &lt;&lt; ":";
+        for (int prova = 1; prova &lt;= 2; prova++) {
+            std::cout &lt;&lt; " prova " &lt;&lt; prova;
+        }
+        std::cout &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>for (int turma …)</dt><dd>O laço <strong>de fora</strong>: uma volta por turma (3 voltas).</dd>
+  <dt>std::cout &lt;&lt; "Turma "</dt><dd>Roda uma vez por turma, <strong>antes</strong> do laço de dentro: começa a linha.</dd>
+  <dt>for (int prova …)</dt><dd>O laço <strong>de dentro</strong>: está no corpo do de fora, então roda inteiro (2 voltas) <strong>em cada</strong> turma.</dd>
+  <dt>std::cout &lt;&lt; '\n';</dt><dd>Roda uma vez por turma, <strong>depois</strong> do laço de dentro: termina a linha.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra turmas.cpp -o turmas
+$ ./turmas
+Turma 1: prova 1 prova 2
+Turma 2: prova 1 prova 2
+Turma 3: prova 1 prova 2</pre>
+
+<h3>Passo a passo</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ordem</th><th><code>turma</code></th><th><code>prova</code></th><th>O que aconteceu</th></tr>
+<tr><td>1</td><td>1</td><td>—</td><td>Mostra <code>Turma 1:</code></td></tr>
+<tr><td>2</td><td>1</td><td>1</td><td>Mostra <code> prova 1</code></td></tr>
+<tr><td>3</td><td>1</td><td>2</td><td>Mostra <code> prova 2</code>; o laço de dentro termina (<code>prova</code> vira 3)</td></tr>
+<tr><td>4</td><td>1</td><td>—</td><td>Pula a linha; o de fora avança: <code>turma</code> vira 2</td></tr>
+<tr><td>5</td><td>2</td><td>1</td><td>O laço de dentro <strong>recomeça</strong>: <code>int prova = 1</code> de novo</td></tr>
+<tr><td>…</td><td>…</td><td>…</td><td>…</td></tr>
+</table>
+</div>
+
+<p>O ponto central: a cada volta do laço de fora, o <code>for</code> de dentro começa do zero, com o seu <strong>início</strong> (<code>int prova = 1</code>) rodando de novo. É como os minutos do relógio voltando ao 00.</p>
+
+<h3>Todas as combinações</h3>
+<p>Laços aninhados geram <strong>todas as combinações</strong> de duas listas. A Ana tem 2 camisetas e 3 calças. Quantas roupas diferentes ela consegue montar?</p>
+
+<pre class="file" data-file="roupas.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; camisetas = {"branca", "preta"};
+    std::vector&lt;std::string&gt; calcas = {"jeans", "bege", "cinza"};
+    for (const auto&amp; camiseta : camisetas) {
+        for (const auto&amp; calca : calcas) {
+            std::cout &lt;&lt; "camiseta " &lt;&lt; camiseta &lt;&lt; " + calça " &lt;&lt; calca &lt;&lt; '\n';
+        }
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra roupas.cpp -o roupas
+$ ./roupas
+camiseta branca + calça jeans
+camiseta branca + calça bege
+camiseta branca + calça cinza
+camiseta preta + calça jeans
+camiseta preta + calça bege
+camiseta preta + calça cinza</pre>
+
+<p>2 camisetas × 3 calças = 6 roupas. A camiseta (laço de fora) muda devagar; a calça (laço de dentro) passa por todas as opções antes da camiseta mudar. Os dois laços são <a href="for-range.html">for de intervalo</a>: qualquer tipo de laço pode ser aninhado com qualquer outro.</p>
+
+<hr>
+
+<h2>2. A tabuada completa</h2>
+<p>Na aula <a href="for.html">for</a>, um laço fazia a tabuada de <strong>um</strong> número. Para todas, do 1 ao 10, basta colocar aquele laço dentro de outro que escolhe o número. Para a saída virar uma tabela alinhada, cada número ocupa 4 posições com <code>std::setw(4)</code> ("set width", definir a largura, da aula <a href="iomanip.html">iomanip</a>):</p>
+
+<pre class="file" data-file="tabuada.cpp">#include &lt;iomanip&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    for (int linha = 1; linha &lt;= 10; linha++) {
+        for (int coluna = 1; coluna &lt;= 10; coluna++) {
+            std::cout &lt;&lt; std::setw(4) &lt;&lt; linha * coluna;
+        }
+        std::cout &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tabuada.cpp -o tabuada
+$ ./tabuada
+   1   2   3   4   5   6   7   8   9  10
+   2   4   6   8  10  12  14  16  18  20
+   3   6   9  12  15  18  21  24  27  30
+   4   8  12  16  20  24  28  32  36  40
+   5  10  15  20  25  30  35  40  45  50
+   6  12  18  24  30  36  42  48  54  60
+   7  14  21  28  35  42  49  56  63  70
+   8  16  24  32  40  48  56  64  72  80
+   9  18  27  36  45  54  63  72  81  90
+  10  20  30  40  50  60  70  80  90 100</pre>
+
+<p>Os nomes <code>linha</code> e <code>coluna</code> dizem o papel de cada contador. Essa é a regra de ouro das tabelas:</p>
+<ul>
+  <li>o laço <strong>de fora</strong> escolhe a <strong>linha</strong>;</li>
+  <li>o laço <strong>de dentro</strong> anda pelas <strong>colunas</strong> daquela linha, mostrando um valor por vez, <strong>sem</strong> pular linha;</li>
+  <li>o <code>'\n'</code> fica <strong>entre</strong> o fim do laço de dentro e o fim do de fora: um por linha.</li>
+</ul>
+<p>Cada número da tabela é <code>linha * coluna</code>: na linha 7, coluna 8, aparece 56.</p>
+
+<hr>
+
+<h2>3. Desenhar com <code>*</code>: retângulo</h2>
+<p>Desenhar figuras com caracteres é o melhor treino de laços aninhados, porque você <strong>vê</strong> cada volta. Um retângulo de 3 linhas por 5 colunas:</p>
+
+<pre class="file" data-file="retangulo.cpp">#include &lt;iostream&gt;
+
+int main() {
+    for (int linha = 1; linha &lt;= 3; linha++) {
+        for (int coluna = 1; coluna &lt;= 5; coluna++) {
+            std::cout &lt;&lt; '*';
+        }
+        std::cout &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra retangulo.cpp -o retangulo
+$ ./retangulo
+*****
+*****
+*****</pre>
+
+<p>O laço de dentro desenha <strong>uma linha</strong> de 5 estrelas. O de fora repete isso 3 vezes, pulando de linha entre uma e outra. Troque o 3 e o 5 e o retângulo muda de tamanho.</p>
+
+<hr>
+
+<h2>4. Desenhar com <code>*</code>: triângulo</h2>
+<p>No retângulo, toda linha tem o mesmo número de estrelas. No triângulo, a linha 1 tem 1 estrela, a linha 2 tem 2, a linha 3 tem 3… Ou seja: <strong>a linha <code>n</code> tem <code>n</code> estrelas</strong>. O truque é fazer o laço de dentro <strong>depender</strong> do contador do de fora:</p>
+
+<pre class="file" data-file="triangulo.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int altura = 5;
+    for (int linha = 1; linha &lt;= altura; linha++) {
+        for (int estrela = 1; estrela &lt;= linha; estrela++) {
+            std::cout &lt;&lt; '*';
+        }
+        std::cout &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>int altura = 5;</dt><dd>Quantas linhas o triângulo terá.</dd>
+  <dt>for (int linha = 1; linha &lt;= altura; linha++)</dt><dd>Laço de fora: uma volta por linha, de 1 a 5.</dd>
+  <dt>estrela &lt;= linha</dt><dd>O pulo do gato: o limite do laço de dentro <strong>não é fixo</strong>, é o número da linha atual. Na linha 1, ele dá 1 volta; na linha 4, dá 4.</dd>
+  <dt>std::cout &lt;&lt; '\n';</dt><dd>Depois das estrelas de cada linha, pula a linha.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra triangulo.cpp -o triangulo
+$ ./triangulo
+*
+**
+***
+****
+*****</pre>
+
+<p>Com essa ideia (o laço de dentro olhando para o contador do de fora), dá para desenhar triângulos de cabeça para baixo (<code>estrela &lt;= altura - linha + 1</code>), pirâmides (espaços antes das estrelas), escadas… Os exercícios do fim da aula trazem algumas.</p>
+
+<div class="trycpp" data-goal="outre:1\n12\n123\n1234\n,src:for[\s\S]*for">
+<p class="try-task"><strong>Missão:</strong> em vez de estrelas, desenhe o triângulo com <strong>números</strong>: em cada linha, mostre a variável do laço de dentro. Com altura 4, as linhas devem ser <code>1</code>, <code>12</code>, <code>123</code> e <code>1234</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int altura = 4;
+    for (int linha = 1; linha &lt;= altura; linha++) {
+        for (int estrela = 1; estrela &lt;= linha; estrela++) {
+            std::cout &lt;&lt; '*';
+        }
+        std::cout &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int altura = 4;
+    for (int linha = 1; linha &lt;= altura; linha++) {
+        for (int numero = 1; numero &lt;= linha; numero++) {
+            std::cout &lt;&lt; numero;
+        }
+        std::cout &lt;&lt; '\n';
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="quantas">5. Quantas vezes o corpo de dentro roda?</h2>
+<p>Se o laço de fora dá <code>n</code> voltas e o de dentro dá <code>m</code> voltas em cada uma, o corpo de dentro roda <strong><code>n × m</code></strong> vezes. Um contador confirma:</p>
+
+<pre class="file" data-file="contar.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int voltas = 0;
+    for (int i = 1; i &lt;= 3; i++) {
+        for (int j = 1; j &lt;= 4; j++) {
+            voltas++;
+        }
+    }
+    std::cout &lt;&lt; "3 x 4: o corpo de dentro rodou " &lt;&lt; voltas &lt;&lt; " vezes\n";
+
+    voltas = 0;
+    for (int i = 1; i &lt;= 1000; i++) {
+        for (int j = 1; j &lt;= 1000; j++) {
+            voltas++;
+        }
+    }
+    std::cout &lt;&lt; "1000 x 1000: " &lt;&lt; voltas &lt;&lt; " vezes\n";
+
+    voltas = 0;
+    for (int linha = 1; linha &lt;= 5; linha++) {
+        for (int estrela = 1; estrela &lt;= linha; estrela++) {
+            voltas++;
+        }
+    }
+    std::cout &lt;&lt; "Triângulo de altura 5: " &lt;&lt; voltas &lt;&lt; " estrelas\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra contar.cpp -o contar
+$ ./contar
+3 x 4: o corpo de dentro rodou 12 vezes
+1000 x 1000: 1000000 vezes
+Triângulo de altura 5: 15 estrelas</pre>
+
+<ul>
+  <li><strong>3 × 4 = 12</strong>: a conta simples.</li>
+  <li><strong>1000 × 1000 = 1 milhão</strong>: dois laços de mil voltas parecem pouco, mas juntos dão um milhão. Com três laços de mil, seria um <strong>bilhão</strong>. É por isso que laços aninhados são o primeiro lugar a olhar quando um programa fica lento.</li>
+  <li><strong>Triângulo: 1 + 2 + 3 + 4 + 5 = 15</strong>: quando o laço de dentro depende do de fora, não é <code>n × m</code>; some as voltas de cada linha. (Para altura <code>n</code>, dá <code>n × (n + 1) / 2</code>, cerca de metade do quadrado <code>n × n</code>.)</li>
+</ul>
+
+<div class="tip">
+<strong>Contas para conferir</strong>
+<p>Antes de rodar, estime quantas linhas a saída terá. Se o seu triângulo de altura 5 mostrou 25 estrelas, o laço de dentro está usando um limite fixo (<code>&lt;= altura</code>) em vez de <code>&lt;= linha</code>.</p>
+</div>
+
+<hr>
+
+<h2>Formas diferentes de escrever</h2>
+<ul>
+  <li><strong>Qualquer laço dentro de qualquer laço:</strong> <code>for</code> dentro de <code>for</code> é o mais comum, mas vale <code>while</code> dentro de <code>for</code>, for de intervalo dentro de <code>while</code>… Com <code>while</code>, lembre-se de <strong>zerar</strong> o contador de dentro a cada volta do de fora (veja <a href="#erros">Quando dá errado</a>).</li>
+  <li><strong>Três ou mais níveis:</strong> funcionam do mesmo jeito (um cubo, dias × horas × minutos), mas ficam difíceis de ler. Acima de dois níveis, considere mover o laço de dentro para uma <a href="funcoes.html">função</a> com nome próprio, como <code>desenhar_linha(n)</code>.</li>
+  <li><strong>Nomes de contadores:</strong> <code>i</code> e <code>j</code> são a tradição (e <code>k</code> para um terceiro nível). Nomes como <code>linha</code> e <code>coluna</code> deixam o código autoexplicativo; use-os sempre que o sentido for claro.</li>
+  <li><strong>Sair dos dois laços de uma vez:</strong> o <code>break</code> sai só do laço de dentro. Para sair dos dois, veja <a href="break-continue.html#aninhados">break e continue</a>.</li>
+</ul>
+
+<p>Os laços aninhados aparecem de novo em <a href="arrays-multidimensionais.html">Arrays Multidimensionais</a>, onde servem para percorrer tabelas guardadas na memória, como um tabuleiro de jogo da velha.</p>
+
+<hr>
+
+<h2 id="erros">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Tudo saiu numa linha só (o <code>'\n'</code> ficou fora do laço de fora)</strong>
+<pre class="file" data-file="semquebra.cpp">#include &lt;iostream&gt;
+
+int main() {
+    for (int linha = 1; linha &lt;= 3; linha++) {
+        for (int coluna = 1; coluna &lt;= 5; coluna++) {
+            std::cout &lt;&lt; '*';
+        }
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semquebra.cpp -o semquebra
+$ ./semquebra
+***************</pre>
+<p><strong>O que aconteceu:</strong> as 15 estrelas foram desenhadas, mas o <code>'\n'</code> está depois da <code>}</code> do laço de <strong>fora</strong>: roda uma vez só, no fim. Se ele estivesse <strong>dentro</strong> do laço de dentro, o contrário aconteceria: uma estrela por linha, 15 linhas.</p>
+<p><strong>Como consertar:</strong> o <code>'\n'</code> vai dentro do laço de fora e depois do de dentro, entre as duas <code>}</code>. Indentar direito ajuda a ver onde cada linha está.</p>
+</div>
+
+<div class="cenario">
+<strong>Só a primeira linha foi desenhada (o contador de dentro não foi zerado)</strong>
+<pre class="file" data-file="semzerar.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int linha = 1;
+    int coluna = 1;
+    while (linha &lt;= 3) {
+        while (coluna &lt;= 5) {
+            std::cout &lt;&lt; '*';
+            coluna++;
+        }
+        std::cout &lt;&lt; '\n';
+        linha++;
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semzerar.cpp -o semzerar
+$ ./semzerar
+*****
+                 « linha 2: vazia
+                 « linha 3: vazia</pre>
+<p><strong>O que aconteceu:</strong> com <code>while</code>, o contador <code>coluna</code> foi criado uma vez só, lá em cima. Depois da primeira linha, ele vale 6 e nunca volta a 1: nas linhas 2 e 3, a condição <code>coluna &lt;= 5</code> já começa falsa e o laço de dentro não roda. Só os <code>'\n'</code> aparecem.</p>
+<p><strong>Como consertar:</strong> crie (ou zere) o contador de dentro <strong>dentro</strong> do laço de fora: <code>int coluna = 1;</code> logo depois de <code>while (linha &lt;= 3) {</code>. Melhor ainda: use <code>for</code>, que faz isso sozinho com o seu início.</p>
+</div>
+
+<div class="cenario">
+<strong>A mesma variável nos dois laços</strong>
+<pre class="file" data-file="mesmoi.cpp">#include &lt;iostream&gt;
+
+int main() {
+    for (int i = 1; i &lt;= 2; i++) {
+        for (int i = 1; i &lt;= 3; i++) {
+            std::cout &lt;&lt; "i = " &lt;&lt; i &lt;&lt; '\n';
+        }
+        std::cout &lt;&lt; "fim da linha " &lt;&lt; i &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra mesmoi.cpp -o mesmoi
+$ ./mesmoi
+i = 1
+i = 2
+i = 3
+fim da linha 1
+i = 1
+i = 2
+i = 3
+fim da linha 2</pre>
+<p><strong>O que aconteceu:</strong> compila e roda, mas há <strong>duas</strong> variáveis chamadas <code>i</code>. Dentro do laço de dentro, o <code>i</code> de dentro <strong>esconde</strong> o de fora: não há como saber "em que linha estou" ali. Se você quisesse mostrar a linha e a coluna, não conseguiria. Nem o <code>-Wall -Wextra</code> avisa; só a opção <code>-Wshadow</code> ("sombra"):</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -Wshadow mesmoi.cpp -o mesmoi
+mesmoi.cpp: In function ‘int main()’:
+mesmoi.cpp:5:18: warning: declaration of ‘i’ shadows a previous local [-Wshadow]
+    5 |         for (int i = 1; i &lt;= 3; i++) {
+      |                  ^
+mesmoi.cpp:4:14: note: shadowed declaration is here
+    4 |     for (int i = 1; i &lt;= 2; i++) {
+      |              ^</pre>
+<p><strong>Como consertar:</strong> um nome diferente para cada nível (<code>i</code> e <code>j</code>, ou <code>linha</code> e <code>coluna</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>O triângulo virou um quadrado</strong>
+<p><strong>O que aconteceu:</strong> o limite do laço de dentro é fixo (<code>estrela &lt;= altura</code>), então toda linha tem o mesmo número de estrelas.</p>
+<p><strong>Como consertar:</strong> faça o limite depender do contador de fora: <code>estrela &lt;= linha</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Padrão</th><th>Forma</th></tr>
+<tr><td>Tabela (linhas × colunas)</td><td><code>for (linha…) { for (coluna…) { mostra; } '\n'; }</code></td></tr>
+<tr><td>Todas as combinações</td><td><code>for (a : lista1) { for (b : lista2) { … } }</code></td></tr>
+<tr><td>Triângulo</td><td><code>for (int l = 1; l &lt;= n; l++) { for (int e = 1; e &lt;= l; e++) … }</code></td></tr>
+<tr><td>Voltas do corpo de dentro</td><td><code>n × m</code> (limites fixos); soma das voltas de cada linha (limite variável)</td></tr>
+<tr><td>Sair dos dois</td><td>Variável de controle ou função com <code>return</code> (<a href="break-continue.html#aninhados">break e continue</a>)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Quantas vezes?</h3>
+<p>Quantas estrelas <code>for (int i = 0; i &lt; 4; i++) { for (int j = 0; j &lt; 6; j++) { std::cout &lt;&lt; '*'; } }</code> mostra?</p>
+<div class="ex-code"><input data-answer="24" aria-label="número de estrelas"></div>
+</div>
+
+<div class="exercise">
+<h3>2. O limite do triângulo</h3>
+<p>Complete o laço de dentro para desenhar um triângulo (linha 1 com 1 estrela, linha 2 com 2…):</p>
+<div class="ex-code">for (int l = 1; l &lt;= 5; l++) { for (int e = 1; e &lt;= <input data-answer="l" aria-label="limite" size="4">; e++) std::cout &lt;&lt; '*'; std::cout &lt;&lt; '\n'; }</div>
+</div>
+
+<div class="exercise">
+<h3>3. Triângulo de altura 4</h3>
+<p>Quantas estrelas tem, no total, um triângulo de altura 4 (1 + 2 + 3 + 4)?</p>
+<div class="ex-code"><input data-answer="10|dez" aria-label="total"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Num laço aninhado, o laço de dentro…</p>
+<label><input type="radio" name="q4"> roda uma vez só, junto com a primeira volta do de fora.</label>
+<label><input type="radio" name="q4"> roda inteiro, do começo, em cada volta do laço de fora.</label>
+<label><input type="radio" name="q4"> roda depois que o laço de fora termina.</label>
+<label><input type="radio" name="q4"> alterna com o de fora: uma volta de cada.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Para desenhar uma tabela, onde fica o <code>std::cout &lt;&lt; '\n';</code>?</p>
+<label><input type="radio" name="q5"> Antes do laço de fora.</label>
+<label><input type="radio" name="q5"> Dentro do laço de dentro.</label>
+<label><input type="radio" name="q5"> Depois do laço de fora.</label>
+<label><input type="radio" name="q5"> Dentro do laço de fora, depois do fim do laço de dentro.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Dois laços aninhados de 10 mil voltas cada: quantas vezes o corpo de dentro roda?</p>
+<label><input type="radio" name="q6"> 100 milhões</label>
+<label><input type="radio" name="q6"> 20 mil</label>
+<label><input type="radio" name="q6"> 10 mil</label>
+<label><input type="radio" name="q6"> 1 milhão</label>
+</div>
+
+<h3>Missão final: o triângulo e a conta das estrelas</h3>
+<div class="trycpp" data-goal="outre:\*\n\*\*\n\*\*\*\n\*\*\*\*\n\*\*\*\*\*\n,out:Total: 15 estrelas,src:for[\s\S]*for">
+<p class="try-task"><strong>Missão:</strong> desenhe um triângulo de <code>*</code> com altura 5 e, enquanto desenha, <strong>conte</strong> as estrelas numa variável <code>total</code>. No fim, mostre <code>Total: 15 estrelas</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int altura = 5;
+    int total = 0;
+    // desenhe o triângulo aqui
+
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; " estrelas\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int altura = 5;
+    int total = 0;
+    for (int linha = 1; linha &lt;= altura; linha++) {
+        for (int estrela = 1; estrela &lt;= linha; estrela++) {
+            std::cout &lt;&lt; '*';
+            total++;
+        }
+        std::cout &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; " estrelas\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um laço aninhado é um laço dentro do corpo de outro. A cada volta do de fora, o de dentro roda <strong>inteiro</strong>, começando do zero.</li>
+  <li>Em tabelas: o de fora escolhe a <strong>linha</strong>, o de dentro anda pelas <strong>colunas</strong>, e o <code>'\n'</code> fica entre o fim do de dentro e o fim do de fora.</li>
+  <li>Se o limite do de dentro depende do contador do de fora (<code>e &lt;= linha</code>), as linhas têm tamanhos diferentes: é o triângulo.</li>
+  <li>Voltas do corpo de dentro: <code>n × m</code> com limites fixos. Dois laços de 1000 já dão 1 milhão.</li>
+  <li>Use um nome diferente em cada nível, e, com <code>while</code>, zere o contador de dentro a cada volta do de fora.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
