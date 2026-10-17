@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Boas Práticas — checklist comentado e um programa refatorado | Guia C++</title>
+<meta name="description" content="Boas práticas de C++ para quem está começando: compilar com -Wall -Wextra e -Werror, inicializar tudo, vector e string no lugar de arrays crus, smart pointers, RAII, const, const&amp;, enum class, using namespace std, funções pequenas, sanitizers e clang-format. Com um programa antes × depois e os avisos reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Boas Práticas</span></h1>
+
+<p class="intro">O C++ deixa você fazer quase tudo, inclusive muita coisa errada sem reclamar. Um programa pode compilar, rodar e mostrar um número absurdo, ou funcionar no seu computador e quebrar no de outra pessoa. As <strong>boas práticas</strong> são hábitos que evitam esses problemas antes que eles apareçam. Esta página junta todas as que o guia ensinou num <strong>checklist comentado</strong> e termina com um programa "antes × depois": um código cheio de problemas, os avisos reais do compilador e a versão consertada, mudança por mudança.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Os 12 itens do checklist de um bom código C++, cada um com o porquê.</li>
+  <li>Como usar os avisos do compilador (<code>-Wall -Wextra</code>) e o <code>-Werror</code> a seu favor.</li>
+  <li>Por que <code>using namespace std;</code> pode quebrar um programa, com o erro real.</li>
+  <li>Como os sanitizers encontram o erro que o compilador não viu.</li>
+  <li>Como refatorar (melhorar sem mudar o que faz) um programa ruim, passo a passo.</li>
+</ul>
+</div>
+
+<p>Todos os programas foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp/boas</code>. Cada item do checklist tem uma aula própria; aqui você vê todos juntos e aprende a usá-los como rotina.</p>
+
+<hr>
+
+<h2>A ideia: o checklist do piloto</h2>
+<p>Antes de decolar, todo piloto de avião, por mais experiente que seja, segue um checklist: combustível, portas, flaps. Não é porque ele esqueceu como se pilota. É porque, numa rotina repetida mil vezes, um item esquecido custa caro, e o checklist torna o esquecimento quase impossível.</p>
+
+<p>Programar é parecido. Você sabe o que é uma variável sem valor inicial, mas num programa de 300 linhas, às 23h, ela passa. O checklist abaixo é a sua lista antes de "decolar" (entregar o programa):</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>#</th><th>Prática</th><th>Evita</th></tr>
+<tr><td>1</td><td>Compile com <code>-Wall -Wextra</code> (e <code>-Werror</code> em projetos)</td><td>Erros que o compilador já tinha visto</td></tr>
+<tr><td>2</td><td>Inicialize toda variável</td><td>Números "lixo"</td></tr>
+<tr><td>3</td><td>Prefira <code>std::vector</code>, <code>std::string</code> e <code>std::array</code> a arrays crus</td><td>Ler e escrever fora dos limites</td></tr>
+<tr><td>4</td><td>Use ponteiros inteligentes em vez de <code>new</code>/<code>delete</code></td><td>Vazamentos e <code>delete</code> errado</td></tr>
+<tr><td>5</td><td>RAII: deixe os objetos cuidarem dos recursos</td><td>Arquivos e memória esquecidos abertos</td></tr>
+<tr><td>6</td><td><code>const</code> sempre que puder</td><td>Mudar o que não devia</td></tr>
+<tr><td>7</td><td><code>const&amp;</code> para objetos grandes</td><td>Cópias lentas</td></tr>
+<tr><td>8</td><td><code>enum class</code> no lugar de <code>enum</code></td><td>Misturar categorias com números</td></tr>
+<tr><td>9</td><td>Evite <code>using namespace std;</code> (nunca em headers)</td><td>Conflito de nomes</td></tr>
+<tr><td>10</td><td>Funções pequenas, nomes claros</td><td>Código que ninguém entende</td></tr>
+<tr><td>11</td><td>Sanitizers nos testes</td><td>Erros de memória que só aparecem às vezes</td></tr>
+<tr><td>12</td><td>Formatação automática (clang-format)</td><td>Discussões sobre espaços e chaves</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. Compile com <code>-Wall -Wextra</code> (e <code>-Werror</code> em projetos)</h2>
+<p>O compilador percebe muita coisa suspeita, mas só <strong>avisa</strong> se você pedir. <code>-Wall</code> (de <em>warnings: all</em>, "todos os avisos", que na verdade são os mais importantes) e <code>-Wextra</code> ("avisos extras") ligam os avisos que todo programador deveria ver. A aula <a href="avisos.html">Avisos (-Wall -Wextra)</a> explica cada um.</p>
+
+<p>Este programa soma as notas da Ana. Ele compila e mostra a resposta certa, mas tem dois problemas:</p>
+
+<pre class="file" data-file="aviso1.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 9, 10};
+    int soma = 0;
+    int maior;
+    for (int i = 0; i &lt; notas.size(); i++) {
+        soma += notas[i];
+    }
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/boas">$ g++ -std=c++23 -Wall -Wextra aviso1.cpp -o aviso1
+aviso1.cpp: In function ‘int main()’:
+aviso1.cpp:8:23: warning: comparison of integer expressions of different signedness: ‘int’ and ‘std::vector&lt;int&gt;::size_type’ {aka ‘long unsigned int’} [-Wsign-compare]
+    8 |     for (int i = 0; i &lt; notas.size(); i++) {
+      |                     ~~^~~~~~~~~~~~~~
+aviso1.cpp:7:9: warning: unused variable ‘maior’ [-Wunused-variable]
+    7 |     int maior;
+      |         ^~~~~
+$ ./aviso1
+Soma: 26</pre>
+
+<dl class="anatomy">
+  <dt>comparison of integer expressions of different signedness</dt><dd>"Comparação de inteiros com sinais diferentes": o <code>i</code> é <code>int</code> (pode ser negativo) e o <code>notas.size()</code> é <code>unsigned</code> (nunca negativo). Comparar os dois pode dar resultados estranhos com números negativos (veja <a href="inteiros.html">Inteiros</a>). O conserto mais simples é nem usar índice: um <a href="for-range.html">range-for</a>.</dd>
+  <dt>unused variable ‘maior’</dt><dd>"Variável não usada": você criou <code>maior</code> e esqueceu. Às vezes é sobra; às vezes é sinal de que faltou um pedaço do programa.</dd>
+</dl>
+
+<p>Um aviso não impede o programa de ser criado. Por isso é fácil ignorá-los, e em pouco tempo um projeto tem 200 avisos e ninguém lê mais nenhum. A solução dos projetos sérios é o <code>-Werror</code> ("avisos viram erros"): com ele, qualquer aviso <strong>impede</strong> a compilação. Você vai vê-lo em ação no <a href="#antes-depois">programa antes × depois</a>.</p>
+
+<div class="tip">
+<strong>A regra de ouro: zero avisos</strong>
+<p>Trate todo aviso como um erro que ainda não aconteceu. Leia, entenda e conserte. Um programa com zero avisos tem uma vantagem escondida: quando aparecer um aviso novo, você vai notá-lo na hora.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Soma: 26,semaviso">
+<p class="try-task"><strong>Missão:</strong> rode e veja os dois avisos (o editor usa o Clang, que escreve as mensagens de outro jeito, mas os avisos são os mesmos). Depois conserte o programa para compilar com <strong>zero avisos</strong>: apague a variável que sobrou e troque o <code>for</code> com índice por um <code>for (int nota : notas)</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 9, 10};
+    int soma = 0;
+    int maior;
+    for (int i = 0; i &lt; notas.size(); i++) {
+        soma += notas[i];
+    }
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 9, 10};
+    int soma = 0;
+    for (int nota : notas) {
+        soma += nota;
+    }
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Inicialize toda variável</h2>
+<p>Uma variável local sem valor inicial, como <code>int total;</code>, não começa com zero: ela começa com o que estiver naquele pedaço da memória, um número "lixo". Usar esse valor é <a href="comportamento-indefinido.html">comportamento indefinido</a>: o programa pode mostrar 0, mostrar <code>-1192551482</code> ou fazer coisa pior. O mais traiçoeiro é que, às vezes, o lixo é zero por acaso e o programa parece certo.</p>
+
+<pre class="file" data-file="exemplo.cpp">int total;              // ruim: valor lixo
+int total = 0;          // bom
+double preco{};         // bom: as chaves vazias valem zero
+std::string nome;       // ok: string e vector começam vazios sozinhos
+</pre>
+
+<p>Dentro de uma <code>struct</code>, dê um valor padrão a cada campo (<code>double preco = 0.0;</code>), como você viu em <a href="structs.html">Structs</a>.</p>
+
+<hr>
+
+<h2>3. Prefira <code>std::vector</code>, <code>std::string</code> e <code>std::array</code> a arrays crus</h2>
+<p>Um array cru (<code>int notas[5];</code>) não sabe o próprio tamanho, não cresce e deixa você ler a posição 5, 50 ou 5000 sem reclamar. As alternativas da biblioteca padrão resolvem isso:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Em vez de</th><th>Use</th><th>Por quê</th></tr>
+<tr><td><code>int notas[5];</code></td><td><code>std::array&lt;int, 5&gt; notas{};</code></td><td>Tamanho fixo, mas sabe o tamanho (<code>notas.size()</code>) e funciona com range-for e algoritmos. Aula: <a href="std-array.html">std::array</a>.</td></tr>
+<tr><td><code>int* v = new int[n];</code></td><td><code>std::vector&lt;int&gt; v(n);</code></td><td>Cresce, libera a memória sozinho. Aula: <a href="vector.html">std::vector</a>.</td></tr>
+<tr><td><code>char nome[50];</code></td><td><code>std::string nome;</code></td><td>Cabe qualquer tamanho, sem estourar. Aula: <a href="strings.html">Strings</a>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>4. Ponteiros inteligentes em vez de <code>new</code>/<code>delete</code></h2>
+<p>Todo <code>new</code> precisa de exatamente um <code>delete</code>, do tipo certo (<code>new[]</code> pede <code>delete[]</code>), no momento certo, mesmo se uma função terminar no meio. É fácil errar. Os <a href="smart-pointers.html">ponteiros inteligentes</a> fazem o <code>delete</code> sozinhos:</p>
+
+<pre class="file" data-file="exemplo.cpp">Produto* p = new Produto{"maçã", 2.5};      // ruim: e o delete?
+delete p;
+
+auto p = std::make_unique&lt;Produto&gt;("maçã", 2.5);   // bom: liberado sozinho
+</pre>
+
+<p>Na prática, quase nunca você precisa nem disso: um <code>std::vector&lt;Produto&gt;</code> guarda os produtos e cuida da memória. A regra é: <strong>se você escreveu <code>new</code>, pergunte se um container ou um <code>make_unique</code> resolve</strong>.</p>
+
+<hr>
+
+<h2>5. RAII: deixe os objetos cuidarem dos recursos</h2>
+<p>RAII é a sigla de <em>Resource Acquisition Is Initialization</em> ("adquirir um recurso é inicializar um objeto"). O nome é feio, a ideia é simples: <strong>quem abre, fecha sozinho</strong>. Um <code>std::ifstream</code> abre o arquivo quando é criado e fecha quando sai de escopo; um <code>std::vector</code> pede memória quando é criado e devolve quando sai de escopo. Você não precisa lembrar de nada.</p>
+
+<pre class="file" data-file="exemplo.cpp">void ler_lista() {
+    std::ifstream arquivo("lista.txt");   // abre
+    std::string linha;
+    while (std::getline(arquivo, linha)) {
+        // ...
+    }
+}                                          // fecha sozinho aqui, mesmo se houver um return no meio
+</pre>
+
+<p>Os ponteiros inteligentes do item 4 são RAII para memória. A aula <a href="destrutores-raii.html">Destrutores e RAII</a> mostra como escrever as suas próprias classes assim.</p>
+
+<hr>
+
+<h2>6. <code>const</code> sempre que puder</h2>
+<p>Se um valor não deve mudar, diga isso ao compilador com <code>const</code> (aula <a href="constantes.html">Constantes</a>). Se alguém tentar mudar (inclusive você, daqui a um mês), o programa não compila:</p>
+
+<pre class="file" data-file="exemplo.cpp">const double taxa = 0.05;
+const std::vector&lt;std::string&gt; categorias{"fruta", "limpeza"};
+</pre>
+
+<p>Além de proteger, o <code>const</code> é documentação: quem lê sabe na hora que aquele valor é fixo. Nos <a href="metodos-const.html">métodos de classe</a>, <code>const</code> diz "este método só lê o objeto".</p>
+
+<hr>
+
+<h2>7. <code>const&amp;</code> para objetos grandes</h2>
+<p>Quando você passa um <code>std::vector</code> ou uma <code>std::string</code> para uma função "por valor", o C++ faz uma <strong>cópia</strong> inteira. Com mil produtos, são mil produtos copiados a cada chamada. Passar por <strong>referência constante</strong> (<code>const&amp;</code>) entrega o original, só para leitura, sem copiar nada (aula <a href="passagem-referencia.html">Por Valor × Por Referência</a>):</p>
+
+<pre class="file" data-file="exemplo.cpp">double total(std::vector&lt;Produto&gt; estoque);          // copia tudo
+double total(const std::vector&lt;Produto&gt;&amp; estoque);   // só olha, sem copiar
+</pre>
+
+<p>Para tipos pequenos (<code>int</code>, <code>double</code>, <code>char</code>, <code>bool</code>), passe por valor: copiar um número é mais barato que criar uma referência.</p>
+
+<hr>
+
+<h2>8. <code>enum class</code> no lugar de <code>enum</code></h2>
+<p>O <code>enum</code> antigo vira <code>int</code> sem avisar e espalha os nomes pelo programa inteiro (<code>FRUTA</code> passa a ser um nome solto). O <code>enum class</code> fica fechado no próprio nome: <code>Categoria::fruta</code>, e não se mistura com números (aula <a href="enums.html">Enums</a>).</p>
+
+<pre class="file" data-file="exemplo.cpp">enum Categoria { FRUTA, LIMPEZA };            // antigo: FRUTA + 1 compila
+enum class Categoria { fruta, limpeza };      // moderno: Categoria::fruta + 1 não compila
+</pre>
+
+<hr>
+
+<h2>9. Evite <code>using namespace std;</code> (e nunca em headers)</h2>
+<p>A linha <code>using namespace std;</code> "despeja" todos os nomes da biblioteca padrão no seu programa, para você escrever <code>cout</code> em vez de <code>std::cout</code>. Parece prático, mas a biblioteca tem <strong>milhares</strong> de nomes, e alguns são palavras comuns: <code>count</code>, <code>size</code>, <code>distance</code>, <code>max</code>. Veja o que acontece quando a Ana cria uma variável <code>count</code> (contagem):</p>
+
+<pre class="file" data-file="colisao.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+using namespace std;
+
+int count = 0;
+
+int main() {
+    count++;
+    cout &lt;&lt; count &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/boas">$ g++ -std=c++23 -Wall -Wextra colisao.cpp -o colisao
+colisao.cpp: In function ‘int main()’:
+colisao.cpp:8:5: error: reference to ‘count’ is ambiguous
+    8 |     count++;
+      |     ^~~~~
+In file included from /usr/include/c++/15/algorithm:89,
+                 from colisao.cpp:1:
+/usr/include/c++/15/pstl/glue_algorithm_defs.h:102:1: note: candidates are: ‘template&lt;class _ExecutionPolicy, class _ForwardIterator, class _Tp&gt; __pstl::__internal::__enable_if_execution_policy&lt;_ExecutionPolicy, typename std::iterator_traits&lt;_II&gt;::difference_type&gt; std::count(_ExecutionPolicy&amp;&amp;, _ForwardIterator, _ForwardIterator, const _Tp&amp;)’
+  102 | count(_ExecutionPolicy&amp;&amp; __exec, _ForwardIterator __first, _ForwardIterator __last, const _Tp&amp; __value);
+      | ^~~~~
+In file included from /usr/include/c++/15/algorithm:63:
+/usr/include/c++/15/bits/stl_algo.h:4070:5: note:                 ‘template&lt;class _IIter, class _Tp&gt; constexpr typename std::iterator_traits&lt;_Iterator&gt;::difference_type std::count(_IIter, _IIter, const _Tp&amp;)’
+ 4070 |     count(_InputIterator __first, _InputIterator __last, const _Tp&amp; __value)
+      |     ^~~~~
+colisao.cpp:5:5: note:                 ‘int count’
+    5 | int count = 0;
+      |     ^~~~~
+colisao.cpp:9:13: error: reference to ‘count’ is ambiguous
+    9 |     cout &lt;&lt; count &lt;&lt; '\n';
+      |             ^~~~~
+/usr/include/c++/15/pstl/glue_algorithm_defs.h:102:1: note: candidates are: ‘template&lt;class _ExecutionPolicy, class _ForwardIterator, class _Tp&gt; __pstl::__internal::__enable_if_execution_policy&lt;_ExecutionPolicy, typename std::iterator_traits&lt;_II&gt;::difference_type&gt; std::count(_ExecutionPolicy&amp;&amp;, _ForwardIterator, _ForwardIterator, const _Tp&amp;)’
+  102 | count(_ExecutionPolicy&amp;&amp; __exec, _ForwardIterator __first, _ForwardIterator __last, const _Tp&amp; __value);
+      | ^~~~~
+/usr/include/c++/15/bits/stl_algo.h:4070:5: note:                 ‘template&lt;class _IIter, class _Tp&gt; constexpr typename std::iterator_traits&lt;_Iterator&gt;::difference_type std::count(_IIter, _IIter, const _Tp&amp;)’
+ 4070 |     count(_InputIterator __first, _InputIterator __last, const _Tp&amp; __value)
+      |     ^~~~~
+colisao.cpp:5:5: note:                 ‘int count’
+    5 | int count = 0;
+      |     ^~~~~</pre>
+
+<p>Assusta, mas a primeira linha diz tudo: <em>reference to ‘count’ is ambiguous</em>, "a referência a <code>count</code> é ambígua". Existem dois <code>count</code>: o da Ana (<code>‘int count’</code>, a última nota) e a função <code>std::count</code> do <code>&lt;algorithm&gt;</code> (as outras notas, com nomes enormes). Por causa do <code>using namespace std;</code>, os dois estão "soltos", e o compilador não sabe qual você quis. Sem essa linha, <code>count</code> seria só o da Ana e <code>std::count</code> seria o da biblioteca.</p>
+
+<p>Num arquivo <code>.cpp</code> pequeno, o estrago fica nele. Num <strong>header</strong> (<code>.h</code>), é pior: todo arquivo que fizer <code>#include</code> dele recebe o <code>using namespace std;</code> junto, sem saber (aula <a href="headers.html">Arquivos .h e .cpp</a>). Por isso a regra é: <strong>nunca em headers</strong>; nos <code>.cpp</code>, prefira escrever <code>std::</code>. Se quiser encurtar um nome muito usado, traga só ele: <code>using std::cout;</code> (aula <a href="namespaces.html">Namespaces</a>).</p>
+
+<hr>
+
+<h2>10. Funções pequenas, nomes claros</h2>
+<p>Compare estas duas assinaturas:</p>
+
+<pre class="file" data-file="exemplo.cpp">double f(vector&lt;Produto&gt; v, int x);
+double valor_do_estoque(const std::vector&lt;Produto&gt;&amp; estoque);
+</pre>
+
+<p>A segunda dispensa comentário: você sabe o que ela faz, o que recebe e que não muda nada. Duas regras práticas:</p>
+<ul>
+  <li><strong>Uma função, uma tarefa.</strong> Se para descrever o que ela faz você precisa de "e" ("lê o arquivo <em>e</em> calcula o total <em>e</em> mostra"), divida em três (aula <a href="funcoes.html">Funções</a>). Uma função que cabe na tela inteira é um bom limite.</li>
+  <li><strong>Nomes que dizem o que a coisa é.</strong> <code>total_vendas</code>, não <code>tv</code>; <code>quantidade</code>, não <code>q</code>. A exceção são contadores de laço curtos (<code>i</code>). Veja as regras de nomes em <a href="identificadores.html">Nomes de Variáveis</a>.</li>
+</ul>
+
+<hr>
+
+<h2>11. Sanitizers nos testes</h2>
+<p>Alguns erros o compilador não consegue ver, porque só acontecem na hora de rodar: ler fora de um array, usar memória já liberada, estourar um <code>int</code>. Os <strong>sanitizers</strong> ("higienizadores") são verificações que o g++ coloca dentro do programa: ele fica mais lento, mas para no primeiro erro e diz a linha exata. Use-os sempre que testar:</p>
+
+<pre class="term" data-cwd="~/cpp/boas">$ g++ -std=c++23 -Wall -Wextra -g -fsanitize=address,undefined programa.cpp -o programa</pre>
+
+<p>Você vai ver um deles pegando um erro real no programa abaixo. A aula <a href="sanitizers.html">Sanitizers</a> explica cada tipo e como ler o relatório.</p>
+
+<hr>
+
+<h2>12. Formatação automática (clang-format)</h2>
+<p>Onde vai a chave? Quatro espaços ou dois? Em vez de decidir na mão, os projetos usam um <strong>formatador</strong>: o mais comum em C++ é o <strong>clang-format</strong>, da mesma família do Clang. Ele reescreve o arquivo seguindo regras guardadas num arquivo <code>.clang-format</code> na pasta do projeto, e as IDEs (veja <a href="editores.html">Editores e IDEs</a>) podem rodá-lo toda vez que você salva. O guia só cita a ferramenta: o importante é que o projeto inteiro tenha <strong>um</strong> estilo, qualquer que seja.</p>
+
+<hr>
+
+<h2 id="antes-depois">O programa antes × depois</h2>
+<p>Agora o checklist em ação. Este é o controle de estoque da lojinha da Ana, escrito "do jeito rápido". Ele deveria mostrar o valor do estoque, o total de vendas da semana e quantos produtos estão zerados:</p>
+
+<pre class="file" data-file="antes.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+using namespace std;
+
+enum Categoria { FRUTA, LIMPEZA };
+
+struct Produto {
+    string nome;
+    double preco;
+    int qtd;
+    Categoria cat;
+};
+
+double f(vector&lt;Produto&gt; v, int x) {
+    double t;
+    for (int i = 0; i &lt; v.size(); i++)
+        t += v[i].preco * v[i].qtd;
+    return t;
+}
+
+int main() {
+    vector&lt;Produto&gt; estoque;
+    estoque.push_back({"maçã", 2.5, 40, FRUTA});
+    estoque.push_back({"sabão", 8.9, 10, LIMPEZA});
+    estoque.push_back({"pera", 3.0, 0, FRUTA});
+
+    int* vendas = new int[3];
+    vendas[0] = 5; vendas[1] = 2; vendas[2] = 7;
+    int total_vendas = 0;
+    for (int i = 0; i &lt;= 3; i++)
+        total_vendas += vendas[i];
+    delete vendas;
+
+    int zerados;
+    for (int i = 0; i &lt; estoque.size(); i++)
+        if (estoque[i].qtd = 0) zerados++;
+
+    cout &lt;&lt; "Valor do estoque: " &lt;&lt; f(estoque, 1) &lt;&lt; endl;
+    cout &lt;&lt; "Vendas: " &lt;&lt; total_vendas &lt;&lt; endl;
+    cout &lt;&lt; "Produtos zerados: " &lt;&lt; zerados &lt;&lt; endl;
+}
+</pre>
+
+<p>As respostas certas seriam: valor 189 (2,5 × 40 + 8,9 × 10 + 3 × 0), vendas 14 e um produto zerado. Primeiro, a Ana compila <strong>sem avisos</strong>:</p>
+
+<pre class="term" data-cwd="~/cpp/boas">$ g++ -std=c++23 antes.cpp -o antes
+$ ./antes
+Valor do estoque: 4.83151e-310          « devia ser 189
+Vendas: 14                              « certo… por sorte
+Produtos zerados: -1192551482           « devia ser 1</pre>
+
+<p>Compilou sem nenhuma mensagem e rodou. Duas respostas são absurdas, e os números mudam de uma execução para outra (são lixo da memória). A terceira parece certa, mas, como você vai ver, é sorte. Agora com os avisos ligados:</p>
+
+<pre class="term" data-cwd="~/cpp/boas">$ g++ -std=c++23 -Wall -Wextra antes.cpp -o antes
+antes.cpp: In function ‘double f(std::vector&lt;Produto&gt;, int)’:
+antes.cpp:17:23: warning: comparison of integer expressions of different signedness: ‘int’ and ‘std::vector&lt;Produto&gt;::size_type’ {aka ‘long unsigned int’} [-Wsign-compare]
+   17 |     for (int i = 0; i &lt; v.size(); i++)
+      |                     ~~^~~~~~~~~~
+antes.cpp:15:33: warning: unused parameter ‘x’ [-Wunused-parameter]
+   15 | double f(vector&lt;Produto&gt; v, int x) {
+      |                             ~~~~^
+antes.cpp: In function ‘int main()’:
+antes.cpp:36:23: warning: comparison of integer expressions of different signedness: ‘int’ and ‘std::vector&lt;Produto&gt;::size_type’ {aka ‘long unsigned int’} [-Wsign-compare]
+   36 |     for (int i = 0; i &lt; estoque.size(); i++)
+      |                     ~~^~~~~~~~~~~~~~~~
+antes.cpp:37:28: warning: suggest parentheses around assignment used as truth value [-Wparentheses]
+   37 |         if (estoque[i].qtd = 0) zerados++;
+antes.cpp:33:12: warning: ‘void operator delete(void*, std::size_t)’ called on pointer returned from a mismatched allocation function [-Wmismatched-new-delete]
+   33 |     delete vendas;
+      |            ^~~~~~
+antes.cpp:28:28: note: returned from ‘void* operator new [](std::size_t)’
+   28 |     int* vendas = new int[3];
+      |                            ^</pre>
+
+<p>Cinco avisos. Os mais graves:</p>
+
+<dl class="anatomy">
+  <dt>suggest parentheses around assignment used as truth value (linha 37)</dt><dd>"Sugiro parênteses em volta da atribuição usada como verdadeiro/falso". A Ana escreveu <code>=</code> (atribuir) no lugar de <code>==</code> (comparar). Esse <code>if</code> não pergunta "a quantidade é zero?": ele <strong>zera</strong> a quantidade de todos os produtos! É por isso que o valor do estoque deu praticamente zero. Veja <a href="operadores-comparacao.html">Operadores de Comparação</a>.</dd>
+  <dt>called on pointer returned from a mismatched allocation function (linha 33)</dt><dd>"<code>delete</code> chamado num ponteiro que veio de uma função de alocação diferente": a memória foi pedida com <code>new int[3]</code> (com colchetes) e devolvida com <code>delete</code> (sem colchetes). O certo seria <code>delete[]</code>. Melhor ainda: não usar <code>new</code> (item 4).</dd>
+  <dt>unused parameter ‘x’ (linha 15)</dt><dd>A função <code>f</code> recebe um <code>x</code> que nunca usa. Sobra de uma versão antiga.</dd>
+  <dt>comparison of integer expressions of different signedness (linhas 17 e 36)</dt><dd><code>int</code> comparado com o tamanho <code>unsigned</code> do vector, como no item 1.</dd>
+</dl>
+
+<p>Faltam dois problemas que o g++ só enxerga quando otimiza o código (<code>-O2</code>), porque é nessa hora que ele analisa por onde cada valor passa:</p>
+
+<pre class="term" data-cwd="~/cpp/boas">$ g++ -std=c++23 -Wall -Wextra -O2 antes.cpp -o antes 2&gt;&amp;1 | grep -A6 "may be used"
+antes.cpp:18:11: warning: ‘t’ may be used uninitialized [-Wmaybe-uninitialized]
+   18 |         t += v[i].preco * v[i].qtd;
+      |         ~~^~~~~~~~~~~~~~~~~~~~~~~~
+antes.cpp:16:12: note: ‘t’ was declared here
+   16 |     double t;
+      |            ^
+antes.cpp: In function ‘int main()’:
+antes.cpp:41:37: warning: ‘zerados’ may be used uninitialized [-Wmaybe-uninitialized]
+   41 |     cout &lt;&lt; "Produtos zerados: " &lt;&lt; zerados &lt;&lt; endl;
+      |                                     ^~~~~~~
+antes.cpp:35:9: note: ‘zerados’ was declared here
+   35 |     int zerados;
+      |         ^~~~~~~
+antes.cpp:33:12: warning: ‘void operator delete(void*, std::size_t)’ called on pointer returned from a mismatched allocation function [-Wmismatched-new-delete]
+                                        « o -A6 mostra 6 linhas depois de cada achado: esta já é do aviso seguinte</pre>
+
+<p><em>‘t’ may be used uninitialized</em>: "<code>t</code> pode ser usada sem ter sido inicializada". O mesmo vale para <code>zerados</code>. São os números lixo da saída (item 2). O <code>| grep -A6 "may be used"</code> no fim do comando só filtra a saída: mostra as linhas com "may be used" e as 6 seguintes, para não repetir os cinco avisos que você já viu.</p>
+
+<h3>O que o <code>-Werror</code> faria</h3>
+<p>Num projeto com <code>-Werror</code>, esse programa nem chegaria a existir:</p>
+
+<pre class="term" data-cwd="~/cpp/boas">$ rm -f antes                           « apaga o programa da compilação anterior
+$ g++ -std=c++23 -Wall -Wextra -Werror antes.cpp -o antes
+antes.cpp: In function ‘double f(std::vector&lt;Produto&gt;, int)’:
+antes.cpp:17:23: error: comparison of integer expressions of different signedness: ‘int’ and ‘std::vector&lt;Produto&gt;::size_type’ {aka ‘long unsigned int’} [-Werror=sign-compare]
+   17 |     for (int i = 0; i &lt; v.size(); i++)
+      |                     ~~^~~~~~~~~~
+antes.cpp:15:33: error: unused parameter ‘x’ [-Werror=unused-parameter]
+   15 | double f(vector&lt;Produto&gt; v, int x) {
+      |                             ~~~~^
+antes.cpp: In function ‘int main()’:
+antes.cpp:36:23: error: comparison of integer expressions of different signedness: ‘int’ and ‘std::vector&lt;Produto&gt;::size_type’ {aka ‘long unsigned int’} [-Werror=sign-compare]
+   36 |     for (int i = 0; i &lt; estoque.size(); i++)
+      |                     ~~^~~~~~~~~~~~~~~~
+antes.cpp:37:28: error: suggest parentheses around assignment used as truth value [-Werror=parentheses]
+   37 |         if (estoque[i].qtd = 0) zerados++;
+antes.cpp:33:12: error: ‘void operator delete(void*, std::size_t)’ called on pointer returned from a mismatched allocation function [-Werror=mismatched-new-delete]
+   33 |     delete vendas;
+      |            ^~~~~~
+antes.cpp:28:28: note: returned from ‘void* operator new [](std::size_t)’
+   28 |     int* vendas = new int[3];
+      |                            ^
+cc1plus: all warnings being treated as errors
+$ ls antes
+ls: não foi possível acessar 'antes': Arquivo ou diretório inexistente     « nenhum programa foi criado</pre>
+
+<p>Cada <code>warning</code> virou <code>error</code>, e o nome entre colchetes ganhou um <code>-Werror=</code> na frente. A última linha, <em>all warnings being treated as errors</em>, quer dizer "todos os avisos estão sendo tratados como erros" (<code>cc1plus</code> é o nome da parte do g++ que compila C++).</p>
+
+<h3>O erro que nem os avisos viram</h3>
+<p>Repare na linha 31: <code>for (int i = 0; i &lt;= 3; i++)</code>. Com <code>&lt;=</code>, o laço vai de 0 a <strong>3</strong>, e lê <code>vendas[3]</code>, uma posição que não existe (o array tem 0, 1 e 2). Nenhum aviso apontou isso. Por sorte, a posição "fantasma" valia 0 e o total deu 14. Os sanitizers do item 11 pegam esse erro na hora:</p>
+
+<pre class="term" data-cwd="~/cpp/boas">$ g++ -std=c++23 -g -fsanitize=address,undefined antes.cpp -o antes-san
+$ ./antes-san
+=================================================================
+==4==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x7864169e001c at pc 0x58c21cf5f153 bp 0x7ffca773f6e0 sp 0x7ffca773f6d0
+READ of size 4 at 0x7864169e001c thread T0
+    #0 0x58c21cf5f152 in main /home/ana/cpp/boas/antes.cpp:32
+    #1 0x7c441762a600 in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+    #2 0x7c441762a717 in __libc_start_main_impl ../csu/libc-start.c:360
+    #3 0x58c21cf5e564 in _start (/home/ana/cpp/boas/antes-san+0x14564) (BuildId: b31395161dae059797fd86f8c1bd8d2c83b5375f)
+
+0x7864169e001c is located 0 bytes after 12-byte region [0x7864169e0010,0x7864169e001c)
+allocated by thread T0 here:
+    #0 0x7c441872c8cf in operator new[](unsigned long) ../../../../src/libsanitizer/asan/asan_new_delete.cpp:111
+    #1 0x58c21cf5eee2 in main /home/ana/cpp/boas/antes.cpp:28
+    #2 0x7c441762a600 in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+    #3 0x7c441762a717 in __libc_start_main_impl ../csu/libc-start.c:360
+    #4 0x58c21cf5e564 in _start (/home/ana/cpp/boas/antes-san+0x14564) (BuildId: b31395161dae059797fd86f8c1bd8d2c83b5375f)
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow /home/ana/cpp/boas/antes.cpp:32 in main
+Shadow bytes around the buggy address:
+…                                       « um mapa da memória, útil para especialistas
+==4==ABORTING</pre>
+
+<dl class="anatomy">
+  <dt>heap-buffer-overflow</dt><dd>"Estouro de um bloco da memória dinâmica" (o <em>heap</em>, de onde vem a memória do <code>new</code>; veja <a href="memoria.html">Como a Memória Funciona</a>).</dd>
+  <dt>READ of size 4 … in main /home/ana/cpp/boas/antes.cpp:32</dt><dd>Uma <strong>leitura</strong> de 4 bytes (um <code>int</code>) fora do lugar, na <strong>linha 32</strong>: <code>total_vendas += vendas[i];</code>.</dd>
+  <dt>0 bytes after 12-byte region</dt><dd>"Logo depois de um bloco de 12 bytes": os 3 <code>int</code> do array (3 × 4 bytes). Ou seja, a leitura foi na primeira posição depois do fim.</dd>
+  <dt>allocated by thread T0 here: … antes.cpp:28</dt><dd>Onde o bloco foi criado: a linha 28, do <code>new int[3]</code>.</dd>
+</dl>
+
+<p>Os endereços (<code>0x7864…</code>) mudam a cada execução; o que importa são os nomes de arquivo e as linhas.</p>
+
+<h3>Depois: o mesmo programa com o checklist aplicado</h3>
+
+<pre class="file" data-file="depois.cpp">#include &lt;array&gt;
+#include &lt;print&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+enum class Categoria { fruta, limpeza };
+
+struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+    Categoria categoria = Categoria::fruta;
+};
+
+double valor_do_estoque(const std::vector&lt;Produto&gt;&amp; estoque) {
+    double total = 0.0;
+    for (const auto&amp; produto : estoque) {
+        total += produto.preco * produto.quantidade;
+    }
+    return total;
+}
+
+int contar_zerados(const std::vector&lt;Produto&gt;&amp; estoque) {
+    int zerados = 0;
+    for (const auto&amp; produto : estoque) {
+        if (produto.quantidade == 0) {
+            ++zerados;
+        }
+    }
+    return zerados;
+}
+
+int main() {
+    const std::vector&lt;Produto&gt; estoque{
+        {"maçã", 2.5, 40, Categoria::fruta},
+        {"sabão", 8.9, 10, Categoria::limpeza},
+        {"pera", 3.0, 0, Categoria::fruta},
+    };
+    const std::array vendas{5, 2, 7};
+
+    int total_vendas = 0;
+    for (int venda : vendas) {
+        total_vendas += venda;
+    }
+
+    std::println("Valor do estoque: {:.2f}", valor_do_estoque(estoque));
+    std::println("Vendas: {}", total_vendas);
+    std::println("Produtos zerados: {}", contar_zerados(estoque));
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/boas">$ g++ -std=c++23 -Wall -Wextra depois.cpp -o depois    « nenhum aviso
+$ ./depois
+Valor do estoque: 189.00
+Vendas: 14
+Produtos zerados: 1</pre>
+
+<p>As três respostas certas, zero avisos. Cada mudança, e o item do checklist que ela aplica:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Antes</th><th>Depois</th><th>Item</th></tr>
+<tr><td><code>using namespace std;</code></td><td>Apagado; <code>std::</code> escrito em cada nome</td><td>9</td></tr>
+<tr><td><code>enum Categoria { FRUTA, LIMPEZA };</code></td><td><code>enum class Categoria { fruta, limpeza };</code></td><td>8</td></tr>
+<tr><td>Campos <code>double preco; int qtd;</code> sem valor</td><td><code>double preco = 0.0; int quantidade = 0;</code></td><td>2, 10</td></tr>
+<tr><td><code>double f(vector&lt;Produto&gt; v, int x)</code></td><td><code>double valor_do_estoque(const std::vector&lt;Produto&gt;&amp; estoque)</code>: nome claro, sem cópia, sem o <code>x</code> que sobrava</td><td>7, 10</td></tr>
+<tr><td><code>double t;</code></td><td><code>double total = 0.0;</code></td><td>2</td></tr>
+<tr><td><code>for (int i = 0; i &lt; v.size(); i++)</code></td><td><code>for (const auto&amp; produto : estoque)</code>: sem índice, sem aviso de sinal</td><td>1</td></tr>
+<tr><td><code>new int[3]</code> … <code>delete vendas;</code></td><td><code>const std::array vendas{5, 2, 7};</code>: sem <code>new</code>, sem <code>delete</code>, sem estouro</td><td>3, 4, 5</td></tr>
+<tr><td><code>i &lt;= 3</code> (lia uma posição a mais)</td><td><code>for (int venda : vendas)</code>: o range-for nunca passa do fim</td><td>3</td></tr>
+<tr><td><code>if (estoque[i].qtd = 0) zerados++;</code> no meio do <code>main</code></td><td>Função <code>contar_zerados</code>, com <code>==</code>; o estoque é <code>const</code>, então um <code>=</code> por engano nem compilaria</td><td>6, 10</td></tr>
+<tr><td><code>cout &lt;&lt; … &lt;&lt; endl;</code></td><td><code>std::println("… {:.2f}", …)</code>, com duas casas decimais</td><td>(<a href="format-print.html">format e print</a>)</td></tr>
+</table>
+</div>
+
+<p>Repare na penúltima linha: o <code>const</code> do item 6 não só conserta o erro, ele torna o erro <strong>impossível</strong>. Se alguém escrever <code>produto.quantidade = 0</code> dentro de <code>contar_zerados</code>, o compilador recusa, porque <code>produto</code> é <code>const</code>. Esse é o espírito das boas práticas: em vez de "tomar cuidado", fazer o compilador tomar cuidado por você.</p>
+
+<div class="tip">
+<strong>Refatore aos poucos</strong>
+<p>A Ana não reescreveu tudo de uma vez. Ela fez uma mudança, compilou, rodou, conferiu a saída e só então fez a próxima. Assim, se algo quebrar, você sabe qual mudança foi a culpada.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"cc1plus: all warnings being treated as errors"</strong>
+<p>Você (ou o <code>Makefile</code>/<code>CMakeLists.txt</code> do projeto) está usando <code>-Werror</code>, e o código tem pelo menos um aviso. O programa não foi criado.</p>
+<p><strong>Como consertar:</strong> leia cada linha com <code>error:</code> e o nome entre colchetes (<code>[-Werror=unused-parameter]</code> = o aviso <code>-Wunused-parameter</code>) e conserte o código. Não tire o <code>-Werror</code> para "fazer passar": ele existe exatamente para isso.</p>
+</div>
+
+<div class="cenario">
+<strong>"reference to ‘…’ is ambiguous"</strong>
+<p>Um nome seu bateu com um nome da biblioteca padrão, quase sempre por causa de um <code>using namespace std;</code> (item 9).</p>
+<p><strong>Como consertar:</strong> apague o <code>using namespace std;</code> e escreva <code>std::</code>, ou dê outro nome à sua variável (<code>contador</code> em vez de <code>count</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>"No meu computador funciona"</strong>
+<p>Um programa que dá a resposta certa num computador e errada em outro, ou certa hoje e errada amanhã, quase sempre tem uma variável sem valor inicial ou uma leitura fora do array: exatamente o <code>t</code>, o <code>zerados</code> e o <code>vendas[3]</code> do programa "antes". O resultado depende do lixo que estava na memória.</p>
+<p><strong>Como consertar:</strong> compile com <code>-Wall -Wextra -O2</code> (para os avisos de "may be used uninitialized") e rode com <code>-fsanitize=address,undefined</code>. Veja <a href="comportamento-indefinido.html">Comportamento Indefinido</a>.</p>
+</div>
+
+<hr>
+
+<h2>Missão final: refatorar a média</h2>
+
+<div class="trycpp" data-goal="out:Média: 7.5,semaviso,src:const\s+std::vector&lt;double&gt;\s*&amp;">
+<p class="try-task"><strong>Missão:</strong> aplique o checklist nesta função de média das notas. Ela deve continuar mostrando <code>Média: 7.5</code>, mas compilar com <strong>zero avisos</strong> e receber as notas como <code>const std::vector&lt;double&gt;&amp;</code>. Apague o <code>using namespace std;</code>, inicialize a soma e use um range-for. Dica: o Clang do editor avisa que <code>s</code> não foi inicializada; o g++ sem <code>-O2</code> não avisa, e o programa mostra 7.5 por pura sorte.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+using namespace std;
+
+double media(vector&lt;double&gt; notas) {
+    double s;
+    for (int i = 0; i &lt; notas.size(); i++) s += notas[i];
+    return s / notas.size();
+}
+
+int main() {
+    vector&lt;double&gt; notas = {7.5, 9.0, 6.0};
+    cout &lt;&lt; "Média: " &lt;&lt; media(notas) &lt;&lt; endl;
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+double media(const std::vector&lt;double&gt;&amp; notas) {
+    double soma = 0.0;
+    for (double nota : notas) {
+        soma += nota;
+    }
+    return soma / notas.size();
+}
+
+int main() {
+    const std::vector&lt;double&gt; notas{7.5, 9.0, 6.0};
+    std::cout &lt;&lt; "Média: " &lt;&lt; media(notas) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<p>No laboratório, o código original deu estes avisos no clang++ 21 (o mesmo compilador do editor):</p>
+
+<pre class="term" data-cwd="~/cpp/boas">$ clang++ -std=c++23 -Wall -Wextra media.cpp -o media
+media.cpp:7:23: warning: comparison of integers of different signs: 'int' and 'size_type' (aka 'unsigned long') [-Wsign-compare]
+    7 |     for (int i = 0; i &lt; notas.size(); i++) s += notas[i];
+      |                     ~ ^ ~~~~~~~~~~~~
+media.cpp:7:44: warning: variable 's' is uninitialized when used here [-Wuninitialized]
+    7 |     for (int i = 0; i &lt; notas.size(); i++) s += notas[i];
+      |                                            ^
+media.cpp:6:13: note: initialize the variable 's' to silence this warning
+    6 |     double s;
+      |             ^
+      |              = 0.0
+2 warnings generated.</pre>
+
+<p>O Clang até sugere o conserto: a última linha mostra <code>= 0.0</code> onde ele quer que você inicialize.</p>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Prática</th><th>Na prática</th><th>Aula</th></tr>
+<tr><td>Avisos</td><td><code>g++ -std=c++23 -Wall -Wextra</code>; em projetos, <code>-Werror</code></td><td><a href="avisos.html">Avisos</a></td></tr>
+<tr><td>Inicializar</td><td><code>int total = 0;</code>, <code>double preco{};</code>, valores padrão nos campos</td><td><a href="variaveis.html">Variáveis</a></td></tr>
+<tr><td>Containers</td><td><code>std::vector</code>, <code>std::array</code>, <code>std::string</code></td><td><a href="vector.html">vector</a>, <a href="std-array.html">array</a>, <a href="strings.html">string</a></td></tr>
+<tr><td>Memória</td><td><code>std::make_unique</code>; nada de <code>new</code>/<code>delete</code> soltos</td><td><a href="smart-pointers.html">Ponteiros Inteligentes</a></td></tr>
+<tr><td>RAII</td><td>Recursos dentro de objetos que se limpam sozinhos</td><td><a href="destrutores-raii.html">Destrutores e RAII</a></td></tr>
+<tr><td><code>const</code></td><td>Em variáveis, parâmetros e métodos que não mudam</td><td><a href="constantes.html">Constantes</a></td></tr>
+<tr><td><code>const&amp;</code></td><td>Parâmetros <code>vector</code>, <code>string</code>, structs</td><td><a href="passagem-referencia.html">Valor × Referência</a></td></tr>
+<tr><td><code>enum class</code></td><td><code>Categoria::fruta</code></td><td><a href="enums.html">Enums</a></td></tr>
+<tr><td>Namespaces</td><td><code>std::</code> explícito; nada de <code>using namespace</code> em <code>.h</code></td><td><a href="namespaces.html">Namespaces</a></td></tr>
+<tr><td>Funções</td><td>Uma tarefa por função, nomes descritivos</td><td><a href="funcoes.html">Funções</a></td></tr>
+<tr><td>Sanitizers</td><td><code>-g -fsanitize=address,undefined</code> nos testes</td><td><a href="sanitizers.html">Sanitizers</a></td></tr>
+<tr><td>Formatação</td><td>clang-format com um <code>.clang-format</code> no projeto</td><td><a href="editores.html">Editores e IDEs</a></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">1. O g++ mostrou <code>warning: suggest parentheses around assignment used as truth value</code> num <code>if (qtd = 0)</code>. O que está errado?</p>
+<label><input type="radio" name="q1"> Faltam parênteses em volta do <code>if</code>.</label>
+<label><input type="radio" name="q1"> <code>qtd</code> não foi declarada.</label>
+<label><input type="radio" name="q1"> Foi usado <code>=</code> (atribuir) no lugar de <code>==</code> (comparar).</label>
+<label><input type="radio" name="q1"> Nada: é só uma sugestão de estilo.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">2. Qual é a melhor forma de passar um <code>std::vector&lt;Produto&gt;</code> grande para uma função que só lê os produtos?</p>
+<label><input type="radio" name="q2"> <code>std::vector&lt;Produto&gt; estoque</code></label>
+<label><input type="radio" name="q2"> <code>const std::vector&lt;Produto&gt;&amp; estoque</code></label>
+<label><input type="radio" name="q2"> <code>std::vector&lt;Produto&gt;* estoque</code></label>
+<label><input type="radio" name="q2"> <code>using namespace std;</code> e <code>vector&lt;Produto&gt; estoque</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">3. O que o <code>-Werror</code> faz?</p>
+<label><input type="radio" name="q3"> Liga todos os avisos.</label>
+<label><input type="radio" name="q3"> Esconde os avisos.</label>
+<label><input type="radio" name="q3"> Procura erros de memória enquanto o programa roda.</label>
+<label><input type="radio" name="q3"> Transforma todo aviso em erro: com qualquer aviso, o programa não é criado.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. Um laço <code>for (int i = 0; i &lt;= 3; i++)</code> lê <code>v[i]</code> num array de 3 posições. Quem encontra esse erro?</p>
+<label><input type="radio" name="q4"> O AddressSanitizer (<code>-fsanitize=address</code>), quando o programa roda.</label>
+<label><input type="radio" name="q4"> O <code>-Wall</code>, sempre.</label>
+<label><input type="radio" name="q4"> O clang-format.</label>
+<label><input type="radio" name="q4"> Ninguém: não é um erro.</label>
+</div>
+
+<div class="exercise">
+<p>5. Complete a declaração para que a variável comece com zero:</p>
+<div class="ex-code">int zerados <input data-answer="= 0;|{};|{0};|= 0" aria-label="inicialização"></div>
+</div>
+
+<div class="exercise">
+<p>6. Complete o comando para compilar com os sanitizers de memória e de comportamento indefinido:</p>
+<div class="ex-code">g++ -std=c++23 -g <input data-answer="-fsanitize=address,undefined|-fsanitize=undefined,address" aria-label="opção"> programa.cpp -o programa</div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Compile sempre com <code>-Wall -Wextra</code> e busque <strong>zero avisos</strong>; em projetos, <code>-Werror</code> garante isso. Alguns avisos só aparecem com <code>-O2</code>.</li>
+  <li>Inicialize tudo. Variável sem valor tem lixo, e lixo às vezes parece certo.</li>
+  <li><code>std::vector</code>, <code>std::array</code>, <code>std::string</code> e ponteiros inteligentes no lugar de arrays crus e <code>new</code>/<code>delete</code>. RAII: quem abre, fecha sozinho.</li>
+  <li><code>const</code> sempre que puder; <code>const&amp;</code> para objetos grandes; <code>enum class</code> no lugar de <code>enum</code>.</li>
+  <li>Nada de <code>using namespace std;</code> em headers; nos <code>.cpp</code>, prefira <code>std::</code>.</li>
+  <li>Funções pequenas com nomes que dizem o que fazem.</li>
+  <li>Teste com <code>-fsanitize=address,undefined</code>: ele encontra o que o compilador não vê. Formate com clang-format.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
