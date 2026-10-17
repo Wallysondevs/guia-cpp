@@ -1,0 +1,2587 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Projeto Contas Bancárias — classes, exceções, herança e unique_ptr | Guia C++</title>
+<meta name="description" content="Projeto passo a passo em C++: contas bancárias com POO. Classe Conta com saldo privado, depósito e saque validados, exceção SaldoInsuficiente, ContaPoupanca com virtual e override, std::vector de std::unique_ptr, extrato com std::format, separação em conta.h, conta.cpp e main.cpp e um menu interativo. Saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>Projeto <span class="hl">Contas Bancárias (POO)</span></h1>
+
+<p class="intro">Um banco é o exemplo perfeito de por que a orientação a objetos existe: o saldo de uma conta <strong>não pode</strong> ser mudado por qualquer um, de qualquer jeito. Neste projeto você vai construir, em oito etapas, um pequeno banco em C++: contas que depositam e sacam com validação, uma exceção própria para "saldo insuficiente", uma conta poupança que rende no fim do mês, uma lista de contas de tipos diferentes, um extrato bem alinhado e, no fim, um programa dividido em três arquivos com um menu que você usa digitando comandos.</p>
+
+<div class="note">
+<strong>Você vai praticar</strong>
+<ul>
+  <li><a href="classes-objetos.html">Classes</a> com dados <code>private</code> e <a href="metodos.html">métodos</a> <code>public</code> (<a href="encapsulamento.html">encapsulamento</a>).</li>
+  <li>Validar valores: primeiro devolvendo <code>bool</code>, depois com <a href="excecoes.html">exceções</a> e uma classe de exceção própria.</li>
+  <li><a href="heranca.html">Herança</a> e <a href="polimorfismo.html">polimorfismo</a>: <code>virtual</code>, <code>override</code> e destrutor virtual.</li>
+  <li><code>std::vector&lt;std::unique_ptr&lt;Conta&gt;&gt;</code>: uma lista de contas de tipos diferentes (<a href="smart-pointers.html">ponteiros inteligentes</a>).</li>
+  <li>Texto alinhado com <a href="format-print.html">std::format</a>.</li>
+  <li>Separar o programa em <a href="headers.html">.h e .cpp</a> e <a href="multiplos-arquivos.html">compilar vários arquivos</a>.</li>
+  <li>Ler comandos do teclado com <a href="getline.html">getline</a>.</li>
+</ul>
+</div>
+
+<p>Todos os programas foram compilados e executados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp/banco</code>, com o <strong>g++ 15.2</strong> e o comando padrão do guia, <code>g++ -std=c++23 -Wall -Wextra</code>. Cada etapa tem uma caixa <em>Experimente</em> em que você faz a etapa no navegador.</p>
+
+<hr>
+
+<h2>O que vamos construir</h2>
+<p>No fim, a pasta do projeto terá três arquivos:</p>
+
+<pre class="term" data-cwd="~/cpp/banco">$ ls
+conta.cpp
+conta.h
+main.cpp</pre>
+
+<p>E o programa funciona assim (o que vem depois de <code>banco&gt;</code> é o que a Ana digitou):</p>
+
+<pre class="term" data-cwd="~/cpp/banco">$ g++ -std=c++23 -Wall -Wextra main.cpp conta.cpp -o banco
+$ ./banco
+Banco da Ana. Comandos: l, d N VALOR, s N VALOR, e N, m, q
+banco&gt; l
+1. Ana (Corrente)
+2. Bruno (Poupança)
+banco&gt; d 1 1000
+Depósito feito.
+banco&gt; d 2 1000
+Depósito feito.
+banco&gt; s 1 250
+Saque feito.
+banco&gt; s 2 5000
+Recusado: saldo insuficiente (saldo 1000.00, pedido 5000.00)
+banco&gt; d 3 10
+Erro: não existe a conta 3
+banco&gt; d 1 -5
+Erro: o valor precisa ser positivo
+banco&gt; m
+Mês fechado.
+banco&gt; e 1
+Extrato de Ana (Corrente)
+  Depósito      +1000.00
+  Saque          -250.00
+  Saldo           750.00
+banco&gt; e 2
+Extrato de Bruno (Poupança)
+  Depósito      +1000.00
+  Rendimento       +5.00
+  Saldo          1005.00
+banco&gt; q
+
+Até logo!</pre>
+
+<p>O caminho até lá:</p>
+<ol class="passo">
+  <li><a href="#etapa1">A classe Conta</a>: titular, saldo privado, depósito.</li>
+  <li><a href="#etapa2">Validar depósito e saque</a> devolvendo <code>bool</code>.</li>
+  <li><a href="#etapa3">A exceção SaldoInsuficiente</a>: <code>throw</code>, <code>try</code> e <code>catch</code>.</li>
+  <li><a href="#etapa4">A conta poupança</a>: herança, <code>virtual</code> e <code>override</code>.</li>
+  <li><a href="#etapa5">Uma lista de contas</a>: <code>std::vector&lt;std::unique_ptr&lt;Conta&gt;&gt;</code>.</li>
+  <li><a href="#etapa6">O extrato</a> com <code>std::format</code>.</li>
+  <li><a href="#etapa7">Separar em conta.h, conta.cpp e main.cpp</a>.</li>
+  <li><a href="#etapa8">O menu</a>: comandos digitados pelo usuário.</li>
+</ol>
+
+<h3>Antes de começar</h3>
+<p>Este projeto junta assuntos do Nível 3. Se algum termo for novidade, a aula indicada em cada etapa explica com calma; aqui o foco é ver as peças funcionando juntas. Crie a pasta do projeto:</p>
+
+<pre class="term">$ mkdir -p cpp/banco
+$ cd cpp/banco</pre>
+
+<p>Nas etapas 1 a 6, todo o programa fica num arquivo só, <code>banco.cpp</code>, que vai crescendo. Na etapa 7 ele é dividido em três.</p>
+
+<hr>
+
+<h2 id="etapa1">Etapa 1 · A classe Conta</h2>
+<p>Uma conta tem duas informações: o <strong>titular</strong> (o nome do dono) e o <strong>saldo</strong>. E sabe fazer uma coisa, por enquanto: receber um depósito. Em C++, isso vira uma <a href="classes-objetos.html">classe</a>:</p>
+
+<pre class="file" data-file="banco.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Conta {
+public:
+    explicit Conta(std::string titular) : titular_{titular} {}
+
+    void depositar(double valor) {
+        saldo_ += valor;
+    }
+
+    std::string titular() const { return titular_; }
+    double saldo() const { return saldo_; }
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+};
+
+int main() {
+    Conta ana{"Ana"};
+    ana.depositar(150.0);
+    ana.depositar(49.90);
+    std::cout &lt;&lt; ana.titular() &lt;&lt; " tem R$ " &lt;&lt; ana.saldo() &lt;&lt; '\n';
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>class Conta { … };</code></td><td>O molde de toda conta. Repare no <code>;</code> depois da chave final: esquecê-lo é um erro clássico.</td></tr>
+<tr><td><code>public:</code></td><td>Daqui para baixo, tudo pode ser usado por quem tem uma conta (o <code>main</code>, por exemplo).</td></tr>
+<tr><td><code>explicit Conta(std::string titular) : titular_{titular} {}</code></td><td>O <a href="construtores.html">construtor</a>: roda quando a conta nasce e guarda o nome em <code>titular_</code>. O <code>explicit</code> impede que um texto solto vire conta "sem querer" (por exemplo, numa função que espera uma <code>Conta</code> e recebe <code>"Ana"</code>).</td></tr>
+<tr><td><code>void depositar(double valor)</code></td><td>Soma o valor ao saldo. É o <strong>único</strong> jeito de fazer o saldo crescer.</td></tr>
+<tr><td><code>double saldo() const</code></td><td>Devolve o saldo para quem quiser <em>ler</em>. O <code>const</code> promete que o método não muda a conta (veja <a href="metodos-const.html">métodos const</a>).</td></tr>
+<tr><td><code>private:</code></td><td>Daqui para baixo, só os métodos da própria classe enxergam. É o cofre.</td></tr>
+<tr><td><code>titular_</code>, <code>saldo_</code></td><td>Os dados. O <code>_</code> no fim é um costume para diferenciar o dado (<code>saldo_</code>) do método que o lê (<code>saldo()</code>).</td></tr>
+<tr><td><code>double saldo_ = 0.0;</code></td><td>Toda conta nasce zerada. Nunca deixe um número sem valor inicial.</td></tr>
+<tr><td><code>Conta ana{"Ana"};</code></td><td>Cria o objeto <code>ana</code> chamando o construtor.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp/banco">$ g++ -std=c++23 -Wall -Wextra banco.cpp -o banco
+$ ./banco
+Ana tem R$ 199.9</pre>
+
+<p>O <code>std::cout</code> mostra <code>199.9</code>, sem o zero do fim. Na etapa 6 o <code>std::format</code> vai mostrar <code>199.90</code>, como se espera de dinheiro.</p>
+
+<h3>O cofre funciona?</h3>
+<p>O motivo de o saldo ser <code>private</code> é que ninguém de fora possa escrever <code>ana.saldo_ = 1000000;</code>. Coloque essa linha no <code>main</code>, logo depois dos depósitos, e compile:</p>
+
+<pre class="term" data-cwd="~/cpp/banco">$ g++ -std=c++23 -Wall -Wextra banco.cpp -o banco
+banco.cpp: In function ‘int main()’:
+banco.cpp:24:9: error: ‘double Conta::saldo_’ is private within this context
+   24 |     ana.saldo_ = 1000000;
+      |         ^~~~~~
+banco.cpp:17:12: note: declared private here
+   17 |     double saldo_ = 0.0;
+      |            ^~~~~~
+banco.cpp:24:9: note: field ‘double Conta::saldo_’ can be accessed via ‘double Conta::saldo() const’
+   24 |     ana.saldo_ = 1000000;
+      |         ^~~~~~
+      |         saldo()</pre>
+
+<p>Lendo de cima para baixo: <code>error: ‘double Conta::saldo_’ is private within this context</code> ("é privado neste contexto": o <code>main</code> não pode mexer). A primeira <code>note</code> mostra onde ele foi declarado <code>private</code>, e a segunda até sugere o caminho certo: ler pelo método <code>saldo()</code>. É exatamente o que queremos: o compilador protege o saldo para você. Apague a linha e siga em frente.</p>
+
+<div class="warning">
+<strong><code>double</code> e dinheiro</strong>
+<p>O <code>double</code> guarda números em binário, e a maioria dos centavos não tem representação exata em binário (como 1/3 não tem em decimal). Veja:</p>
+<pre class="file" data-file="frac.cpp">#include &lt;format&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    double total = 0.1 + 0.2;
+    std::cout &lt;&lt; total &lt;&lt; '\n';
+    std::cout &lt;&lt; std::format("{}", total) &lt;&lt; '\n';
+    std::cout &lt;&lt; (total == 0.3) &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/banco">$ g++ -std=c++23 -Wall -Wextra frac.cpp -o frac
+$ ./frac
+0.3
+0.30000000000000004
+0</pre>
+<p>O <code>cout</code> arredonda e mostra <code>0.3</code>, mas o valor guardado é <code>0.30000000000000004</code>, e por isso <code>total == 0.3</code> dá falso (<code>0</code>). Para aprender POO, o <code>double</code> serve. Um banco de verdade guarda <strong>centavos inteiros</strong> (<code>long long</code>, com R$ 10,50 guardado como 1050): fica como desafio no fim da página. Mais em <a href="ponto-flutuante.html">float e double</a>.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Bruno tem R$ 325.5,src:Conta\s+bruno">
+<p class="try-task"><strong>Missão (etapa 1):</strong> crie uma segunda conta, <code>bruno</code>, do titular <code>"Bruno"</code>. Deposite 300 e depois 25.50, e mostre a frase dele igual à da Ana. A saída deve terminar com:</p>
+<pre class="out">Bruno tem R$ 325.5</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Conta {
+public:
+    explicit Conta(std::string titular) : titular_{titular} {}
+
+    void depositar(double valor) {
+        saldo_ += valor;
+    }
+
+    std::string titular() const { return titular_; }
+    double saldo() const { return saldo_; }
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+};
+
+int main() {
+    Conta ana{"Ana"};
+    ana.depositar(150.0);
+    ana.depositar(49.90);
+    std::cout &lt;&lt; ana.titular() &lt;&lt; " tem R$ " &lt;&lt; ana.saldo() &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Conta {
+public:
+    explicit Conta(std::string titular) : titular_{titular} {}
+
+    void depositar(double valor) {
+        saldo_ += valor;
+    }
+
+    std::string titular() const { return titular_; }
+    double saldo() const { return saldo_; }
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+};
+
+int main() {
+    Conta ana{"Ana"};
+    ana.depositar(150.0);
+    ana.depositar(49.90);
+    std::cout &lt;&lt; ana.titular() &lt;&lt; " tem R$ " &lt;&lt; ana.saldo() &lt;&lt; '\n';
+
+    Conta bruno{"Bruno"};
+    bruno.depositar(300.0);
+    bruno.depositar(25.50);
+    std::cout &lt;&lt; bruno.titular() &lt;&lt; " tem R$ " &lt;&lt; bruno.saldo() &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa2">Etapa 2 · Validar depósito e saque</h2>
+<p>A conta da etapa 1 aceita <code>ana.depositar(-500)</code>, e isso é, na prática, um saque escondido. Também falta o saque. As regras do banco:</p>
+<ul>
+  <li>depósito e saque só com valor <strong>positivo</strong>;</li>
+  <li>saque só se houver saldo.</li>
+</ul>
+<p>Primeira forma de fazer: cada método devolve <code>bool</code> (<code>true</code> = deu certo, <code>false</code> = recusado) e não mexe no saldo quando recusa.</p>
+
+<pre class="file" data-file="banco.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Conta {
+public:
+    explicit Conta(std::string titular) : titular_{titular} {}
+
+    bool depositar(double valor) {
+        if (valor &lt;= 0) {
+            return false;          // recusado: nada muda
+        }
+        saldo_ += valor;
+        return true;
+    }
+
+    bool sacar(double valor) {
+        if (valor &lt;= 0 || valor &gt; saldo_) {
+            return false;
+        }
+        saldo_ -= valor;
+        return true;
+    }
+
+    std::string titular() const { return titular_; }
+    double saldo() const { return saldo_; }
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+};
+
+int main() {
+    Conta ana{"Ana"};
+    ana.depositar(1000.0);
+
+    if (ana.sacar(250.0)) {
+        std::cout &lt;&lt; "Saque de 250 feito.\n";
+    }
+    if (!ana.sacar(5000.0)) {
+        std::cout &lt;&lt; "Saque de 5000 recusado.\n";
+    }
+    if (!ana.depositar(-50.0)) {
+        std::cout &lt;&lt; "Depósito de -50 recusado.\n";
+    }
+    ana.sacar(800.0);      // ninguém conferiu se deu certo...
+    std::cout &lt;&lt; ana.titular() &lt;&lt; " tem R$ " &lt;&lt; ana.saldo() &lt;&lt; '\n';
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>bool depositar(double valor)</code></td><td>Agora o método <strong>responde</strong> se deu certo.</td></tr>
+<tr><td><code>if (valor &lt;= 0) { return false; }</code></td><td>Recusa antes de mexer em qualquer coisa. O <code>return</code> sai do método na hora.</td></tr>
+<tr><td><code>valor &lt;= 0 || valor &gt; saldo_</code></td><td>No saque, duas condições de recusa ligadas por "ou" (<a href="operadores-logicos.html">operadores lógicos</a>).</td></tr>
+<tr><td><code>if (!ana.sacar(5000.0))</code></td><td>Quem chama confere a resposta. O <code>!</code> lê-se "se <strong>não</strong> conseguiu sacar".</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp/banco">$ g++ -std=c++23 -Wall -Wextra banco.cpp -o banco
+$ ./banco
+Saque de 250 feito.
+Saque de 5000 recusado.
+Depósito de -50 recusado.
+Ana tem R$ 750</pre>
+
+<p>Funciona, mas olhe a penúltima linha do <code>main</code>: <code>ana.sacar(800.0);</code>. O saque foi recusado (só havia 750) e <strong>ninguém percebeu</strong>: o programa seguiu como se o dinheiro tivesse saído. Com <code>bool</code>, conferir é opcional, e o que é opcional acaba esquecido.</p>
+
+<p>O C++ tem um remédio parcial: o atributo <code>[[nodiscard]]</code> ("não descarte") <span class="versao">C++17</span>. Escreva-o antes de <code>bool</code> nos dois métodos (<code>[[nodiscard]] bool depositar(…)</code>) e compile de novo:</p>
+
+<pre class="term" data-cwd="~/cpp/banco">$ g++ -std=c++23 -Wall -Wextra banco.cpp -o banco
+banco.cpp: In function ‘int main()’:
+banco.cpp:34:18: warning: ignoring return value of ‘bool Conta::depositar(double)’, declared with attribute ‘nodiscard’ [-Wunused-result]
+   34 |     ana.depositar(1000.0);
+      |     ~~~~~~~~~~~~~^~~~~~~~
+banco.cpp:8:24: note: declared here
+    8 |     [[nodiscard]] bool depositar(double valor) {
+      |                        ^~~~~~~~~
+banco.cpp:45:14: warning: ignoring return value of ‘bool Conta::sacar(double)’, declared with attribute ‘nodiscard’ [-Wunused-result]
+   45 |     ana.sacar(800.0);      // ninguém conferiu se deu certo...
+      |     ~~~~~~~~~^~~~~~~
+banco.cpp:16:24: note: declared here
+   16 |     [[nodiscard]] bool sacar(double valor) {
+      |                        ^~~~~</pre>
+
+<p>Dois avisos: <code>ignoring return value … declared with attribute ‘nodiscard’</code> ("ignorando o valor de retorno"). O segundo pega justamente o saque esquecido. O primeiro pega o depósito inicial, que também não foi conferido. É uma ajuda, mas ainda é só um aviso: o programa compila e roda do mesmo jeito. Na próxima etapa, um saque recusado vai <strong>interromper</strong> o caminho normal do programa, e não dá para ignorar.</p>
+
+<div class="trycpp" data-goal="out:Saque de 250 feito.,out:Saque de 5000 recusado.,out:Ana tem R$ 750">
+<p class="try-task"><strong>Missão (etapa 2):</strong> o método <code>sacar</code> está vazio: sempre recusa. Escreva o corpo dele: devolva <code>false</code> se o valor for zero, negativo ou maior que o saldo; senão, tire o valor do saldo e devolva <code>true</code>. (O aviso <code>unused parameter ‘valor’</code> some quando você usar o parâmetro.) A saída deve ser:</p>
+<pre class="out">Saque de 250 feito.
+Saque de 5000 recusado.
+Depósito de -50 recusado.
+Ana tem R$ 750</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Conta {
+public:
+    explicit Conta(std::string titular) : titular_{titular} {}
+
+    bool depositar(double valor) {
+        if (valor &lt;= 0) {
+            return false;          // recusado: nada muda
+        }
+        saldo_ += valor;
+        return true;
+    }
+
+    bool sacar(double valor) {
+        // Missão: recuse (return false) se o valor for zero, negativo
+        // ou maior que o saldo; senão, tire do saldo e devolva true.
+        return false;
+    }
+
+    std::string titular() const { return titular_; }
+    double saldo() const { return saldo_; }
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+};
+
+int main() {
+    Conta ana{"Ana"};
+    ana.depositar(1000.0);
+
+    if (ana.sacar(250.0)) {
+        std::cout &lt;&lt; "Saque de 250 feito.\n";
+    }
+    if (!ana.sacar(5000.0)) {
+        std::cout &lt;&lt; "Saque de 5000 recusado.\n";
+    }
+    if (!ana.depositar(-50.0)) {
+        std::cout &lt;&lt; "Depósito de -50 recusado.\n";
+    }
+    ana.sacar(800.0);      // ninguém conferiu se deu certo...
+    std::cout &lt;&lt; ana.titular() &lt;&lt; " tem R$ " &lt;&lt; ana.saldo() &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Conta {
+public:
+    explicit Conta(std::string titular) : titular_{titular} {}
+
+    bool depositar(double valor) {
+        if (valor &lt;= 0) {
+            return false;          // recusado: nada muda
+        }
+        saldo_ += valor;
+        return true;
+    }
+
+    bool sacar(double valor) {
+        if (valor &lt;= 0 || valor &gt; saldo_) {
+            return false;
+        }
+        saldo_ -= valor;
+        return true;
+    }
+
+    std::string titular() const { return titular_; }
+    double saldo() const { return saldo_; }
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+};
+
+int main() {
+    Conta ana{"Ana"};
+    ana.depositar(1000.0);
+
+    if (ana.sacar(250.0)) {
+        std::cout &lt;&lt; "Saque de 250 feito.\n";
+    }
+    if (!ana.sacar(5000.0)) {
+        std::cout &lt;&lt; "Saque de 5000 recusado.\n";
+    }
+    if (!ana.depositar(-50.0)) {
+        std::cout &lt;&lt; "Depósito de -50 recusado.\n";
+    }
+    ana.sacar(800.0);      // ninguém conferiu se deu certo...
+    std::cout &lt;&lt; ana.titular() &lt;&lt; " tem R$ " &lt;&lt; ana.saldo() &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa3">Etapa 3 · A exceção SaldoInsuficiente</h2>
+<p>Uma <a href="excecoes.html">exceção</a> é um aviso de "deu errado" que <strong>não pode ser ignorado</strong>: quando um método faz <code>throw</code> (lança), o programa para o que estava fazendo e pula para o <code>catch</code> (captura) mais próximo. Se não houver nenhum, o programa termina.</p>
+
+<p>Para o saque sem saldo, vamos criar a nossa própria exceção, <code>SaldoInsuficiente</code>. Para valor zero ou negativo, usamos uma que já vem pronta na biblioteca: <code>std::invalid_argument</code> ("argumento inválido").</p>
+
+<pre class="file" data-file="banco.cpp">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+
+class SaldoInsuficiente : public std::runtime_error {
+public:
+    SaldoInsuficiente(double saldo, double pedido)
+        : std::runtime_error{std::format("saldo insuficiente (saldo {:.2f}, pedido {:.2f})",
+                                         saldo, pedido)} {}
+};
+
+class Conta {
+public:
+    explicit Conta(std::string titular) : titular_{titular} {}
+
+    void depositar(double valor) {
+        if (valor &lt;= 0) {
+            throw std::invalid_argument{"o valor precisa ser positivo"};
+        }
+        saldo_ += valor;
+    }
+
+    void sacar(double valor) {
+        if (valor &lt;= 0) {
+            throw std::invalid_argument{"o valor precisa ser positivo"};
+        }
+        if (valor &gt; saldo_) {
+            throw SaldoInsuficiente{saldo_, valor};
+        }
+        saldo_ -= valor;
+    }
+
+    std::string titular() const { return titular_; }
+    double saldo() const { return saldo_; }
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+};
+
+int main() {
+    Conta ana{"Ana"};
+    ana.depositar(1000.0);
+
+    try {
+        ana.sacar(250.0);
+        std::cout &lt;&lt; "Saque de 250 feito.\n";
+        ana.sacar(5000.0);
+        std::cout &lt;&lt; "Esta linha não aparece.\n";
+    } catch (const SaldoInsuficiente&amp; e) {
+        std::cout &lt;&lt; "Recusado: " &lt;&lt; e.what() &lt;&lt; '\n';
+    }
+
+    try {
+        ana.depositar(-50.0);
+    } catch (const std::invalid_argument&amp; e) {
+        std::cout &lt;&lt; "Erro: " &lt;&lt; e.what() &lt;&lt; '\n';
+    }
+
+    std::cout &lt;&lt; ana.titular() &lt;&lt; " tem R$ " &lt;&lt; ana.saldo() &lt;&lt; '\n';
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>#include &lt;stdexcept&gt;</code></td><td>Traz as exceções prontas: <code>std::runtime_error</code>, <code>std::invalid_argument</code>, <code>std::out_of_range</code>…</td></tr>
+<tr><td><code>class SaldoInsuficiente : public std::runtime_error</code></td><td>A nossa exceção <strong>é um</strong> <code>runtime_error</code> (<a href="heranca.html">herança</a>, que a etapa 4 explica). Com isso ela ganha de graça o método <code>what()</code>, que devolve a mensagem.</td></tr>
+<tr><td><code>: std::runtime_error{std::format(…)}</code></td><td>O construtor monta a mensagem com o saldo e o pedido e entrega ao <code>runtime_error</code>. O <code>{:.2f}</code> mostra o número com 2 casas (detalhes na etapa 6).</td></tr>
+<tr><td><code>throw std::invalid_argument{"…"};</code></td><td>Lança a exceção. Nada depois dela, no método, é executado: o saldo não muda.</td></tr>
+<tr><td><code>throw SaldoInsuficiente{saldo_, valor};</code></td><td>Lança a nossa, com os dois números.</td></tr>
+<tr><td><code>void sacar(…)</code></td><td>Voltou a ser <code>void</code>: não precisa mais responder <code>true</code>/<code>false</code>. Se voltou do método, deu certo.</td></tr>
+<tr><td><code>try { … }</code></td><td>"Tente": o trecho que pode lançar.</td></tr>
+<tr><td><code>catch (const SaldoInsuficiente&amp; e)</code></td><td>Captura <strong>só</strong> esse tipo de exceção. O <code>const &amp;</code> evita copiar o objeto da exceção; use sempre assim.</td></tr>
+<tr><td><code>e.what()</code></td><td>A mensagem montada no construtor.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp/banco">$ g++ -std=c++23 -Wall -Wextra banco.cpp -o banco
+$ ./banco
+Saque de 250 feito.
+Recusado: saldo insuficiente (saldo 750.00, pedido 5000.00)
+Erro: o valor precisa ser positivo
+Ana tem R$ 750</pre>
+
+<p>Repare que <code>Esta linha não aparece.</code> de fato não aparece: o <code>throw</code> do segundo saque pulou direto para o <code>catch</code>. E o saldo continua 750: nenhuma operação recusada mexeu nele.</p>
+
+<div class="cenario">
+<strong>Quando dá errado: uma exceção que ninguém captura</strong>
+<p>Coloque <code>ana.sacar(800.0);</code> <strong>fora</strong> de qualquer <code>try</code>, logo antes da última linha do <code>main</code>:</p>
+<pre class="term" data-cwd="~/cpp/banco">$ g++ -std=c++23 -Wall -Wextra banco.cpp -o banco
+$ ./banco
+Saque de 250 feito.
+Recusado: saldo insuficiente (saldo 750.00, pedido 5000.00)
+Erro: o valor precisa ser positivo
+terminate called after throwing an instance of 'SaldoInsuficiente'
+  what():  saldo insuficiente (saldo 750.00, pedido 800.00)
+Abortado                   (imagem do núcleo gravada) ./banco
+$ echo $?
+134</pre>
+<ul>
+  <li><code>terminate called after throwing an instance of 'SaldoInsuficiente'</code>: "terminar, chamado depois de lançar um <code>SaldoInsuficiente</code>". Como ninguém capturou, o C++ chama <code>std::terminate</code>, que encerra o programa.</li>
+  <li><code>what():</code> mostra a nossa mensagem. Ainda bem que ela diz o saldo e o pedido.</li>
+  <li><code>Abortado (imagem do núcleo gravada)</code> é o Bash avisando que o programa foi abortado; o código de saída 134 é 128 + 6, o número do sinal de "abortar".</li>
+  <li>A frase final <code>Ana tem R$ 750</code> nunca foi impressa. Diferente do <code>bool</code> esquecido, o erro <strong>não passou despercebido</strong>.</li>
+</ul>
+<p><strong>Como consertar:</strong> toda operação que pode lançar fica dentro de um <code>try</code> com o <code>catch</code> certo, como as outras do <code>main</code>.</p>
+</div>
+
+<div class="tip">
+<strong>Sem <code>-std=c++23</code> o <code>std::format</code> não existe</strong>
+<p>O g++ 15 usa C++17 se você não pedir outro padrão. Compilando com <code>g++ -Wall -Wextra banco.cpp -o banco</code>, a primeira mensagem é <code>error: ‘format’ is not a member of ‘std’</code>, seguida da dica <code>note: ‘std::format’ is only available from C++20 onwards</code>. Use sempre o comando padrão do guia.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Erro: o valor precisa ser positivo,out:Ana tem R$ 750">
+<p class="try-task"><strong>Missão (etapa 3):</strong> o <code>sacar</code> já lança as exceções, mas o <code>depositar</code> aceita qualquer valor, e o depósito de −50 tirou dinheiro da Ana (ela ficou com 700). Faça o <code>depositar</code> lançar <code>std::invalid_argument</code> com a mensagem <code>"o valor precisa ser positivo"</code> quando o valor não for positivo. O <code>main</code> já tem o <code>catch</code>. A saída deve ser:</p>
+<pre class="out">Saque de 250 feito.
+Recusado: saldo insuficiente (saldo 750.00, pedido 5000.00)
+Erro: o valor precisa ser positivo
+Ana tem R$ 750</pre>
+<pre class="script">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+
+class SaldoInsuficiente : public std::runtime_error {
+public:
+    SaldoInsuficiente(double saldo, double pedido)
+        : std::runtime_error{std::format("saldo insuficiente (saldo {:.2f}, pedido {:.2f})",
+                                         saldo, pedido)} {}
+};
+
+class Conta {
+public:
+    explicit Conta(std::string titular) : titular_{titular} {}
+
+    void depositar(double valor) {
+        // Missão: lance std::invalid_argument se o valor não for positivo.
+        saldo_ += valor;
+    }
+
+    void sacar(double valor) {
+        if (valor &lt;= 0) {
+            throw std::invalid_argument{"o valor precisa ser positivo"};
+        }
+        if (valor &gt; saldo_) {
+            throw SaldoInsuficiente{saldo_, valor};
+        }
+        saldo_ -= valor;
+    }
+
+    std::string titular() const { return titular_; }
+    double saldo() const { return saldo_; }
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+};
+
+int main() {
+    Conta ana{"Ana"};
+    ana.depositar(1000.0);
+
+    try {
+        ana.sacar(250.0);
+        std::cout &lt;&lt; "Saque de 250 feito.\n";
+        ana.sacar(5000.0);
+        std::cout &lt;&lt; "Esta linha não aparece.\n";
+    } catch (const SaldoInsuficiente&amp; e) {
+        std::cout &lt;&lt; "Recusado: " &lt;&lt; e.what() &lt;&lt; '\n';
+    }
+
+    try {
+        ana.depositar(-50.0);
+    } catch (const std::invalid_argument&amp; e) {
+        std::cout &lt;&lt; "Erro: " &lt;&lt; e.what() &lt;&lt; '\n';
+    }
+
+    std::cout &lt;&lt; ana.titular() &lt;&lt; " tem R$ " &lt;&lt; ana.saldo() &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+
+class SaldoInsuficiente : public std::runtime_error {
+public:
+    SaldoInsuficiente(double saldo, double pedido)
+        : std::runtime_error{std::format("saldo insuficiente (saldo {:.2f}, pedido {:.2f})",
+                                         saldo, pedido)} {}
+};
+
+class Conta {
+public:
+    explicit Conta(std::string titular) : titular_{titular} {}
+
+    void depositar(double valor) {
+        if (valor &lt;= 0) {
+            throw std::invalid_argument{"o valor precisa ser positivo"};
+        }
+        saldo_ += valor;
+    }
+
+    void sacar(double valor) {
+        if (valor &lt;= 0) {
+            throw std::invalid_argument{"o valor precisa ser positivo"};
+        }
+        if (valor &gt; saldo_) {
+            throw SaldoInsuficiente{saldo_, valor};
+        }
+        saldo_ -= valor;
+    }
+
+    std::string titular() const { return titular_; }
+    double saldo() const { return saldo_; }
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+};
+
+int main() {
+    Conta ana{"Ana"};
+    ana.depositar(1000.0);
+
+    try {
+        ana.sacar(250.0);
+        std::cout &lt;&lt; "Saque de 250 feito.\n";
+        ana.sacar(5000.0);
+        std::cout &lt;&lt; "Esta linha não aparece.\n";
+    } catch (const SaldoInsuficiente&amp; e) {
+        std::cout &lt;&lt; "Recusado: " &lt;&lt; e.what() &lt;&lt; '\n';
+    }
+
+    try {
+        ana.depositar(-50.0);
+    } catch (const std::invalid_argument&amp; e) {
+        std::cout &lt;&lt; "Erro: " &lt;&lt; e.what() &lt;&lt; '\n';
+    }
+
+    std::cout &lt;&lt; ana.titular() &lt;&lt; " tem R$ " &lt;&lt; ana.saldo() &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa4">Etapa 4 · A conta poupança</h2>
+<p>A poupança é uma conta com tudo o que a conta comum tem (titular, saldo, depósito, saque) e <strong>uma diferença</strong>: no fim do mês, ela rende juros. Em vez de copiar a classe inteira, dizemos que <code>ContaPoupanca</code> <strong>herda</strong> de <code>Conta</code> (<a href="heranca.html">herança</a>) e escrevemos só o que muda.</p>
+
+<p>Para o "fim do mês" funcionar com qualquer conta, a classe base ganha dois métodos <code>virtual</code>: <code>tipo()</code> (o nome do tipo de conta) e <code>fecharMes()</code>. <code>virtual</code> quer dizer "uma classe filha pode trocar este método pelo dela, e o C++ vai chamar o da filha mesmo quando só souber que tem uma <code>Conta</code> nas mãos". Isso é o <a href="polimorfismo.html">polimorfismo</a>.</p>
+
+<p>Os <code>#include</code>, a <code>SaldoInsuficiente</code>, o <code>depositar</code> e o <code>sacar</code> continuam iguais à etapa 3. O resto do <code>banco.cpp</code> fica assim (o arquivo inteiro está na missão desta etapa):</p>
+
+<pre class="file" data-file="banco.cpp (o que mudou)">class Conta {
+public:
+    explicit Conta(std::string titular) : titular_{titular} {}
+    virtual ~Conta() = default;
+
+    virtual std::string tipo() const { return "Corrente"; }
+    virtual void fecharMes() {}      // a conta corrente não rende
+
+    // depositar, sacar, titular() e saldo(): iguais à etapa 3
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+};
+
+class ContaPoupanca : public Conta {
+public:
+    ContaPoupanca(std::string titular, double taxa)
+        : Conta{titular}, taxa_{taxa} {}
+
+    std::string tipo() const override { return "Poupança"; }
+
+    void fecharMes() override {
+        double rendimento = saldo() * taxa_;
+        if (rendimento &gt; 0) {
+            depositar(rendimento);
+        }
+    }
+
+private:
+    double taxa_;
+};
+
+void mostrar(const Conta&amp; conta) {
+    std::cout &lt;&lt; conta.titular() &lt;&lt; " (" &lt;&lt; conta.tipo() &lt;&lt; "): R$ "
+              &lt;&lt; conta.saldo() &lt;&lt; '\n';
+}
+
+int main() {
+    Conta ana{"Ana"};
+    ContaPoupanca bruno{"Bruno", 0.005};    // rende 0,5% ao mês
+
+    ana.depositar(1000.0);
+    bruno.depositar(1000.0);                // depositar veio de Conta
+    mostrar(ana);
+    mostrar(bruno);
+
+    ana.fecharMes();
+    bruno.fecharMes();
+    std::cout &lt;&lt; "--- fim do mês ---\n";
+    mostrar(ana);
+    mostrar(bruno);
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>virtual ~Conta() = default;</code></td><td>Destrutor virtual. Regra: classe com métodos <code>virtual</code> tem destrutor <code>virtual</code>. Sem ele, apagar uma poupança por um ponteiro de <code>Conta</code> (etapa 5) não chamaria a parte da poupança. <code>= default</code> = "o padrão serve".</td></tr>
+<tr><td><code>virtual std::string tipo() const { return "Corrente"; }</code></td><td>A versão da conta comum. As filhas podem trocar.</td></tr>
+<tr><td><code>virtual void fecharMes() {}</code></td><td>A conta comum não faz nada no fim do mês: corpo vazio.</td></tr>
+<tr><td><code>class ContaPoupanca : public Conta</code></td><td>"Poupança é uma Conta". Herda tudo; o <code>private</code> da <code>Conta</code> continua fechado até para a filha, que mexe no saldo só pelos métodos públicos.</td></tr>
+<tr><td><code>: Conta{titular}, taxa_{taxa}</code></td><td>O construtor da filha chama primeiro o da mãe (que guarda o titular) e depois guarda a taxa.</td></tr>
+<tr><td><code>std::string tipo() const override</code></td><td><code>override</code> ("sobrescreve") diz ao compilador: "esta função substitui uma <code>virtual</code> da mãe". Se não substituir nada (nome errado, <code>const</code> a mais…), é erro de compilação.</td></tr>
+<tr><td><code>double rendimento = saldo() * taxa_;</code></td><td>Com taxa 0.005 (0,5%), mil reais rendem 5.</td></tr>
+<tr><td><code>depositar(rendimento);</code></td><td>O rendimento entra pelo <code>depositar</code> herdado: a poupança não precisa (nem consegue) mexer em <code>saldo_</code> direto.</td></tr>
+<tr><td><code>void mostrar(const Conta&amp; conta)</code></td><td>Uma função que recebe <strong>qualquer</strong> conta por <a href="referencias.html">referência</a>. Graças ao <code>virtual</code>, <code>conta.tipo()</code> chama a versão certa.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp/banco">$ g++ -std=c++23 -Wall -Wextra banco.cpp -o banco
+$ ./banco
+Ana (Corrente): R$ 1000
+Bruno (Poupança): R$ 1000
+--- fim do mês ---
+Ana (Corrente): R$ 1000
+Bruno (Poupança): R$ 1005</pre>
+
+<p>As duas contas receberam o mesmo depósito e o mesmo <code>fecharMes()</code>, mas só a do Bruno rendeu. E a função <code>mostrar</code>, que só conhece <code>Conta</code>, escreveu "Poupança" para o Bruno.</p>
+
+<div class="cenario">
+<strong>Quando dá errado: esquecer o <code>virtual</code></strong>
+<p>Tire as palavras <code>virtual</code> e <code>override</code> de <code>tipo()</code> e <code>fecharMes()</code>. Compila sem nenhum aviso, mas veja:</p>
+<pre class="term" data-cwd="~/cpp/banco">$ g++ -std=c++23 -Wall -Wextra banco.cpp -o banco
+$ ./banco
+Ana (Corrente): R$ 1000
+Bruno (Corrente): R$ 1000
+--- fim do mês ---
+Ana (Corrente): R$ 1000
+Bruno (Corrente): R$ 1005</pre>
+<p>O Bruno virou "Corrente" na tela. Sem <code>virtual</code>, a função <code>mostrar</code> recebe uma <code>Conta&amp;</code> e chama o <code>tipo()</code> <strong>da Conta</strong>, sem olhar que o objeto é uma poupança. O rendimento ainda entrou só porque o <code>main</code> chamou <code>bruno.fecharMes()</code> direto numa variável do tipo <code>ContaPoupanca</code>; numa lista de contas (etapa 5) ele também se perderia. <strong>Como consertar:</strong> <code>virtual</code> na mãe e <code>override</code> na filha, sempre os dois.</p>
+</div>
+
+<div class="cenario">
+<strong>Quando dá errado: um <code>override</code> que não sobrescreve nada</strong>
+<p>Um erro de digitação, <code>fecharmes</code> com <code>m</code> minúsculo:</p>
+<pre class="term" data-cwd="~/cpp/banco">$ g++ -std=c++23 -Wall -Wextra banco.cpp -o banco
+banco.cpp:53:10: error: ‘void ContaPoupanca::fecharmes()’ marked ‘override’, but does not override
+   53 |     void fecharmes() override {
+      |          ^~~~~~~~~</pre>
+<p><code>marked ‘override’, but does not override</code>: "marcado como <code>override</code>, mas não sobrescreve". Não existe <code>fecharmes</code> virtual na <code>Conta</code>. Sem o <code>override</code>, esse erro passaria em silêncio: a poupança ganharia um método novo que ninguém chama, e nunca renderia. É por isso que o <code>override</code> vale a pena.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Carla (Tarifada): R$ 87.1">
+<p class="try-task"><strong>Missão (etapa 4):</strong> crie a conta que cobra tarifa. A classe <code>ContaTarifada</code> já herda de <code>Conta</code>; escreva nela <code>tipo()</code>, devolvendo <code>"Tarifada"</code>, e <code>fecharMes()</code>, que saca a tarifa de 12.90 (use o <code>sacar</code> herdado). Não esqueça o <code>override</code>. A saída deve ser:</p>
+<pre class="out">Carla (Tarifada): R$ 87.1</pre>
+<pre class="script">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+
+class SaldoInsuficiente : public std::runtime_error {
+public:
+    SaldoInsuficiente(double saldo, double pedido)
+        : std::runtime_error{std::format("saldo insuficiente (saldo {:.2f}, pedido {:.2f})",
+                                         saldo, pedido)} {}
+};
+
+class Conta {
+public:
+    explicit Conta(std::string titular) : titular_{titular} {}
+    virtual ~Conta() = default;
+
+    virtual std::string tipo() const { return "Corrente"; }
+    virtual void fecharMes() {}      // a conta corrente não rende
+
+    void depositar(double valor) {
+        if (valor &lt;= 0) {
+            throw std::invalid_argument{"o valor precisa ser positivo"};
+        }
+        saldo_ += valor;
+    }
+
+    void sacar(double valor) {
+        if (valor &lt;= 0) {
+            throw std::invalid_argument{"o valor precisa ser positivo"};
+        }
+        if (valor &gt; saldo_) {
+            throw SaldoInsuficiente{saldo_, valor};
+        }
+        saldo_ -= valor;
+    }
+
+    std::string titular() const { return titular_; }
+    double saldo() const { return saldo_; }
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+};
+
+class ContaPoupanca : public Conta {
+public:
+    ContaPoupanca(std::string titular, double taxa)
+        : Conta{titular}, taxa_{taxa} {}
+
+    std::string tipo() const override { return "Poupança"; }
+
+    void fecharMes() override {
+        double rendimento = saldo() * taxa_;
+        if (rendimento &gt; 0) {
+            depositar(rendimento);
+        }
+    }
+
+private:
+    double taxa_;
+};
+
+class ContaTarifada : public Conta {
+public:
+    explicit ContaTarifada(std::string titular) : Conta{titular} {}
+
+    // Missão: tipo() devolve "Tarifada" e fecharMes() saca a tarifa de 12.90.
+};
+
+void mostrar(const Conta&amp; conta) {
+    std::cout &lt;&lt; conta.titular() &lt;&lt; " (" &lt;&lt; conta.tipo() &lt;&lt; "): R$ "
+              &lt;&lt; conta.saldo() &lt;&lt; '\n';
+}
+
+int main() {
+    ContaTarifada carla{"Carla"};
+    carla.depositar(100.0);
+    carla.fecharMes();
+    mostrar(carla);
+}
+</pre>
+<pre class="solucao">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+
+class SaldoInsuficiente : public std::runtime_error {
+public:
+    SaldoInsuficiente(double saldo, double pedido)
+        : std::runtime_error{std::format("saldo insuficiente (saldo {:.2f}, pedido {:.2f})",
+                                         saldo, pedido)} {}
+};
+
+class Conta {
+public:
+    explicit Conta(std::string titular) : titular_{titular} {}
+    virtual ~Conta() = default;
+
+    virtual std::string tipo() const { return "Corrente"; }
+    virtual void fecharMes() {}      // a conta corrente não rende
+
+    void depositar(double valor) {
+        if (valor &lt;= 0) {
+            throw std::invalid_argument{"o valor precisa ser positivo"};
+        }
+        saldo_ += valor;
+    }
+
+    void sacar(double valor) {
+        if (valor &lt;= 0) {
+            throw std::invalid_argument{"o valor precisa ser positivo"};
+        }
+        if (valor &gt; saldo_) {
+            throw SaldoInsuficiente{saldo_, valor};
+        }
+        saldo_ -= valor;
+    }
+
+    std::string titular() const { return titular_; }
+    double saldo() const { return saldo_; }
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+};
+
+class ContaPoupanca : public Conta {
+public:
+    ContaPoupanca(std::string titular, double taxa)
+        : Conta{titular}, taxa_{taxa} {}
+
+    std::string tipo() const override { return "Poupança"; }
+
+    void fecharMes() override {
+        double rendimento = saldo() * taxa_;
+        if (rendimento &gt; 0) {
+            depositar(rendimento);
+        }
+    }
+
+private:
+    double taxa_;
+};
+
+class ContaTarifada : public Conta {
+public:
+    explicit ContaTarifada(std::string titular) : Conta{titular} {}
+
+    std::string tipo() const override { return "Tarifada"; }
+
+    void fecharMes() override {
+        sacar(12.90);
+    }
+};
+
+void mostrar(const Conta&amp; conta) {
+    std::cout &lt;&lt; conta.titular() &lt;&lt; " (" &lt;&lt; conta.tipo() &lt;&lt; "): R$ "
+              &lt;&lt; conta.saldo() &lt;&lt; '\n';
+}
+
+int main() {
+    ContaTarifada carla{"Carla"};
+    carla.depositar(100.0);
+    carla.fecharMes();
+    mostrar(carla);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa5">Etapa 5 · Uma lista de contas</h2>
+<p>Um banco tem muitas contas, de tipos misturados. O natural seria um <code>std::vector&lt;Conta&gt;</code>. Veja o que acontece:</p>
+
+<pre class="file" data-file="banco.cpp (só o main)">int main() {
+    std::vector&lt;Conta&gt; contas;
+    contas.push_back(Conta{"Ana"});
+    contas.push_back(ContaPoupanca{"Bruno", 0.005});
+
+    for (auto&amp; conta : contas) {
+        conta.depositar(1000.0);
+        conta.fecharMes();
+        std::cout &lt;&lt; conta.titular() &lt;&lt; " (" &lt;&lt; conta.tipo() &lt;&lt; "): R$ "
+                  &lt;&lt; conta.saldo() &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/banco">$ g++ -std=c++23 -Wall -Wextra banco.cpp -o banco
+$ ./banco
+Ana (Corrente): R$ 1000
+Bruno (Corrente): R$ 1000</pre>
+
+<p>Compilou sem aviso e o Bruno virou "Corrente" e não rendeu. Cada lugar de um <code>vector&lt;Conta&gt;</code> tem o tamanho exato de uma <code>Conta</code>. Ao guardar a poupança ali, o C++ <strong>copia só a parte <code>Conta</code></strong> e joga fora o resto (a taxa e o "jeito poupança" de ser). Isso tem nome: <strong>fatiamento</strong> (<em>slicing</em>).</p>
+
+<p>A solução é guardar no vetor não as contas, mas <strong>ponteiros</strong> para elas: todo ponteiro tem o mesmo tamanho, aponte ele para uma conta comum ou para uma poupança. E, para não ter de lembrar de apagar cada conta com <code>delete</code>, usamos o ponteiro inteligente <code>std::unique_ptr</code> (<a href="smart-pointers.html">ponteiros inteligentes</a>): quando o vetor some, ele apaga as contas sozinho. As classes ficam iguais à etapa 4; acrescente <code>#include &lt;memory&gt;</code> e <code>#include &lt;vector&gt;</code> no topo e troque o <code>main</code>:</p>
+
+<pre class="file" data-file="banco.cpp (só o main)">int main() {
+    std::vector&lt;std::unique_ptr&lt;Conta&gt;&gt; contas;
+    contas.push_back(std::make_unique&lt;Conta&gt;("Ana"));
+    contas.push_back(std::make_unique&lt;ContaPoupanca&gt;("Bruno", 0.005));
+    contas.push_back(std::make_unique&lt;ContaPoupanca&gt;("Carla", 0.01));
+
+    for (const auto&amp; conta : contas) {
+        conta-&gt;depositar(1000.0);
+    }
+    for (const auto&amp; conta : contas) {
+        conta-&gt;fecharMes();               // cada uma do seu jeito
+    }
+    for (const auto&amp; conta : contas) {
+        std::cout &lt;&lt; conta-&gt;titular() &lt;&lt; " (" &lt;&lt; conta-&gt;tipo() &lt;&lt; "): R$ "
+                  &lt;&lt; conta-&gt;saldo() &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>std::vector&lt;std::unique_ptr&lt;Conta&gt;&gt;</code></td><td>"Um vetor de ponteiros únicos para <code>Conta</code>". Cada ponteiro é o <strong>único dono</strong> da sua conta.</td></tr>
+<tr><td><code>std::make_unique&lt;Conta&gt;("Ana")</code></td><td>Cria uma <code>Conta</code> na memória dinâmica e devolve o <code>unique_ptr</code> para ela. Os parênteses levam os argumentos do construtor.</td></tr>
+<tr><td><code>std::make_unique&lt;ContaPoupanca&gt;("Bruno", 0.005)</code></td><td>Cria uma poupança. O ponteiro para <code>ContaPoupanca</code> vira, sozinho, ponteiro para <code>Conta</code>, porque toda poupança é uma conta.</td></tr>
+<tr><td><code>conta-&gt;depositar(1000.0)</code></td><td>Com ponteiro, usa-se <code>-&gt;</code> em vez de <code>.</code>.</td></tr>
+<tr><td><code>const auto&amp; conta : contas</code></td><td>Percorre o vetor <strong>sem copiar</strong> os ponteiros (um <code>unique_ptr</code> não pode ser copiado; veja abaixo).</td></tr>
+<tr><td><code>conta-&gt;fecharMes();</code></td><td>Polimorfismo de verdade: cada conta faz o seu próprio fechamento.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp/banco">$ g++ -std=c++23 -Wall -Wextra banco.cpp -o banco
+$ ./banco
+Ana (Corrente): R$ 1000
+Bruno (Poupança): R$ 1005
+Carla (Poupança): R$ 1010</pre>
+
+<p>Agora cada conta se comporta como o que ela é: Bruno rende 0,5%, Carla rende 1%, Ana não rende. E nenhum <code>delete</code> no programa: quando o <code>main</code> termina, o vetor é destruído, cada <code>unique_ptr</code> apaga a sua conta, e o destrutor <code>virtual</code> da etapa 4 garante que a poupança seja apagada inteira.</p>
+
+<div class="cenario">
+<strong>Quando dá errado: copiar um <code>unique_ptr</code></strong>
+<p>No segundo laço, troque <code>const auto&amp; conta</code> por <code>auto conta</code> (sem o <code>&amp;</code>):</p>
+<pre class="term" data-cwd="~/cpp/banco">$ g++ -std=c++23 -Wall -Wextra banco.cpp -o banco
+banco.cpp: In function ‘int main()’:
+banco.cpp:75:23: error: use of deleted function ‘std::unique_ptr&lt;_Tp, _Dp&gt;::unique_ptr(const std::unique_ptr&lt;_Tp, _Dp&gt;&amp;) [with _Tp = Conta; _Dp = std::default_delete&lt;Conta&gt;]’
+   75 |     for (auto conta : contas) {
+      |                       ^~~~~~
+In file included from /usr/include/c++/15/memory:80,
+                 from banco.cpp:3:
+/usr/include/c++/15/bits/unique_ptr.h:524:7: note: declared here
+  524 |       unique_ptr(const unique_ptr&amp;) = delete;
+      |       ^~~~~~~~~~
+banco.cpp:75:23: note: use ‘-fdiagnostics-all-candidates’ to display considered candidates
+   75 |     for (auto conta : contas) {
+      |                       ^~~~~~</pre>
+<p>A mensagem é comprida, mas o começo diz tudo: <code>use of deleted function ‘std::unique_ptr&lt;…&gt;::unique_ptr(const std::unique_ptr&lt;…&gt;&amp;)’</code>, "uso de função apagada: o construtor de <strong>cópia</strong> do <code>unique_ptr</code>". O <code>auto conta</code> tenta fazer uma cópia de cada ponteiro, e o <code>unique_ptr</code> proíbe cópias (<code>= delete</code>, como mostra a <code>note</code> do arquivo <code>unique_ptr.h</code>): se houvesse duas cópias, as duas tentariam apagar a mesma conta. <strong>Como consertar:</strong> percorra com <code>auto&amp;</code> ou <code>const auto&amp;</code>.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Diego (Poupança): R$ 1020,out:Total no banco: R$ 4035">
+<p class="try-task"><strong>Missão (etapa 5):</strong> abra uma quarta conta, uma poupança do <code>"Diego"</code> com taxa <code>0.02</code>. Depois do último laço, some o saldo de todas as contas numa variável <code>total</code> (com mais um <code>for</code>) e mostre o total. A saída deve terminar com:</p>
+<pre class="out">Diego (Poupança): R$ 1020
+Total no banco: R$ 4035</pre>
+<pre class="script">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class SaldoInsuficiente : public std::runtime_error {
+public:
+    SaldoInsuficiente(double saldo, double pedido)
+        : std::runtime_error{std::format("saldo insuficiente (saldo {:.2f}, pedido {:.2f})",
+                                         saldo, pedido)} {}
+};
+
+class Conta {
+public:
+    explicit Conta(std::string titular) : titular_{titular} {}
+    virtual ~Conta() = default;
+
+    virtual std::string tipo() const { return "Corrente"; }
+    virtual void fecharMes() {}      // a conta corrente não rende
+
+    void depositar(double valor) {
+        if (valor &lt;= 0) {
+            throw std::invalid_argument{"o valor precisa ser positivo"};
+        }
+        saldo_ += valor;
+    }
+
+    void sacar(double valor) {
+        if (valor &lt;= 0) {
+            throw std::invalid_argument{"o valor precisa ser positivo"};
+        }
+        if (valor &gt; saldo_) {
+            throw SaldoInsuficiente{saldo_, valor};
+        }
+        saldo_ -= valor;
+    }
+
+    std::string titular() const { return titular_; }
+    double saldo() const { return saldo_; }
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+};
+
+class ContaPoupanca : public Conta {
+public:
+    ContaPoupanca(std::string titular, double taxa)
+        : Conta{titular}, taxa_{taxa} {}
+
+    std::string tipo() const override { return "Poupança"; }
+
+    void fecharMes() override {
+        double rendimento = saldo() * taxa_;
+        if (rendimento &gt; 0) {
+            depositar(rendimento);
+        }
+    }
+
+private:
+    double taxa_;
+};
+
+int main() {
+    std::vector&lt;std::unique_ptr&lt;Conta&gt;&gt; contas;
+    contas.push_back(std::make_unique&lt;Conta&gt;("Ana"));
+    contas.push_back(std::make_unique&lt;ContaPoupanca&gt;("Bruno", 0.005));
+    contas.push_back(std::make_unique&lt;ContaPoupanca&gt;("Carla", 0.01));
+
+    for (const auto&amp; conta : contas) {
+        conta-&gt;depositar(1000.0);
+    }
+    for (const auto&amp; conta : contas) {
+        conta-&gt;fecharMes();               // cada uma do seu jeito
+    }
+    for (const auto&amp; conta : contas) {
+        std::cout &lt;&lt; conta-&gt;titular() &lt;&lt; " (" &lt;&lt; conta-&gt;tipo() &lt;&lt; "): R$ "
+                  &lt;&lt; conta-&gt;saldo() &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class SaldoInsuficiente : public std::runtime_error {
+public:
+    SaldoInsuficiente(double saldo, double pedido)
+        : std::runtime_error{std::format("saldo insuficiente (saldo {:.2f}, pedido {:.2f})",
+                                         saldo, pedido)} {}
+};
+
+class Conta {
+public:
+    explicit Conta(std::string titular) : titular_{titular} {}
+    virtual ~Conta() = default;
+
+    virtual std::string tipo() const { return "Corrente"; }
+    virtual void fecharMes() {}      // a conta corrente não rende
+
+    void depositar(double valor) {
+        if (valor &lt;= 0) {
+            throw std::invalid_argument{"o valor precisa ser positivo"};
+        }
+        saldo_ += valor;
+    }
+
+    void sacar(double valor) {
+        if (valor &lt;= 0) {
+            throw std::invalid_argument{"o valor precisa ser positivo"};
+        }
+        if (valor &gt; saldo_) {
+            throw SaldoInsuficiente{saldo_, valor};
+        }
+        saldo_ -= valor;
+    }
+
+    std::string titular() const { return titular_; }
+    double saldo() const { return saldo_; }
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+};
+
+class ContaPoupanca : public Conta {
+public:
+    ContaPoupanca(std::string titular, double taxa)
+        : Conta{titular}, taxa_{taxa} {}
+
+    std::string tipo() const override { return "Poupança"; }
+
+    void fecharMes() override {
+        double rendimento = saldo() * taxa_;
+        if (rendimento &gt; 0) {
+            depositar(rendimento);
+        }
+    }
+
+private:
+    double taxa_;
+};
+
+int main() {
+    std::vector&lt;std::unique_ptr&lt;Conta&gt;&gt; contas;
+    contas.push_back(std::make_unique&lt;Conta&gt;("Ana"));
+    contas.push_back(std::make_unique&lt;ContaPoupanca&gt;("Bruno", 0.005));
+    contas.push_back(std::make_unique&lt;ContaPoupanca&gt;("Carla", 0.01));
+    contas.push_back(std::make_unique&lt;ContaPoupanca&gt;("Diego", 0.02));
+
+    for (const auto&amp; conta : contas) {
+        conta-&gt;depositar(1000.0);
+    }
+    for (const auto&amp; conta : contas) {
+        conta-&gt;fecharMes();               // cada uma do seu jeito
+    }
+    for (const auto&amp; conta : contas) {
+        std::cout &lt;&lt; conta-&gt;titular() &lt;&lt; " (" &lt;&lt; conta-&gt;tipo() &lt;&lt; "): R$ "
+                  &lt;&lt; conta-&gt;saldo() &lt;&lt; '\n';
+    }
+
+    double total = 0.0;
+    for (const auto&amp; conta : contas) {
+        total += conta-&gt;saldo();
+    }
+    std::cout &lt;&lt; "Total no banco: R$ " &lt;&lt; total &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa6">Etapa 6 · O extrato com std::format</h2>
+<p>Um banco precisa lembrar <strong>cada movimento</strong>, não só o saldo. Cada movimento tem uma descrição ("Depósito", "Saque", "Rendimento") e um valor: positivo quando entra, negativo quando sai. Isso é uma <a href="structs.html">struct</a>, e a conta guarda um <code>std::vector</code> delas. Para mostrar o extrato em colunas alinhadas, usamos <a href="format-print.html">std::format</a>.</p>
+
+<pre class="file" data-file="banco.cpp">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class SaldoInsuficiente : public std::runtime_error {
+public:
+    SaldoInsuficiente(double saldo, double pedido)
+        : std::runtime_error{std::format("saldo insuficiente (saldo {:.2f}, pedido {:.2f})",
+                                         saldo, pedido)} {}
+};
+
+struct Movimento {
+    std::string descricao;
+    double valor;              // positivo entra, negativo sai
+};
+
+class Conta {
+public:
+    explicit Conta(std::string titular) : titular_{titular} {}
+    virtual ~Conta() = default;
+
+    virtual std::string tipo() const { return "Corrente"; }
+    virtual void fecharMes() {}      // a conta corrente não rende
+
+    void depositar(double valor, std::string descricao = "Depósito") {
+        if (valor &lt;= 0) {
+            throw std::invalid_argument{"o valor precisa ser positivo"};
+        }
+        saldo_ += valor;
+        movimentos_.push_back({descricao, valor});
+    }
+
+    void sacar(double valor) {
+        if (valor &lt;= 0) {
+            throw std::invalid_argument{"o valor precisa ser positivo"};
+        }
+        if (valor &gt; saldo_) {
+            throw SaldoInsuficiente{saldo_, valor};
+        }
+        saldo_ -= valor;
+        movimentos_.push_back({"Saque", -valor});
+    }
+
+    std::string extrato() const {
+        std::string texto = std::format("Extrato de {} ({})\n", titular_, tipo());
+        for (const auto&amp; m : movimentos_) {
+            texto += std::format("  {:&lt;12}{:&gt;+10.2f}\n", m.descricao, m.valor);
+        }
+        texto += std::format("  {:&lt;12}{:&gt;10.2f}\n", "Saldo", saldo_);
+        return texto;
+    }
+
+    std::string titular() const { return titular_; }
+    double saldo() const { return saldo_; }
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+    std::vector&lt;Movimento&gt; movimentos_;
+};
+
+class ContaPoupanca : public Conta {
+public:
+    ContaPoupanca(std::string titular, double taxa)
+        : Conta{titular}, taxa_{taxa} {}
+
+    std::string tipo() const override { return "Poupança"; }
+
+    void fecharMes() override {
+        double rendimento = saldo() * taxa_;
+        if (rendimento &gt; 0) {
+            depositar(rendimento, "Rendimento");
+        }
+    }
+
+private:
+    double taxa_;
+};
+
+int main() {
+    std::vector&lt;std::unique_ptr&lt;Conta&gt;&gt; contas;
+    contas.push_back(std::make_unique&lt;Conta&gt;("Ana"));
+    contas.push_back(std::make_unique&lt;ContaPoupanca&gt;("Bruno", 0.005));
+
+    contas[0]-&gt;depositar(1000.0);
+    contas[0]-&gt;sacar(250.0);
+    contas[0]-&gt;depositar(49.9, "Pix da Carla");
+    contas[1]-&gt;depositar(1000.0);
+
+    for (const auto&amp; conta : contas) {
+        conta-&gt;fecharMes();
+        std::cout &lt;&lt; conta-&gt;extrato() &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<p>O que mudou em relação à etapa 5:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>struct Movimento { … };</code></td><td>Um movimento: descrição + valor.</td></tr>
+<tr><td><code>std::vector&lt;Movimento&gt; movimentos_;</code></td><td>O histórico, <code>private</code> como o saldo.</td></tr>
+<tr><td><code>std::string descricao = "Depósito"</code></td><td>Um <a href="valor-padrao.html">valor padrão</a>: <code>depositar(1000.0)</code> registra "Depósito"; <code>depositar(49.9, "Pix da Carla")</code> registra outra descrição. A poupança usa isso para registrar "Rendimento".</td></tr>
+<tr><td><code>movimentos_.push_back({descricao, valor});</code></td><td>Acrescenta um <code>Movimento</code> no fim. As chaves montam a struct na hora.</td></tr>
+<tr><td><code>movimentos_.push_back({"Saque", -valor});</code></td><td>No saque, o valor vai negativo.</td></tr>
+<tr><td><code>std::string extrato() const</code></td><td>Monta o extrato inteiro num texto e devolve. Quem chama decide onde mostrar (tela, arquivo…).</td></tr>
+<tr><td><code>texto += std::format(…)</code></td><td>Cada linha é formatada e grudada no fim do texto.</td></tr>
+<tr><td><code>contas[0]-&gt;</code></td><td>A primeira conta do vetor (a da Ana).</td></tr>
+</table>
+</div>
+
+<p>As "máscaras" dentro das chaves dizem como cada valor aparece:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Máscara</th><th>Significado</th><th>Exemplo de resultado</th></tr>
+<tr><td><code>{}</code></td><td>O valor do jeito padrão.</td><td><code>Ana</code></td></tr>
+<tr><td><code>{:&lt;12}</code></td><td>Ocupa 12 colunas, alinhado à <strong>esquerda</strong> (<code>&lt;</code>), completando com espaços.</td><td><code>Saque&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code></td></tr>
+<tr><td><code>{:&gt;10.2f}</code></td><td>10 colunas, alinhado à <strong>direita</strong> (<code>&gt;</code>), número com 2 casas decimais (<code>.2f</code>).</td><td><code>&nbsp;&nbsp;&nbsp;799.90</code></td></tr>
+<tr><td><code>{:&gt;+10.2f}</code></td><td>O mesmo, mas sempre com sinal (<code>+</code>), também nos positivos.</td><td><code>&nbsp;&nbsp;+1000.00</code></td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp/banco">$ g++ -std=c++23 -Wall -Wextra banco.cpp -o banco
+$ ./banco
+Extrato de Ana (Corrente)
+  Depósito      +1000.00
+  Saque          -250.00
+  Pix da Carla    +49.90
+  Saldo           799.90
+
+Extrato de Bruno (Poupança)
+  Depósito      +1000.00
+  Rendimento       +5.00
+  Saldo          1005.00</pre>
+
+<p>Os números ficaram alinhados à direita, com duas casas e sinal; e o rendimento da poupança apareceu como um movimento. Repare em "Depósito": tem acento, ocupa 9 bytes em UTF-8 mas 8 colunas na tela, e o <code>std::format</code> do C++23 alinha pelas <strong>colunas</strong>, por isso a coluna saiu certa (veja <a href="acentos-utf8.html">Acentos e UTF-8</a>). Com <code>std::setw</code>, do <a href="iomanip.html">iomanip</a>, que conta bytes, essa linha ficaria um espaço mais curta.</p>
+
+<div class="trycpp" data-goal="outre:Ana +Corrente +799\.90,outre:Bruno +Poupança +1005\.00,src:std::format">
+<p class="try-task"><strong>Missão (etapa 6):</strong> no fim do <code>main</code>, em vez dos extratos, mostre um <strong>resumo</strong> com uma linha por conta, usando <code>std::format("{:&lt;6}{:&lt;10}{:&gt;8.2f}\n", …)</code> com o titular, o tipo e o saldo. A saída deve ser:</p>
+<pre class="out">Ana   Corrente    799.90
+Bruno Poupança   1005.00</pre>
+<pre class="script">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class SaldoInsuficiente : public std::runtime_error {
+public:
+    SaldoInsuficiente(double saldo, double pedido)
+        : std::runtime_error{std::format("saldo insuficiente (saldo {:.2f}, pedido {:.2f})",
+                                         saldo, pedido)} {}
+};
+
+struct Movimento {
+    std::string descricao;
+    double valor;              // positivo entra, negativo sai
+};
+
+class Conta {
+public:
+    explicit Conta(std::string titular) : titular_{titular} {}
+    virtual ~Conta() = default;
+
+    virtual std::string tipo() const { return "Corrente"; }
+    virtual void fecharMes() {}      // a conta corrente não rende
+
+    void depositar(double valor, std::string descricao = "Depósito") {
+        if (valor &lt;= 0) {
+            throw std::invalid_argument{"o valor precisa ser positivo"};
+        }
+        saldo_ += valor;
+        movimentos_.push_back({descricao, valor});
+    }
+
+    void sacar(double valor) {
+        if (valor &lt;= 0) {
+            throw std::invalid_argument{"o valor precisa ser positivo"};
+        }
+        if (valor &gt; saldo_) {
+            throw SaldoInsuficiente{saldo_, valor};
+        }
+        saldo_ -= valor;
+        movimentos_.push_back({"Saque", -valor});
+    }
+
+    std::string extrato() const {
+        std::string texto = std::format("Extrato de {} ({})\n", titular_, tipo());
+        for (const auto&amp; m : movimentos_) {
+            texto += std::format("  {:&lt;12}{:&gt;+10.2f}\n", m.descricao, m.valor);
+        }
+        texto += std::format("  {:&lt;12}{:&gt;10.2f}\n", "Saldo", saldo_);
+        return texto;
+    }
+
+    std::string titular() const { return titular_; }
+    double saldo() const { return saldo_; }
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+    std::vector&lt;Movimento&gt; movimentos_;
+};
+
+class ContaPoupanca : public Conta {
+public:
+    ContaPoupanca(std::string titular, double taxa)
+        : Conta{titular}, taxa_{taxa} {}
+
+    std::string tipo() const override { return "Poupança"; }
+
+    void fecharMes() override {
+        double rendimento = saldo() * taxa_;
+        if (rendimento &gt; 0) {
+            depositar(rendimento, "Rendimento");
+        }
+    }
+
+private:
+    double taxa_;
+};
+
+int main() {
+    std::vector&lt;std::unique_ptr&lt;Conta&gt;&gt; contas;
+    contas.push_back(std::make_unique&lt;Conta&gt;("Ana"));
+    contas.push_back(std::make_unique&lt;ContaPoupanca&gt;("Bruno", 0.005));
+
+    contas[0]-&gt;depositar(1000.0);
+    contas[0]-&gt;sacar(250.0);
+    contas[0]-&gt;depositar(49.9, "Pix da Carla");
+    contas[1]-&gt;depositar(1000.0);
+
+    for (const auto&amp; conta : contas) {
+        conta-&gt;fecharMes();
+    }
+    // Missão: uma linha por conta com
+    // std::format("{:&lt;6}{:&lt;10}{:&gt;8.2f}\n", titular, tipo, saldo)
+}
+</pre>
+<pre class="solucao">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class SaldoInsuficiente : public std::runtime_error {
+public:
+    SaldoInsuficiente(double saldo, double pedido)
+        : std::runtime_error{std::format("saldo insuficiente (saldo {:.2f}, pedido {:.2f})",
+                                         saldo, pedido)} {}
+};
+
+struct Movimento {
+    std::string descricao;
+    double valor;              // positivo entra, negativo sai
+};
+
+class Conta {
+public:
+    explicit Conta(std::string titular) : titular_{titular} {}
+    virtual ~Conta() = default;
+
+    virtual std::string tipo() const { return "Corrente"; }
+    virtual void fecharMes() {}      // a conta corrente não rende
+
+    void depositar(double valor, std::string descricao = "Depósito") {
+        if (valor &lt;= 0) {
+            throw std::invalid_argument{"o valor precisa ser positivo"};
+        }
+        saldo_ += valor;
+        movimentos_.push_back({descricao, valor});
+    }
+
+    void sacar(double valor) {
+        if (valor &lt;= 0) {
+            throw std::invalid_argument{"o valor precisa ser positivo"};
+        }
+        if (valor &gt; saldo_) {
+            throw SaldoInsuficiente{saldo_, valor};
+        }
+        saldo_ -= valor;
+        movimentos_.push_back({"Saque", -valor});
+    }
+
+    std::string extrato() const {
+        std::string texto = std::format("Extrato de {} ({})\n", titular_, tipo());
+        for (const auto&amp; m : movimentos_) {
+            texto += std::format("  {:&lt;12}{:&gt;+10.2f}\n", m.descricao, m.valor);
+        }
+        texto += std::format("  {:&lt;12}{:&gt;10.2f}\n", "Saldo", saldo_);
+        return texto;
+    }
+
+    std::string titular() const { return titular_; }
+    double saldo() const { return saldo_; }
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+    std::vector&lt;Movimento&gt; movimentos_;
+};
+
+class ContaPoupanca : public Conta {
+public:
+    ContaPoupanca(std::string titular, double taxa)
+        : Conta{titular}, taxa_{taxa} {}
+
+    std::string tipo() const override { return "Poupança"; }
+
+    void fecharMes() override {
+        double rendimento = saldo() * taxa_;
+        if (rendimento &gt; 0) {
+            depositar(rendimento, "Rendimento");
+        }
+    }
+
+private:
+    double taxa_;
+};
+
+int main() {
+    std::vector&lt;std::unique_ptr&lt;Conta&gt;&gt; contas;
+    contas.push_back(std::make_unique&lt;Conta&gt;("Ana"));
+    contas.push_back(std::make_unique&lt;ContaPoupanca&gt;("Bruno", 0.005));
+
+    contas[0]-&gt;depositar(1000.0);
+    contas[0]-&gt;sacar(250.0);
+    contas[0]-&gt;depositar(49.9, "Pix da Carla");
+    contas[1]-&gt;depositar(1000.0);
+
+    for (const auto&amp; conta : contas) {
+        conta-&gt;fecharMes();
+    }
+    for (const auto&amp; conta : contas) {
+        std::cout &lt;&lt; std::format("{:&lt;6}{:&lt;10}{:&gt;8.2f}\n",
+                                 conta-&gt;titular(), conta-&gt;tipo(), conta-&gt;saldo());
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa7">Etapa 7 · Separar em conta.h, conta.cpp e main.cpp</h2>
+<p>O <code>banco.cpp</code> já passou de 90 linhas, e tudo nele está misturado: as classes do banco e o programa que as usa. Programas de verdade separam (veja <a href="headers.html">Arquivos .h e .cpp</a>):</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Arquivo</th><th>O que tem</th><th>Comparação</th></tr>
+<tr><td><code>conta.h</code></td><td>As <strong>declarações</strong>: os nomes das classes, dos métodos e dos dados. O "o quê".</td><td>O cardápio.</td></tr>
+<tr><td><code>conta.cpp</code></td><td>As <strong>definições</strong>: o corpo de cada método. O "como".</td><td>A cozinha.</td></tr>
+<tr><td><code>main.cpp</code></td><td>O programa, que inclui <code>conta.h</code> e usa as contas.</td><td>O cliente, que só lê o cardápio.</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="conta.h">#pragma once
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class SaldoInsuficiente : public std::runtime_error {
+public:
+    SaldoInsuficiente(double saldo, double pedido);
+};
+
+struct Movimento {
+    std::string descricao;
+    double valor;
+};
+
+class Conta {
+public:
+    explicit Conta(std::string titular);
+    virtual ~Conta() = default;
+
+    void depositar(double valor, std::string descricao = "Depósito");
+    void sacar(double valor);
+
+    virtual std::string tipo() const;
+    virtual void fecharMes();
+
+    std::string titular() const;
+    double saldo() const;
+    std::string extrato() const;
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+    std::vector&lt;Movimento&gt; movimentos_;
+};
+
+class ContaPoupanca : public Conta {
+public:
+    ContaPoupanca(std::string titular, double taxa);
+
+    std::string tipo() const override;
+    void fecharMes() override;
+
+private:
+    double taxa_;
+};
+</pre>
+
+<pre class="file" data-file="conta.cpp">#include "conta.h"
+#include &lt;format&gt;
+
+SaldoInsuficiente::SaldoInsuficiente(double saldo, double pedido)
+    : std::runtime_error{std::format("saldo insuficiente (saldo {:.2f}, pedido {:.2f})", saldo, pedido)} {}
+
+Conta::Conta(std::string titular) : titular_{titular} {}
+
+void Conta::depositar(double valor, std::string descricao) {
+    if (valor &lt;= 0) {
+        throw std::invalid_argument{"o valor precisa ser positivo"};
+    }
+    saldo_ += valor;
+    movimentos_.push_back({descricao, valor});
+}
+
+void Conta::sacar(double valor) {
+    if (valor &lt;= 0) {
+        throw std::invalid_argument{"o valor precisa ser positivo"};
+    }
+    if (valor &gt; saldo_) {
+        throw SaldoInsuficiente{saldo_, valor};
+    }
+    saldo_ -= valor;
+    movimentos_.push_back({"Saque", -valor});
+}
+
+std::string Conta::tipo() const { return "Corrente"; }
+void Conta::fecharMes() {}   // a conta corrente não rende
+std::string Conta::titular() const { return titular_; }
+double Conta::saldo() const { return saldo_; }
+
+std::string Conta::extrato() const {
+    std::string texto = std::format("Extrato de {} ({})\n", titular_, tipo());
+    for (const auto&amp; m : movimentos_) {
+        texto += std::format("  {:&lt;12}{:&gt;+10.2f}\n", m.descricao, m.valor);
+    }
+    texto += std::format("  {:&lt;12}{:&gt;10.2f}\n", "Saldo", saldo_);
+    return texto;
+}
+
+ContaPoupanca::ContaPoupanca(std::string titular, double taxa)
+    : Conta{titular}, taxa_{taxa} {}
+
+std::string ContaPoupanca::tipo() const { return "Poupança"; }
+
+void ContaPoupanca::fecharMes() {
+    double rendimento = saldo() * taxa_;
+    if (rendimento &gt; 0) {
+        depositar(rendimento, "Rendimento");
+    }
+}
+</pre>
+
+<pre class="file" data-file="main.cpp">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;vector&gt;
+#include "conta.h"
+
+int main() {
+    std::vector&lt;std::unique_ptr&lt;Conta&gt;&gt; contas;
+    contas.push_back(std::make_unique&lt;Conta&gt;("Ana"));
+    contas.push_back(std::make_unique&lt;ContaPoupanca&gt;("Bruno", 0.005));
+
+    contas[0]-&gt;depositar(1000.0);
+    contas[0]-&gt;sacar(250.0);
+    contas[0]-&gt;depositar(49.9, "Pix da Carla");
+    contas[1]-&gt;depositar(1000.0);
+
+    for (const auto&amp; conta : contas) {
+        conta-&gt;fecharMes();
+        std::cout &lt;&lt; conta-&gt;extrato() &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>#pragma once</code></td><td>"Inclua este arquivo uma vez só", mesmo que dois arquivos façam <code>#include "conta.h"</code>. Sem isso, as classes seriam declaradas duas vezes, e isso é erro (veja <a href="preprocessador.html">o pré-processador</a>).</td></tr>
+<tr><td><code>void depositar(double valor, std::string descricao = "Depósito");</code></td><td>No <code>.h</code>, só a "assinatura", terminando em <code>;</code>. O valor padrão fica <strong>só</strong> aqui, não se repete no <code>.cpp</code>.</td></tr>
+<tr><td><code>#include "conta.h"</code></td><td>Com aspas: um arquivo do projeto, procurado primeiro na pasta atual. Com <code>&lt; &gt;</code>: um da biblioteca padrão.</td></tr>
+<tr><td><code>void Conta::depositar(…) { … }</code></td><td>No <code>.cpp</code>, o nome completo: <code>Conta::</code> diz "o <code>depositar</code> da classe <code>Conta</code>".</td></tr>
+<tr><td><code>override</code>, <code>virtual</code>, <code>explicit</code></td><td>Aparecem só no <code>.h</code>. No <code>.cpp</code> não se repetem.</td></tr>
+<tr><td><code>#include &lt;format&gt;</code> no <code>conta.cpp</code></td><td>Só quem usa o <code>std::format</code> precisa dele. O <code>main.cpp</code> nem sabe que ele existe.</td></tr>
+</table>
+</div>
+
+<p>Para compilar, passe os <strong>dois</strong> arquivos <code>.cpp</code> para o g++ (o <code>.h</code> não entra no comando: ele é copiado para dentro dos <code>.cpp</code> pelo <code>#include</code>):</p>
+
+<pre class="term" data-cwd="~/cpp/banco">$ ls
+conta.cpp
+conta.h
+main.cpp
+$ g++ -std=c++23 -Wall -Wextra main.cpp conta.cpp -o banco
+$ ./banco
+Extrato de Ana (Corrente)
+  Depósito      +1000.00
+  Saque          -250.00
+  Pix da Carla    +49.90
+  Saldo           799.90
+
+Extrato de Bruno (Poupança)
+  Depósito      +1000.00
+  Rendimento       +5.00
+  Saldo          1005.00</pre>
+
+<p>A mesma saída da etapa 6: o programa é o mesmo, só mudou de organização. Veja os detalhes do comando em <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>.</p>
+
+<div class="cenario">
+<strong>Quando dá errado: esquecer o conta.cpp no comando</strong>
+<pre class="term" data-cwd="~/cpp/banco">$ g++ -std=c++23 -Wall -Wextra main.cpp -o banco
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccqdte6y.o: na função "main":
+main.cpp:(.text+0x147): referência não definida para "Conta::depositar(double, std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;)"
+/usr/bin/x86_64-linux-gnu-ld.bfd: main.cpp:(.text+0x184): referência não definida para "Conta::sacar(double)"
+/usr/bin/x86_64-linux-gnu-ld.bfd: main.cpp:(.text+0x1e5): referência não definida para "Conta::depositar(double, std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;)"
+/usr/bin/x86_64-linux-gnu-ld.bfd: main.cpp:(.text+0x253): referência não definida para "Conta::depositar(double, std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;)"
+/usr/bin/x86_64-linux-gnu-ld.bfd: main.cpp:(.text+0x2e9): referência não definida para "Conta::extrato[abi:cxx11]() const"
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccqdte6y.o: na função "std::__detail::_MakeUniq&lt;Conta&gt;::__single_object std::make_unique&lt;Conta, char const (&amp;) [4]&gt;(char const (&amp;) [4])":
+main.cpp:(.text._ZSt11make_uniqueI5ContaJRA4_KcEENSt8__detail9_MakeUniqIT_E15__single_objectEDpOT0_[_ZSt11make_uniqueI5ContaJRA4_KcEENSt8__detail9_MakeUniqIT_E15__single_objectEDpOT0_]+0x6f): referência não definida para "Conta::Conta(std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;)"
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccqdte6y.o: na função "std::__detail::_MakeUniq&lt;ContaPoupanca&gt;::__single_object std::make_unique&lt;ContaPoupanca, char const (&amp;) [6], double&gt;(char const (&amp;) [6], double&amp;&amp;)":
+main.cpp:(.text._ZSt11make_uniqueI13ContaPoupancaJRA6_KcdEENSt8__detail9_MakeUniqIT_E15__single_objectEDpOT0_[_ZSt11make_uniqueI13ContaPoupancaJRA6_KcdEENSt8__detail9_MakeUniqIT_E15__single_objectEDpOT0_]+0x8d): referência não definida para "ContaPoupanca::ContaPoupanca(std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;, double)"
+collect2: error: ld returned 1 exit status</pre>
+<p>Este erro não é do compilador, é do <strong>ligador</strong> (<em>linker</em>, o <code>ld</code>), a etapa que junta os pedaços no fim (por isso essas linhas saem em português: o <code>ld</code> do Ubuntu tem tradução, o g++ não). O <code>main.cpp</code> compilou sem problemas, porque o <code>conta.h</code> prometeu que <code>Conta::depositar</code> existe. Na hora de juntar, o ligador procurou o corpo do método e não achou: <code>referência não definida para "Conta::depositar(…)"</code> ("<em>undefined reference</em>", na versão em inglês). O <code>std::__cxx11::basic_string&lt;…&gt;</code> é o nome completo de <code>std::string</code>. O nome do arquivo em <code>/tmp</code> muda a cada vez. <strong>Como consertar:</strong> ponha <code>conta.cpp</code> no comando. Quando o projeto tiver muitos arquivos, quem lembra disso por você é o <a href="make.html">Make</a> ou o <a href="cmake.html">CMake</a>.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Transferência   +100.00,out:Saldo           699.90">
+<p class="try-task"><strong>Missão (etapa 7):</strong> o <code>main.cpp</code> já chama <code>contas[0]-&gt;transferir(*contas[1], 100.0)</code>, mas o método não existe, e a compilação falha. Crie-o: declare <code>void transferir(Conta&amp; destino, double valor);</code> no <code>conta.h</code> e escreva o corpo no <code>conta.cpp</code> (saque da própria conta e depósito no destino com a descrição <code>"Transferência"</code>). O <code>*contas[1]</code> é a conta do Bruno: o <code>*</code> pega a conta para a qual o ponteiro aponta. Na saída devem aparecer:</p>
+<pre class="out">  Saldo           699.90
+  Transferência   +100.00</pre>
+<pre class="script" data-file="main.cpp">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;vector&gt;
+#include "conta.h"
+
+int main() {
+    std::vector&lt;std::unique_ptr&lt;Conta&gt;&gt; contas;
+    contas.push_back(std::make_unique&lt;Conta&gt;("Ana"));
+    contas.push_back(std::make_unique&lt;ContaPoupanca&gt;("Bruno", 0.005));
+
+    contas[0]-&gt;depositar(1000.0);
+    contas[0]-&gt;sacar(250.0);
+    contas[0]-&gt;depositar(49.9, "Pix da Carla");
+    contas[1]-&gt;depositar(1000.0);
+    contas[0]-&gt;transferir(*contas[1], 100.0);   // Ana manda 100 para o Bruno
+
+    for (const auto&amp; conta : contas) {
+        std::cout &lt;&lt; conta-&gt;extrato() &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="script" data-file="conta.h">#pragma once
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class SaldoInsuficiente : public std::runtime_error {
+public:
+    SaldoInsuficiente(double saldo, double pedido);
+};
+
+struct Movimento {
+    std::string descricao;
+    double valor;
+};
+
+class Conta {
+public:
+    explicit Conta(std::string titular);
+    virtual ~Conta() = default;
+
+    void depositar(double valor, std::string descricao = "Depósito");
+    void sacar(double valor);
+
+    virtual std::string tipo() const;
+    virtual void fecharMes();
+
+    std::string titular() const;
+    double saldo() const;
+    std::string extrato() const;
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+    std::vector&lt;Movimento&gt; movimentos_;
+};
+
+class ContaPoupanca : public Conta {
+public:
+    ContaPoupanca(std::string titular, double taxa);
+
+    std::string tipo() const override;
+    void fecharMes() override;
+
+private:
+    double taxa_;
+};
+</pre>
+<pre class="script" data-file="conta.cpp">#include "conta.h"
+#include &lt;format&gt;
+
+SaldoInsuficiente::SaldoInsuficiente(double saldo, double pedido)
+    : std::runtime_error{std::format("saldo insuficiente (saldo {:.2f}, pedido {:.2f})", saldo, pedido)} {}
+
+Conta::Conta(std::string titular) : titular_{titular} {}
+
+void Conta::depositar(double valor, std::string descricao) {
+    if (valor &lt;= 0) {
+        throw std::invalid_argument{"o valor precisa ser positivo"};
+    }
+    saldo_ += valor;
+    movimentos_.push_back({descricao, valor});
+}
+
+void Conta::sacar(double valor) {
+    if (valor &lt;= 0) {
+        throw std::invalid_argument{"o valor precisa ser positivo"};
+    }
+    if (valor &gt; saldo_) {
+        throw SaldoInsuficiente{saldo_, valor};
+    }
+    saldo_ -= valor;
+    movimentos_.push_back({"Saque", -valor});
+}
+
+std::string Conta::tipo() const { return "Corrente"; }
+void Conta::fecharMes() {}   // a conta corrente não rende
+std::string Conta::titular() const { return titular_; }
+double Conta::saldo() const { return saldo_; }
+
+std::string Conta::extrato() const {
+    std::string texto = std::format("Extrato de {} ({})\n", titular_, tipo());
+    for (const auto&amp; m : movimentos_) {
+        texto += std::format("  {:&lt;12}{:&gt;+10.2f}\n", m.descricao, m.valor);
+    }
+    texto += std::format("  {:&lt;12}{:&gt;10.2f}\n", "Saldo", saldo_);
+    return texto;
+}
+
+ContaPoupanca::ContaPoupanca(std::string titular, double taxa)
+    : Conta{titular}, taxa_{taxa} {}
+
+std::string ContaPoupanca::tipo() const { return "Poupança"; }
+
+void ContaPoupanca::fecharMes() {
+    double rendimento = saldo() * taxa_;
+    if (rendimento &gt; 0) {
+        depositar(rendimento, "Rendimento");
+    }
+}
+</pre>
+<pre class="solucao" data-file="conta.h">#pragma once
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class SaldoInsuficiente : public std::runtime_error {
+public:
+    SaldoInsuficiente(double saldo, double pedido);
+};
+
+struct Movimento {
+    std::string descricao;
+    double valor;
+};
+
+class Conta {
+public:
+    explicit Conta(std::string titular);
+    virtual ~Conta() = default;
+
+    void depositar(double valor, std::string descricao = "Depósito");
+    void sacar(double valor);
+    void transferir(Conta&amp; destino, double valor);
+
+    virtual std::string tipo() const;
+    virtual void fecharMes();
+
+    std::string titular() const;
+    double saldo() const;
+    std::string extrato() const;
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+    std::vector&lt;Movimento&gt; movimentos_;
+};
+
+class ContaPoupanca : public Conta {
+public:
+    ContaPoupanca(std::string titular, double taxa);
+
+    std::string tipo() const override;
+    void fecharMes() override;
+
+private:
+    double taxa_;
+};
+</pre>
+<pre class="solucao" data-file="conta.cpp">#include "conta.h"
+#include &lt;format&gt;
+
+SaldoInsuficiente::SaldoInsuficiente(double saldo, double pedido)
+    : std::runtime_error{std::format("saldo insuficiente (saldo {:.2f}, pedido {:.2f})", saldo, pedido)} {}
+
+Conta::Conta(std::string titular) : titular_{titular} {}
+
+void Conta::depositar(double valor, std::string descricao) {
+    if (valor &lt;= 0) {
+        throw std::invalid_argument{"o valor precisa ser positivo"};
+    }
+    saldo_ += valor;
+    movimentos_.push_back({descricao, valor});
+}
+
+void Conta::sacar(double valor) {
+    if (valor &lt;= 0) {
+        throw std::invalid_argument{"o valor precisa ser positivo"};
+    }
+    if (valor &gt; saldo_) {
+        throw SaldoInsuficiente{saldo_, valor};
+    }
+    saldo_ -= valor;
+    movimentos_.push_back({"Saque", -valor});
+}
+
+void Conta::transferir(Conta&amp; destino, double valor) {
+    sacar(valor);                            // se faltar saldo, para aqui
+    destino.depositar(valor, "Transferência");
+}
+
+std::string Conta::tipo() const { return "Corrente"; }
+void Conta::fecharMes() {}   // a conta corrente não rende
+std::string Conta::titular() const { return titular_; }
+double Conta::saldo() const { return saldo_; }
+
+std::string Conta::extrato() const {
+    std::string texto = std::format("Extrato de {} ({})\n", titular_, tipo());
+    for (const auto&amp; m : movimentos_) {
+        texto += std::format("  {:&lt;12}{:&gt;+10.2f}\n", m.descricao, m.valor);
+    }
+    texto += std::format("  {:&lt;12}{:&gt;10.2f}\n", "Saldo", saldo_);
+    return texto;
+}
+
+ContaPoupanca::ContaPoupanca(std::string titular, double taxa)
+    : Conta{titular}, taxa_{taxa} {}
+
+std::string ContaPoupanca::tipo() const { return "Poupança"; }
+
+void ContaPoupanca::fecharMes() {
+    double rendimento = saldo() * taxa_;
+    if (rendimento &gt; 0) {
+        depositar(rendimento, "Rendimento");
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa8">Etapa 8 · O menu</h2>
+<p>Até aqui, as operações estavam escritas no <code>main</code>. Agora quem decide é o usuário, digitando comandos. O <code>conta.h</code> e o <code>conta.cpp</code> não mudam nada: essa é a vantagem de ter separado. Só o <code>main.cpp</code> é novo:</p>
+
+<pre class="file" data-file="main.cpp">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include "conta.h"
+
+using Contas = std::vector&lt;std::unique_ptr&lt;Conta&gt;&gt;;
+
+Conta&amp; escolher(Contas&amp; contas, int numero) {
+    if (numero &lt; 1 || numero &gt; static_cast&lt;int&gt;(contas.size())) {
+        throw std::out_of_range{"não existe a conta " + std::to_string(numero)};
+    }
+    return *contas[numero - 1];
+}
+
+int main() {
+    Contas contas;
+    contas.push_back(std::make_unique&lt;Conta&gt;("Ana"));
+    contas.push_back(std::make_unique&lt;ContaPoupanca&gt;("Bruno", 0.005));
+
+    std::cout &lt;&lt; "Banco da Ana. Comandos: l, d N VALOR, s N VALOR, e N, m, q\n";
+    std::string linha;
+    while (std::cout &lt;&lt; "banco&gt; " &amp;&amp; std::getline(std::cin, linha)) {
+        std::istringstream pedaco{linha};
+        char comando = ' ';
+        int numero = 0;
+        double valor = 0.0;
+        pedaco &gt;&gt; comando &gt;&gt; numero &gt;&gt; valor;
+
+        try {
+            if (comando == 'q') {
+                break;
+            } else if (comando == 'l') {
+                for (std::size_t i = 0; i &lt; contas.size(); ++i) {
+                    std::cout &lt;&lt; i + 1 &lt;&lt; ". " &lt;&lt; contas[i]-&gt;titular() &lt;&lt; " ("
+                              &lt;&lt; contas[i]-&gt;tipo() &lt;&lt; ")\n";
+                }
+            } else if (comando == 'd') {
+                escolher(contas, numero).depositar(valor);
+                std::cout &lt;&lt; "Depósito feito.\n";
+            } else if (comando == 's') {
+                escolher(contas, numero).sacar(valor);
+                std::cout &lt;&lt; "Saque feito.\n";
+            } else if (comando == 'e') {
+                std::cout &lt;&lt; escolher(contas, numero).extrato();
+            } else if (comando == 'm') {
+                for (auto&amp; conta : contas) {
+                    conta-&gt;fecharMes();
+                }
+                std::cout &lt;&lt; "Mês fechado.\n";
+            } else {
+                std::cout &lt;&lt; "Comando desconhecido: " &lt;&lt; linha &lt;&lt; '\n';
+            }
+        } catch (const SaldoInsuficiente&amp; e) {
+            std::cout &lt;&lt; "Recusado: " &lt;&lt; e.what() &lt;&lt; '\n';
+        } catch (const std::exception&amp; e) {
+            std::cout &lt;&lt; "Erro: " &lt;&lt; e.what() &lt;&lt; '\n';
+        }
+    }
+    std::cout &lt;&lt; "\nAté logo!\n";
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>using Contas = std::vector&lt;std::unique_ptr&lt;Conta&gt;&gt;;</code></td><td>Um apelido para o tipo comprido (<a href="using-typedef.html">using</a>).</td></tr>
+<tr><td><code>Conta&amp; escolher(Contas&amp; contas, int numero)</code></td><td>Recebe o número que o usuário digitou (que começa em 1) e devolve a conta (que no vetor começa em 0). Número fora da lista: lança <code>std::out_of_range</code>.</td></tr>
+<tr><td><code>static_cast&lt;int&gt;(contas.size())</code></td><td><code>size()</code> devolve um número sem sinal; converter para <code>int</code> evita comparar um número com sinal e outro sem sinal, que o <code>-Wall</code> avisa: <code>warning: comparison of integer expressions of different signedness</code>. Veja <a href="conversao-tipos.html">Conversão de Tipos</a>.</td></tr>
+<tr><td><code>while (std::cout &lt;&lt; "banco&gt; " &amp;&amp; std::getline(std::cin, linha))</code></td><td>Mostra o convite e lê uma linha inteira. O laço para quando a entrada acaba (<a href="getline.html">getline</a> devolve "falso").</td></tr>
+<tr><td><code>std::istringstream pedaco{linha};</code></td><td>Transforma a linha num "fluxo de entrada", como um <code>cin</code> particular. Daí, <code>pedaco &gt;&gt; comando &gt;&gt; numero &gt;&gt; valor</code> separa <code>d 1 1000</code> em <code>'d'</code>, <code>1</code> e <code>1000.0</code>. O que faltar fica com o valor inicial (<code>0</code>).</td></tr>
+<tr><td><code>char comando = ' ';</code></td><td>Inicializado: numa linha vazia, cai no "Comando desconhecido".</td></tr>
+<tr><td><code>catch (const SaldoInsuficiente&amp; e)</code> antes de <code>catch (const std::exception&amp; e)</code></td><td>O mais específico vem primeiro. <code>std::exception</code> é a mãe de todas as exceções da biblioteca (e da nossa), e captura o resto: <code>invalid_argument</code>, <code>out_of_range</code>.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp/banco">$ g++ -std=c++23 -Wall -Wextra main.cpp conta.cpp -o banco
+$ ./banco
+Banco da Ana. Comandos: l, d N VALOR, s N VALOR, e N, m, q
+banco&gt; l
+1. Ana (Corrente)
+2. Bruno (Poupança)
+banco&gt; d 1 1000
+Depósito feito.
+banco&gt; d 2 1000
+Depósito feito.
+banco&gt; s 1 250
+Saque feito.
+banco&gt; s 2 5000
+Recusado: saldo insuficiente (saldo 1000.00, pedido 5000.00)
+banco&gt; d 3 10
+Erro: não existe a conta 3
+banco&gt; d 1 -5
+Erro: o valor precisa ser positivo
+banco&gt; m
+Mês fechado.
+banco&gt; e 1
+Extrato de Ana (Corrente)
+  Depósito      +1000.00
+  Saque          -250.00
+  Saldo           750.00
+banco&gt; e 2
+Extrato de Bruno (Poupança)
+  Depósito      +1000.00
+  Rendimento       +5.00
+  Saldo          1005.00
+banco&gt; q
+
+Até logo!</pre>
+
+<p>Repare que nenhum erro derruba o programa: conta inexistente, valor negativo e saldo insuficiente viram mensagens, e o menu continua. Esse é o papel do <code>try</code>/<code>catch</code> dentro do laço. Para mais formas de tratar o que o usuário digita, veja <a href="validar-entrada.html">Validar a Entrada</a>.</p>
+
+<div class="trycpp" data-stdin="d 1 1000&#10;s 1 250&#10;v 1&#10;q&#10;" data-goal="out:Saldo de Ana: R$ 750.00">
+<p class="try-task"><strong>Missão (etapa 8):</strong> acrescente ao menu o comando <code>v N</code>, que mostra só o saldo da conta N, com duas casas: <code>Saldo de Ana: R$ 750.00</code>. Use <code>escolher</code> e <code>std::format</code> (lembre do <code>#include &lt;format&gt;</code>). A caixa já digita para você: <code>d 1 1000</code>, <code>s 1 250</code>, <code>v 1</code> e <code>q</code>.</p>
+<pre class="script" data-file="main.cpp">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include "conta.h"
+
+using Contas = std::vector&lt;std::unique_ptr&lt;Conta&gt;&gt;;
+
+Conta&amp; escolher(Contas&amp; contas, int numero) {
+    if (numero &lt; 1 || numero &gt; static_cast&lt;int&gt;(contas.size())) {
+        throw std::out_of_range{"não existe a conta " + std::to_string(numero)};
+    }
+    return *contas[numero - 1];
+}
+
+int main() {
+    Contas contas;
+    contas.push_back(std::make_unique&lt;Conta&gt;("Ana"));
+    contas.push_back(std::make_unique&lt;ContaPoupanca&gt;("Bruno", 0.005));
+
+    std::cout &lt;&lt; "Banco da Ana. Comandos: l, d N VALOR, s N VALOR, e N, m, q\n";
+    std::string linha;
+    while (std::cout &lt;&lt; "banco&gt; " &amp;&amp; std::getline(std::cin, linha)) {
+        std::istringstream pedaco{linha};
+        char comando = ' ';
+        int numero = 0;
+        double valor = 0.0;
+        pedaco &gt;&gt; comando &gt;&gt; numero &gt;&gt; valor;
+
+        try {
+            if (comando == 'q') {
+                break;
+            } else if (comando == 'l') {
+                for (std::size_t i = 0; i &lt; contas.size(); ++i) {
+                    std::cout &lt;&lt; i + 1 &lt;&lt; ". " &lt;&lt; contas[i]-&gt;titular() &lt;&lt; " ("
+                              &lt;&lt; contas[i]-&gt;tipo() &lt;&lt; ")\n";
+                }
+            } else if (comando == 'd') {
+                escolher(contas, numero).depositar(valor);
+                std::cout &lt;&lt; "Depósito feito.\n";
+            } else if (comando == 's') {
+                escolher(contas, numero).sacar(valor);
+                std::cout &lt;&lt; "Saque feito.\n";
+            } else if (comando == 'e') {
+                std::cout &lt;&lt; escolher(contas, numero).extrato();
+            } else if (comando == 'm') {
+                for (auto&amp; conta : contas) {
+                    conta-&gt;fecharMes();
+                }
+                std::cout &lt;&lt; "Mês fechado.\n";
+            } else {
+                std::cout &lt;&lt; "Comando desconhecido: " &lt;&lt; linha &lt;&lt; '\n';
+            }
+        } catch (const SaldoInsuficiente&amp; e) {
+            std::cout &lt;&lt; "Recusado: " &lt;&lt; e.what() &lt;&lt; '\n';
+        } catch (const std::exception&amp; e) {
+            std::cout &lt;&lt; "Erro: " &lt;&lt; e.what() &lt;&lt; '\n';
+        }
+    }
+    std::cout &lt;&lt; "\nAté logo!\n";
+}
+</pre>
+<pre class="script" data-file="conta.h">#pragma once
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class SaldoInsuficiente : public std::runtime_error {
+public:
+    SaldoInsuficiente(double saldo, double pedido);
+};
+
+struct Movimento {
+    std::string descricao;
+    double valor;
+};
+
+class Conta {
+public:
+    explicit Conta(std::string titular);
+    virtual ~Conta() = default;
+
+    void depositar(double valor, std::string descricao = "Depósito");
+    void sacar(double valor);
+
+    virtual std::string tipo() const;
+    virtual void fecharMes();
+
+    std::string titular() const;
+    double saldo() const;
+    std::string extrato() const;
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+    std::vector&lt;Movimento&gt; movimentos_;
+};
+
+class ContaPoupanca : public Conta {
+public:
+    ContaPoupanca(std::string titular, double taxa);
+
+    std::string tipo() const override;
+    void fecharMes() override;
+
+private:
+    double taxa_;
+};
+</pre>
+<pre class="script" data-file="conta.cpp">#include "conta.h"
+#include &lt;format&gt;
+
+SaldoInsuficiente::SaldoInsuficiente(double saldo, double pedido)
+    : std::runtime_error{std::format("saldo insuficiente (saldo {:.2f}, pedido {:.2f})", saldo, pedido)} {}
+
+Conta::Conta(std::string titular) : titular_{titular} {}
+
+void Conta::depositar(double valor, std::string descricao) {
+    if (valor &lt;= 0) {
+        throw std::invalid_argument{"o valor precisa ser positivo"};
+    }
+    saldo_ += valor;
+    movimentos_.push_back({descricao, valor});
+}
+
+void Conta::sacar(double valor) {
+    if (valor &lt;= 0) {
+        throw std::invalid_argument{"o valor precisa ser positivo"};
+    }
+    if (valor &gt; saldo_) {
+        throw SaldoInsuficiente{saldo_, valor};
+    }
+    saldo_ -= valor;
+    movimentos_.push_back({"Saque", -valor});
+}
+
+std::string Conta::tipo() const { return "Corrente"; }
+void Conta::fecharMes() {}   // a conta corrente não rende
+std::string Conta::titular() const { return titular_; }
+double Conta::saldo() const { return saldo_; }
+
+std::string Conta::extrato() const {
+    std::string texto = std::format("Extrato de {} ({})\n", titular_, tipo());
+    for (const auto&amp; m : movimentos_) {
+        texto += std::format("  {:&lt;12}{:&gt;+10.2f}\n", m.descricao, m.valor);
+    }
+    texto += std::format("  {:&lt;12}{:&gt;10.2f}\n", "Saldo", saldo_);
+    return texto;
+}
+
+ContaPoupanca::ContaPoupanca(std::string titular, double taxa)
+    : Conta{titular}, taxa_{taxa} {}
+
+std::string ContaPoupanca::tipo() const { return "Poupança"; }
+
+void ContaPoupanca::fecharMes() {
+    double rendimento = saldo() * taxa_;
+    if (rendimento &gt; 0) {
+        depositar(rendimento, "Rendimento");
+    }
+}
+</pre>
+<pre class="solucao" data-file="main.cpp">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include "conta.h"
+
+using Contas = std::vector&lt;std::unique_ptr&lt;Conta&gt;&gt;;
+
+Conta&amp; escolher(Contas&amp; contas, int numero) {
+    if (numero &lt; 1 || numero &gt; static_cast&lt;int&gt;(contas.size())) {
+        throw std::out_of_range{"não existe a conta " + std::to_string(numero)};
+    }
+    return *contas[numero - 1];
+}
+
+int main() {
+    Contas contas;
+    contas.push_back(std::make_unique&lt;Conta&gt;("Ana"));
+    contas.push_back(std::make_unique&lt;ContaPoupanca&gt;("Bruno", 0.005));
+
+    std::cout &lt;&lt; "Banco da Ana. Comandos: l, d N VALOR, s N VALOR, e N, m, q\n";
+    std::string linha;
+    while (std::cout &lt;&lt; "banco&gt; " &amp;&amp; std::getline(std::cin, linha)) {
+        std::istringstream pedaco{linha};
+        char comando = ' ';
+        int numero = 0;
+        double valor = 0.0;
+        pedaco &gt;&gt; comando &gt;&gt; numero &gt;&gt; valor;
+
+        try {
+            if (comando == 'q') {
+                break;
+            } else if (comando == 'l') {
+                for (std::size_t i = 0; i &lt; contas.size(); ++i) {
+                    std::cout &lt;&lt; i + 1 &lt;&lt; ". " &lt;&lt; contas[i]-&gt;titular() &lt;&lt; " ("
+                              &lt;&lt; contas[i]-&gt;tipo() &lt;&lt; ")\n";
+                }
+            } else if (comando == 'd') {
+                escolher(contas, numero).depositar(valor);
+                std::cout &lt;&lt; "Depósito feito.\n";
+            } else if (comando == 's') {
+                escolher(contas, numero).sacar(valor);
+                std::cout &lt;&lt; "Saque feito.\n";
+            } else if (comando == 'v') {
+                Conta&amp; conta = escolher(contas, numero);
+                std::cout &lt;&lt; std::format("Saldo de {}: R$ {:.2f}\n", conta.titular(), conta.saldo());
+            } else if (comando == 'e') {
+                std::cout &lt;&lt; escolher(contas, numero).extrato();
+            } else if (comando == 'm') {
+                for (auto&amp; conta : contas) {
+                    conta-&gt;fecharMes();
+                }
+                std::cout &lt;&lt; "Mês fechado.\n";
+            } else {
+                std::cout &lt;&lt; "Comando desconhecido: " &lt;&lt; linha &lt;&lt; '\n';
+            }
+        } catch (const SaldoInsuficiente&amp; e) {
+            std::cout &lt;&lt; "Recusado: " &lt;&lt; e.what() &lt;&lt; '\n';
+        } catch (const std::exception&amp; e) {
+            std::cout &lt;&lt; "Erro: " &lt;&lt; e.what() &lt;&lt; '\n';
+        }
+    }
+    std::cout &lt;&lt; "\nAté logo!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>O código completo</h2>
+<p>Os três arquivos finais, prontos para copiar. Compile com <code>g++ -std=c++23 -Wall -Wextra main.cpp conta.cpp -o banco</code>.</p>
+
+<pre class="file" data-file="conta.h">#pragma once
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class SaldoInsuficiente : public std::runtime_error {
+public:
+    SaldoInsuficiente(double saldo, double pedido);
+};
+
+struct Movimento {
+    std::string descricao;
+    double valor;
+};
+
+class Conta {
+public:
+    explicit Conta(std::string titular);
+    virtual ~Conta() = default;
+
+    void depositar(double valor, std::string descricao = "Depósito");
+    void sacar(double valor);
+
+    virtual std::string tipo() const;
+    virtual void fecharMes();
+
+    std::string titular() const;
+    double saldo() const;
+    std::string extrato() const;
+
+private:
+    std::string titular_;
+    double saldo_ = 0.0;
+    std::vector&lt;Movimento&gt; movimentos_;
+};
+
+class ContaPoupanca : public Conta {
+public:
+    ContaPoupanca(std::string titular, double taxa);
+
+    std::string tipo() const override;
+    void fecharMes() override;
+
+private:
+    double taxa_;
+};
+</pre>
+<pre class="file" data-file="conta.cpp">#include "conta.h"
+#include &lt;format&gt;
+
+SaldoInsuficiente::SaldoInsuficiente(double saldo, double pedido)
+    : std::runtime_error{std::format("saldo insuficiente (saldo {:.2f}, pedido {:.2f})", saldo, pedido)} {}
+
+Conta::Conta(std::string titular) : titular_{titular} {}
+
+void Conta::depositar(double valor, std::string descricao) {
+    if (valor &lt;= 0) {
+        throw std::invalid_argument{"o valor precisa ser positivo"};
+    }
+    saldo_ += valor;
+    movimentos_.push_back({descricao, valor});
+}
+
+void Conta::sacar(double valor) {
+    if (valor &lt;= 0) {
+        throw std::invalid_argument{"o valor precisa ser positivo"};
+    }
+    if (valor &gt; saldo_) {
+        throw SaldoInsuficiente{saldo_, valor};
+    }
+    saldo_ -= valor;
+    movimentos_.push_back({"Saque", -valor});
+}
+
+std::string Conta::tipo() const { return "Corrente"; }
+void Conta::fecharMes() {}   // a conta corrente não rende
+std::string Conta::titular() const { return titular_; }
+double Conta::saldo() const { return saldo_; }
+
+std::string Conta::extrato() const {
+    std::string texto = std::format("Extrato de {} ({})\n", titular_, tipo());
+    for (const auto&amp; m : movimentos_) {
+        texto += std::format("  {:&lt;12}{:&gt;+10.2f}\n", m.descricao, m.valor);
+    }
+    texto += std::format("  {:&lt;12}{:&gt;10.2f}\n", "Saldo", saldo_);
+    return texto;
+}
+
+ContaPoupanca::ContaPoupanca(std::string titular, double taxa)
+    : Conta{titular}, taxa_{taxa} {}
+
+std::string ContaPoupanca::tipo() const { return "Poupança"; }
+
+void ContaPoupanca::fecharMes() {
+    double rendimento = saldo() * taxa_;
+    if (rendimento &gt; 0) {
+        depositar(rendimento, "Rendimento");
+    }
+}
+</pre>
+<pre class="file" data-file="main.cpp">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include "conta.h"
+
+using Contas = std::vector&lt;std::unique_ptr&lt;Conta&gt;&gt;;
+
+Conta&amp; escolher(Contas&amp; contas, int numero) {
+    if (numero &lt; 1 || numero &gt; static_cast&lt;int&gt;(contas.size())) {
+        throw std::out_of_range{"não existe a conta " + std::to_string(numero)};
+    }
+    return *contas[numero - 1];
+}
+
+int main() {
+    Contas contas;
+    contas.push_back(std::make_unique&lt;Conta&gt;("Ana"));
+    contas.push_back(std::make_unique&lt;ContaPoupanca&gt;("Bruno", 0.005));
+
+    std::cout &lt;&lt; "Banco da Ana. Comandos: l, d N VALOR, s N VALOR, e N, m, q\n";
+    std::string linha;
+    while (std::cout &lt;&lt; "banco&gt; " &amp;&amp; std::getline(std::cin, linha)) {
+        std::istringstream pedaco{linha};
+        char comando = ' ';
+        int numero = 0;
+        double valor = 0.0;
+        pedaco &gt;&gt; comando &gt;&gt; numero &gt;&gt; valor;
+
+        try {
+            if (comando == 'q') {
+                break;
+            } else if (comando == 'l') {
+                for (std::size_t i = 0; i &lt; contas.size(); ++i) {
+                    std::cout &lt;&lt; i + 1 &lt;&lt; ". " &lt;&lt; contas[i]-&gt;titular() &lt;&lt; " ("
+                              &lt;&lt; contas[i]-&gt;tipo() &lt;&lt; ")\n";
+                }
+            } else if (comando == 'd') {
+                escolher(contas, numero).depositar(valor);
+                std::cout &lt;&lt; "Depósito feito.\n";
+            } else if (comando == 's') {
+                escolher(contas, numero).sacar(valor);
+                std::cout &lt;&lt; "Saque feito.\n";
+            } else if (comando == 'e') {
+                std::cout &lt;&lt; escolher(contas, numero).extrato();
+            } else if (comando == 'm') {
+                for (auto&amp; conta : contas) {
+                    conta-&gt;fecharMes();
+                }
+                std::cout &lt;&lt; "Mês fechado.\n";
+            } else {
+                std::cout &lt;&lt; "Comando desconhecido: " &lt;&lt; linha &lt;&lt; '\n';
+            }
+        } catch (const SaldoInsuficiente&amp; e) {
+            std::cout &lt;&lt; "Recusado: " &lt;&lt; e.what() &lt;&lt; '\n';
+        } catch (const std::exception&amp; e) {
+            std::cout &lt;&lt; "Erro: " &lt;&lt; e.what() &lt;&lt; '\n';
+        }
+    }
+    std::cout &lt;&lt; "\nAté logo!\n";
+}
+</pre>
+
+
+<hr>
+
+<h2>Desafios extras</h2>
+<p>Sem solução pronta: use o editor da <a href="#etapa8">etapa 8</a>, que tem o banco completo, ou o seu computador.</p>
+<ol>
+  <li><strong>Centavos inteiros.</strong> Troque o <code>double saldo_</code> por <code>long long centavos_</code> (R$ 10,50 = 1050). No extrato, mostre com <code>std::format("{}.{:02}", c / 100, c % 100)</code>. Cuidado com os valores negativos.</li>
+  <li><strong>Vírgula brasileira.</strong> Faça o extrato mostrar <code>1.000,00</code> em vez de <code>1000.00</code>. Dica: formate e depois troque os caracteres no texto (<a href="funcoes-string.html">Funções de String</a>).</li>
+  <li><strong>Transferência no menu.</strong> Com o <code>transferir</code> da missão 7, crie o comando <code>t ORIGEM DESTINO VALOR</code>. Se faltar saldo, nenhuma das duas contas pode mudar.</li>
+  <li><strong>Cheque especial.</strong> Crie <code>ContaEspecial</code>, que pode ficar negativa até um limite. Dica: a mãe precisa de um método <code>virtual</code> para perguntar "quanto posso sacar?".</li>
+  <li><strong>Salvar as contas.</strong> No <code>q</code>, grave titular, tipo e saldo num arquivo <code>contas.csv</code>; ao abrir, leia de volta (<a href="arquivos.html">Ler e Escrever Arquivos</a>). O <a href="projeto-estoque.html">Controle de Estoque</a> faz isso com um CSV.</li>
+  <li><strong>Classe abstrata.</strong> Faça <code>tipo()</code> virar <code>virtual std::string tipo() const = 0;</code> e crie <code>ContaCorrente</code>. O que acontece com <code>std::make_unique&lt;Conta&gt;("Ana")</code>? (<a href="classes-abstratas.html">Classes Abstratas</a>)</li>
+</ol>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Dados <code>private</code> + métodos <code>public</code>: o saldo só muda por <code>depositar</code> e <code>sacar</code>, e o compilador barra <code>ana.saldo_ = …</code>.</li>
+  <li>Validar com <code>bool</code> funciona, mas a resposta pode ser ignorada (<code>[[nodiscard]]</code> só avisa). Uma exceção não passa despercebida: sem <code>catch</code>, o programa termina com <code>terminate called after throwing…</code>.</li>
+  <li>Exceção própria: <code>class SaldoInsuficiente : public std::runtime_error</code>, com a mensagem montada no construtor e lida com <code>what()</code>. Capture com <code>catch (const Tipo&amp; e)</code>, do mais específico para o mais geral.</li>
+  <li>Herança: <code>class ContaPoupanca : public Conta</code>. Na mãe, <code>virtual</code> (e destrutor virtual); na filha, <code>override</code>. Sem <code>virtual</code>, a função errada é chamada em silêncio.</li>
+  <li>Contas de tipos diferentes num vetor: <code>std::vector&lt;std::unique_ptr&lt;Conta&gt;&gt;</code> com <code>std::make_unique</code>. Um <code>vector&lt;Conta&gt;</code> fatia a poupança; <code>unique_ptr</code> não se copia, então percorra com <code>auto&amp;</code>.</li>
+  <li><code>std::format("{:&lt;12}{:&gt;+10.2f}", …)</code> alinha colunas, fixa as casas decimais e mostra o sinal.</li>
+  <li><code>.h</code> com as declarações e <code>#pragma once</code>, <code>.cpp</code> com os corpos (<code>Conta::metodo</code>); compile todos os <code>.cpp</code> juntos, senão vem <code>referência não definida</code> do ligador.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
