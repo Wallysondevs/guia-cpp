@@ -1,0 +1,1149 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Quiz — 79 perguntas com código, do básico ao avançado | Guia C++</title>
+<meta name="description" content="Quiz do Guia C++: 79 perguntas nos três níveis, muitas do tipo &quot;o que este programa imprime?&quot; e &quot;este código compila?&quot;, com correção na hora, explicação e link para revisar. Todas as respostas foram conferidas no g++ 15 e no clang++ 21.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Quiz</span></h1>
+
+<p class="intro">79 perguntas sobre o que você estudou no guia, divididas nos três níveis. A maioria mostra um trecho de código e pergunta <strong>o que ele imprime</strong> ou <strong>se ele compila</strong>: tente responder de cabeça, sem rodar. Cada resposta foi conferida de verdade, com <code>g++ -std=c++23 -Wall -Wextra</code> (g++ 15) e com o clang++ 21. A correção é na hora; abra "Explicação" para entender o porquê, e o link "Revise" leva à aula do assunto.</p>
+
+<p>Acertos: <strong id="placar">0 de 79</strong></p>
+
+<div class="note">
+<strong>Como os trechos funcionam</strong>
+<p>Para economizar espaço, os trechos que só têm instruções estão, na verdade, dentro de um <code>int main() { … }</code>, com os <code>#include</code> necessários (<code>&lt;iostream&gt;</code>, <code>&lt;string&gt;</code>, <code>&lt;vector&gt;</code>…). Quando o trecho tem funções, structs ou classes, o <code>main</code> aparece. Nas saídas, o <code>cout</code> não pula linha sozinho: <code>std::cout &lt;&lt; 1 &lt;&lt; 2;</code> mostra <code>12</code>.</p>
+</div>
+
+<p>Ir para: <a href="#nivel1">Nível 1</a> · <a href="#nivel2">Nível 2</a> · <a href="#nivel3">Nível 3</a> · <a href="#conferir">Conferir no editor</a></p>
+
+<h2 id="nivel1">Nível 1 · Iniciante</h2>
+<p>Saída, variáveis, tipos, operadores, texto, decisões, repetições e <code>std::vector</code>.</p>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">1. O que este código imprime?</p>
+<pre class="file">std::cout &lt;&lt; 7 / 2;</pre>
+<label><input type="radio" name="q1"> <code>4</code></label>
+<label><input type="radio" name="q1"> <code>3.0</code></label>
+<label><input type="radio" name="q1"> <code>3.5</code></label>
+<label><input type="radio" name="q1"> <code>3</code></label>
+<details><summary>Explicação</summary><p>Os dois números são <code>int</code>, então a divisão é <strong>inteira</strong>: o resultado é 3 e a parte decimal é jogada fora (não arredonda).</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="operadores-aritmeticos.html">Operadores Aritméticos</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">2. O que este código imprime?</p>
+<pre class="file">std::cout &lt;&lt; 7 % 3;</pre>
+<label><input type="radio" name="q2"> <code>1</code></label>
+<label><input type="radio" name="q2"> <code>2.33</code></label>
+<label><input type="radio" name="q2"> <code>0</code></label>
+<label><input type="radio" name="q2"> <code>2</code></label>
+<details><summary>Explicação</summary><p><code>%</code> é o <strong>resto</strong> da divisão inteira: 7 = 3 × 2 + <strong>1</strong>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="operadores-aritmeticos.html">Operadores Aritméticos</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">3. O que este código imprime?</p>
+<pre class="file">std::cout &lt;&lt; 7 / 2.0;</pre>
+<label><input type="radio" name="q3"> <code>3.5</code></label>
+<label><input type="radio" name="q3"> <code>3</code></label>
+<label><input type="radio" name="q3"> <code>3.50</code></label>
+<label><input type="radio" name="q3"> <code>4</code></label>
+<details><summary>Explicação</summary><p>Basta um dos lados ser <code>double</code> (<code>2.0</code>) para a divisão ser "de verdade". O <code>cout</code> não mostra zeros à direita: <code>3.5</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="ponto-flutuante.html">float e double</a></p>
+</div>
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O que este código imprime?</p>
+<pre class="file">int x = 5;
+x += 3;
+x *= 2;
+std::cout &lt;&lt; x;</pre>
+<label><input type="radio" name="q4"> <code>10</code></label>
+<label><input type="radio" name="q4"> <code>13</code></label>
+<label><input type="radio" name="q4"> <code>16</code></label>
+<label><input type="radio" name="q4"> <code>11</code></label>
+<details><summary>Explicação</summary><p><code>x += 3</code> deixa 8; <code>x *= 2</code> deixa 16.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="operadores-atribuicao.html">Operadores de Atribuição</a></p>
+</div>
+<div class="mc" data-answer="4">
+<p class="mc-q">5. O que este código imprime?</p>
+<pre class="file">int i = 5;
+int j = i++;
+std::cout &lt;&lt; j &lt;&lt; i;</pre>
+<label><input type="radio" name="q5"> <code>55</code></label>
+<label><input type="radio" name="q5"> <code>65</code></label>
+<label><input type="radio" name="q5"> <code>66</code></label>
+<label><input type="radio" name="q5"> <code>56</code></label>
+<details><summary>Explicação</summary><p><code>i++</code> (pós-incremento) entrega o valor <strong>antigo</strong> (5) e só depois soma 1. Então <code>j</code> = 5 e <code>i</code> = 6.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="incremento.html">++ e --</a></p>
+</div>
+<div class="mc" data-answer="3">
+<p class="mc-q">6. O que este código imprime?</p>
+<pre class="file">int i = 5;
+int j = ++i;
+std::cout &lt;&lt; j &lt;&lt; i;</pre>
+<label><input type="radio" name="q6"> <code>55</code></label>
+<label><input type="radio" name="q6"> <code>56</code></label>
+<label><input type="radio" name="q6"> <code>66</code></label>
+<label><input type="radio" name="q6"> <code>65</code></label>
+<details><summary>Explicação</summary><p><code>++i</code> (pré-incremento) soma 1 <strong>primeiro</strong> e entrega o valor novo: os dois ficam 6.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="incremento.html">++ e --</a></p>
+</div>
+<div class="mc" data-answer="3">
+<p class="mc-q">7. Este código compila?</p>
+<pre class="file">int x = 5
+std::cout &lt;&lt; x;</pre>
+<label><input type="radio" name="q7"> Não: <code>x</code> não foi declarado</label>
+<label><input type="radio" name="q7"> Sim, compila e roda sem erro e imprime 5</label>
+<label><input type="radio" name="q7"> Não: falta o <code>;</code> no fim da primeira linha</label>
+<label><input type="radio" name="q7"> Compila, mas com um aviso</label>
+<details><summary>Explicação</summary><p>O g++ diz <code>expected ‘,’ or ‘;’ before ‘std’</code>, apontando a linha <strong>seguinte</strong>, onde percebeu a falta.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="ref-erros.html#e1">Mensagens de Erro</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">8. O que este código imprime?</p>
+<pre class="file">std::cout &lt;&lt; (10 &gt; 3 &amp;&amp; 2 &gt; 5);</pre>
+<label><input type="radio" name="q8"> <code>0</code></label>
+<label><input type="radio" name="q8"> <code>false</code></label>
+<label><input type="radio" name="q8"> <code>1</code></label>
+<label><input type="radio" name="q8"> <code>true</code></label>
+<details><summary>Explicação</summary><p><code>10 &gt; 3</code> é verdadeiro, mas <code>2 &gt; 5</code> é falso; com <code>&amp;&amp;</code>, o resultado é falso. O <code>cout</code> mostra um <code>bool</code> como <code>0</code> ou <code>1</code>, a menos que você peça <code>std::boolalpha</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="operadores-logicos.html">Operadores Lógicos</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">9. O que este código imprime?</p>
+<pre class="file">std::cout &lt;&lt; std::boolalpha &lt;&lt; (3 == 3.0);</pre>
+<label><input type="radio" name="q9"> <code>false</code></label>
+<label><input type="radio" name="q9"> <code>true</code></label>
+<label><input type="radio" name="q9"> <code>1</code></label>
+<label><input type="radio" name="q9"> Erro de compilação: int com double</label>
+<details><summary>Explicação</summary><p>O <code>3</code> é convertido para <code>double</code> antes de comparar, e 3.0 == 3.0. Com <code>std::boolalpha</code>, o <code>cout</code> escreve <code>true</code>/<code>false</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="bool.html">Booleanos</a></p>
+</div>
+<div class="mc" data-answer="3">
+<p class="mc-q">10. O que este código imprime?</p>
+<pre class="file">char c = 'A';
+c = c + 2;
+std::cout &lt;&lt; c;</pre>
+<label><input type="radio" name="q10"> <code>B</code></label>
+<label><input type="radio" name="q10"> <code>67</code></label>
+<label><input type="radio" name="q10"> <code>C</code></label>
+<label><input type="radio" name="q10"> <code>A2</code></label>
+<details><summary>Explicação</summary><p>Um <code>char</code> é um número (o código da letra). 'A' + 2 é o código do 'C', e como <code>c</code> é <code>char</code>, o <code>cout</code> mostra a letra.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="char.html">Caracteres</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">11. O que este código imprime?</p>
+<pre class="file">std::cout &lt;&lt; 'A' + 1;</pre>
+<label><input type="radio" name="q11"> <code>65</code></label>
+<label><input type="radio" name="q11"> <code>66</code></label>
+<label><input type="radio" name="q11"> <code>B</code></label>
+<label><input type="radio" name="q11"> <code>A1</code></label>
+<details><summary>Explicação</summary><p>Na conta, o <code>char</code> vira <code>int</code>: 'A' vale 65, e 65 + 1 = 66. O resultado é um <code>int</code>, então aparece o número, não a letra.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="char.html">Caracteres</a></p>
+</div>
+<div class="mc" data-answer="3">
+<p class="mc-q">12. O que este código imprime?</p>
+<pre class="file">int x = 3.9;
+std::cout &lt;&lt; x;</pre>
+<label><input type="radio" name="q12"> Erro de compilação</label>
+<label><input type="radio" name="q12"> <code>4</code></label>
+<label><input type="radio" name="q12"> <code>3</code></label>
+<label><input type="radio" name="q12"> <code>3.9</code></label>
+<details><summary>Explicação</summary><p>A parte decimal é <strong>cortada</strong> (não arredonda). O g++ aceita em silêncio com <code>-Wall -Wextra</code>; o Clang avisa <code>implicit conversion from 'double' to 'int' changes value from 3.9 to 3</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="conversao-tipos.html">Conversão de Tipos</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">13. O que este código imprime?</p>
+<pre class="file">std::string s = "Olá";
+std::cout &lt;&lt; s.size();</pre>
+<label><input type="radio" name="q13"> <code>4</code></label>
+<label><input type="radio" name="q13"> <code>2</code></label>
+<label><input type="radio" name="q13"> <code>3</code></label>
+<label><input type="radio" name="q13"> <code>6</code></label>
+<details><summary>Explicação</summary><p><code>size()</code> conta <strong>bytes</strong>, não letras. Em UTF-8, o "á" ocupa 2 bytes: O + l + á(2) = 4.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="acentos-utf8.html">Acentos e UTF-8</a></p>
+</div>
+<div class="mc" data-answer="4">
+<p class="mc-q">14. O que este código imprime?</p>
+<pre class="file">std::string a = "10";
+std::string b = "5";
+std::cout &lt;&lt; a + b;</pre>
+<label><input type="radio" name="q14"> <code>10 5</code></label>
+<label><input type="radio" name="q14"> Erro de compilação</label>
+<label><input type="radio" name="q14"> <code>15</code></label>
+<label><input type="radio" name="q14"> <code>105</code></label>
+<details><summary>Explicação</summary><p>Com <code>std::string</code>, o <code>+</code> <strong>junta</strong> textos, não soma números.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="concatenacao.html">Juntar Strings</a></p>
+</div>
+<div class="mc" data-answer="4">
+<p class="mc-q">15. O que este código imprime?</p>
+<pre class="file">std::cout &lt;&lt; std::stoi("42") + 1;</pre>
+<label><input type="radio" name="q15"> Erro de compilação</label>
+<label><input type="radio" name="q15"> <code>42</code></label>
+<label><input type="radio" name="q15"> <code>421</code></label>
+<label><input type="radio" name="q15"> <code>43</code></label>
+<details><summary>Explicação</summary><p><code>std::stoi</code> ("string to int") transforma o texto <code>"42"</code> no número 42; aí 42 + 1 = 43.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="string-numero.html">Texto ↔ Número</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">16. O que este código imprime?</p>
+<pre class="file">int n = 0;
+if (n) {
+    std::cout &lt;&lt; "sim";
+} else {
+    std::cout &lt;&lt; "não";
+}</pre>
+<label><input type="radio" name="q16"> <code>não</code></label>
+<label><input type="radio" name="q16"> <code>sim</code></label>
+<label><input type="radio" name="q16"> Nada</label>
+<label><input type="radio" name="q16"> Erro: <code>n</code> não é <code>bool</code></label>
+<details><summary>Explicação</summary><p>Numa condição, um número vira <code>bool</code>: 0 é falso, qualquer outro é verdadeiro.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="if-else.html">if e else</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">17. O que este código imprime?</p>
+<pre class="file">int x = 5;
+if (x = 0) {
+    std::cout &lt;&lt; "zero";
+} else {
+    std::cout &lt;&lt; x;
+}</pre>
+<label><input type="radio" name="q17"> <code>0</code></label>
+<label><input type="radio" name="q17"> <code>zero</code></label>
+<label><input type="radio" name="q17"> <code>5</code></label>
+<label><input type="radio" name="q17"> Erro de compilação</label>
+<details><summary>Explicação</summary><p><code>x = 0</code> é uma <strong>atribuição</strong>, não uma comparação: guarda 0 em <code>x</code>, e o valor 0 conta como falso. Vai para o <code>else</code> e mostra o novo <code>x</code>. O compilador avisa: <code>suggest parentheses around assignment used as truth value</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="operadores-comparacao.html">Operadores de Comparação</a></p>
+</div>
+<div class="mc" data-answer="4">
+<p class="mc-q">18. O que este código imprime?</p>
+<pre class="file">int op = 1;
+switch (op) {
+case 1:
+    std::cout &lt;&lt; "um ";
+case 2:
+    std::cout &lt;&lt; "dois ";
+    break;
+case 3:
+    std::cout &lt;&lt; "três ";
+}</pre>
+<label><input type="radio" name="q18"> <code>um</code></label>
+<label><input type="radio" name="q18"> <code>dois</code></label>
+<label><input type="radio" name="q18"> <code>um dois três</code></label>
+<label><input type="radio" name="q18"> <code>um dois</code></label>
+<details><summary>Explicação</summary><p>Sem <code>break</code> no <code>case 1</code>, a execução "cai" no <code>case 2</code> e só para no <code>break</code> dele. O g++ avisa: <code>this statement may fall through</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="switch.html">switch</a></p>
+</div>
+<div class="mc" data-answer="3">
+<p class="mc-q">19. O que este código imprime?</p>
+<pre class="file">int n = 10;
+while (n &gt; 1) {
+    n /= 2;
+    std::cout &lt;&lt; n &lt;&lt; ' ';
+}</pre>
+<label><input type="radio" name="q19"> <code>5 2 1 0</code></label>
+<label><input type="radio" name="q19"> <code>5 2</code></label>
+<label><input type="radio" name="q19"> <code>5 2 1</code></label>
+<label><input type="radio" name="q19"> <code>10 5 2</code></label>
+<details><summary>Explicação</summary><p>10 → 5 → 2 → 1 (divisão inteira). Com <code>n</code> = 1, a condição <code>n &gt; 1</code> fica falsa e o laço para.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="while.html">while</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">20. O que este código imprime?</p>
+<pre class="file">int i = 10;
+do {
+    std::cout &lt;&lt; i;
+} while (i &lt; 5);</pre>
+<label><input type="radio" name="q20"> 10 repetido sem parar</label>
+<label><input type="radio" name="q20"> <code>10</code></label>
+<label><input type="radio" name="q20"> Nada</label>
+<label><input type="radio" name="q20"> Erro de compilação</label>
+<details><summary>Explicação</summary><p>O <code>do-while</code> roda o bloco <strong>uma vez</strong> antes de testar a condição.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="do-while.html">do-while</a></p>
+</div>
+<div class="mc" data-answer="3">
+<p class="mc-q">21. O que este código imprime?</p>
+<pre class="file">for (int i = 1; i &lt;= 6; i++) {
+    if (i % 2 == 0) continue;
+    if (i &gt; 4) break;
+    std::cout &lt;&lt; i;
+}</pre>
+<label><input type="radio" name="q21"> <code>135</code></label>
+<label><input type="radio" name="q21"> <code>1</code></label>
+<label><input type="radio" name="q21"> <code>13</code></label>
+<label><input type="radio" name="q21"> <code>246</code></label>
+<details><summary>Explicação</summary><p>Os pares são pulados pelo <code>continue</code>. Mostra 1 e 3; no 5, o <code>break</code> encerra o laço antes de mostrar.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="break-continue.html">break e continue</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">22. O que este código imprime?</p>
+<pre class="file">for (int i = 1; i &lt;= 2; i++) {
+    for (int j = 1; j &lt;= 3; j++) {
+        std::cout &lt;&lt; i * j &lt;&lt; ' ';
+    }
+}</pre>
+<label><input type="radio" name="q22"> <code>1 2 3 2 4 6</code></label>
+<label><input type="radio" name="q22"> <code>1 2 2 4 3 6</code></label>
+<label><input type="radio" name="q22"> <code>1 2 3 4 5 6</code></label>
+<label><input type="radio" name="q22"> <code>2 4 6</code></label>
+<details><summary>Explicação</summary><p>Para cada <code>i</code>, o laço de dentro roda inteiro: i = 1 dá 1 2 3; i = 2 dá 2 4 6.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="lacos-aninhados.html">Laços Aninhados</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">23. O que este código imprime?</p>
+<pre class="file">std::vector&lt;int&gt; v{1, 2, 3};
+v.push_back(4);
+std::cout &lt;&lt; v.size() &lt;&lt; v.back();</pre>
+<label><input type="radio" name="q23"> <code>44</code></label>
+<label><input type="radio" name="q23"> <code>34</code></label>
+<label><input type="radio" name="q23"> <code>33</code></label>
+<label><input type="radio" name="q23"> <code>43</code></label>
+<details><summary>Explicação</summary><p><code>push_back</code> acrescenta no fim: o vetor fica com 4 itens, e o último (<code>back()</code>) é 4.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="vector.html">std::vector</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">24. O que este código imprime?</p>
+<pre class="file">std::vector&lt;int&gt; v(3);
+std::cout &lt;&lt; v.size() &lt;&lt; v[0];</pre>
+<label><input type="radio" name="q24"> <code>30</code></label>
+<label><input type="radio" name="q24"> <code>13</code></label>
+<label><input type="radio" name="q24"> <code>10</code></label>
+<label><input type="radio" name="q24"> <code>33</code></label>
+<details><summary>Explicação</summary><p>Com <strong>parênteses</strong>, <code>v(3)</code> cria um vetor com <strong>3 itens</strong>, todos 0.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="vector.html">std::vector</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">25. O que este código imprime?</p>
+<pre class="file">std::vector&lt;int&gt; v{3};
+std::cout &lt;&lt; v.size() &lt;&lt; v[0];</pre>
+<label><input type="radio" name="q25"> <code>33</code></label>
+<label><input type="radio" name="q25"> <code>13</code></label>
+<label><input type="radio" name="q25"> <code>30</code></label>
+<label><input type="radio" name="q25"> <code>03</code></label>
+<details><summary>Explicação</summary><p>Com <strong>chaves</strong>, <code>v{3}</code> é uma lista de valores: <strong>1 item</strong>, que vale 3. Compare com a pergunta anterior.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="vector.html">std::vector</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">26. Este código compila?</p>
+<pre class="file">const int x = 5;
+x = 6;</pre>
+<label><input type="radio" name="q26"> Compila, e <code>x</code> continua 5</label>
+<label><input type="radio" name="q26"> Não: <code>x</code> é <code>const</code> e não pode mudar</label>
+<label><input type="radio" name="q26"> Sim, compila e roda sem erro</label>
+<label><input type="radio" name="q26"> Compila, mas com um aviso</label>
+<details><summary>Explicação</summary><p>O g++ diz <code>assignment of read-only variable ‘x’</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="constantes.html">Constantes</a></p>
+</div>
+<div class="mc" data-answer="4">
+<p class="mc-q">27. O que este código imprime?</p>
+<pre class="file">int a = 7, b = 2;
+double r = a / b;
+std::cout &lt;&lt; r;</pre>
+<label><input type="radio" name="q27"> <code>4</code></label>
+<label><input type="radio" name="q27"> <code>3.5</code></label>
+<label><input type="radio" name="q27"> Erro de compilação</label>
+<label><input type="radio" name="q27"> <code>3</code></label>
+<details><summary>Explicação</summary><p>A divisão acontece <strong>antes</strong> de guardar, entre dois <code>int</code>: dá 3. Só depois o 3 vira <code>double</code>. Para 3.5, converta antes: <code>static_cast&lt;double&gt;(a) / b</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="conversao-tipos.html">Conversão de Tipos</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">28. Este código compila?</p>
+<pre class="file">std::cout &lt;&lt; "Olá" &lt;&lt; endl;</pre>
+<label><input type="radio" name="q28"> Compila, mas não pula linha</label>
+<label><input type="radio" name="q28"> Não: faltou o <code>std::</code> antes de <code>endl</code></label>
+<label><input type="radio" name="q28"> Sim, compila e roda sem erro</label>
+<label><input type="radio" name="q28"> Não: <code>endl</code> precisa de parênteses</label>
+<details><summary>Explicação</summary><p>O g++ diz <code>‘endl’ was not declared in this scope; did you mean ‘std::endl’?</code></p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="novas-linhas.html">Novas Linhas</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">29. O que este código imprime?</p>
+<pre class="file">std::cout &lt;&lt; std::format("{:.2f}", 3.14159);</pre>
+<label><input type="radio" name="q29"> <code>3.14</code></label>
+<label><input type="radio" name="q29"> <code>3.14159</code></label>
+<label><input type="radio" name="q29"> <code>3.15</code></label>
+<label><input type="radio" name="q29"> <code>3.1</code></label>
+<details><summary>Explicação</summary><p><code>.2f</code> = duas casas decimais, com arredondamento: 3.14159 → 3.14.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="format-print.html">std::format e std::print</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">30. O que este código imprime?</p>
+<pre class="file">std::string s = "banana";
+std::cout &lt;&lt; s[0] &lt;&lt; s.find("na");</pre>
+<label><input type="radio" name="q30"> <code>b2</code></label>
+<label><input type="radio" name="q30"> <code>b3</code></label>
+<label><input type="radio" name="q30"> <code>a2</code></label>
+<label><input type="radio" name="q30"> <code>n2</code></label>
+<details><summary>Explicação</summary><p><code>s[0]</code> é o primeiro caractere, <code>b</code>. <code>find</code> devolve a posição da primeira ocorrência de "na", contando do 0: b(0) a(1) <strong>n(2)</strong>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="funcoes-string.html">Funções de String</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">31. O que este código imprime?</p>
+<pre class="file">std::cout &lt;&lt; 2 + 3 * 4 &lt;&lt; ' ' &lt;&lt; (2 + 3) * 4;</pre>
+<label><input type="radio" name="q31"> <code>20 20</code></label>
+<label><input type="radio" name="q31"> <code>14 20</code></label>
+<label><input type="radio" name="q31"> <code>14 14</code></label>
+<label><input type="radio" name="q31"> <code>20 14</code></label>
+<details><summary>Explicação</summary><p><code>*</code> vem antes de <code>+</code>: 2 + 12 = 14. Os parênteses mudam a ordem: 5 × 4 = 20.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="precedencia.html">Precedência</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">32. O que este código imprime?</p>
+<pre class="file">std::string s = "abc";
+std::cout &lt;&lt; s.substr(1) &lt;&lt; s.length();</pre>
+<label><input type="radio" name="q32"> <code>bc3</code></label>
+<label><input type="radio" name="q32"> <code>ab3</code></label>
+<label><input type="radio" name="q32"> <code>abc3</code></label>
+<label><input type="radio" name="q32"> <code>bc2</code></label>
+<details><summary>Explicação</summary><p><code>substr(1)</code> pega do índice 1 até o fim ("bc") e <strong>não muda</strong> <code>s</code>, que continua com 3 letras.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="funcoes-string.html">Funções de String</a></p>
+</div>
+<div class="mc" data-answer="4">
+<p class="mc-q">33. O que este código imprime?</p>
+<pre class="file">int x = 7;
+std::cout &lt;&lt; (x &gt; 5 ? "grande" : "pequeno");</pre>
+<label><input type="radio" name="q33"> <code>7</code></label>
+<label><input type="radio" name="q33"> <code>1</code></label>
+<label><input type="radio" name="q33"> <code>pequeno</code></label>
+<label><input type="radio" name="q33"> <code>grande</code></label>
+<details><summary>Explicação</summary><p>O ternário <code>condição ? a : b</code> escolhe <code>a</code> quando a condição é verdadeira.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="ternario.html">Operador Ternário</a></p>
+</div>
+<div class="mc" data-answer="3">
+<p class="mc-q">34. O que este código imprime?</p>
+<pre class="file">std::println("{:&gt;5}|", 42);</pre>
+<label><input type="radio" name="q34"> <code>00042|</code></label>
+<label><input type="radio" name="q34"> <code>42   |</code></label>
+<label><input type="radio" name="q34"> <code>   42|</code> (três espaços antes)</label>
+<label><input type="radio" name="q34"> <code>42|</code></label>
+<details><summary>Explicação</summary><p><code>:&gt;5</code> = alinhar à direita num espaço de 5 caracteres. Para preencher com zeros, seria <code>{:05}</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="format-print.html">std::format e std::print</a></p>
+</div>
+
+<h2 id="nivel2">Nível 2 · Intermediário</h2>
+<p>Funções, lambdas, referências, ponteiros, structs, enums, exceções, organização e os erros que aparecem no caminho.</p>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">35. O que este código imprime?</p>
+<pre class="file">void dobra(int x) {
+    x *= 2;
+}
+
+int main() {
+    int n = 5;
+    dobra(n);
+    std::cout &lt;&lt; n;
+}</pre>
+<label><input type="radio" name="q35"> <code>0</code></label>
+<label><input type="radio" name="q35"> <code>10</code></label>
+<label><input type="radio" name="q35"> <code>5</code></label>
+<label><input type="radio" name="q35"> Erro de compilação</label>
+<details><summary>Explicação</summary><p>Por valor, a função recebe uma <strong>cópia</strong>: dobra a cópia, e o <code>n</code> de fora continua 5.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="passagem-referencia.html">Por Valor × Por Referência</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">36. O que este código imprime?</p>
+<pre class="file">void dobra(int&amp; x) {
+    x *= 2;
+}
+
+int main() {
+    int n = 5;
+    dobra(n);
+    std::cout &lt;&lt; n;
+}</pre>
+<label><input type="radio" name="q36"> <code>25</code></label>
+<label><input type="radio" name="q36"> <code>10</code></label>
+<label><input type="radio" name="q36"> <code>5</code></label>
+<label><input type="radio" name="q36"> Erro de compilação</label>
+<details><summary>Explicação</summary><p>Com <code>int&amp;</code>, o parâmetro é uma <strong>referência</strong>: outro nome para o próprio <code>n</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="passagem-referencia.html">Por Valor × Por Referência</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">37. O que este código imprime?</p>
+<pre class="file">int soma(int a, int b = 10) {
+    return a + b;
+}
+
+int main() {
+    std::cout &lt;&lt; soma(5);
+}</pre>
+<label><input type="radio" name="q37"> <code>15</code></label>
+<label><input type="radio" name="q37"> Erro: falta um argumento</label>
+<label><input type="radio" name="q37"> <code>10</code></label>
+<label><input type="radio" name="q37"> <code>5</code></label>
+<details><summary>Explicação</summary><p><code>b</code> tem valor padrão: se você não passar, ele vale 10.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="valor-padrao.html">Valores Padrão</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">38. O que este código imprime?</p>
+<pre class="file">void f(int) { std::cout &lt;&lt; "int"; }
+void f(double) { std::cout &lt;&lt; "double"; }
+
+int main() {
+    f('a');
+}</pre>
+<label><input type="radio" name="q38"> <code>a</code></label>
+<label><input type="radio" name="q38"> <code>int</code></label>
+<label><input type="radio" name="q38"> Erro: chamada ambígua</label>
+<label><input type="radio" name="q38"> <code>double</code></label>
+<details><summary>Explicação</summary><p>Não existe <code>f(char)</code>. Passar <code>char</code> para <code>int</code> é uma <strong>promoção</strong>, que o compilador prefere a uma conversão para <code>double</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="sobrecarga.html">Sobrecarga de Funções</a></p>
+</div>
+<div class="mc" data-answer="4">
+<p class="mc-q">39. O que este código imprime?</p>
+<pre class="file">int x = 1;
+{
+    int x = 2;
+    std::cout &lt;&lt; x;
+}
+std::cout &lt;&lt; x;</pre>
+<label><input type="radio" name="q39"> <code>11</code></label>
+<label><input type="radio" name="q39"> <code>22</code></label>
+<label><input type="radio" name="q39"> <code>12</code></label>
+<label><input type="radio" name="q39"> <code>21</code></label>
+<details><summary>Explicação</summary><p>O <code>x</code> de dentro do bloco é <strong>outra</strong> variável, que esconde a de fora e some na <code>}</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="escopo.html">Escopo</a></p>
+</div>
+<div class="mc" data-answer="4">
+<p class="mc-q">40. O que este código imprime?</p>
+<pre class="file">int f(int n) {
+    return n &lt;= 1 ? 1 : n * f(n - 1);
+}
+
+int main() {
+    std::cout &lt;&lt; f(5);
+}</pre>
+<label><input type="radio" name="q40"> <code>24</code></label>
+<label><input type="radio" name="q40"> <code>5</code></label>
+<label><input type="radio" name="q40"> <code>15</code></label>
+<label><input type="radio" name="q40"> <code>120</code></label>
+<details><summary>Explicação</summary><p>É o fatorial: 5 × 4 × 3 × 2 × 1 = 120. O caso de parada é <code>n &lt;= 1</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="recursao.html">Recursão</a></p>
+</div>
+<div class="mc" data-answer="3">
+<p class="mc-q">41. O que este código imprime?</p>
+<pre class="file">int x = 1;
+auto f = [x]() { return x * 10; };
+x = 5;
+std::cout &lt;&lt; f();</pre>
+<label><input type="radio" name="q41"> <code>5</code></label>
+<label><input type="radio" name="q41"> <code>1</code></label>
+<label><input type="radio" name="q41"> <code>10</code></label>
+<label><input type="radio" name="q41"> <code>50</code></label>
+<details><summary>Explicação</summary><p><code>[x]</code> captura uma <strong>cópia</strong> de <code>x</code> no momento em que a lambda é criada (quando <code>x</code> valia 1).</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="lambdas.html">Lambdas</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">42. O que este código imprime?</p>
+<pre class="file">int x = 1;
+auto f = [&amp;x]() { return x * 10; };
+x = 5;
+std::cout &lt;&lt; f();</pre>
+<label><input type="radio" name="q42"> <code>50</code></label>
+<label><input type="radio" name="q42"> <code>10</code></label>
+<label><input type="radio" name="q42"> <code>5</code></label>
+<label><input type="radio" name="q42"> <code>1</code></label>
+<details><summary>Explicação</summary><p><code>[&amp;x]</code> captura por <strong>referência</strong>: a lambda enxerga o valor atual de <code>x</code> quando é chamada.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="lambdas.html">Lambdas</a></p>
+</div>
+<div class="mc" data-answer="3">
+<p class="mc-q">43. O que este código imprime?</p>
+<pre class="file">int a = 1;
+int&amp; r = a;
+r = 9;
+std::cout &lt;&lt; a;</pre>
+<label><input type="radio" name="q43"> <code>10</code></label>
+<label><input type="radio" name="q43"> Erro de compilação</label>
+<label><input type="radio" name="q43"> <code>9</code></label>
+<label><input type="radio" name="q43"> <code>1</code></label>
+<details><summary>Explicação</summary><p><code>r</code> é outro nome para <code>a</code>: mudar <code>r</code> é mudar <code>a</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="referencias.html">Referências</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">44. O que este código imprime?</p>
+<pre class="file">int a = 3;
+int* p = &amp;a;
+*p += 4;
+std::cout &lt;&lt; a;</pre>
+<label><input type="radio" name="q44"> <code>3</code></label>
+<label><input type="radio" name="q44"> <code>7</code></label>
+<label><input type="radio" name="q44"> <code>4</code></label>
+<label><input type="radio" name="q44"> O endereço de <code>a</code></label>
+<details><summary>Explicação</summary><p><code>p</code> guarda o endereço de <code>a</code>; <code>*p</code> é o próprio <code>a</code>. Somar 4 em <code>*p</code> muda <code>a</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="ponteiros.html">Ponteiros</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">45. O que este código imprime?</p>
+<pre class="file">int v[] = {10, 20, 30};
+int* p = v;
+std::cout &lt;&lt; *(p + 2);</pre>
+<label><input type="radio" name="q45"> <code>10</code></label>
+<label><input type="radio" name="q45"> <code>30</code></label>
+<label><input type="radio" name="q45"> <code>20</code></label>
+<label><input type="radio" name="q45"> <code>12</code></label>
+<details><summary>Explicação</summary><p>O nome do array vira um ponteiro para o primeiro item. <code>p + 2</code> anda dois <strong>itens</strong> (não dois bytes): aponta o 30.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="ponteiros-arrays.html">Ponteiros e Arrays</a></p>
+</div>
+<div class="mc" data-answer="3">
+<p class="mc-q">46. Este código compila?</p>
+<pre class="file">int&amp; r;</pre>
+<label><input type="radio" name="q46"> Sim, <code>r</code> vira um <code>nullptr</code></label>
+<label><input type="radio" name="q46"> Sim, compila e roda sem erro</label>
+<label><input type="radio" name="q46"> Não: uma referência precisa ser inicializada</label>
+<label><input type="radio" name="q46"> Sim, <code>r</code> começa valendo 0</label>
+<details><summary>Explicação</summary><p>Toda referência precisa "apontar" para algo desde o nascimento. O g++ diz <code>‘r’ declared as reference but not initialized</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="referencias.html">Referências</a></p>
+</div>
+<div class="mc" data-answer="3">
+<p class="mc-q">47. O que este código imprime?</p>
+<pre class="file">struct P {
+    int x = 1;
+    int y = 2;
+};
+
+int main() {
+    P p;
+    p.y = 5;
+    std::cout &lt;&lt; p.x + p.y;
+}</pre>
+<label><input type="radio" name="q47"> <code>7</code></label>
+<label><input type="radio" name="q47"> Erro de compilação</label>
+<label><input type="radio" name="q47"> <code>6</code></label>
+<label><input type="radio" name="q47"> <code>3</code></label>
+<details><summary>Explicação</summary><p>Os campos têm valores iniciais (1 e 2); depois <code>y</code> vira 5. 1 + 5 = 6.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="structs.html">Structs</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">48. Este código compila?</p>
+<pre class="file">enum class Cor { Vermelho, Verde };
+
+int main() {
+    int c = Cor::Verde;
+}</pre>
+<label><input type="radio" name="q48"> Sim, e <code>c</code> vale 2</label>
+<label><input type="radio" name="q48"> Não: <code>enum class</code> não vira <code>int</code> sozinho</label>
+<label><input type="radio" name="q48"> Sim, compila e roda sem erro e <code>c</code> vale 1</label>
+<label><input type="radio" name="q48"> Não: falta <code>std::</code> antes de <code>Cor</code></label>
+<details><summary>Explicação</summary><p>É de propósito: o <code>enum class</code> é um tipo próprio. O g++ diz <code>cannot convert ‘Cor’ to ‘int’ in initialization</code>. Para o número, use <code>static_cast&lt;int&gt;(Cor::Verde)</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="enums.html">Enums</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">49. O que este código imprime?</p>
+<pre class="file">enum class Cor { Vermelho, Verde, Azul };
+
+int main() {
+    std::cout &lt;&lt; static_cast&lt;int&gt;(Cor::Azul);
+}</pre>
+<label><input type="radio" name="q49"> <code>Azul</code></label>
+<label><input type="radio" name="q49"> <code>2</code></label>
+<label><input type="radio" name="q49"> <code>1</code></label>
+<label><input type="radio" name="q49"> <code>3</code></label>
+<details><summary>Explicação</summary><p>Os valores começam em 0: Vermelho = 0, Verde = 1, Azul = 2.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="enums.html">Enums</a></p>
+</div>
+<div class="mc" data-answer="4">
+<p class="mc-q">50. Este código compila?</p>
+<pre class="file">auto a = std::make_unique&lt;int&gt;(5);
+auto b = a;</pre>
+<label><input type="radio" name="q50"> Sim: <code>a</code> e <code>b</code> apontam o mesmo 5</label>
+<label><input type="radio" name="q50"> Sim: <code>b</code> recebe uma cópia do 5</label>
+<label><input type="radio" name="q50"> Sim, compila e roda sem erro</label>
+<label><input type="radio" name="q50"> Não: um <code>unique_ptr</code> não pode ser copiado</label>
+<details><summary>Explicação</summary><p><code>unique_ptr</code> tem um dono só; a cópia foi apagada (<code>use of deleted function</code>). Para transferir, use <code>std::move(a)</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="smart-pointers.html">Ponteiros Inteligentes</a></p>
+</div>
+<div class="mc" data-answer="4">
+<p class="mc-q">51. O que este código imprime?</p>
+<pre class="file">auto a = std::make_unique&lt;int&gt;(5);
+auto b = std::move(a);
+std::cout &lt;&lt; (a == nullptr) &lt;&lt; *b;</pre>
+<label><input type="radio" name="q51"> Erro de compilação</label>
+<label><input type="radio" name="q51"> <code>10</code></label>
+<label><input type="radio" name="q51"> <code>05</code></label>
+<label><input type="radio" name="q51"> <code>15</code></label>
+<details><summary>Explicação</summary><p>O <code>std::move</code> transfere a posse: <code>b</code> passa a ter o 5 e <code>a</code> fica nulo (<code>a == nullptr</code> é verdadeiro, mostrado como 1).</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="smart-pointers.html">Ponteiros Inteligentes</a></p>
+</div>
+<div class="mc" data-answer="4">
+<p class="mc-q">52. O que este código imprime?</p>
+<pre class="file">try {
+    throw std::runtime_error("x");
+    std::cout &lt;&lt; "A";
+} catch (const std::exception&amp; e) {
+    std::cout &lt;&lt; "B" &lt;&lt; e.what();
+}</pre>
+<label><input type="radio" name="q52"> <code>A</code></label>
+<label><input type="radio" name="q52"> <code>ABx</code></label>
+<label><input type="radio" name="q52"> <code>x</code></label>
+<label><input type="radio" name="q52"> <code>Bx</code></label>
+<details><summary>Explicação</summary><p>O <code>throw</code> pula direto para o <code>catch</code>: o <code>"A"</code> nunca é mostrado. <code>e.what()</code> devolve a mensagem da exceção.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="excecoes.html">Exceções</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">53. O que este código imprime?</p>
+<pre class="file">std::vector&lt;int&gt; v{1, 2, 3};
+try {
+    std::cout &lt;&lt; v.at(5);
+} catch (const std::out_of_range&amp;) {
+    std::cout &lt;&lt; "fora";
+}</pre>
+<label><input type="radio" name="q53"> <code>fora</code></label>
+<label><input type="radio" name="q53"> <code>0</code></label>
+<label><input type="radio" name="q53"> O programa aborta</label>
+<label><input type="radio" name="q53"> Um número qualquer (lixo)</label>
+<details><summary>Explicação</summary><p><code>at()</code> confere o índice e lança <code>std::out_of_range</code>, que é capturada. (Com <code>v[5]</code>, não haveria exceção: seria comportamento indefinido.)</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="excecoes.html">Exceções</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">54. O que este código imprime?</p>
+<pre class="file">namespace a { int x = 1; }
+namespace b { int x = 2; }
+
+int main() {
+    std::cout &lt;&lt; a::x + b::x;
+}</pre>
+<label><input type="radio" name="q54"> <code>12</code></label>
+<label><input type="radio" name="q54"> <code>3</code></label>
+<label><input type="radio" name="q54"> Erro: <code>x</code> definido duas vezes</label>
+<label><input type="radio" name="q54"> <code>2</code></label>
+<details><summary>Explicação</summary><p>Cada namespace tem o seu <code>x</code>: <code>a::x</code> e <code>b::x</code> são variáveis diferentes.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="namespaces.html">Namespaces</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">55. O que este código imprime?</p>
+<pre class="file">#define DOBRO(x) x * 2
+
+int main() {
+    std::cout &lt;&lt; DOBRO(1 + 2);
+}</pre>
+<label><input type="radio" name="q55"> <code>3</code></label>
+<label><input type="radio" name="q55"> <code>5</code></label>
+<label><input type="radio" name="q55"> <code>6</code></label>
+<label><input type="radio" name="q55"> Erro de compilação</label>
+<details><summary>Explicação</summary><p>O pré-processador troca <strong>texto</strong>, sem entender a conta: vira <code>1 + 2 * 2</code> = 5. Por isso, prefira funções (ou <code>constexpr</code>) a macros.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="preprocessador.html">O Pré-processador</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">56. O que acontece?</p>
+<pre class="file">int x;
+std::cout &lt;&lt; x;</pre>
+<label><input type="radio" name="q56"> O programa sempre trava</label>
+<label><input type="radio" name="q56"> Qualquer coisa: é comportamento indefinido (e o g++ avisa com <code>-Wall</code>)</label>
+<label><input type="radio" name="q56"> Erro de compilação</label>
+<label><input type="radio" name="q56"> Sempre imprime 0</label>
+<details><summary>Explicação</summary><p>Uma variável local sem valor inicial guarda o que estava naquele pedaço da memória. Ler esse valor é comportamento indefinido. Inicialize sempre: <code>int x = 0;</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="comportamento-indefinido.html">Comportamento Indefinido</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">57. Depois de um programa morrer, <code>echo $?</code> mostra <code>139</code>. O que aconteceu?</p>
+<label><input type="radio" name="q57"> Ele acessou memória inválida (<code>Segmentation fault</code>)</label>
+<label><input type="radio" name="q57"> Uma exceção não foi capturada</label>
+<label><input type="radio" name="q57"> Uma divisão inteira por zero</label>
+<label><input type="radio" name="q57"> O <code>main</code> fez <code>return 139</code> por causa de um aviso</label>
+<details><summary>Explicação</summary><p>139 = 128 + 11, e 11 é o sinal <code>SIGSEGV</code>. Exceção não capturada dá 134; divisão por zero, 136.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="ref-erros.html#sinais">Códigos de saída</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">58. O g++ termina com <code>undefined reference to `soma(int, int)'</code> e <code>collect2: error: ld returned 1 exit status</code>. Qual é a causa mais provável?</p>
+<label><input type="radio" name="q58"> Faltou um <code>;</code> na função <code>soma</code></label>
+<label><input type="radio" name="q58"> A função foi declarada, mas o <code>.cpp</code> com a definição não entrou no comando</label>
+<label><input type="radio" name="q58"> Faltou o <code>#include &lt;iostream&gt;</code></label>
+<label><input type="radio" name="q58"> A função <code>soma</code> travou durante a execução</label>
+<details><summary>Explicação</summary><p>É um erro de <strong>ligação</strong>: cada arquivo compilou, mas o ligador não achou o corpo da função. Compile todos os arquivos juntos: <code>g++ main.cpp soma.cpp -o prog</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a></p>
+</div>
+
+<h2 id="nivel3">Nível 3 · Avançado</h2>
+<p>Classes, herança e polimorfismo, templates, containers, algoritmos e C++ moderno.</p>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">59. O que este código imprime?</p>
+<pre class="file">struct T {
+    T() { std::cout &lt;&lt; "C"; }
+    ~T() { std::cout &lt;&lt; "D"; }
+};
+
+int main() {
+    T a;
+    {
+        T b;
+    }
+    std::cout &lt;&lt; "F";
+}</pre>
+<label><input type="radio" name="q59"> <code>CCDDF</code></label>
+<label><input type="radio" name="q59"> <code>CCFDD</code></label>
+<label><input type="radio" name="q59"> <code>CDCDF</code></label>
+<label><input type="radio" name="q59"> <code>CCDFD</code></label>
+<details><summary>Explicação</summary><p><code>a</code> nasce (C), <code>b</code> nasce (C) e morre na <code>}</code> do bloco (D), aparece o F, e <code>a</code> morre no fim do <code>main</code> (D). O destrutor roda sozinho: é o RAII.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="destrutores-raii.html">Destrutores e RAII</a></p>
+</div>
+<div class="mc" data-answer="4">
+<p class="mc-q">60. O que este código imprime?</p>
+<pre class="file">struct A {
+    virtual void f() { std::cout &lt;&lt; "A"; }
+};
+struct B : A {
+    void f() override { std::cout &lt;&lt; "B"; }
+};
+
+int main() {
+    B b;
+    A&amp; r = b;
+    r.f();
+}</pre>
+<label><input type="radio" name="q60"> <code>A</code></label>
+<label><input type="radio" name="q60"> <code>AB</code></label>
+<label><input type="radio" name="q60"> Erro de compilação</label>
+<label><input type="radio" name="q60"> <code>B</code></label>
+<details><summary>Explicação</summary><p>Com <code>virtual</code>, a versão é escolhida pelo tipo <strong>real</strong> do objeto (um <code>B</code>), mesmo chamando por uma referência para <code>A</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="polimorfismo.html">Polimorfismo</a></p>
+</div>
+<div class="mc" data-answer="4">
+<p class="mc-q">61. O que este código imprime?</p>
+<pre class="file">struct A {
+    void f() { std::cout &lt;&lt; "A"; }
+};
+struct B : A {
+    void f() { std::cout &lt;&lt; "B"; }
+};
+
+int main() {
+    B b;
+    A&amp; r = b;
+    r.f();
+}</pre>
+<label><input type="radio" name="q61"> <code>B</code></label>
+<label><input type="radio" name="q61"> Erro de compilação</label>
+<label><input type="radio" name="q61"> <code>AB</code></label>
+<label><input type="radio" name="q61"> <code>A</code></label>
+<details><summary>Explicação</summary><p>Sem <code>virtual</code>, quem decide é o tipo da <strong>referência</strong> (<code>A&amp;</code>), já na compilação.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="polimorfismo.html">Polimorfismo</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">62. O que este código imprime?</p>
+<pre class="file">struct A {
+    virtual void f() { std::cout &lt;&lt; "A"; }
+};
+struct B : A {
+    void f() override { std::cout &lt;&lt; "B"; }
+};
+
+int main() {
+    B b;
+    A a = b;
+    a.f();
+}</pre>
+<label><input type="radio" name="q62"> <code>B</code></label>
+<label><input type="radio" name="q62"> <code>A</code></label>
+<label><input type="radio" name="q62"> <code>AB</code></label>
+<label><input type="radio" name="q62"> Erro de compilação</label>
+<details><summary>Explicação</summary><p><code>A a = b;</code> <strong>copia</strong> só a parte <code>A</code> de <code>b</code> para um objeto que é de fato um <code>A</code> (o "fatiamento", <em>slicing</em>). O polimorfismo só funciona por referência ou ponteiro.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="heranca.html">Herança</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">63. Este código compila?</p>
+<pre class="file">struct Forma {
+    virtual double area() const = 0;
+};
+
+int main() {
+    Forma f;
+}</pre>
+<label><input type="radio" name="q63"> Sim, compila e roda sem erro</label>
+<label><input type="radio" name="q63"> Não: <code>Forma</code> é abstrata</label>
+<label><input type="radio" name="q63"> Sim, e <code>f.area()</code> devolve 0</label>
+<label><input type="radio" name="q63"> Não: falta um construtor</label>
+<details><summary>Explicação</summary><p><code>= 0</code> torna o método "virtual puro" e a classe, abstrata. O g++ diz <code>cannot declare variable ‘f’ to be of abstract type ‘Forma’</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="classes-abstratas.html">Classes Abstratas</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">64. O que este código imprime?</p>
+<pre class="file">struct C {
+    static int n;
+    C() { n++; }
+};
+int C::n = 0;
+
+int main() {
+    C a, b, c;
+    std::cout &lt;&lt; C::n;
+}</pre>
+<label><input type="radio" name="q64"> Erro: <code>n</code> não foi definido</label>
+<label><input type="radio" name="q64"> <code>3</code></label>
+<label><input type="radio" name="q64"> <code>1</code></label>
+<label><input type="radio" name="q64"> <code>0</code></label>
+<details><summary>Explicação</summary><p>Um membro <code>static</code> é um só para a classe inteira; cada construtor soma 1 no mesmo <code>n</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="membros-static.html">Membros static</a></p>
+</div>
+<div class="mc" data-answer="3">
+<p class="mc-q">65. Este código compila?</p>
+<pre class="file">class Conta {
+public:
+    double saldo() { return s; }
+private:
+    double s = 0;
+};
+
+int main() {
+    const Conta c;
+    std::cout &lt;&lt; c.saldo();
+}</pre>
+<label><input type="radio" name="q65"> Sim, mas com um aviso</label>
+<label><input type="radio" name="q65"> Não: <code>s</code> é privado</label>
+<label><input type="radio" name="q65"> Não: <code>saldo()</code> não é um método <code>const</code></label>
+<label><input type="radio" name="q65"> Sim, compila e roda sem erro e imprime 0</label>
+<details><summary>Explicação</summary><p>Num objeto <code>const</code>, só dá para chamar métodos marcados <code>const</code>. O g++ diz <code>passing ‘const Conta’ as ‘this’ argument discards qualifiers</code>. Conserto: <code>double saldo() const</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="metodos-const.html">Métodos const</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">66. O que este código imprime?</p>
+<pre class="file">template &lt;typename T&gt;
+T maior(T a, T b) {
+    return a &gt; b ? a : b;
+}
+
+int main() {
+    std::cout &lt;&lt; maior(3, 7) &lt;&lt; maior&lt;double&gt;(2, 2.5);
+}</pre>
+<label><input type="radio" name="q66"> <code>72.5</code></label>
+<label><input type="radio" name="q66"> <code>37</code></label>
+<label><input type="radio" name="q66"> <code>72</code></label>
+<label><input type="radio" name="q66"> Erro de compilação</label>
+<details><summary>Explicação</summary><p><code>maior(3, 7)</code> deduz <code>T = int</code> e dá 7; <code>maior&lt;double&gt;(2, 2.5)</code> usa <code>double</code> e dá 2.5.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="templates-funcao.html">Templates de Função</a></p>
+</div>
+<div class="mc" data-answer="3">
+<p class="mc-q">67. Este código compila?</p>
+<pre class="file">template &lt;typename T&gt;
+T maior(T a, T b) {
+    return a &gt; b ? a : b;
+}
+
+int main() {
+    std::cout &lt;&lt; maior(3, 7.5);
+}</pre>
+<label><input type="radio" name="q67"> Sim, e imprime 7</label>
+<label><input type="radio" name="q67"> Sim, compila e roda sem erro e imprime 7.5</label>
+<label><input type="radio" name="q67"> Não: o compilador não sabe se <code>T</code> é <code>int</code> ou <code>double</code></label>
+<label><input type="radio" name="q67"> Não: templates não aceitam <code>double</code></label>
+<details><summary>Explicação</summary><p>Os dois argumentos deveriam ter o mesmo tipo <code>T</code>, mas um é <code>int</code> e o outro <code>double</code>. O g++ diz <code>no matching function for call to ‘maior(int, double)’</code>. Conserto: <code>maior&lt;double&gt;(3, 7.5)</code> (é a missão do fim da página).</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="templates-funcao.html">Templates de Função</a></p>
+</div>
+<div class="mc" data-answer="3">
+<p class="mc-q">68. Este código compila?</p>
+<pre class="file">int n = 5;
+constexpr int x = n * 2;</pre>
+<label><input type="radio" name="q68"> Não: <code>constexpr</code> só vale para funções</label>
+<label><input type="radio" name="q68"> Sim, compila e roda sem erro</label>
+<label><input type="radio" name="q68"> Não: <code>n</code> não é uma constante conhecida na compilação</label>
+<label><input type="radio" name="q68"> Sim, e <code>x</code> vale 10</label>
+<details><summary>Explicação</summary><p><code>constexpr</code> exige um valor calculável durante a compilação. O g++ diz <code>the value of ‘n’ is not usable in a constant expression</code>. Com <code>constexpr int n = 5;</code>, funcionaria.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="constexpr.html">constexpr e consteval</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">69. O que este código imprime?</p>
+<pre class="file">std::map&lt;std::string, int&gt; m;
+m["b"] = 2;
+m["a"] = 1;
+for (const auto&amp; [k, v] : m) {
+    std::cout &lt;&lt; k &lt;&lt; v;
+}</pre>
+<label><input type="radio" name="q69"> <code>a1b2</code></label>
+<label><input type="radio" name="q69"> <code>ab12</code></label>
+<label><input type="radio" name="q69"> Erro de compilação</label>
+<label><input type="radio" name="q69"> <code>b2a1</code></label>
+<details><summary>Explicação</summary><p>O <code>std::map</code> mantém as chaves <strong>em ordem</strong>, não na ordem em que foram inseridas.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="map.html">std::map</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">70. O que este código imprime?</p>
+<pre class="file">std::map&lt;std::string, int&gt; m;
+std::cout &lt;&lt; m["x"] &lt;&lt; m.size();</pre>
+<label><input type="radio" name="q70"> <code>01</code></label>
+<label><input type="radio" name="q70"> <code>10</code></label>
+<label><input type="radio" name="q70"> <code>00</code></label>
+<label><input type="radio" name="q70"> Uma exceção</label>
+<details><summary>Explicação</summary><p>Ler <code>m["x"]</code> com uma chave que não existe <strong>cria</strong> a chave com valor 0. O mapa passa a ter 1 item. Para só procurar, use <code>m.contains("x")</code> ou <code>m.find</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="map.html">std::map</a></p>
+</div>
+<div class="mc" data-answer="3">
+<p class="mc-q">71. O que este código imprime?</p>
+<pre class="file">std::set&lt;int&gt; s{3, 1, 3, 2};
+for (int x : s) {
+    std::cout &lt;&lt; x;
+}</pre>
+<label><input type="radio" name="q71"> <code>312</code></label>
+<label><input type="radio" name="q71"> <code>3132</code></label>
+<label><input type="radio" name="q71"> <code>123</code></label>
+<label><input type="radio" name="q71"> <code>1233</code></label>
+<details><summary>Explicação</summary><p>Um <code>std::set</code> não guarda repetidos e mantém os valores em ordem.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="set.html">std::set</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">72. O que este código imprime?</p>
+<pre class="file">std::stack&lt;int&gt; p;
+p.push(1);
+p.push(2);
+p.push(3);
+p.pop();
+std::cout &lt;&lt; p.top();</pre>
+<label><input type="radio" name="q72"> <code>1</code></label>
+<label><input type="radio" name="q72"> <code>2</code></label>
+<label><input type="radio" name="q72"> <code>3</code></label>
+<label><input type="radio" name="q72"> Erro de compilação</label>
+<details><summary>Explicação</summary><p>Na pilha, o último a entrar é o primeiro a sair: <code>pop</code> tira o 3, e o topo passa a ser 2.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="stack-queue.html">stack e queue</a></p>
+</div>
+<div class="mc" data-answer="3">
+<p class="mc-q">73. O que este código imprime?</p>
+<pre class="file">std::queue&lt;int&gt; f;
+f.push(1);
+f.push(2);
+f.push(3);
+f.pop();
+std::cout &lt;&lt; f.front();</pre>
+<label><input type="radio" name="q73"> <code>1</code></label>
+<label><input type="radio" name="q73"> Erro de compilação</label>
+<label><input type="radio" name="q73"> <code>2</code></label>
+<label><input type="radio" name="q73"> <code>3</code></label>
+<details><summary>Explicação</summary><p>Na fila, o primeiro a entrar é o primeiro a sair: <code>pop</code> tira o 1, e a frente passa a ser 2.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="stack-queue.html">stack e queue</a></p>
+</div>
+<div class="mc" data-answer="3">
+<p class="mc-q">74. O que este código imprime?</p>
+<pre class="file">std::vector&lt;int&gt; v{5, 3, 8, 1};
+std::sort(v.begin(), v.end());
+std::cout &lt;&lt; v[0] &lt;&lt; v.back();</pre>
+<label><input type="radio" name="q74"> <code>58</code></label>
+<label><input type="radio" name="q74"> <code>81</code></label>
+<label><input type="radio" name="q74"> <code>18</code></label>
+<label><input type="radio" name="q74"> <code>51</code></label>
+<details><summary>Explicação</summary><p>Depois de ordenar, o vetor fica <code>[1, 3, 5, 8]</code>: o primeiro é 1 e o último, 8.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="algoritmos.html">Algoritmos</a></p>
+</div>
+<div class="mc" data-answer="1">
+<p class="mc-q">75. O que este código imprime?</p>
+<pre class="file">std::vector&lt;int&gt; v{1, 2, 1, 3};
+std::erase(v, 1);
+std::cout &lt;&lt; v.size();</pre>
+<label><input type="radio" name="q75"> <code>2</code></label>
+<label><input type="radio" name="q75"> <code>4</code></label>
+<label><input type="radio" name="q75"> <code>3</code></label>
+<label><input type="radio" name="q75"> <code>1</code></label>
+<details><summary>Explicação</summary><p><code>std::erase</code> (C++20) apaga <strong>todos</strong> os itens iguais a 1, de verdade: sobra <code>[2, 3]</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="ref-algoritmos.html#remover">Referência de Algoritmos</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">76. O que este código imprime?</p>
+<pre class="file">std::vector&lt;double&gt; d{1.5, 2.5};
+std::cout &lt;&lt; std::accumulate(d.begin(), d.end(), 0);</pre>
+<label><input type="radio" name="q76"> <code>4</code></label>
+<label><input type="radio" name="q76"> <code>3</code></label>
+<label><input type="radio" name="q76"> <code>4.0</code></label>
+<label><input type="radio" name="q76"> <code>3.5</code></label>
+<details><summary>Explicação</summary><p>O valor inicial <code>0</code> é <code>int</code>, então a soma é feita em <code>int</code>: 0 + 1.5 → 1; 1 + 2.5 → 3. Com <code>0.0</code>, daria 4.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="ref-algoritmos.html#armadilhas">Referência de Algoritmos</a></p>
+</div>
+<div class="mc" data-answer="4">
+<p class="mc-q">77. O que este código imprime?</p>
+<pre class="file">for (int x : std::views::iota(1, 10)
+             | std::views::filter([](int n) { return n % 3 == 0; })) {
+    std::cout &lt;&lt; x;
+}</pre>
+<label><input type="radio" name="q77"> <code>0369</code></label>
+<label><input type="radio" name="q77"> <code>3691</code></label>
+<label><input type="radio" name="q77"> <code>123456789</code></label>
+<label><input type="radio" name="q77"> <code>369</code></label>
+<details><summary>Explicação</summary><p><code>iota(1, 10)</code> gera 1 a 9 (o 10 fica de fora); o <code>filter</code> deixa passar só os múltiplos de 3.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="ranges.html">Ranges</a></p>
+</div>
+<div class="mc" data-answer="2">
+<p class="mc-q">78. O que este código imprime?</p>
+<pre class="file">std::optional&lt;int&gt; o;
+std::cout &lt;&lt; o.value_or(7);</pre>
+<label><input type="radio" name="q78"> <code>0</code></label>
+<label><input type="radio" name="q78"> <code>7</code></label>
+<label><input type="radio" name="q78"> Erro de compilação</label>
+<label><input type="radio" name="q78"> Uma exceção</label>
+<details><summary>Explicação</summary><p>O <code>optional</code> está vazio, então <code>value_or</code> devolve o valor reserva. (<code>o.value()</code> lançaria <code>std::bad_optional_access</code>.)</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="optional-variant.html">optional e variant</a></p>
+</div>
+<div class="mc" data-answer="4">
+<p class="mc-q">79. O que este código imprime?</p>
+<pre class="file">auto [a, b] = std::pair{3, "três"};
+std::cout &lt;&lt; b &lt;&lt; a;</pre>
+<label><input type="radio" name="q79"> <code>3</code></label>
+<label><input type="radio" name="q79"> <code>3três</code></label>
+<label><input type="radio" name="q79"> Erro de compilação</label>
+<label><input type="radio" name="q79"> <code>três3</code></label>
+<details><summary>Explicação</summary><p>A desestruturação abre o par em duas variáveis: <code>a</code> = 3 e <code>b</code> = "três". O código mostra <code>b</code> primeiro.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="pair-tuple.html">pair, tuple e Desestruturação</a></p>
+</div>
+
+<h2 id="conferir">Conferir no editor</h2>
+<p>Ficou em dúvida numa resposta? Cole o trecho dentro do <code>main</code> abaixo (com os <code>#include</code> que ele usa) e clique em Rodar. O editor usa o Clang: quando uma pergunta é "compila?", a mensagem de erro dele tem outras palavras, mas o resultado é o mesmo.</p>
+
+<div class="trycpp">
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    int i = 5;
+    int j = i++;
+    std::cout &lt;&lt; j &lt;&lt; i &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<div class="trycpp" data-goal="out:7.5">
+<p class="try-task"><strong>Missão:</strong> o código da pergunta sobre <code>maior(3, 7.5)</code> não compila. Sem mudar o template, faça a chamada funcionar e mostrar <code>7.5</code>, dizendo ao compilador qual tipo usar.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+template &lt;typename T&gt;
+T maior(T a, T b) {
+    return a &gt; b ? a : b;
+}
+
+int main() {
+    std::cout &lt;&lt; maior(3, 7.5) &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+template &lt;typename T&gt;
+T maior(T a, T b) {
+    return a &gt; b ? a : b;
+}
+
+int main() {
+    std::cout &lt;&lt; maior&lt;double&gt;(3, 7.5) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<div class="tip">
+<strong>Terminou?</strong>
+<p>Role até o topo para ver o placar. Errou alguma? A explicação e o link "Revise" levam direto ao assunto. Para consultar rápido, use o <a href="glossario.html">Glossário</a> e as referências de <a href="ref-algoritmos.html">algoritmos</a> e de <a href="ref-erros.html">mensagens de erro</a>.</p>
+</div>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

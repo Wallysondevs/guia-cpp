@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Glossário — os termos do guia explicados em poucas palavras | Guia C++</title>
+<meta name="description" content="Glossário do Guia C++: compilador, ligador, cabeçalho, pré-processador, tipo, variável, referência, ponteiro, pilha, heap, RAII, classe, objeto, construtor, destrutor, herança, polimorfismo, virtual, template, concept, STL, container, iterador, algoritmo, lambda, smart pointer, move, comportamento indefinido, sanitizer, namespace, módulo, padrão ISO e mais, em ordem alfabética, cada um com link para a aula.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Glossário</span></h1>
+
+<p class="intro">Os termos que aparecem no guia, em ordem alfabética, explicados em uma ou duas frases, cada um com o link para a aula em que é explicado com calma. Termos em inglês aparecem com a tradução; quando o nome em inglês é o mais usado no dia a dia (como <em>template</em> ou <em>lambda</em>), ele é a entrada principal.</p>
+
+<div class="tip">
+<strong>Dica</strong>
+<p>Use <kbd>Ctrl</kbd>+<kbd>F</kbd> no navegador para achar um termo, ou o índice de letras abaixo. Para consultas rápidas, veja também as referências de <a href="ref-tipos.html">tipos</a>, de <a href="ref-string.html">std::string</a>, de <a href="ref-containers.html">containers</a>, de <a href="ref-algoritmos.html">algoritmos</a> e de <a href="ref-erros.html">mensagens de erro</a>.</p>
+</div>
+
+<p class="indice-letras"><a href="#g-A">A</a> · <a href="#g-B">B</a> · <a href="#g-C">C</a> · <a href="#g-D">D</a> · <a href="#g-E">E</a> · <a href="#g-F">F</a> · <a href="#g-G">G</a> · <a href="#g-H">H</a> · <a href="#g-I">I</a> · <a href="#g-L">L</a> · <a href="#g-M">M</a> · <a href="#g-N">N</a> · <a href="#g-O">O</a> · <a href="#g-P">P</a> · <a href="#g-R">R</a> · <a href="#g-S">S</a> · <a href="#g-T">T</a> · <a href="#g-U">U</a> · <a href="#g-V">V</a> · <a href="#g-W">W</a></p>
+
+<h2 id="g-A">A</h2>
+<dl class="glossario">
+<dt><strong>Algoritmo</strong></dt>
+<dd>Uma receita passo a passo para resolver um problema. Na biblioteca padrão, são as funções prontas de <code>&lt;algorithm&gt;</code> que ordenam, procuram, contam e transformam coleções: <code>std::sort</code>, <code>std::find</code>, <code>std::count_if</code>… Veja: <a href="algoritmos.html">Algoritmos</a> e <a href="ref-algoritmos.html">Referência de Algoritmos</a>.</dd>
+<dt><strong>Alocação dinâmica</strong></dt>
+<dd>Pedir memória enquanto o programa roda (no <strong>heap</strong>), em vez de declarar uma variável comum. É o que <code>new</code>, <code>std::vector</code> e <code>std::make_unique</code> fazem. Veja: <a href="new-delete.html">Memória Dinâmica</a>.</dd>
+<dt><strong>Argumento</strong></dt>
+<dd>O valor que você entrega a uma função quando a chama: em <code>soma(2, 3)</code>, os argumentos são <code>2</code> e <code>3</code>. Do lado de dentro, eles chegam nos <strong>parâmetros</strong>. Veja: <a href="parametros.html">Parâmetros e Argumentos</a>.</dd>
+<dt><strong>Array</strong> (vetor fixo)</dt>
+<dd>Uma fileira de variáveis do mesmo tipo, lado a lado na memória, com tamanho fixo: <code>int notas[3];</code>. O array "cru" do C não sabe o próprio tamanho e não confere índices; prefira <code>std::array</code> ou <code>std::vector</code>. Veja: <a href="arrays.html">Arrays</a> e <a href="std-array.html">std::array</a>.</dd>
+<dt><strong>Atribuição</strong></dt>
+<dd>Guardar um valor numa variável que já existe, com <code>=</code>: <code>idade = 31;</code>. Os atalhos <code>+=</code>, <code>-=</code>, <code>*=</code> fazem a conta e guardam. Veja: <a href="operadores-atribuicao.html">Operadores de Atribuição</a>.</dd>
+<dt><strong>auto</strong> <span class="versao">C++11</span></dt>
+<dd>Palavra que pede ao compilador para descobrir o tipo sozinho, olhando o valor: <code>auto total = 10.5;</code> vira <code>double</code>. Veja: <a href="auto.html">auto</a>.</dd>
+<dt><strong>Aviso</strong> (<em>warning</em>)</dt>
+<dd>Mensagem do compilador sobre algo suspeito que <strong>não</strong> impede o programa de ser criado, como uma variável não usada. Quase sempre aponta um defeito real; ligue-os com <code>-Wall -Wextra</code>. Veja: <a href="avisos.html">Avisos</a>.</dd>
+</dl>
+
+<h2 id="g-B">B</h2>
+<dl class="glossario">
+<dt><strong>Biblioteca</strong></dt>
+<dd>Código pronto, escrito por outras pessoas, que o seu programa usa. Pode ser só de cabeçalhos (<em>header-only</em>) ou vir compilada, e então precisa ser <strong>ligada</strong> (<code>-lnome</code>). Veja: <a href="bibliotecas.html">Usar Bibliotecas Externas</a>.</dd>
+<dt><strong>Biblioteca padrão</strong> (<em>standard library</em>)</dt>
+<dd>A biblioteca que vem com todo compilador C++ e faz parte do padrão ISO: <code>std::cout</code>, <code>std::string</code>, <code>std::vector</code>, os algoritmos, <code>std::thread</code>… Tudo nela mora no namespace <code>std</code>. Veja: <a href="stl.html">O que é a STL</a>.</dd>
+<dt><strong>Bloco</strong></dt>
+<dd>Um trecho de código entre chaves <code>{ }</code>. As variáveis criadas dentro de um bloco só existem até a <code>}</code> que o fecha. Veja: <a href="escopo.html">Escopo</a>.</dd>
+<dt><strong>bool</strong></dt>
+<dd>O tipo que só guarda <code>true</code> (verdadeiro) ou <code>false</code> (falso). É o resultado das comparações. Veja: <a href="bool.html">Booleanos</a>.</dd>
+<dt><strong>break</strong></dt>
+<dd>Sai do laço (<code>for</code>, <code>while</code>) ou do <code>switch</code> na hora. Veja: <a href="break-continue.html">break e continue</a>.</dd>
+</dl>
+
+<h2 id="g-C">C</h2>
+<dl class="glossario">
+<dt><strong>Cabeçalho</strong> (<em>header</em>)</dt>
+<dd>Arquivo com declarações que outros arquivos incluem com <code>#include</code>. Os da biblioteca padrão não têm extensão (<code>&lt;iostream&gt;</code>, <code>&lt;vector&gt;</code>); os seus costumam terminar em <code>.h</code> ou <code>.hpp</code>. Veja: <a href="headers.html">Arquivos .h e .cpp</a>.</dd>
+<dt><strong>char</strong> (caractere)</dt>
+<dd>O tipo de um caractere, escrito entre aspas simples: <code>'A'</code>. Por dentro, é um número pequeno (o código da letra). Letras acentuadas em UTF-8 ocupam mais de um <code>char</code>. Veja: <a href="char.html">Caracteres</a> e <a href="acentos-utf8.html">Acentos e UTF-8</a>.</dd>
+<dt><strong>Classe</strong></dt>
+<dd>A "planta" de um tipo novo, que junta dados (atributos) e ações (métodos): <code>class Conta { … };</code>. A partir dela, você cria objetos. Veja: <a href="classes-objetos.html">Classes e Objetos</a>.</dd>
+<dt><strong>Classe abstrata</strong></dt>
+<dd>Classe com pelo menos um método virtual puro (<code>= 0</code>), que serve só de modelo: não dá para criar objetos dela, só das classes filhas. Veja: <a href="classes-abstratas.html">Classes Abstratas</a>.</dd>
+<dt><strong>CMake</strong></dt>
+<dd>Ferramenta que descreve como montar um projeto (arquivo <code>CMakeLists.txt</code>) e gera os arquivos de construção para o <code>make</code>, o Ninja ou uma IDE. É o padrão de fato dos projetos C++. Veja: <a href="cmake.html">CMake</a>.</dd>
+<dt><strong>Código de saída</strong> (<em>exit code</em>)</dt>
+<dd>O número que o programa devolve ao terminar: <code>0</code> = sucesso. É o valor do <code>return</code> do <code>main</code>, visto com <code>echo $?</code>. Quando o sistema mata o programa, é 128 + o número do sinal (139 = <code>Segmentation fault</code>). Veja: <a href="ref-erros.html#sinais">Códigos de saída</a>.</dd>
+<dt><strong>Código-fonte</strong></dt>
+<dd>O texto que você escreve (<code>ola.cpp</code>), que pessoas leem e o compilador traduz. Veja: <a href="como-funciona.html">Como o C++ Vira Programa</a>.</dd>
+<dt><strong>Comentário</strong></dt>
+<dd>Texto que o compilador ignora, escrito para pessoas: <code>// até o fim da linha</code> ou <code>/* em bloco */</code>. Veja: <a href="comentarios.html">Comentários</a>.</dd>
+<dt><strong>Compilador</strong></dt>
+<dd>O programa que traduz o código-fonte C++ para código de máquina. Os principais são o <strong>g++</strong> (do GCC), o <strong>clang++</strong> (do LLVM, usado no editor do guia) e o MSVC (da Microsoft). Veja: <a href="como-funciona.html">Como o C++ Vira Programa</a> e <a href="compilar.html">Compilar com g++</a>.</dd>
+<dt><strong>Compilação</strong></dt>
+<dd>A etapa em que cada arquivo <code>.cpp</code> é traduzido para um arquivo-objeto (<code>.o</code>). Erros dessa etapa têm arquivo, linha e coluna. Veja: <a href="erros-compilacao.html">Lendo Erros do Compilador</a>.</dd>
+<dt><strong>Comportamento indefinido</strong> (<em>undefined behavior</em>, UB)</dt>
+<dd>O que acontece quando o programa faz algo que o padrão proíbe, como ler fora de um array, usar uma variável sem valor ou estourar um <code>int</code>. O compilador não é obrigado a avisar e o resultado pode ser qualquer coisa: funcionar, mostrar lixo ou travar. Veja: <a href="comportamento-indefinido.html">Comportamento Indefinido</a>.</dd>
+<dt><strong>Concept</strong> (conceito) <span class="versao">C++20</span></dt>
+<dd>Uma exigência com nome para os tipos de um template: <code>template &lt;std::integral T&gt;</code> só aceita inteiros. Deixa as mensagens de erro muito mais claras. Veja: <a href="concepts.html">Concepts</a>.</dd>
+<dt><strong>const</strong></dt>
+<dd>Marca algo como "não pode mudar": <code>const int maximo = 10;</code>. Num método, <code>const</code> promete não alterar o objeto. Veja: <a href="constantes.html">Constantes</a>, <a href="const-ponteiros.html">const com Ponteiros</a> e <a href="metodos-const.html">Métodos const</a>.</dd>
+<dt><strong>constexpr</strong> <span class="versao">C++11</span> e <strong>consteval</strong> <span class="versao">C++20</span></dt>
+<dd><code>constexpr</code> permite calcular um valor <strong>durante a compilação</strong>; <code>consteval</code> obriga isso. O resultado já entra pronto no programa. Veja: <a href="constexpr.html">constexpr e consteval</a>.</dd>
+<dt><strong>Construtor</strong></dt>
+<dd>Método especial, com o mesmo nome da classe, que roda quando um objeto nasce e deixa-o pronto para uso: <code>Conta(std::string dono)</code>. Veja: <a href="construtores.html">Construtores</a>.</dd>
+<dt><strong>Container</strong> (recipiente)</dt>
+<dd>Um tipo da biblioteca padrão que guarda vários valores: <code>std::vector</code>, <code>std::list</code>, <code>std::map</code>, <code>std::set</code>… Cada um organiza os itens de um jeito. Veja: <a href="stl.html">O que é a STL</a> e <a href="ref-containers.html">Referência de Containers</a>.</dd>
+<dt><strong>continue</strong></dt>
+<dd>Pula o resto desta volta do laço e vai para a próxima. Veja: <a href="break-continue.html">break e continue</a>.</dd>
+<dt><strong>Conversão de tipos</strong> (<em>cast</em>)</dt>
+<dd>Transformar um valor de um tipo em outro. Algumas são automáticas (<code>int</code> → <code>double</code>); as explícitas usam <code>static_cast&lt;int&gt;(3.7)</code>. Veja: <a href="conversao-tipos.html">Conversão de Tipos</a>.</dd>
+<dt><strong>Cópia</strong></dt>
+<dd>Criar um objeto novo, independente, com o mesmo conteúdo de outro. Em C++, passar por valor e atribuir copiam. Veja: <a href="copia-movimento.html">Cópia e Movimento</a>.</dd>
+</dl>
+
+<h2 id="g-D">D</h2>
+<dl class="glossario">
+<dt><strong>Declaração</strong></dt>
+<dd>Apresenta um nome ao compilador e diz o seu tipo: <code>int soma(int a, int b);</code> diz que a função existe, sem dizer o que ela faz. Veja: <a href="funcoes.html">Funções</a> e <a href="headers.html">Arquivos .h e .cpp</a>.</dd>
+<dt><strong>Definição</strong></dt>
+<dd>A declaração completa, com o corpo (<code>int soma(int a, int b) { return a + b; }</code>) ou com a memória (<code>int total = 0;</code>). Cada coisa pode ser declarada várias vezes, mas definida uma vez só no programa. Veja: <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>.</dd>
+<dt><strong>delete</strong></dt>
+<dd>Devolve a memória pedida com <code>new</code> (<code>delete[]</code> para arrays). Esquecer gera vazamento; repetir gera <code>double free</code>. Prefira ponteiros inteligentes. Veja: <a href="new-delete.html">new e delete</a>.</dd>
+<dt><strong>Depurador</strong> (<em>debugger</em>)</dt>
+<dd>Programa que roda o seu passo a passo, mostrando os valores das variáveis. No Linux, o <code>gdb</code>. Veja: <a href="depuracao-gdb.html">Depurar com o GDB</a>.</dd>
+<dt><strong>deque</strong></dt>
+<dd>"Fila de duas pontas": container que cresce rápido pelo começo e pelo fim. Veja: <a href="list-deque.html">list e deque</a>.</dd>
+<dt><strong>Desestruturação</strong> (<em>structured bindings</em>) <span class="versao">C++17</span></dt>
+<dd>Abrir um par, tupla ou struct em várias variáveis de uma vez: <code>auto [nome, nota] = par;</code>. Veja: <a href="pair-tuple.html">pair, tuple e Desestruturação</a>.</dd>
+<dt><strong>Destrutor</strong></dt>
+<dd>Método especial (<code>~Conta()</code>) que roda sozinho quando o objeto deixa de existir, para liberar o que ele usava. É a base do RAII. Veja: <a href="destrutores-raii.html">Destrutores e RAII</a>.</dd>
+<dt><strong>double</strong></dt>
+<dd>O tipo padrão para números com casas decimais (ponto flutuante de precisão dupla, cerca de 15 algarismos). Veja: <a href="ponto-flutuante.html">float e double</a>.</dd>
+</dl>
+
+<h2 id="g-E">E</h2>
+<dl class="glossario">
+<dt><strong>Encapsulamento</strong></dt>
+<dd>Esconder os dados de um objeto (<code>private</code>) e só deixar mexer neles por métodos (<code>public</code>), que garantem que o objeto fique sempre válido. Veja: <a href="encapsulamento.html">public e private</a>.</dd>
+<dt><strong>enum class</strong> (enumeração) <span class="versao">C++11</span></dt>
+<dd>Um tipo com uma lista fechada de valores com nome: <code>enum class Cor { Vermelho, Verde };</code>, usados como <code>Cor::Verde</code>. Veja: <a href="enums.html">Enums</a>.</dd>
+<dt><strong>Entrada padrão</strong> (<em>stdin</em>)</dt>
+<dd>De onde o programa lê: normalmente o teclado. Em C++, <code>std::cin</code> e <code>std::getline</code>. Veja: <a href="entrada-cin.html">Entrada com cin</a>.</dd>
+<dt><strong>Escopo</strong></dt>
+<dd>A região do código em que um nome existe. Uma variável criada dentro de um bloco <code>{ }</code> some na <code>}</code>. Veja: <a href="escopo.html">Escopo</a>.</dd>
+<dt><strong>Exceção</strong></dt>
+<dd>Um jeito de avisar um erro "pulando" para quem sabe tratá-lo: <code>throw</code> lança, <code>try</code>/<code>catch</code> captura. Se ninguém captura, o programa aborta com <code>terminate called after throwing…</code>. Veja: <a href="excecoes.html">Exceções</a>.</dd>
+<dt><strong>Executável</strong></dt>
+<dd>O arquivo final, que o sistema roda: <code>./ola</code>. É o resultado da compilação e da ligação. Veja: <a href="primeiro-programa.html">Olá, Mundo</a>.</dd>
+<dt><strong>Expressão</strong></dt>
+<dd>Um pedaço de código que produz um valor: <code>preco * 2</code>, <code>x &gt; 0</code>, <code>soma(2, 3)</code>. Veja: <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>.</dd>
+</dl>
+
+<h2 id="g-F">F</h2>
+<dl class="glossario">
+<dt><strong>float</strong></dt>
+<dd>Número com casas decimais de precisão simples (cerca de 7 algarismos). Use <code>double</code>, a menos que tenha um bom motivo. Veja: <a href="ponto-flutuante.html">float e double</a>.</dd>
+<dt><strong>for</strong></dt>
+<dd>Laço com contador: <code>for (int i = 0; i &lt; 5; i++)</code>. Veja: <a href="for.html">for</a>.</dd>
+<dt><strong>for de intervalo</strong> (<em>range-for</em>) <span class="versao">C++11</span></dt>
+<dd>Laço que passa por todos os itens de uma coleção, sem índice: <code>for (int n : notas)</code>. Veja: <a href="for-range.html">for de Intervalo</a>.</dd>
+<dt><strong>friend</strong> (amigo)</dt>
+<dd>Dá a uma função ou classe de fora acesso aos membros privados de uma classe. Use com moderação. Veja: <a href="friend.html">friend</a>.</dd>
+<dt><strong>Função</strong></dt>
+<dd>Um bloco de código com nome, que recebe parâmetros e pode devolver um valor: <code>int dobro(int x) { return 2 * x; }</code>. Veja: <a href="funcoes.html">Funções</a>.</dd>
+<dt><strong>Função membro</strong></dt>
+<dd>O nome oficial do <strong>método</strong>: uma função que pertence a uma classe. Veja: <a href="metodos.html">Métodos</a>.</dd>
+</dl>
+
+<h2 id="g-G">G</h2>
+<dl class="glossario">
+<dt><strong>g++</strong> / <strong>GCC</strong></dt>
+<dd>O compilador C++ do projeto GNU (GCC = <em>GNU Compiler Collection</em>), o mais comum no Linux. O guia usa o g++ 15. Veja: <a href="compilar.html">Compilar com g++</a> e <a href="instalar-linux.html">Instalar no Linux</a>.</dd>
+<dt><strong>gdb</strong></dt>
+<dd>O depurador do projeto GNU. Veja: <a href="depuracao-gdb.html">Depurar com o GDB</a>.</dd>
+<dt><strong>getline</strong></dt>
+<dd>Lê uma linha inteira, com espaços, para uma <code>std::string</code>: <code>std::getline(std::cin, nome);</code>. Veja: <a href="getline.html">Ler uma Linha</a>.</dd>
+</dl>
+
+<h2 id="g-H">H</h2>
+<dl class="glossario">
+<dt><strong>Heap</strong> (monte, memória livre)</dt>
+<dd>A grande área de memória de onde vêm os pedidos feitos durante a execução (<code>new</code>, <code>std::vector</code>, <code>std::string</code>). É maior que a pilha, mas alguém precisa devolver a memória (de preferência, um destrutor). Veja: <a href="memoria.html">Como a Memória Funciona</a>.</dd>
+<dt><strong>Herança</strong></dt>
+<dd>Criar uma classe a partir de outra, aproveitando o que ela tem: <code>class Gato : public Animal</code>. A filha "é um" tipo da mãe. Veja: <a href="heranca.html">Herança</a>.</dd>
+</dl>
+
+<h2 id="g-I">I</h2>
+<dl class="glossario">
+<dt><strong>IDE</strong> (ambiente de desenvolvimento integrado)</dt>
+<dd>Um editor que junta escrever, compilar e depurar: VS Code, CLion, Visual Studio, Qt Creator. Veja: <a href="editores.html">Editores e IDEs</a>.</dd>
+<dt><strong>Identificador</strong></dt>
+<dd>O nome que você dá a uma variável, função ou classe. Começa com letra ou <code>_</code>, sem espaços, e maiúsculas contam. Veja: <a href="identificadores.html">Nomes de Variáveis</a>.</dd>
+<dt><strong>if / else</strong></dt>
+<dd>Decisão: executa um bloco se a condição for verdadeira e, opcionalmente, outro se for falsa. Veja: <a href="if-else.html">if e else</a>.</dd>
+<dt><strong>#include</strong></dt>
+<dd>Instrução do pré-processador que cola o conteúdo de um cabeçalho no lugar dela. Veja: <a href="preprocessador.html">O Pré-processador</a>.</dd>
+<dt><strong>Inicialização</strong></dt>
+<dd>Dar o primeiro valor a uma variável, na hora em que ela é criada: <code>int x = 0;</code> ou <code>int x{0};</code>. As chaves recusam conversões que perdem informação. Variáveis sem inicialização guardam lixo. Veja: <a href="variaveis.html">Variáveis</a>.</dd>
+<dt><strong>inline</strong></dt>
+<dd>Permite que uma função ou variável <span class="versao">C++17</span> seja definida num cabeçalho incluído por vários <code>.cpp</code>, sem dar <code>multiple definition</code>. Veja: <a href="headers.html">Arquivos .h e .cpp</a>.</dd>
+<dt><strong>int</strong></dt>
+<dd>O tipo inteiro padrão; no Linux de 64 bits, vai de −2.147.483.648 a 2.147.483.647. Veja: <a href="inteiros.html">Inteiros</a> e <a href="ref-tipos.html">Tipos e Limites</a>.</dd>
+<dt><strong>Instância</strong></dt>
+<dd>Outro nome para <strong>objeto</strong>: um exemplar criado a partir de uma classe. Veja: <a href="classes-objetos.html">Classes e Objetos</a>.</dd>
+<dt><strong>Iterador</strong></dt>
+<dd>Um "marcador de posição" que anda pelos itens de um container: <code>v.begin()</code> aponta o primeiro, <code>v.end()</code> um depois do último, <code>*it</code> lê o item e <code>++it</code> avança. É a ponte entre containers e algoritmos. Veja: <a href="iteradores.html">Iteradores</a>.</dd>
+</dl>
+
+<h2 id="g-L">L</h2>
+<dl class="glossario">
+<dt><strong>Lambda</strong> <span class="versao">C++11</span></dt>
+<dd>Uma função sem nome, escrita no meio do código: <code>[](int x) { return x &gt; 5; }</code>. Os colchetes dizem quais variáveis de fora ela "captura". Muito usada com algoritmos. Veja: <a href="lambdas.html">Lambdas</a>.</dd>
+<dt><strong>Laço</strong> (<em>loop</em>)</dt>
+<dd>Repetição: <code>while</code>, <code>do-while</code>, <code>for</code> e o for de intervalo. Veja: <a href="while.html">while</a> e <a href="for.html">for</a>.</dd>
+<dt><strong>Ligador</strong> (<em>linker</em>)</dt>
+<dd>O programa (<code>ld</code>, no Linux) que junta os arquivos-objeto e as bibliotecas num executável, conferindo se toda função usada foi definida em algum lugar. Seus erros: <code>undefined reference</code>, <code>multiple definition</code>. Veja: <a href="como-funciona.html">Como o C++ Vira Programa</a> e <a href="ref-erros.html#ligacao">Erros de ligação</a>.</dd>
+<dt><strong>Ligação</strong> (<em>linking</em>)</dt>
+<dd>A etapa feita pelo ligador, depois da compilação. Veja: <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>.</dd>
+<dt><strong>list</strong></dt>
+<dd>Lista duplamente encadeada: cada item aponta o vizinho. Inserir no meio é rápido, mas não há acesso direto por índice (e <code>std::sort</code> não funciona nela; use <code>l.sort()</code>). Veja: <a href="list-deque.html">list e deque</a>.</dd>
+<dt><strong>Literal</strong></dt>
+<dd>Um valor escrito direto no código: <code>42</code>, <code>3.14</code>, <code>'A'</code>, <code>"Ana"</code>, <code>true</code>. Veja: <a href="tipos-dados.html">Tipos de Dados</a>.</dd>
+<dt><strong>lvalue / rvalue</strong></dt>
+<dd>Termos que aparecem nas mensagens de erro. Um <strong>lvalue</strong> é algo com endereço, que pode ficar do lado esquerdo do <code>=</code> (uma variável); um <strong>rvalue</strong> é um valor temporário (<code>5</code>, <code>x + 1</code>). Veja: <a href="referencias.html">Referências</a> e <a href="move.html">Semântica de Movimento</a>.</dd>
+</dl>
+
+<h2 id="g-M">M</h2>
+<dl class="glossario">
+<dt><strong>main</strong></dt>
+<dd>A função por onde todo programa C++ começa: <code>int main() { … }</code>. O valor que ela devolve é o código de saída. Veja: <a href="primeiro-programa.html">Olá, Mundo</a>.</dd>
+<dt><strong>make</strong> / <strong>Makefile</strong></dt>
+<dd>Ferramenta que recompila só o que mudou, seguindo as regras de um arquivo <code>Makefile</code>. Veja: <a href="make.html">Make</a>.</dd>
+<dt><strong>map</strong></dt>
+<dd>Container de pares chave → valor, mantidos em ordem de chave: <code>std::map&lt;std::string, int&gt; estoque;</code>. Veja: <a href="map.html">std::map</a>.</dd>
+<dt><strong>Membro</strong></dt>
+<dd>Tudo o que pertence a uma classe ou struct: atributos (dados) e métodos (funções). Acessados com <code>.</code> (ou <code>-&gt;</code> por um ponteiro). Veja: <a href="classes-objetos.html">Classes e Objetos</a>.</dd>
+<dt><strong>Membro static</strong></dt>
+<dd>Atributo ou método que pertence à <strong>classe</strong>, não a cada objeto: um contador de quantas contas foram criadas, por exemplo. Veja: <a href="membros-static.html">Membros static</a>.</dd>
+<dt><strong>Método</strong></dt>
+<dd>Uma função que pertence a uma classe e age sobre um objeto: <code>conta.depositar(50);</code>. Veja: <a href="metodos.html">Métodos</a>.</dd>
+<dt><strong>Módulo</strong> <span class="versao">C++20</span></dt>
+<dd>A alternativa moderna aos cabeçalhos: o código é exportado com <code>export module</code> e usado com <code>import</code>. O C++23 trouxe <code>import std;</code> para a biblioteca padrão inteira. Veja: <a href="modulos.html">Módulos</a>.</dd>
+<dt><strong>Move</strong> (movimento) <span class="versao">C++11</span></dt>
+<dd>Transferir o conteúdo de um objeto para outro sem copiar, "roubando" a memória dele: <code>auto b = std::move(a);</code>. Depois disso, <code>a</code> fica vazio, mas válido. Veja: <a href="move.html">Semântica de Movimento</a> e <a href="copia-movimento.html">Cópia e Movimento</a>.</dd>
+</dl>
+
+<h2 id="g-N">N</h2>
+<dl class="glossario">
+<dt><strong>Namespace</strong> (espaço de nomes)</dt>
+<dd>Um "sobrenome" para agrupar nomes e evitar conflitos: <code>std::cout</code> é o <code>cout</code> do namespace <code>std</code>. Veja: <a href="namespaces.html">Namespaces</a>.</dd>
+<dt><strong>new</strong></dt>
+<dd>Pede memória no heap e cria um objeto lá, devolvendo um ponteiro: <code>int* p = new int(5);</code>. Cada <code>new</code> precisa de um <code>delete</code>. Em código moderno, use <code>std::make_unique</code>. Veja: <a href="new-delete.html">new e delete</a>.</dd>
+<dt><strong>nullptr</strong> <span class="versao">C++11</span></dt>
+<dd>O valor de um ponteiro que não aponta para nada. Usar <code>*</code> num <code>nullptr</code> derruba o programa (<code>Segmentation fault</code>). Substitui o antigo <code>NULL</code>. Veja: <a href="nullptr.html">nullptr</a>.</dd>
+</dl>
+
+<h2 id="g-O">O</h2>
+<dl class="glossario">
+<dt><strong>Objeto</strong></dt>
+<dd>Um "exemplar" de uma classe, com os seus próprios dados: <code>Conta minha{"Ana"};</code>. No padrão C++, qualquer região de memória com tipo (até um <code>int</code>) também é chamada de objeto. Veja: <a href="classes-objetos.html">Classes e Objetos</a>.</dd>
+<dt><strong>Operador</strong></dt>
+<dd>Um símbolo que faz uma operação: <code>+</code>, <code>==</code>, <code>&amp;&amp;</code>, <code>&lt;&lt;</code>. A <strong>precedência</strong> decide quem é calculado primeiro. Veja: <a href="operadores-aritmeticos.html">Operadores</a> e <a href="precedencia.html">Precedência</a>.</dd>
+<dt><strong>optional</strong> <span class="versao">C++17</span></dt>
+<dd>Uma caixa que pode ter um valor ou estar vazia: <code>std::optional&lt;int&gt;</code>. Bom para funções que às vezes não têm resposta. Veja: <a href="optional-variant.html">optional e variant</a>.</dd>
+<dt><strong>override</strong> <span class="versao">C++11</span></dt>
+<dd>Marca, na classe filha, que um método substitui um método <code>virtual</code> da mãe. Se a assinatura não bater, o compilador acusa erro. Veja: <a href="polimorfismo.html">Polimorfismo</a>.</dd>
+</dl>
+
+<h2 id="g-P">P</h2>
+<dl class="glossario">
+<dt><strong>Padrão ISO</strong> (<em>standard</em>)</dt>
+<dd>O documento oficial que define o C++, mantido por um comitê internacional (ISO/IEC 14882). Cada versão tem o ano: C++98, C++03, C++11, C++14, C++17, C++20, C++23 e C++26. Os compiladores implementam o padrão; com o g++, você escolhe a versão com <code>-std=c++23</code>. Veja: <a href="versoes.html">Versões do C++</a> e <a href="novidades.html">Novidades</a>.</dd>
+<dt><strong>pair</strong> / <strong>tuple</strong></dt>
+<dd><code>std::pair</code> junta dois valores (<code>first</code>, <code>second</code>); <code>std::tuple</code>, quantos você quiser. Veja: <a href="pair-tuple.html">pair e tuple</a>.</dd>
+<dt><strong>Parâmetro</strong></dt>
+<dd>A variável, na definição da função, que recebe o argumento: em <code>int dobro(int x)</code>, <code>x</code> é o parâmetro. Veja: <a href="parametros.html">Parâmetros e Argumentos</a>.</dd>
+<dt><strong>Passagem por referência</strong> / <strong>por valor</strong></dt>
+<dd>Por valor (<code>int x</code>), a função recebe uma cópia; por referência (<code>int&amp; x</code>), recebe a própria variável e pode mudá-la. <code>const T&amp;</code> evita a cópia sem permitir mudança. Veja: <a href="passagem-referencia.html">Por Valor × Por Referência</a>.</dd>
+<dt><strong>Pilha</strong> (<em>stack</em>, memória)</dt>
+<dd>A área de memória das variáveis locais e das chamadas de função. É rápida e se arruma sozinha: cada variável some quando a função termina. É pequena (no Linux, uns 8 MB); uma recursão sem fim a estoura. Veja: <a href="memoria.html">Como a Memória Funciona</a>.</dd>
+<dt><strong>Pilha e fila</strong> (<code>std::stack</code>, <code>std::queue</code>)</dt>
+<dd>Containers adaptadores: na pilha, o último a entrar é o primeiro a sair; na fila, o primeiro a entrar é o primeiro a sair. Veja: <a href="stack-queue.html">stack e queue</a>.</dd>
+<dt><strong>POO</strong> (Programação Orientada a Objetos)</dt>
+<dd>Um jeito de organizar o programa em objetos que juntam dados e comportamento, com encapsulamento, herança e polimorfismo. Veja: <a href="poo.html">O que é POO</a>.</dd>
+<dt><strong>Polimorfismo</strong></dt>
+<dd>"Muitas formas": chamar o mesmo método (<code>animal.som()</code>) e cada tipo de objeto responder do seu jeito. Em C++, funciona com métodos <code>virtual</code> chamados por referência ou ponteiro para a classe mãe. Veja: <a href="polimorfismo.html">Polimorfismo</a>.</dd>
+<dt><strong>Ponteiro</strong></dt>
+<dd>Uma variável que guarda um <strong>endereço</strong> de memória: <code>int* p = &amp;x;</code>. <code>*p</code> lê o que está naquele endereço. Poderoso e perigoso; prefira referências e ponteiros inteligentes. Veja: <a href="ponteiros.html">Ponteiros</a>.</dd>
+<dt><strong>Ponteiro inteligente</strong> (<em>smart pointer</em>) <span class="versao">C++11</span></dt>
+<dd>Um objeto que se comporta como ponteiro e apaga sozinho o que aponta: <code>std::unique_ptr</code> (um dono só) e <code>std::shared_ptr</code> (vários donos, com contagem). Criados com <code>std::make_unique</code> e <code>std::make_shared</code>. Veja: <a href="smart-pointers.html">Ponteiros Inteligentes</a>.</dd>
+<dt><strong>Pré-processador</strong></dt>
+<dd>A etapa que roda antes da compilação e trata as linhas com <code>#</code>: <code>#include</code> cola arquivos, <code>#define</code> troca textos, <code>#if</code> liga e desliga trechos. Veja: <a href="preprocessador.html">O Pré-processador</a>.</dd>
+<dt><strong>private / public / protected</strong></dt>
+<dd>Quem pode mexer em cada membro de uma classe: só ela mesma (<code>private</code>), qualquer um (<code>public</code>) ou ela e as filhas (<code>protected</code>). Veja: <a href="encapsulamento.html">public e private</a> e <a href="heranca.html">Herança</a>.</dd>
+</dl>
+
+<h2 id="g-R">R</h2>
+<dl class="glossario">
+<dt><strong>RAII</strong></dt>
+<dd>"<em>Resource Acquisition Is Initialization</em>": a aquisição de um recurso é a inicialização de um objeto. O construtor pega o recurso (memória, arquivo, trava) e o destrutor devolve, automaticamente, mesmo se houver exceção. É a ideia por trás de <code>std::vector</code>, <code>std::fstream</code> e dos ponteiros inteligentes. Veja: <a href="destrutores-raii.html">Destrutores e RAII</a>.</dd>
+<dt><strong>Range</strong> (intervalo) <span class="versao">C++20</span></dt>
+<dd>Qualquer coisa que tenha começo e fim e possa ser percorrida: um <code>vector</code>, uma <code>string</code>, uma view. Os algoritmos <code>std::ranges::</code> recebem o range inteiro: <code>std::ranges::sort(v)</code>. Veja: <a href="ranges.html">Ranges</a>.</dd>
+<dt><strong>Recursão</strong></dt>
+<dd>Uma função que chama a si mesma, com um caso de parada. Sem ele, a pilha estoura. Veja: <a href="recursao.html">Recursão</a>.</dd>
+<dt><strong>Referência</strong></dt>
+<dd>Um segundo nome para uma variável que já existe: <code>int&amp; r = x;</code>. Mexer em <code>r</code> é mexer em <code>x</code>. Diferente do ponteiro, nunca é nula e não muda de alvo. Veja: <a href="referencias.html">Referências</a>.</dd>
+<dt><strong>Retorno</strong></dt>
+<dd>O valor que a função devolve com <code>return</code>; o tipo dele vem antes do nome da função (<code>int</code>, <code>double</code>, ou <code>void</code> para "nada"). Veja: <a href="retorno.html">Retorno</a>.</dd>
+</dl>
+
+<h2 id="g-S">S</h2>
+<dl class="glossario">
+<dt><strong>Saída padrão</strong> (<em>stdout</em>) e <strong>saída de erro</strong> (<em>stderr</em>)</dt>
+<dd>Para onde o programa escreve: <code>std::cout</code> vai para a saída padrão; <code>std::cerr</code>, para a de erro. As duas aparecem no terminal, mas podem ser separadas (<code>2&gt;</code>). Veja: <a href="saida-cout.html">Saída com cout</a>.</dd>
+<dt><strong>Sanitizer</strong> (fiscal)</dt>
+<dd>Verificação que o compilador põe dentro do programa (<code>-fsanitize=address,undefined</code>) para pegar, na linha exata, erros de memória e comportamento indefinido enquanto ele roda. Veja: <a href="sanitizers.html">Sanitizers</a>.</dd>
+<dt><strong>Segmentation fault</strong> (falha de segmentação)</dt>
+<dd>Quando o programa acessa memória que não é dele e o sistema o mata (código 139). Causa comum: ponteiro nulo ou inválido. Veja: <a href="ref-erros.html#e-segv">Mensagens de Erro</a>.</dd>
+<dt><strong>set</strong></dt>
+<dd>Container que guarda valores sem repetição, em ordem. Veja: <a href="set.html">std::set</a>.</dd>
+<dt><strong>Sinal</strong> (<em>signal</em>)</dt>
+<dd>Aviso que o sistema manda a um processo, muitas vezes para matá-lo: <code>SIGSEGV</code> (memória inválida), <code>SIGFPE</code> (divisão por zero), <code>SIGABRT</code> (abortar). Veja: <a href="ref-erros.html#sinais">Códigos de saída</a>.</dd>
+<dt><strong>Sobrecarga</strong> (<em>overload</em>)</dt>
+<dd>Várias funções com o mesmo nome e parâmetros diferentes; o compilador escolhe a certa pelos argumentos. Também vale para operadores (<code>operator+</code>, <code>operator&lt;&lt;</code>). Veja: <a href="sobrecarga.html">Sobrecarga de Funções</a> e <a href="sobrecarga-operadores.html">Sobrecarga de Operadores</a>.</dd>
+<dt><strong>static</strong></dt>
+<dd>Tem vários sentidos: numa classe, um membro que pertence à classe inteira; numa variável local, uma variável que sobrevive entre chamadas; num arquivo, um nome visível só nele. Veja: <a href="membros-static.html">Membros static</a>.</dd>
+<dt><strong>std</strong></dt>
+<dd>O namespace da biblioteca padrão. Veja: <a href="namespaces.html">Namespaces</a>.</dd>
+<dt><strong>STL</strong></dt>
+<dd>"<em>Standard Template Library</em>": o pedaço da biblioteca padrão com os containers, os iteradores e os algoritmos, todos feitos com templates. Veja: <a href="stl.html">O que é a STL</a>.</dd>
+<dt><strong>std::string</strong></dt>
+<dd>O tipo de texto do C++: cresce sozinho, sabe o próprio tamanho e se apaga sozinho. Veja: <a href="strings.html">Strings</a> e <a href="ref-string.html">Referência de std::string</a>.</dd>
+<dt><strong>string_view</strong> <span class="versao">C++17</span></dt>
+<dd>Uma "janela" só de leitura para um texto que já existe, sem copiá-lo. Veja: <a href="string-view.html">string_view</a>.</dd>
+<dt><strong>struct</strong></dt>
+<dd>Um tipo que agrupa vários campos: <code>struct Aluno { std::string nome; int nota; };</code>. É igual a uma classe, só que tudo começa <code>public</code>. Veja: <a href="structs.html">Structs</a>.</dd>
+<dt><strong>switch</strong></dt>
+<dd>Escolhe um entre vários <code>case</code> conforme um valor inteiro, <code>char</code> ou <code>enum</code>. Veja: <a href="switch.html">switch</a>.</dd>
+</dl>
+
+<h2 id="g-T">T</h2>
+<dl class="glossario">
+<dt><strong>Template</strong> (modelo)</dt>
+<dd>Código escrito com tipos "em branco", que o compilador preenche conforme o uso: <code>template &lt;typename T&gt; T maior(T a, T b)</code> serve para <code>int</code>, <code>double</code>, <code>std::string</code>… É assim que <code>std::vector&lt;int&gt;</code> funciona. Veja: <a href="templates-funcao.html">Templates de Função</a> e <a href="templates-classe.html">Templates de Classe</a>.</dd>
+<dt><strong>this</strong></dt>
+<dd>Dentro de um método, um ponteiro para o próprio objeto: <code>this-&gt;saldo</code>. Veja: <a href="this.html">this</a>.</dd>
+<dt><strong>Thread</strong> (linha de execução)</dt>
+<dd>Um "trabalhador" a mais dentro do mesmo programa, rodando ao mesmo tempo que os outros: <code>std::thread</code>, <code>std::jthread</code>. Veja: <a href="threads.html">Threads</a>.</dd>
+<dt><strong>throw / try / catch</strong></dt>
+<dd>As palavras das exceções: <code>throw</code> lança, <code>try</code> marca o trecho vigiado, <code>catch</code> trata. Veja: <a href="excecoes.html">Exceções</a>.</dd>
+<dt><strong>Tipo</strong></dt>
+<dd>O que uma variável guarda e quais operações valem para ela: <code>int</code>, <code>double</code>, <code>char</code>, <code>bool</code>, <code>std::string</code>, as suas classes… Em C++, o tipo é decidido na compilação e não muda (tipagem estática). Veja: <a href="tipos-dados.html">Tipos de Dados</a>.</dd>
+<dt><strong>Tipagem estática</strong></dt>
+<dd>Cada variável tem um tipo fixo, conferido pelo compilador antes de rodar. Muitos erros são pegos cedo, na compilação. Veja: <a href="tipos-dados.html">Tipos de Dados</a>.</dd>
+</dl>
+
+<h2 id="g-U">U</h2>
+<dl class="glossario">
+<dt><strong>UB</strong></dt>
+<dd>Sigla de <em>undefined behavior</em>: veja <strong>Comportamento indefinido</strong>. Veja: <a href="comportamento-indefinido.html">Comportamento Indefinido</a>.</dd>
+<dt><strong>unique_ptr</strong> / <strong>shared_ptr</strong></dt>
+<dd>Os dois ponteiros inteligentes principais. <code>unique_ptr</code> não pode ser copiado, só movido; <code>shared_ptr</code> pode ser copiado e apaga o objeto quando o último dono some. Veja: <a href="smart-pointers.html">Ponteiros Inteligentes</a>.</dd>
+<dt><strong>unordered_map</strong></dt>
+<dd>Como o <code>std::map</code>, mas sem ordem: usa uma tabela de espalhamento (<em>hash</em>) e costuma ser mais rápido para procurar. Veja: <a href="unordered-map.html">std::unordered_map</a>.</dd>
+<dt><strong>unsigned</strong> (sem sinal)</dt>
+<dd>Inteiro que não aceita negativos e, em troca, vai mais longe no positivo. <code>v.size()</code> devolve um sem sinal, por isso os avisos de <code>-Wsign-compare</code>. Veja: <a href="inteiros.html">Inteiros</a>.</dd>
+<dt><strong>using</strong> / <strong>typedef</strong></dt>
+<dd>Dão um apelido a um tipo: <code>using Nota = double;</code>. <code>using namespace std;</code> é outra coisa: traz todos os nomes de <code>std</code> (evite em cabeçalhos). Veja: <a href="using-typedef.html">using e typedef</a> e <a href="namespaces.html">Namespaces</a>.</dd>
+</dl>
+
+<h2 id="g-V">V</h2>
+<dl class="glossario">
+<dt><strong>Variável</strong></dt>
+<dd>Um espaço na memória com nome e tipo, que guarda um valor: <code>int idade = 30;</code>. Veja: <a href="variaveis.html">Variáveis</a>.</dd>
+<dt><strong>variant</strong> <span class="versao">C++17</span></dt>
+<dd>Uma caixa que guarda um valor de um entre vários tipos possíveis: <code>std::variant&lt;int, std::string&gt;</code>. Veja: <a href="optional-variant.html">optional e variant</a>.</dd>
+<dt><strong>vector</strong> (vetor)</dt>
+<dd>O container mais usado: uma lista que cresce sozinha, com acesso direto por índice: <code>std::vector&lt;int&gt; notas{7, 9};</code>. Veja: <a href="vector.html">std::vector</a>.</dd>
+<dt><strong>View</strong> (visão) <span class="versao">C++20</span></dt>
+<dd>Uma "janela" sobre um range que mostra os itens de outro jeito (filtrados, transformados, invertidos) sem copiar: <code>v | std::views::filter(…)</code>. Veja: <a href="ranges.html">Ranges</a>.</dd>
+<dt><strong>virtual</strong></dt>
+<dd>Marca um método que as classes filhas podem substituir, e cuja versão é escolhida <strong>durante a execução</strong>, pelo tipo real do objeto. É o que faz o polimorfismo funcionar. Veja: <a href="polimorfismo.html">Polimorfismo</a>.</dd>
+<dt><strong>void</strong></dt>
+<dd>"Nada": o tipo de retorno de uma função que não devolve valor. Veja: <a href="retorno.html">Retorno</a>.</dd>
+</dl>
+
+<h2 id="g-W">W</h2>
+<dl class="glossario">
+<dt><strong>-Wall -Wextra</strong></dt>
+<dd>As opções do compilador que ligam os avisos mais úteis. O guia compila sempre com elas. Veja: <a href="avisos.html">Avisos</a> e <a href="compilar.html">Compilar com g++</a>.</dd>
+<dt><strong>WebAssembly</strong></dt>
+<dd>Um formato de programa que roda dentro do navegador. O editor do guia compila o seu C++ com o Clang para WebAssembly e o roda na própria página. Veja: <a href="simulador.html">O Editor do Guia</a>.</dd>
+<dt><strong>while</strong> / <strong>do-while</strong></dt>
+<dd>Laços que repetem enquanto a condição for verdadeira; o <code>do-while</code> roda pelo menos uma vez. Veja: <a href="while.html">while</a> e <a href="do-while.html">do-while</a>.</dd>
+</dl>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
