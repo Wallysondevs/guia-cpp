@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Sobrecarga de Operadores — operator+, ==, &lt;&lt;, [] e &lt;=&gt; numa classe Dinheiro | Guia C++</title>
+<meta name="description" content="Sobrecarga de operadores em C++ para quem está começando: ensinar operator+, operator*, operator+=, operator==, operator&lt;&lt; (para imprimir com cout), operator[] e o operator&lt;=&gt; do C++20 a uma classe Dinheiro, método × função livre, os erros reais do g++ e quando não sobrecarregar.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Sobrecarga de Operadores</span></h1>
+
+<p class="intro">Com números, você escreve <code>preco + frete</code>. Com <code>std::string</code>, escreve <code>nome + " Silva"</code>, e com <code>std::cout</code>, <code>std::cout &lt;&lt; nome</code>. Por que esses sinais funcionam com tipos tão diferentes? Porque alguém <strong>ensinou</strong> o <code>+</code> e o <code>&lt;&lt;</code> a cada um deles. Nesta aula você vai fazer o mesmo com uma classe sua, <code>Dinheiro</code>: somar valores com <code>+</code>, comparar com <code>==</code> e <code>&lt;</code>, imprimir com <code>std::cout &lt;&lt;</code>. E vai aprender a parte mais importante: quando <strong>não</strong> fazer isso.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é sobrecarregar um operador: escrever uma função chamada <code>operator+</code>.</li>
+  <li><code>operator+</code>, <code>operator*</code> e <code>operator+=</code> numa classe <code>Dinheiro</code>.</li>
+  <li><code>operator&lt;&lt;</code> para imprimir com <code>std::cout</code>, e por que ele é uma função <strong>livre</strong>.</li>
+  <li><code>operator==</code> e o <code>operator&lt;=&gt;</code> do C++20 com <code>= default</code>, que dão todas as comparações de uma vez.</li>
+  <li><code>operator[]</code>, para acessar itens com colchetes.</li>
+  <li>Método × função livre, os erros reais do compilador e as regras de bom senso.</li>
+</ul>
+</div>
+
+<p>Antes, veja <a href="sobrecarga.html">Sobrecarga de Funções</a> (a mesma ideia, com funções comuns) e <a href="metodos-const.html">Métodos const</a>. Os programas foram compilados com o <strong>g++ 15</strong> na máquina da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: o mesmo sinal, outro significado</h2>
+<p>Na escola, o <code>+</code> serve para somar números. Mas, numa receita, "farinha + ovos" quer dizer "junte os dois", e ninguém se confunde: o sentido vem do contexto. Em C++, cada operador (<code>+</code>, <code>==</code>, <code>&lt;&lt;</code>, <code>[]</code>…) é na verdade uma <strong>função com um nome especial</strong>. Quando você escreve:</p>
+
+<pre class="file" data-file="ideia">a + b
+</pre>
+
+<p>o compilador procura uma função chamada <code>operator+</code> que aceite <code>a</code> e <code>b</code>, e a chama. Para <code>int</code>, ela já existe. Para a sua classe, você escreve. Isso se chama <strong>sobrecarga de operadores</strong> (<em>operator overloading</em>): dar mais um significado a um operador que já existe.</p>
+
+<hr>
+
+<h2>1. O problema: a classe <code>Dinheiro</code> não sabe somar</h2>
+<p>Guardar dinheiro em <code>double</code> traz problemas de arredondamento (aula <a href="ponto-flutuante.html">float e double</a>). Um jeito profissional é guardar <strong>centavos</strong> num número inteiro. A classe começa assim:</p>
+
+<pre class="file" data-file="op1.cpp">#include &lt;iostream&gt;
+
+class Dinheiro {
+public:
+    explicit Dinheiro(long long centavos = 0) : centavos_{centavos} {}
+    long long centavos() const { return centavos_; }
+private:
+    long long centavos_;
+};
+
+int main() {
+    Dinheiro caderno{1290};
+    Dinheiro lapis{150};
+    Dinheiro total = caderno + lapis;
+    std::cout &lt;&lt; total.centavos() &lt;&lt; '\n';
+}
+</pre>
+
+<p>O <code>explicit</code> no construtor impede conversões escondidas: sem ele, <code>Dinheiro d = 5;</code> compilaria (e seriam 5 centavos ou 5 reais?). Com ele, é preciso escrever <code>Dinheiro{5}</code>, deixando claro. Agora, o erro:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra op1.cpp -o op1
+op1.cpp: In function ‘int main()’:
+op1.cpp:14:30: error: no match for ‘operator+’ (operand types are ‘Dinheiro’ and ‘Dinheiro’)
+   14 |     Dinheiro total = caderno + lapis;
+      |                      ~~~~~~~ ^ ~~~~~
+      |                      |         |
+      |                      Dinheiro  Dinheiro</pre>
+
+<p>"Nenhuma correspondência para <code>operator+</code> (os operandos são <code>Dinheiro</code> e <code>Dinheiro</code>)". O g++ até desenha setas mostrando o tipo de cada lado. O compilador procurou a função <code>operator+</code> para dois <code>Dinheiro</code> e não achou. (Clang: <code>invalid operands to binary expression ('Dinheiro' and 'Dinheiro')</code>.)</p>
+
+<hr>
+
+<h2>2. <code>operator+</code>: ensinando a somar</h2>
+<p>Escreva, dentro da classe, um método chamado <code>operator+</code>:</p>
+
+<pre class="file" data-file="trecho">Dinheiro operator+(const Dinheiro&amp; outro) const {
+    return Dinheiro{centavos_ + outro.centavos_};
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>Dinheiro</dt><dd>O tipo do resultado: somar dois valores dá um valor novo.</dd>
+  <dt>operator+</dt><dd>O nome da função: a palavra <code>operator</code> colada no sinal.</dd>
+  <dt>(const Dinheiro&amp; outro)</dt><dd>O que está à <strong>direita</strong> do <code>+</code>. O da esquerda é o próprio objeto (<a href="this.html">this</a>).</dd>
+  <dt>const</dt><dd>Somar não muda nenhuma das parcelas, como em <code>2 + 3</code>.</dd>
+  <dt>return Dinheiro{…};</dt><dd>Cria e devolve o resultado.</dd>
+</dl>
+
+<p>A partir daí, <code>caderno + lapis</code> é só um jeito bonito de escrever <code>caderno.operator+(lapis)</code>. As duas formas funcionam e fazem exatamente a mesma coisa.</p>
+
+<h3>Outros operadores aritméticos</h3>
+<p>Do mesmo jeito, dá para ensinar <code>*</code> (preço vezes quantidade) e <code>+=</code> (somar no próprio objeto):</p>
+
+<pre class="file" data-file="trecho">Dinheiro operator*(int quantidade) const {
+    return Dinheiro{centavos_ * quantidade};
+}
+Dinheiro&amp; operator+=(const Dinheiro&amp; outro) {
+    centavos_ += outro.centavos_;
+    return *this;
+}
+</pre>
+
+<p>Repare nas diferenças: o <code>*</code> recebe um <code>int</code> (dinheiro × número, e não dinheiro × dinheiro, que não faz sentido); o <code>+=</code> <strong>não</strong> é <code>const</code>, porque muda o objeto da esquerda, e devolve <code>*this</code> por referência, como o <code>operator=</code> da aula <a href="copia-movimento.html">Cópia e Movimento</a>.</p>
+
+<hr>
+
+<h2>3. <code>operator&lt;&lt;</code>: imprimir com <code>std::cout</code></h2>
+<p>Tente imprimir um <code>Dinheiro</code> sem ensinar o <code>&lt;&lt;</code>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra op2.cpp -o op2
+op2.cpp: In function ‘int main()’:
+op2.cpp:13:15: error: no match for ‘operator&lt;&lt;’ (operand types are ‘std::ostream’ {aka ‘std::basic_ostream&lt;char&gt;’} and ‘Dinheiro’)
+   13 |     std::cout &lt;&lt; caderno &lt;&lt; '\n';
+      |     ~~~~~~~~~ ^~ ~~~~~~~
+      |          |       |
+      |          |       Dinheiro
+      |          std::ostream {aka std::basic_ostream&lt;char&gt;}
+op2.cpp:13:15: note: there are 52 candidates
+                         « (mais 370 linhas: uma explicação para cada um dos 52 candidatos)</pre>
+
+<p>É o mesmo erro da soma, só que <strong>muito</strong> mais longo: o g++ lista os 52 <code>operator&lt;&lt;</code> que existem (para <code>int</code>, <code>double</code>, <code>char</code>, <code>bool</code>…) e explica por que nenhum aceita um <code>Dinheiro</code>. Diante de uma parede de texto assim, leia só a <strong>primeira</strong> linha <code>error:</code>. Ela já diz tudo: falta um <code>operator&lt;&lt;</code> para <code>std::ostream</code> e <code>Dinheiro</code>.</p>
+
+<p>O <code>std::ostream</code> ("output stream", fluxo de saída) é o tipo do <code>std::cout</code>. A função que falta é esta, escrita <strong>fora</strong> da classe:</p>
+
+<pre class="file" data-file="trecho">std::ostream&amp; operator&lt;&lt;(std::ostream&amp; saida, const Dinheiro&amp; d) {
+    return saida &lt;&lt; std::format("R$ {},{:02}", d.centavos() / 100, d.centavos() % 100);
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>std::ostream&amp; saida</dt><dd>O lado <strong>esquerdo</strong> do <code>&lt;&lt;</code>: o <code>std::cout</code> (ou um arquivo, aula <a href="arquivos.html">Arquivos</a>). Por referência, porque fluxos não podem ser copiados.</dd>
+  <dt>const Dinheiro&amp; d</dt><dd>O lado <strong>direito</strong>: o valor a imprimir.</dd>
+  <dt>std::format("R$ {},{:02}", …)</dt><dd>Monta o texto: os reais, uma vírgula e os centavos com 2 dígitos (<code>{:02}</code> completa com zero: <code>5</code> vira <code>05</code>). Veja <a href="format-print.html">std::format</a>.</dd>
+  <dt>return saida &lt;&lt; …;</dt><dd>Devolve o próprio fluxo. É isso que permite encadear: <code>std::cout &lt;&lt; a &lt;&lt; b &lt;&lt; '\n'</code> vira <code>(std::cout &lt;&lt; a) &lt;&lt; b</code>, e o resultado do primeiro <code>&lt;&lt;</code> precisa ser o <code>std::cout</code> de novo.</dd>
+</dl>
+
+<div class="warning">
+<strong>Por que fora da classe?</strong>
+<p>Num método, o lado <strong>esquerdo</strong> do operador é sempre o próprio objeto. Em <code>std::cout &lt;&lt; caderno</code>, o lado esquerdo é o <code>std::cout</code>, que não é um <code>Dinheiro</code>. Então o <code>operator&lt;&lt;</code> tem que ser uma <strong>função livre</strong>, com dois parâmetros. Se ela precisar ler atributos privados, a classe pode declará-la como <code>friend</code> (aula <a href="friend.html">friend</a>); aqui, o método público <code>centavos()</code> basta.</p>
+</div>
+
+<hr>
+
+<h2>4. Comparações: <code>==</code> e <code>&lt;=&gt;</code> <span class="versao">C++20</span></h2>
+<p>Para comparar dois valores, você poderia escrever seis funções: <code>==</code>, <code>!=</code>, <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code>. Era assim até o C++17. Desde o C++20, duas linhas bastam:</p>
+
+<pre class="file" data-file="trecho">bool operator==(const Dinheiro&amp;) const = default;
+auto operator&lt;=&gt;(const Dinheiro&amp;) const = default;
+</pre>
+
+<dl class="anatomy">
+  <dt>operator==(…) const = default</dt><dd>"Iguais quando todos os atributos são iguais". O compilador escreve o corpo. E o <code>!=</code> vem de graça.</dd>
+  <dt>operator&lt;=&gt;</dt><dd>O <strong>operador nave espacial</strong> (<em>spaceship</em>), pelo formato <code>&lt;=&gt;</code>. Ele compara de uma vez e responde "menor", "igual" ou "maior". A partir dele, o compilador cria <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code> e <code>&gt;=</code>.</dd>
+  <dt>auto … = default</dt><dd>Compara atributo por atributo, na ordem em que foram declarados. O <code>auto</code> deixa o compilador escolher o tipo da resposta. Precisa de <code>#include &lt;compare&gt;</code>.</dd>
+</dl>
+
+<h3>O programa completo</h3>
+
+<pre class="file" data-file="dinheiro.cpp">#include &lt;compare&gt;
+#include &lt;format&gt;
+#include &lt;iostream&gt;
+
+class Dinheiro {
+public:
+    explicit Dinheiro(long long centavos = 0) : centavos_{centavos} {}
+
+    long long centavos() const { return centavos_; }
+
+    Dinheiro operator+(const Dinheiro&amp; outro) const {
+        return Dinheiro{centavos_ + outro.centavos_};
+    }
+    Dinheiro operator*(int quantidade) const {
+        return Dinheiro{centavos_ * quantidade};
+    }
+    Dinheiro&amp; operator+=(const Dinheiro&amp; outro) {
+        centavos_ += outro.centavos_;
+        return *this;
+    }
+    bool operator==(const Dinheiro&amp;) const = default;
+    auto operator&lt;=&gt;(const Dinheiro&amp;) const = default;
+private:
+    long long centavos_;
+};
+
+std::ostream&amp; operator&lt;&lt;(std::ostream&amp; saida, const Dinheiro&amp; d) {
+    return saida &lt;&lt; std::format("R$ {},{:02}", d.centavos() / 100, d.centavos() % 100);
+}
+
+int main() {
+    Dinheiro caderno{1290};   // R$ 12,90
+    Dinheiro lapis{150};      // R$ 1,50
+
+    Dinheiro total = caderno + lapis * 3;
+    std::cout &lt;&lt; "Caderno: " &lt;&lt; caderno &lt;&lt; '\n';
+    std::cout &lt;&lt; "3 lápis: " &lt;&lt; lapis * 3 &lt;&lt; '\n';
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; '\n';
+
+    Dinheiro carteira{2000};
+    carteira += Dinheiro{500};
+    std::cout &lt;&lt; "Na carteira: " &lt;&lt; carteira &lt;&lt; '\n';
+
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "total == 17,40? " &lt;&lt; (total == Dinheiro{1740}) &lt;&lt; '\n';
+    std::cout &lt;&lt; "dá para pagar? " &lt;&lt; (carteira &gt;= total) &lt;&lt; '\n';
+    std::cout &lt;&lt; "caderno &lt; lápis? " &lt;&lt; (caderno &lt; lapis) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra dinheiro.cpp -o dinheiro
+$ ./dinheiro
+Caderno: R$ 12,90
+3 lápis: R$ 4,50
+Total: R$ 17,40          « caderno + lapis * 3: o * vem antes do +, como na matemática
+Na carteira: R$ 25,00
+total == 17,40? true
+dá para pagar? true      « o &gt;= veio do &lt;=&gt;
+caderno &lt; lápis? false</pre>
+
+<p>Observe que a <strong>precedência</strong> continua a mesma dos números: em <code>caderno + lapis * 3</code>, a multiplicação aconteceu primeiro. Você pode ensinar um operador a fazer outra coisa, mas não pode mudar a ordem em que ele é calculado (aula <a href="precedencia.html">Precedência</a>). O <code>std::boolalpha</code> faz o <code>cout</code> mostrar <code>true</code>/<code>false</code> em vez de <code>1</code>/<code>0</code>.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> mude os preços e a quantidade de lápis. Tente <code>std::cout &lt;&lt; (caderno + caderno);</code> e <code>std::cout &lt;&lt; (lapis != caderno);</code>. Depois apague a linha do <code>operator&lt;=&gt;</code> e veja qual linha para de compilar.</p>
+<pre class="script">#include &lt;compare&gt;
+#include &lt;format&gt;
+#include &lt;iostream&gt;
+
+class Dinheiro {
+public:
+    explicit Dinheiro(long long centavos = 0) : centavos_{centavos} {}
+
+    long long centavos() const { return centavos_; }
+
+    Dinheiro operator+(const Dinheiro&amp; outro) const {
+        return Dinheiro{centavos_ + outro.centavos_};
+    }
+    Dinheiro operator*(int quantidade) const {
+        return Dinheiro{centavos_ * quantidade};
+    }
+    bool operator==(const Dinheiro&amp;) const = default;
+    auto operator&lt;=&gt;(const Dinheiro&amp;) const = default;
+private:
+    long long centavos_;
+};
+
+std::ostream&amp; operator&lt;&lt;(std::ostream&amp; saida, const Dinheiro&amp; d) {
+    return saida &lt;&lt; std::format("R$ {},{:02}", d.centavos() / 100, d.centavos() % 100);
+}
+
+int main() {
+    Dinheiro caderno{1290};
+    Dinheiro lapis{150};
+    Dinheiro total = caderno + lapis * 3;
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; '\n';
+    std::cout &lt;&lt; std::boolalpha &lt;&lt; "caderno &gt; lápis? " &lt;&lt; (caderno &gt; lapis) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>5. <code>operator[]</code>: colchetes na sua classe</h2>
+<p>Com <code>std::vector</code>, você escreve <code>notas[0]</code>. Para uma classe sua dar o mesmo acesso, sobrecarregue <code>operator[]</code>. Ele quase sempre vem em <strong>dupla</strong>: uma versão para objetos que podem mudar e outra para objetos <code>const</code>:</p>
+
+<pre class="file" data-file="colchetes.cpp">#include &lt;cstddef&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class Boletim {
+public:
+    Boletim(std::string aluno) : aluno_{aluno} {}
+
+    void adicionar(double nota) { notas_.push_back(nota); }
+    std::size_t quantidade() const { return notas_.size(); }
+
+    double&amp; operator[](std::size_t i) { return notas_[i]; }
+    const double&amp; operator[](std::size_t i) const { return notas_[i]; }
+private:
+    std::string aluno_;
+    std::vector&lt;double&gt; notas_;
+};
+
+void imprimir(const Boletim&amp; b) {
+    for (std::size_t i = 0; i &lt; b.quantidade(); ++i) {
+        std::cout &lt;&lt; "Nota " &lt;&lt; i + 1 &lt;&lt; ": " &lt;&lt; b[i] &lt;&lt; '\n';
+    }
+}
+
+int main() {
+    Boletim ana{"Ana"};
+    ana.adicionar(7.5);
+    ana.adicionar(8);
+    ana.adicionar(6);
+
+    std::cout &lt;&lt; "Primeira nota: " &lt;&lt; ana[0] &lt;&lt; '\n';
+    ana[2] = 9.5;                 // corrigiu a prova
+    imprimir(ana);
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Versão</th><th>Devolve</th><th>Usada em</th></tr>
+<tr><td><code>double&amp; operator[](std::size_t i)</code></td><td>Uma <strong>referência</strong> à nota: dá para mudar</td><td><code>ana[2] = 9.5;</code></td></tr>
+<tr><td><code>const double&amp; operator[](std::size_t i) const</code></td><td>Uma referência só de leitura</td><td><code>b[i]</code> dentro de <code>imprimir</code>, onde <code>b</code> é <code>const Boletim&amp;</code></td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra colchetes.cpp -o colchetes
+$ ./colchetes
+Primeira nota: 7.5
+Nota 1: 7.5
+Nota 2: 8
+Nota 3: 9.5              « o ana[2] = 9.5 mudou a nota de verdade</pre>
+
+<p>Se o <code>operator[]</code> devolvesse <code>double</code> (sem <code>&amp;</code>), <code>ana[2] = 9.5</code> mudaria uma cópia, que seria jogada fora. Como no <code>std::vector</code>, este <code>[]</code> não confere se o índice existe: <code>ana[10]</code> é <a href="comportamento-indefinido.html">comportamento indefinido</a>. <span class="versao">C++23</span> O <code>operator[]</code> pode até receber vários índices, como <code>tabela[linha, coluna]</code>.</p>
+
+<hr>
+
+<h2>6. Método ou função livre?</h2>
+<p>O <code>operator*</code> do <code>Dinheiro</code> é um método, então o lado esquerdo tem que ser um <code>Dinheiro</code>. <code>lapis * 3</code> funciona; <code>3 * lapis</code>, não:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra op4.cpp -o op4
+op4.cpp: In function ‘int main()’:
+op4.cpp:17:20: error: no match for ‘operator*’ (operand types are ‘int’ and ‘Dinheiro’)
+   17 |     Dinheiro b = 3 * lapis;
+      |                  ~ ^ ~~~~~
+      |                  |   |
+      |                  int Dinheiro</pre>
+
+<p>Para aceitar os dois lados, escreva os operadores como <strong>funções livres</strong>, fora da classe:</p>
+
+<pre class="file" data-file="livre.cpp">Dinheiro operator*(const Dinheiro&amp; d, int quantidade) {
+    return Dinheiro{d.centavos() * quantidade};
+}
+
+Dinheiro operator*(int quantidade, const Dinheiro&amp; d) {
+    return d * quantidade;       // reaproveita a de cima
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra livre.cpp -o livre
+$ ./livre
+450 450                  « lapis * 3 e 3 * lapis</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operador</th><th>Costuma ser</th><th>Por quê</th></tr>
+<tr><td><code>=</code>, <code>[]</code>, <code>()</code>, <code>-&gt;</code></td><td>Método (obrigatório)</td><td>A linguagem exige.</td></tr>
+<tr><td><code>+=</code>, <code>-=</code>, <code>*=</code>…</td><td>Método</td><td>Mudam o objeto da esquerda.</td></tr>
+<tr><td><code>&lt;&lt;</code> e <code>&gt;&gt;</code> com fluxos</td><td>Função livre (obrigatório)</td><td>O lado esquerdo é o fluxo, não a sua classe.</td></tr>
+<tr><td><code>+</code>, <code>-</code>, <code>*</code>, <code>/</code></td><td>Função livre ou método</td><td>Livre, se os dois lados podem ser de tipos diferentes.</td></tr>
+<tr><td><code>==</code>, <code>&lt;=&gt;</code></td><td>Método com <code>= default</code></td><td>O C++20 já resolve os dois lados sozinho.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>7. Regras e bom senso</h2>
+<p>O que a linguagem <strong>não</strong> deixa fazer:</p>
+<ul>
+  <li><strong>Criar operadores novos.</strong> Não existe <code>operator**</code> nem <code>operator&lt;&gt;</code>: só os que o C++ já tem.</li>
+  <li><strong>Mudar a precedência</strong> ou a quantidade de operandos. <code>*</code> continua antes de <code>+</code>.</li>
+  <li><strong>Mudar o que acontece com tipos básicos.</strong> <code>1 + 1</code> é sempre <code>2</code>: pelo menos um dos lados tem que ser uma classe sua.</li>
+  <li><strong>Sobrecarregar</strong> <code>::</code>, <code>.</code>, <code>.*</code>, <code>?:</code> e <code>sizeof</code>.</li>
+</ul>
+
+<p>E o que ela deixa, mas <strong>não deveria</strong>:</p>
+<div class="warning">
+<strong>Quando não sobrecarregar</strong>
+<ul>
+  <li><strong>Quando o significado não é óbvio.</strong> <code>cliente + produto</code> quer dizer "o cliente comprou o produto"? Um método <code>cliente.comprar(produto)</code> diz isso sem ninguém precisar adivinhar.</li>
+  <li><strong>Quando o operador faria algo diferente do "normal".</strong> Um <code>+</code> que muda as parcelas, um <code>==</code> que imprime algo, um <code>-</code> que soma: tudo compila, e tudo é uma armadilha para quem lê.</li>
+  <li><strong>Pela metade.</strong> Se a classe tem <code>+</code>, as pessoas vão esperar <code>+=</code>; se tem <code>&lt;</code>, vão esperar <code>&gt;</code> (por isso o <code>&lt;=&gt;</code> é tão bom).</li>
+</ul>
+<p>A regra de ouro: <strong>faça como os <code>int</code> fazem</strong>. Sobrecarregue quando a sua classe é "um tipo de número ou de coleção" (dinheiro, frações, vetores da física, matrizes, datas) e o operador tem o sentido de sempre.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"no match for ‘operator+’ (operand types are …)"</strong>
+<p><strong>O que significa:</strong> não existe um <code>operator+</code> para aquela combinação de tipos. Leia os tipos nos parênteses: <code>‘Dinheiro’ and ‘Dinheiro’</code> (falta o operador), ou <code>‘int’ and ‘Dinheiro’</code> (ele existe, mas como método, só com o <code>Dinheiro</code> à esquerda). (Clang: <code>invalid operands to binary expression</code>.)</p>
+<p><strong>Como consertar:</strong> escreva o operador para esses tipos; para o tipo básico à esquerda, use uma função livre.</p>
+</div>
+
+<div class="cenario">
+<strong>"must have exactly one argument" no <code>operator&lt;&lt;</code></strong>
+<pre class="file" data-file="op3.cpp">class Dinheiro {
+public:
+    // ...
+    std::ostream&amp; operator&lt;&lt;(std::ostream&amp; saida, const Dinheiro&amp; d) {
+        return saida &lt;&lt; std::format("R$ {},{:02}", d.centavos_ / 100, d.centavos_ % 100);
+    }
+    // ...
+};
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra op3.cpp -o op3
+op3.cpp:9:19: error: ‘std::ostream&amp; Dinheiro::operator&lt;&lt;(std::ostream&amp;, const Dinheiro&amp;)’ must have exactly one argument
+    9 |     std::ostream&amp; operator&lt;&lt;(std::ostream&amp; saida, const Dinheiro&amp; d) {
+      |                   ^~~~~~~~
+op3.cpp: In function ‘int main()’:
+op3.cpp:18:15: error: no match for ‘operator&lt;&lt;’ (operand types are ‘std::ostream’ {aka ‘std::basic_ostream&lt;char&gt;’} and ‘Dinheiro’)
+                         « (seguem as 52 notas de candidatos)</pre>
+<p><strong>O que significa:</strong> o <code>operator&lt;&lt;</code> foi escrito <strong>dentro</strong> da classe. Como método, ele já tem o objeto como lado esquerdo, então só caberia mais um parâmetro ("deve ter exatamente um argumento"). Com dois, ele é inválido, e o <code>cout &lt;&lt; caderno</code> continua sem operador. (Clang: <code>overloaded 'operator&lt;&lt;' must be a binary operator (has 3 parameters)</code>.)</p>
+<p><strong>Como consertar:</strong> mova a função para fora da classe e use métodos públicos; ou mantenha dentro, mas com a palavra <code>friend</code> na frente, que a transforma em função livre (aula <a href="friend.html">friend</a>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>a = b + c</code> mudou o <code>b</code></strong>
+<p><strong>O que significa:</strong> o <code>operator+</code> altera o próprio objeto (<code>centavos_ += …</code>) em vez de criar um resultado novo. Isso é o trabalho do <code>+=</code>.</p>
+<p><strong>Como consertar:</strong> marque o <code>operator+</code> como <code>const</code>: aí o compilador recusa qualquer mudança nos atributos dentro dele.</p>
+</div>
+
+<hr>
+
+<h2>Missão</h2>
+
+<div class="trycpp" data-goal="out:Troco: R$ 2\,60,src:operator\s*-,src:operator\s*&lt;=&gt;">
+<p class="try-task"><strong>Missão:</strong> a Ana quer calcular o troco. (1) Escreva o <code>operator-</code> do <code>Dinheiro</code> (parecido com o <code>+</code>). (2) Acrescente o <code>operator&lt;=&gt;</code> com <code>= default</code>, para o <code>&gt;=</code> funcionar. (3) Tire as barras <code>//</code> do <code>main</code>. A saída deve ser <code>Troco: R$ 2,60</code>.</p>
+<pre class="script">#include &lt;compare&gt;
+#include &lt;format&gt;
+#include &lt;iostream&gt;
+
+class Dinheiro {
+public:
+    explicit Dinheiro(long long centavos = 0) : centavos_{centavos} {}
+    long long centavos() const { return centavos_; }
+
+    Dinheiro operator+(const Dinheiro&amp; outro) const {
+        return Dinheiro{centavos_ + outro.centavos_};
+    }
+    bool operator==(const Dinheiro&amp;) const = default;
+private:
+    long long centavos_;
+};
+
+std::ostream&amp; operator&lt;&lt;(std::ostream&amp; saida, const Dinheiro&amp; d) {
+    return saida &lt;&lt; std::format("R$ {},{:02}", d.centavos() / 100, d.centavos() % 100);
+}
+
+int main() {
+    Dinheiro total{1740};
+    Dinheiro pago{2000};
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; '\n';
+    // if (pago &gt;= total) {
+    //     std::cout &lt;&lt; "Troco: " &lt;&lt; (pago - total) &lt;&lt; '\n';
+    // }
+}
+</pre>
+<pre class="solucao">#include &lt;compare&gt;
+#include &lt;format&gt;
+#include &lt;iostream&gt;
+
+class Dinheiro {
+public:
+    explicit Dinheiro(long long centavos = 0) : centavos_{centavos} {}
+    long long centavos() const { return centavos_; }
+
+    Dinheiro operator+(const Dinheiro&amp; outro) const {
+        return Dinheiro{centavos_ + outro.centavos_};
+    }
+    Dinheiro operator-(const Dinheiro&amp; outro) const {
+        return Dinheiro{centavos_ - outro.centavos_};
+    }
+    bool operator==(const Dinheiro&amp;) const = default;
+    auto operator&lt;=&gt;(const Dinheiro&amp;) const = default;
+private:
+    long long centavos_;
+};
+
+std::ostream&amp; operator&lt;&lt;(std::ostream&amp; saida, const Dinheiro&amp; d) {
+    return saida &lt;&lt; std::format("R$ {},{:02}", d.centavos() / 100, d.centavos() % 100);
+}
+
+int main() {
+    Dinheiro total{1740};
+    Dinheiro pago{2000};
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; '\n';
+    if (pago &gt;= total) {
+        std::cout &lt;&lt; "Troco: " &lt;&lt; (pago - total) &lt;&lt; '\n';
+    }
+}
+</pre>
+</div>
+
+<p>A saída da solução no laboratório:</p>
+<pre class="term" data-cwd="~/cpp">$ ./troco
+Total: R$ 17,40
+Troco: R$ 2,60</pre>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operador</th><th>Assinatura típica</th></tr>
+<tr><td><code>a + b</code> (método)</td><td><code>T operator+(const T&amp; outro) const;</code></td></tr>
+<tr><td><code>a + b</code> (livre)</td><td><code>T operator+(const T&amp; a, const T&amp; b);</code></td></tr>
+<tr><td><code>a += b</code></td><td><code>T&amp; operator+=(const T&amp; outro);</code> (devolve <code>*this</code>)</td></tr>
+<tr><td><code>a == b</code></td><td><code>bool operator==(const T&amp;) const = default;</code> <span class="versao">C++20</span></td></tr>
+<tr><td><code>&lt; &lt;= &gt; &gt;=</code></td><td><code>auto operator&lt;=&gt;(const T&amp;) const = default;</code> <span class="versao">C++20</span></td></tr>
+<tr><td><code>std::cout &lt;&lt; a</code></td><td><code>std::ostream&amp; operator&lt;&lt;(std::ostream&amp; s, const T&amp; a);</code> (livre)</td></tr>
+<tr><td><code>a[i]</code></td><td><code>X&amp; operator[](std::size_t i);</code> e <code>const X&amp; operator[](std::size_t i) const;</code></td></tr>
+<tr><td>Não sobrecarregáveis</td><td><code>::</code> <code>.</code> <code>.*</code> <code>?:</code> <code>sizeof</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O nome da função</h3>
+<p>Qual é o nome da função que o compilador procura quando você escreve <code>a - b</code>?</p>
+<div class="ex-code"><input data-answer="operator-|operator -" aria-label="nome"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Todas as comparações</h3>
+<p>Complete a linha que dá <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code> e <code>&gt;=</code> a uma classe <code>Fracao</code>:</p>
+<div class="ex-code">auto <input data-answer="operator&lt;=&gt;|operator &lt;=&gt;" aria-label="operador">(const Fracao&amp;) const = default;</div>
+</div>
+
+<div class="exercise">
+<h3>3. O tipo do cout</h3>
+<p>Complete o primeiro parâmetro do operador que imprime um <code>Ponto</code>:</p>
+<div class="ex-code">std::ostream&amp; operator&lt;&lt;(<input data-answer="std::ostream&amp; saida|std::ostream&amp; os|std::ostream&amp; out|std::ostream &amp;saida|std::ostream &amp;os|std::ostream&amp; s|std::ostream&amp;" aria-label="parâmetro">, const Ponto&amp; p)</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Por que o <code>operator&lt;&lt;</code> para imprimir com <code>cout</code> não pode ser um método comum da sua classe?</p>
+<label><input type="radio" name="q4"> Porque métodos não podem devolver referências.</label>
+<label><input type="radio" name="q4"> Porque, num método, o lado esquerdo é o próprio objeto, e em <code>cout &lt;&lt; x</code> o lado esquerdo é o <code>cout</code>.</label>
+<label><input type="radio" name="q4"> Porque o <code>&lt;&lt;</code> não pode ser sobrecarregado.</label>
+<label><input type="radio" name="q4"> Porque o <code>cout</code> é <code>const</code>.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Qual destas sobrecargas é uma <strong>má</strong> ideia?</p>
+<label><input type="radio" name="q5"> <code>Fracao + Fracao</code>, somando as frações.</label>
+<label><input type="radio" name="q5"> <code>Data == Data</code>, comparando dia, mês e ano.</label>
+<label><input type="radio" name="q5"> <code>Matriz * Matriz</code>, multiplicando matrizes.</label>
+<label><input type="radio" name="q5"> <code>Cliente + Produto</code>, registrando uma compra.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. O <code>operator[]</code> de uma classe devolve <code>double</code> (sem <code>&amp;</code>). O que acontece com <code>obj[0] = 5;</code>?</p>
+<label><input type="radio" name="q6"> Não muda o objeto: a atribuição vai para uma cópia temporária (com <code>double</code>, o compilador até recusa).</label>
+<label><input type="radio" name="q6"> Muda o primeiro item normalmente.</label>
+<label><input type="radio" name="q6"> Muda todos os itens.</label>
+<label><input type="radio" name="q6"> Cria um item novo no fim.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Cada operador é uma função chamada <code>operator</code> + sinal. <code>a + b</code> vira <code>a.operator+(b)</code> ou <code>operator+(a, b)</code>.</li>
+  <li><code>+</code>, <code>-</code>, <code>*</code> devolvem um objeto novo e são <code>const</code>; <code>+=</code> muda o objeto e devolve <code>*this</code>.</li>
+  <li><code>operator&lt;&lt;</code> para fluxos é uma função livre: <code>std::ostream&amp; operator&lt;&lt;(std::ostream&amp;, const T&amp;)</code>, devolvendo o fluxo.</li>
+  <li>C++20: <code>operator==</code> e <code>operator&lt;=&gt;</code> com <code>= default</code> dão as seis comparações.</li>
+  <li><code>operator[]</code> vem em dupla (normal e <code>const</code>) e devolve referência.</li>
+  <li>Função livre quando o lado esquerdo pode não ser a sua classe (<code>3 * lapis</code>, <code>cout &lt;&lt; x</code>).</li>
+  <li>Não dá para criar operadores nem mudar a precedência. Sobrecarregue só quando o sentido é o de sempre: "faça como os <code>int</code> fazem".</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
