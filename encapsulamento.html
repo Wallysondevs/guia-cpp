@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ public e private — encapsulamento, getters, setters e invariantes | Guia C++</title>
+<meta name="description" content="Encapsulamento em C++ para iniciantes: public, private e protected, o erro is private within this context, getters e setters com validação (preço não pode ser negativo), invariantes, validar no construtor e por que esconder os dados, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">public e private</span></h1>
+
+<p class="intro">Na aula <a href="poo.html">O que é POO</a>, a caneta da Ana terminou com "R$ −3 e −10 no estoque", e o compilador não reclamou de nada. Desde então, a classe <code>Produto</code> ganhou <a href="metodos.html">métodos</a> que conferem as regras e <a href="construtores.html">construtores</a> que a fazem nascer certinha, mas qualquer linha do programa ainda pode escrever <code>caneta.preco = -3;</code> e passar por cima de tudo. Nesta aula você fecha essa porta: é o <strong>encapsulamento</strong>, o primeiro pilar da POO.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que fazem <code>public</code>, <code>private</code> e <code>protected</code>.</li>
+  <li>A ler o erro <code>is private within this context</code>.</li>
+  <li>Como escrever <strong>getters</strong> (métodos que leem) e <strong>setters</strong> (métodos que mudam, conferindo as regras).</li>
+  <li>O que é uma <strong>invariante</strong> e como a classe garante que ela nunca quebre.</li>
+  <li>Como validar no construtor, inclusive com exceção.</li>
+  <li>Por que esconder os dados vale a pena, mesmo quando "dá mais trabalho".</li>
+</ul>
+</div>
+
+<p>Os programas desta aula foram compilados e executados na máquina fictícia da Ana, na pasta <code>~/cpp/encapsulamento</code>, com o <strong>g++ 15.2</strong> e o comando padrão <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: o cliente não abre a gaveta do caixa</h2>
+<p>Na lojinha da Ana, o dinheiro fica numa gaveta, atrás do balcão. O cliente não abre a gaveta e tira o troco sozinho: ele <strong>pede</strong> ao caixa. O caixa confere ("a nota é verdadeira? o troco está certo?") e só então mexe na gaveta. A gaveta é <strong>privada</strong>; o balcão, onde se fazem os pedidos, é <strong>público</strong>.</p>
+<p>Uma classe bem feita funciona assim: os dados ficam na gaveta (<code>private</code>), e o resto do programa só conversa com o objeto pelo balcão, os métodos <code>public</code>. Como todo pedido passa pelo balcão, as regras ("preço nunca negativo", "não vende mais do que tem") são conferidas <strong>sempre</strong>, sem depender da memória de quem usa a classe.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Especificador</th><th>Quem pode usar o membro</th><th>Na lojinha</th></tr>
+<tr><td><code>public:</code></td><td>Qualquer código: o <code>main</code>, outras funções, outras classes</td><td>O balcão</td></tr>
+<tr><td><code>private:</code></td><td>Só os métodos da própria classe</td><td>A gaveta do caixa</td></tr>
+<tr><td><code>protected:</code></td><td>Os métodos da própria classe e das classes "filhas" (<a href="heranca.html">herança</a>)</td><td>O depósito, que só a família da dona acessa</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. Esconder os dados com <code>private</code></h2>
+
+<pre class="file" data-file="invasao.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(std::string nome, int preco, int estoque)
+        : nome_(nome), preco_(preco), estoque_(estoque) {
+    }
+
+    int preco() { return preco_; }
+
+private:
+    std::string nome_;
+    int preco_;
+    int estoque_;
+};
+
+int main() {
+    Produto caneta{"caneta", 3, 50};
+    caneta.preco_ = -3;
+    std::cout &lt;&lt; caneta.preco() &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/encapsulamento">$ g++ -std=c++23 -Wall -Wextra invasao.cpp -o invasao
+invasao.cpp: In function ‘int main()’:
+invasao.cpp:20:12: error: ‘int Produto::preco_’ is private within this context
+   20 |     caneta.preco_ = -3;
+      |            ^~~~~~
+invasao.cpp:14:9: note: declared private here
+   14 |     int preco_;
+      |         ^~~~~~
+invasao.cpp:20:12: note: field ‘int Produto::preco_’ can be accessed via ‘int Produto::preco()’
+   20 |     caneta.preco_ = -3;
+      |            ^~~~~~
+      |            preco()</pre>
+
+<p>Pronto: a invasão agora é um <strong>erro de compilação</strong>. O programa nem chega a existir. Leia a mensagem:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>Significado</th></tr>
+<tr><td><code>In function ‘int main()’</code></td><td>O problema está dentro do <code>main</code>, que fica <strong>fora</strong> da classe.</td></tr>
+<tr><td><code>‘int Produto::preco_’ is private within this context</code></td><td>"<code>Produto::preco_</code> é privado neste contexto": daqui (o <code>main</code>), não se pode tocar nele.</td></tr>
+<tr><td><code>note: declared private here</code></td><td>"Foi declarado privado aqui": aponta a linha 14, dentro da seção <code>private:</code>.</td></tr>
+<tr><td><code>note: field … can be accessed via ‘int Produto::preco()’</code></td><td>O g++ 15 ainda dá uma dica: "este campo pode ser acessado pelo método <code>preco()</code>". Ele achou um getter e sugeriu usá-lo (para ler; para mudar, não serviria).</td></tr>
+</table>
+</div>
+
+<p>No editor do guia, o Clang escreve <code>'preco_' is a private member of 'Produto'</code> ("<code>preco_</code> é um membro privado de <code>Produto</code>").</p>
+
+<dl class="anatomy">
+  <dt>public:</dt><dd>Tudo o que vem depois, até o próximo especificador, é público: o construtor e o método <code>preco()</code>.</dd>
+  <dt>private:</dt><dd>Daqui até o fim da classe, tudo é privado: os três atributos. Uma classe pode ter várias seções, em qualquer ordem; o costume é <code>public</code> primeiro (o que os usuários da classe precisam ler) e <code>private</code> no fim (detalhes internos).</dd>
+  <dt>nome_, preco_, estoque_</dt><dd>O sublinhado no fim é um <strong>costume</strong>, não uma regra: marca "este é um dado interno". Ele também resolve um problema da aula <a href="metodos.html">Métodos</a>: um método não pode ter o mesmo nome de um atributo, e agora o método pode se chamar simplesmente <code>preco()</code>. Outro costume comum é <code>m_preco</code> ("m" de <em>membro</em>).</dd>
+  <dt>int preco() { return preco_; }</dt><dd>O método está <strong>dentro</strong> da classe, então pode ler <code>preco_</code> à vontade. <code>private</code> não esconde nada dos métodos da própria classe.</dd>
+</dl>
+
+<div class="note"><strong>Lembra da diferença entre <code>class</code> e <code>struct</code>?</strong> Numa <code>class</code>, quem não está em seção nenhuma já é privado. Por isso, em <a href="classes-objetos.html">Classes e Objetos</a>, foi preciso escrever <code>public:</code> para o <code>main</code> enxergar os atributos. Agora a gente usa isso a favor.</div>
+
+<hr>
+
+<h2>2. Getters e setters: o balcão da classe</h2>
+<p>Se os dados estão escondidos, como o resto do programa lê o preço ou muda o preço? Por métodos públicos, com nomes que já viraram costume:</p>
+<ul>
+  <li><strong>getter</strong> (de <em>get</em>, "pegar"): só <strong>lê</strong> um dado e o devolve. Ex.: <code>int preco()</code>.</li>
+  <li><strong>setter</strong> (de <em>set</em>, "definir"): <strong>muda</strong> um dado, mas antes <strong>confere</strong> se o valor novo faz sentido. Ex.: <code>bool mudarPreco(int novo)</code>.</li>
+</ul>
+
+<pre class="file" data-file="produto.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(std::string nome, int preco, int estoque)
+        : nome_(nome), preco_(0), estoque_(0) {
+        mudarPreco(preco);
+        repor(estoque);
+    }
+
+    std::string nome() { return nome_; }
+    int preco() { return preco_; }
+    int estoque() { return estoque_; }
+
+    bool mudarPreco(int novo) {
+        if (novo &lt; 0) {
+            std::cout &lt;&lt; "Preço inválido: " &lt;&lt; novo &lt;&lt; "\n";
+            return false;
+        }
+        preco_ = novo;
+        return true;
+    }
+
+    bool repor(int quantidade) {
+        if (quantidade &lt; 0) {
+            std::cout &lt;&lt; "Quantidade inválida: " &lt;&lt; quantidade &lt;&lt; "\n";
+            return false;
+        }
+        estoque_ += quantidade;
+        return true;
+    }
+
+    bool vender(int quantidade) {
+        if (quantidade &lt;= 0 || quantidade &gt; estoque_) {
+            std::cout &lt;&lt; "Venda recusada: " &lt;&lt; quantidade &lt;&lt; " " &lt;&lt; nome_ &lt;&lt; "(s)\n";
+            return false;
+        }
+        estoque_ -= quantidade;
+        return true;
+    }
+
+private:
+    std::string nome_;
+    int preco_;
+    int estoque_;
+};
+
+int main() {
+    Produto caneta{"caneta", 3, 50};
+
+    caneta.mudarPreco(-3);
+    caneta.vender(60);
+    caneta.vender(2);
+    caneta.mudarPreco(4);
+
+    std::cout &lt;&lt; caneta.nome() &lt;&lt; ": R$ " &lt;&lt; caneta.preco()
+              &lt;&lt; " (" &lt;&lt; caneta.estoque() &lt;&lt; " no estoque)\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/encapsulamento">$ g++ -std=c++23 -Wall -Wextra produto.cpp -o produto
+$ ./produto
+Preço inválido: -3
+Venda recusada: 60 caneta(s)
+caneta: R$ 4 (48 no estoque)</pre>
+
+<p>Compare com o "R$ −3 (−10 no estoque)" da aula <a href="poo.html">O que é POO</a>. As mesmas tentativas erradas agora são <strong>recusadas</strong>, e a caneta termina num estado que faz sentido.</p>
+
+<dl class="anatomy">
+  <dt>std::string nome() { return nome_; }</dt><dd>Getter: devolve uma cópia do nome. Quem chama pode ler, mas não consegue mudar o <code>nome_</code> de dentro do objeto. Repare que não existe setter de nome: um produto não muda de nome, e a classe simplesmente não oferece essa porta.</dd>
+  <dt>bool mudarPreco(int novo)</dt><dd>Setter com <strong>validação</strong>: se o preço for negativo, avisa e devolve <code>false</code> sem mexer em nada. Só um preço válido chega ao <code>preco_</code>.</dd>
+  <dt>bool repor(int) / bool vender(int)</dt><dd>Não existe <code>mudarEstoque</code>. O estoque só muda por <strong>ações com sentido</strong> na loja: repor e vender, cada uma com a sua regra. Isso é melhor que um setter genérico, que deixaria escrever qualquer número.</dd>
+  <dt>: nome_(nome), preco_(0), estoque_(0) { mudarPreco(preco); repor(estoque); }</dt><dd>O construtor começa com valores seguros (0) e passa os valores recebidos pelos <strong>mesmos</strong> métodos que conferem as regras. Assim, nem no nascimento entra um preço negativo. (Os parâmetros se chamam <code>nome</code> e <code>preco</code>, e não há confusão com os atributos <code>nome_</code> e <code>preco_</code>, graças ao sublinhado.)</dd>
+</dl>
+
+<div class="note"><strong>Falta um detalhe nos getters.</strong> Getters só leem, e o C++ tem uma forma de deixar isso escrito e conferido pelo compilador: a palavra <code>const</code> depois dos parênteses, <code>int preco() const</code>. Ela é tão importante que tem aula própria, <a href="metodos-const.html">Métodos const</a>. Até lá, os getters ficam sem ela.</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> no <code>main</code>, tente escrever <code>caneta.estoque_ = 1000;</code> e rode: leia o erro. Depois apague essa linha e tente vender <code>0</code> canetas e repor <code>-5</code>. Por último, pense: que regra você acrescentaria ao <code>mudarPreco</code> para impedir um preço absurdo, como R$ 10000?</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(std::string nome, int preco, int estoque)
+        : nome_(nome), preco_(0), estoque_(0) {
+        mudarPreco(preco);
+        repor(estoque);
+    }
+
+    std::string nome() { return nome_; }
+    int preco() { return preco_; }
+    int estoque() { return estoque_; }
+
+    bool mudarPreco(int novo) {
+        if (novo &lt; 0) {
+            std::cout &lt;&lt; "Preço inválido: " &lt;&lt; novo &lt;&lt; "\n";
+            return false;
+        }
+        preco_ = novo;
+        return true;
+    }
+
+    bool repor(int quantidade) {
+        if (quantidade &lt; 0) {
+            std::cout &lt;&lt; "Quantidade inválida: " &lt;&lt; quantidade &lt;&lt; "\n";
+            return false;
+        }
+        estoque_ += quantidade;
+        return true;
+    }
+
+    bool vender(int quantidade) {
+        if (quantidade &lt;= 0 || quantidade &gt; estoque_) {
+            std::cout &lt;&lt; "Venda recusada: " &lt;&lt; quantidade &lt;&lt; " " &lt;&lt; nome_ &lt;&lt; "(s)\n";
+            return false;
+        }
+        estoque_ -= quantidade;
+        return true;
+    }
+
+private:
+    std::string nome_;
+    int preco_;
+    int estoque_;
+};
+
+int main() {
+    Produto caneta{"caneta", 3, 50};
+    caneta.vender(2);
+    std::cout &lt;&lt; caneta.nome() &lt;&lt; ": R$ " &lt;&lt; caneta.preco()
+              &lt;&lt; " (" &lt;&lt; caneta.estoque() &lt;&lt; " no estoque)\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Invariantes: as regras que nunca quebram</h2>
+<p>Uma <strong>invariante</strong> é uma regra sobre os dados que vale <strong>o tempo todo</strong>, para todo objeto da classe, do nascimento à morte. As invariantes do <code>Produto</code> da Ana são:</p>
+<ol>
+  <li><code>preco_ &gt;= 0</code> (preço nunca negativo);</li>
+  <li><code>estoque_ &gt;= 0</code> (estoque nunca negativo).</li>
+</ol>
+
+<p>Quem garante as invariantes é a classe, e ela consegue garantir porque <strong>só os métodos dela mexem nos dados</strong>. Basta conferir duas coisas:</p>
+<ul>
+  <li>o <strong>construtor</strong> cria o objeto já respeitando as regras;</li>
+  <li>cada método <strong>público</strong> que muda os dados termina com as regras ainda valendo (ou recusa a mudança).</li>
+</ul>
+
+<p>Se as duas coisas valem, nenhum código no programa inteiro, por mais errado que seja, consegue criar um produto com preço negativo. Sem o <code>private</code>, isso seria impossível de garantir: bastaria uma linha esquecida em algum arquivo.</p>
+
+<div class="tip"><strong>Dica de projeto:</strong> antes de escrever uma classe, escreva num comentário as invariantes dela. Elas dizem quais dados devem ser privados (os que têm regra) e quais métodos você precisa (os que mudam esses dados respeitando a regra). Um dado sem regra nenhuma (qualquer valor serve) talvez nem precise estar numa classe: uma <code>struct</code> pública resolve.</div>
+
+<h3>Validar no construtor: devolver <code>false</code> não dá</h3>
+<p>Um setter pode avisar o erro devolvendo <code>false</code>. Um construtor não devolve nada, então não tem como dizer "não deu". No exemplo acima, a solução foi aceitar o produto com preço 0. Outra solução, mais firme, é <strong>recusar a criação</strong> com uma <a href="excecoes.html">exceção</a>:</p>
+
+<pre class="file" data-file="excecao.cpp">#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(std::string nome, int preco) : nome_(nome), preco_(preco) {
+        if (preco &lt; 0) {
+            throw std::invalid_argument("preço negativo: " + std::to_string(preco));
+        }
+    }
+
+    int preco() { return preco_; }
+
+private:
+    std::string nome_;
+    int preco_;
+};
+
+int main() {
+    try {
+        Produto caneta{"caneta", 3};
+        std::cout &lt;&lt; "Caneta criada: R$ " &lt;&lt; caneta.preco() &lt;&lt; "\n";
+        Produto errado{"lápis", -1};
+        std::cout &lt;&lt; "Esta linha não aparece\n";
+    } catch (const std::invalid_argument&amp; e) {
+        std::cout &lt;&lt; "Não criei o produto: " &lt;&lt; e.what() &lt;&lt; "\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/encapsulamento">$ g++ -std=c++23 -Wall -Wextra excecao.cpp -o excecao
+$ ./excecao
+Caneta criada: R$ 3
+Não criei o produto: preço negativo: -1</pre>
+
+<p>Quando o construtor lança a exceção, o objeto <strong>não chega a existir</strong>: não há como usar um <code>errado</code> inválido, porque o programa pula direto para o <code>catch</code>. <code>std::invalid_argument</code> ("argumento inválido", do cabeçalho <code>&lt;stdexcept&gt;</code>) é a exceção padrão para "você me passou um valor que não serve". Se ninguém capturar a exceção, o programa termina na hora (veja em <a href="#errado">Quando dá errado</a>).</p>
+
+<hr>
+
+<h2>4. Por que esconder os dados</h2>
+<p>"Mas dá mais trabalho: em vez de <code>caneta.preco</code>, tenho de escrever um método." Dá, e vale a pena por três motivos.</p>
+
+<h3>Motivo 1: as regras ficam num lugar só</h3>
+<p>É o que você viu nas seções anteriores. A regra "preço ≥ 0" está no <code>mudarPreco</code> e em nenhum outro lugar. Se a regra mudar ("preço mínimo R$ 1"), muda-se uma linha.</p>
+
+<h3>Motivo 2: dá para mudar o "por dentro" sem quebrar o "por fora"</h3>
+<p>A Ana resolveu dar descontos de 10%, e reais inteiros não servem mais (10% de R$ 3 = R$ 2,70). Ela muda a classe para guardar o preço em <strong>centavos</strong>. Como o atributo era privado, ninguém fora da classe usava <code>preco_</code> direto. Ela troca o atributo, ajusta os métodos, e todo o código que usava <code>caneta.preco()</code> continua funcionando sem mudar uma vírgula:</p>
+
+<pre class="file" data-file="centavos.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(std::string nome, int preco)
+        : nome_(nome), centavos_(preco * 100) {
+    }
+
+    int preco() { return centavos_ / 100; }
+
+    void aplicarDesconto(int porcento) {
+        centavos_ = centavos_ * (100 - porcento) / 100;
+    }
+
+    int centavos() { return centavos_; }
+
+private:
+    std::string nome_;
+    int centavos_;      // antes era: int preco_;
+};
+
+int main() {
+    Produto caneta{"caneta", 3};
+    std::cout &lt;&lt; "Preço: R$ " &lt;&lt; caneta.preco() &lt;&lt; "\n";
+    caneta.aplicarDesconto(10);
+    std::cout &lt;&lt; "Com desconto: " &lt;&lt; caneta.centavos() &lt;&lt; " centavos\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/encapsulamento">$ g++ -std=c++23 -Wall -Wextra centavos.cpp -o centavos
+$ ./centavos
+Preço: R$ 3
+Com desconto: 270 centavos</pre>
+
+<p>Se o <code>preco</code> fosse público e espalhado por 30 arquivos, a troca para centavos exigiria caçar e corrigir cada <code>caneta.preco</code> do projeto. Com o atributo privado, a mudança ficou dentro da classe. Essa é a ideia de <strong>abstração</strong>: quem usa a classe depende do <em>que</em> ela faz (os métodos públicos), não de <em>como</em> ela guarda as coisas.</p>
+
+<h3>Motivo 3: fica fácil achar quem mexeu</h3>
+<p>Se o estoque da caneta aparecer errado, onde procurar? Com o atributo privado, só os métodos <code>repor</code> e <code>vender</code> mexem nele: basta olhar dois métodos (ou pôr um ponto de parada neles no <a href="depuracao-gdb.html">GDB</a>). Com o atributo público, o culpado pode estar em qualquer linha do programa.</p>
+
+<hr>
+
+<h2>5. <code>protected</code> (para a herança)</h2>
+<p><code>protected</code> ("protegido") fica no meio do caminho: para o mundo de fora, funciona como <code>private</code>; mas as classes que <strong>herdam</strong> da classe também podem usar. Herança é assunto da aula <a href="heranca.html">Herança</a>; aqui vai só um exemplo para você ver a diferença. A classe <code>Livro</code> é "filha" de <code>Produto</code>:</p>
+
+<pre class="file" data-file="protegido.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(std::string nome, int preco) : preco_(preco), nome_(nome) {
+    }
+
+protected:
+    int preco_;
+
+private:
+    std::string nome_;
+};
+
+class Livro : public Produto {
+public:
+    Livro(std::string nome, int preco) : Produto(nome, preco) {
+    }
+
+    void promocao() {
+        preco_ = preco_ - 5;    // pode: Livro é "filho" de Produto
+    }
+};
+
+int main() {
+    Livro romance{"romance", 40};
+    romance.promocao();
+    romance.preco_ = 0;         // não pode: main está fora da família
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/encapsulamento">$ g++ -std=c++23 -Wall -Wextra protegido.cpp -o protegido
+protegido.cpp: In function ‘int main()’:
+protegido.cpp:29:13: error: ‘int Produto::preco_’ is protected within this context
+   29 |     romance.preco_ = 0;         // não pode: main está fora da família
+      |             ^~~~~~
+protegido.cpp:10:9: note: declared protected here
+   10 |     int preco_;
+      |         ^~~~~~</pre>
+
+<p>O <code>promocao()</code>, dentro de <code>Livro</code>, pôde mexer em <code>preco_</code>: nenhum erro na linha 22. Já o <code>main</code> recebeu o mesmo tipo de erro do <code>private</code>, agora com <code>protected</code>. Se <code>preco_</code> fosse <code>private</code>, nem o <code>Livro</code> conseguiria.</p>
+
+<div class="warning"><strong>Use <code>protected</code> com moderação.</strong> Um atributo <code>protected</code> pode ser mexido por qualquer classe filha, inclusive as que outras pessoas escreverem no futuro, e aí as invariantes voltam a depender da boa vontade de muita gente. Na dúvida, deixe os atributos <code>private</code> e ofereça métodos <code>protected</code> para as filhas.</div>
+
+<hr>
+
+<h2>6. <code>private</code> vale por classe, não por objeto</h2>
+<p>Um detalhe que surpreende: um método de <code>Produto</code> pode mexer nos dados privados de <strong>outro</strong> objeto <code>Produto</code>. A proteção separa "código da classe" de "código de fora", não um objeto do outro.</p>
+
+<pre class="file" data-file="irmaos.cpp">class Produto {
+public:
+    Produto(std::string nome, int preco) : nome_(nome), preco_(preco) {
+    }
+
+    bool maisCaroQue(const Produto&amp; outro) {
+        return preco_ &gt; outro.preco_;
+    }
+
+private:
+    std::string nome_;
+    int preco_;
+};
+
+int main() {
+    Produto caderno{"caderno", 12};
+    Produto caneta{"caneta", 3};
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; caderno.maisCaroQue(caneta) &lt;&lt; "\n";
+    std::cout &lt;&lt; caneta.maisCaroQue(caderno) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/encapsulamento">$ g++ -std=c++23 -Wall -Wextra irmaos.cpp -o irmaos
+$ ./irmaos
+true
+false</pre>
+
+<p><code>outro.preco_</code> é privado, mas o código está dentro de um método de <code>Produto</code>, então pode. Faz sentido: quem escreveu a classe conhece as regras de todos os produtos. (<code>std::boolalpha</code> faz o <code>cout</code> mostrar <code>true</code>/<code>false</code> em vez de <code>1</code>/<code>0</code>; veja <a href="bool.html">bool</a>.)</p>
+
+<hr>
+
+<h2>Formas diferentes: qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Decisão</th><th>Opções</th><th>Recomendação</th></tr>
+<tr><td>Nome do getter</td><td><code>preco()</code> ou <code>getPreco()</code></td><td>Os dois são comuns; a biblioteca padrão usa o estilo <code>size()</code>, sem "get". Escolha um e use em todo o projeto.</td></tr>
+<tr><td>Nome do setter</td><td><code>setPreco(int)</code> ou um verbo da loja (<code>mudarPreco</code>, <code>vender</code>, <code>repor</code>)</td><td>Prefira <strong>ações com sentido</strong>. <code>setEstoque(qualquer número)</code> é quase um atributo público com outro nome.</td></tr>
+<tr><td>Nome dos atributos privados</td><td><code>preco_</code>, <code>m_preco</code> ou só <code>preco</code></td><td>Um sinal (<code>_</code> ou <code>m_</code>) evita o conflito com o getter. Sem sinal, use <a href="this.html"><code>this-&gt;</code></a> quando houver ambiguidade.</td></tr>
+<tr><td>Valor inválido num setter</td><td>Devolver <code>false</code>, ignorar, ou lançar exceção</td><td><code>false</code> quando o erro é esperado e quem chama pode reagir; exceção quando o valor errado é um defeito do programa. Ignorar em silêncio, nunca.</td></tr>
+<tr><td>Valor inválido no construtor</td><td>Corrigir para um valor seguro ou lançar exceção</td><td>Exceção, se um objeto "corrigido" puder enganar alguém.</td></tr>
+<tr><td>Getter e setter para tudo?</td><td>—</td><td>Não. Getter só para o que alguém precisa ler; setter só se a mudança fizer sentido. Sem regra nenhuma? Talvez seja uma <code>struct</code>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2 id="errado">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Mexer num atributo privado de fora da classe</strong>
+<p>É o erro da seção 1: <code>error: ‘int Produto::preco_’ is private within this context</code>, com a nota <code>declared private here</code>. <strong>Como resolver:</strong> não "conserte" tornando o atributo público. Use o método que a classe oferece (<code>caneta.preco()</code> para ler, <code>caneta.mudarPreco(4)</code> para mudar). Se não existe método para o que você quer, pergunte-se se a classe <em>deveria</em> deixar fazer isso; se sim, escreva o método, com as regras.</p>
+</div>
+
+<div class="cenario">
+<strong>O construtor ficou privado</strong>
+<pre class="file" data-file="construtorprivado.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+    Produto(std::string nome, int preco) : nome_(nome), preco_(preco) {
+    }
+
+public:
+    int preco() { return preco_; }
+
+private:
+    std::string nome_;
+    int preco_;
+};
+
+int main() {
+    Produto caneta{"caneta", 3};
+    std::cout &lt;&lt; caneta.preco() &lt;&lt; "\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/encapsulamento">$ g++ -std=c++23 -Wall -Wextra construtorprivado.cpp -o construtorprivado
+construtorprivado.cpp: In function ‘int main()’:
+construtorprivado.cpp:17:31: error: ‘Produto::Produto(std::string, int)’ is private within this context
+   17 |     Produto caneta{"caneta", 3};
+      |                               ^
+construtorprivado.cpp:5:5: note: declared private here
+    5 |     Produto(std::string nome, int preco) : nome_(nome), preco_(preco) {
+      |     ^~~~~~~</pre>
+<p><strong>O que aconteceu:</strong> o construtor foi escrito antes do <code>public:</code>, e numa <code>class</code> o começo é privado. Ninguém de fora consegue criar um produto. É o mesmo erro, agora apontando para o construtor. O Clang diz <code>calling a private constructor of class 'Produto'</code>.</p>
+<p><strong>Como resolver:</strong> comece a classe com <code>public:</code> e ponha os construtores logo abaixo. (Construtor privado de propósito existe, em técnicas avançadas, mas não é o que você quer agora.)</p>
+</div>
+
+<div class="cenario">
+<strong>A exceção do construtor que ninguém capturou</strong>
+<pre class="file" data-file="semcatch.cpp">int main() {
+    Produto errado{"lápis", -1};
+    std::cout &lt;&lt; "Esta linha não aparece\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/encapsulamento">$ ./semcatch
+terminate called after throwing an instance of 'std::invalid_argument'
+  what():  preço negativo: -1
+Abortado                   (imagem do núcleo gravada) ./semcatch
+$ echo $?
+134</pre>
+<p><strong>O que aconteceu:</strong> a classe é a mesma de <code>excecao.cpp</code>, mas o <code>main</code> não tem <code>try</code>/<code>catch</code>. A exceção subiu até o fim, e o C++ chamou <code>std::terminate</code>: "terminate foi chamado depois de lançar um <code>std::invalid_argument</code>", seguido da mensagem (<code>what()</code>). O Bash avisa que o programa foi abortado, e o código de saída 134 (128 + 6, o sinal de abortar) confirma. A validação funcionou, nenhum produto inválido existiu, mas o programa inteiro parou.</p>
+<p><strong>Como resolver:</strong> capture a exceção onde der para reagir (pedir outro preço, pular o produto), como em <code>excecao.cpp</code>. Veja <a href="excecoes.html">Exceções</a>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>public:</code></td><td>O que vem depois pode ser usado por qualquer código.</td></tr>
+<tr><td><code>private:</code></td><td>Só os métodos da própria classe usam. É o padrão numa <code>class</code>.</td></tr>
+<tr><td><code>protected:</code></td><td>A própria classe e as classes filhas usam; de fora, é como <code>private</code>.</td></tr>
+<tr><td><code>int preco() { return preco_; }</code></td><td>Getter: devolve um dado privado.</td></tr>
+<tr><td><code>bool mudarPreco(int n) { if (n &lt; 0) return false; preco_ = n; return true; }</code></td><td>Setter com validação.</td></tr>
+<tr><td><code>throw std::invalid_argument("…");</code></td><td>Recusa um valor inválido no construtor (<code>&lt;stdexcept&gt;</code>).</td></tr>
+<tr><td><code>is private within this context</code></td><td>Erro: código de fora tentou usar um membro privado.</td></tr>
+<tr><td><code>is protected within this context</code></td><td>Erro: código de fora da família tentou usar um membro protegido.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A gaveta</h3>
+<p>Complete o especificador que esconde os atributos do resto do programa:</p>
+<div class="ex-code"><input data-answer="private:|private" aria-label="especificador"><br>&nbsp;&nbsp;&nbsp;&nbsp;int saldo_;</div>
+</div>
+
+<div class="exercise">
+<h3>2. O getter</h3>
+<p>Complete o getter que devolve o atributo privado <code>saldo_</code>:</p>
+<div class="ex-code">int saldo() { <input data-answer="return saldo_;|return saldo_" aria-label="corpo"> }</div>
+</div>
+
+<div class="exercise">
+<h3>3. A regra</h3>
+<p>No setter <code>bool mudarPreco(int novo)</code>, complete a condição que recusa preço negativo:</p>
+<div class="ex-code">if (<input data-answer="novo &lt; 0|novo&lt;0|0 &gt; novo|0&gt;novo" aria-label="condição">) return false;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Quem pode ler um atributo <code>private</code> da classe <code>Produto</code>?</p>
+<label><input type="radio" name="q4"> Só o <code>main</code></label>
+<label><input type="radio" name="q4"> Só os métodos da classe <code>Produto</code> (inclusive sobre outros objetos <code>Produto</code>)</label>
+<label><input type="radio" name="q4"> Qualquer função do mesmo arquivo</label>
+<label><input type="radio" name="q4"> Ninguém, nem os métodos</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. O que é uma invariante?</p>
+<label><input type="radio" name="q5"> Uma variável que nunca muda de valor</label>
+<label><input type="radio" name="q5"> Um atributo <code>const</code></label>
+<label><input type="radio" name="q5"> Um método que não muda o objeto</label>
+<label><input type="radio" name="q5"> Uma regra sobre os dados que vale o tempo todo, como "estoque nunca negativo"</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. A Ana trocou o atributo privado <code>preco_</code> por <code>centavos_</code> e ajustou os métodos. O que acontece com o código fora da classe que usava <code>caneta.preco()</code>?</p>
+<label><input type="radio" name="q6"> Nada: continua funcionando, porque só usava o método público</label>
+<label><input type="radio" name="q6"> Para de compilar</label>
+<label><input type="radio" name="q6"> Passa a mostrar centavos</label>
+<label><input type="radio" name="q6"> Precisa trocar para <code>caneta.centavos_</code></label>
+</div>
+
+<h3>Missão final: o caixa da lojinha</h3>
+
+<div class="trycpp" data-goal="out:Depósito recusado: -50,out:Saque recusado: 500,out:Saldo: R$ 70,src:private\s*:,src:saldo_">
+<p class="try-task"><strong>Missão:</strong> escreva a classe <code>Caixa</code> com o atributo <strong>privado</strong> <code>saldo_</code> (começa em 0) e três métodos públicos: <code>depositar(int valor)</code>, que recusa valores ≤ 0 mostrando <code>Depósito recusado: VALOR</code>; <code>sacar(int valor)</code>, que recusa valores ≤ 0 ou maiores que o saldo mostrando <code>Saque recusado: VALOR</code>; e o getter <code>saldo()</code>. Com o <code>main</code> pronto, a saída deve ser:</p>
+<pre class="out">Depósito recusado: -50
+Saque recusado: 500
+Saldo: R$ 70</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+class Caixa {
+    // escreva a classe aqui
+};
+
+int main() {
+    Caixa caixa;
+    caixa.depositar(100);
+    caixa.depositar(-50);
+    caixa.sacar(500);
+    caixa.sacar(30);
+    std::cout &lt;&lt; "Saldo: R$ " &lt;&lt; caixa.saldo() &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+class Caixa {
+public:
+    bool depositar(int valor) {
+        if (valor &lt;= 0) {
+            std::cout &lt;&lt; "Depósito recusado: " &lt;&lt; valor &lt;&lt; "\n";
+            return false;
+        }
+        saldo_ += valor;
+        return true;
+    }
+
+    bool sacar(int valor) {
+        if (valor &lt;= 0 || valor &gt; saldo_) {
+            std::cout &lt;&lt; "Saque recusado: " &lt;&lt; valor &lt;&lt; "\n";
+            return false;
+        }
+        saldo_ -= valor;
+        return true;
+    }
+
+    int saldo() { return saldo_; }
+
+private:
+    int saldo_ = 0;
+};
+
+int main() {
+    Caixa caixa;
+    caixa.depositar(100);
+    caixa.depositar(-50);
+    caixa.sacar(500);
+    caixa.sacar(30);
+    std::cout &lt;&lt; "Saldo: R$ " &lt;&lt; caixa.saldo() &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>Encapsulamento</strong>: os dados ficam <code>private</code>; o resto do programa usa os métodos <code>public</code>. Tentar mexer de fora dá <code>is private within this context</code>.</li>
+  <li><strong>Getters</strong> leem (<code>int preco()</code>); <strong>setters</strong> mudam conferindo as regras (<code>bool mudarPreco(int)</code>). Prefira ações com sentido (<code>vender</code>, <code>repor</code>) a setters genéricos, e não crie getter e setter para tudo.</li>
+  <li><strong>Invariantes</strong> são as regras que valem sempre ("preço ≥ 0"). O construtor as estabelece; cada método público as preserva. Só funciona porque os dados são privados.</li>
+  <li>Construtor não devolve <code>false</code>: corrija para um valor seguro ou lance <code>std::invalid_argument</code>.</li>
+  <li>Dados escondidos permitem mudar o "por dentro" (reais → centavos) sem quebrar quem usa a classe, e deixam fácil achar quem mexeu.</li>
+  <li><code>protected</code>: como <code>private</code>, mas as classes filhas também acessam. Use com moderação.</li>
+  <li>Próxima aula: o que acontece quando o parâmetro tem o mesmo nome do atributo, e como encadear chamadas, em <a href="this.html">this</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

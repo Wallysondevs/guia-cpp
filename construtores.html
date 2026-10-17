@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Construtores — lista de inicialização, construtor padrão e explicit | Guia C++</title>
+<meta name="description" content="Construtores em C++ para iniciantes: o que são, construtor com parâmetros, lista de inicialização e por que preferi-la, o construtor padrão e quando ele some (no matching function for call to), vários construtores, = default, explicit e valores iniciais na declaração, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Construtores</span></h1>
+
+<p class="intro">Até aqui, a lojinha da Ana criava produtos de dois jeitos: <code>Produto p;</code>, que deixava lixo nos números, ou <code>Produto p{"caneta", 3, 50};</code>, que só funcionava porque a classe era simples e toda pública. Nesta aula, a classe passa a decidir <strong>como</strong> um produto nasce. Quem faz isso é o <strong>construtor</strong>: uma função especial que o C++ chama sozinho no momento em que o objeto é criado.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um construtor e quando ele roda.</li>
+  <li>Construtores com parâmetros e as três formas de chamá-los.</li>
+  <li>A lista de inicialização (<code>: nome(n), preco(p)</code>) e por que preferi-la.</li>
+  <li>O construtor padrão, e por que ele <strong>some</strong> quando você escreve outro (o erro <code>no matching function for call to</code>).</li>
+  <li>Como ter vários construtores, e o que fazem <code>= default</code> e os valores iniciais na declaração.</li>
+  <li>A ideia do <code>explicit</code>.</li>
+</ul>
+</div>
+
+<p>Os programas desta aula foram compilados e executados na máquina fictícia da Ana, na pasta <code>~/cpp/construtores</code>, com o <strong>g++ 15.2</strong> e o comando padrão <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: a ficha já sai preenchida</h2>
+<p>Imagine que a Ana tem um carimbo na lojinha. Toda ficha nova passa pelo carimbo assim que é tirada do bloco, e o carimbo já escreve "sem nome, R$ 0, estoque 0". Não existe ficha com campo em branco: ou ela sai carimbada, ou alguém preenche na hora, no balcão. Nunca fica uma ficha "pela metade" na gaveta.</p>
+<p>O construtor é o carimbo. Ele roda <strong>uma vez</strong>, <strong>automaticamente</strong>, no nascimento de cada objeto, e deixa o objeto pronto para uso. Você não chama o construtor como um método comum: criar o objeto <em>é</em> chamar o construtor.</p>
+
+<hr>
+
+<h2>1. O primeiro construtor</h2>
+
+<pre class="file" data-file="nasce.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    Produto() {
+        nome = "sem nome";
+        preco = 0;
+        estoque = 0;
+        std::cout &lt;&lt; "Nasceu um produto!\n";
+    }
+
+    void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; " (" &lt;&lt; estoque &lt;&lt; " no estoque)\n";
+    }
+};
+
+int main() {
+    std::cout &lt;&lt; "Início do main\n";
+    Produto a;
+    Produto b;
+    a.mostrar();
+    b.nome = "borracha";
+    b.mostrar();
+    std::cout &lt;&lt; "Fim do main\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/construtores">$ g++ -std=c++23 -Wall -Wextra nasce.cpp -o nasce
+$ ./nasce
+Início do main
+Nasceu um produto!          « Produto a;
+Nasceu um produto!          « Produto b;
+sem nome: R$ 0 (0 no estoque)
+borracha: R$ 0 (0 no estoque)
+Fim do main</pre>
+
+<dl class="anatomy">
+  <dt>Produto()</dt><dd>O construtor. Duas regras o diferenciam de um método: ele tem <strong>o mesmo nome da classe</strong> e <strong>não tem tipo de retorno</strong>, nem <code>void</code>.</dd>
+  <dt>nome = "sem nome"; preco = 0; estoque = 0;</dt><dd>O corpo deixa o objeto num estado válido. Acabou o lixo: a borracha agora nasce com R$ 0, e não com um número qualquer como na aula <a href="classes-objetos.html">Classes e Objetos</a>.</dd>
+  <dt>Produto a;</dt><dd>Criar o objeto <strong>chama</strong> o construtor. A mensagem "Nasceu um produto!" apareceu duas vezes, uma para cada objeto, exatamente na linha em que cada um foi criado.</dd>
+</dl>
+
+<p>Um construtor sem parâmetros, como este, se chama <strong>construtor padrão</strong> (<em>default constructor</em>): é o que roda quando você cria o objeto sem dar nenhum valor. A mensagem na tela foi só para você ver o momento em que ele roda; construtores de verdade normalmente não escrevem nada.</p>
+
+<hr>
+
+<h2>2. Construtor com parâmetros</h2>
+<p>"Sem nome, R$ 0" é melhor que lixo, mas a Ana quer cadastrar a caneta já com nome, preço e estoque. Um construtor pode receber parâmetros, como qualquer função:</p>
+
+<pre class="file" data-file="parametros.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    Produto(std::string n, int p, int e) {
+        nome = n;
+        preco = p;
+        estoque = e;
+    }
+
+    void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; " (" &lt;&lt; estoque &lt;&lt; " no estoque)\n";
+    }
+};
+
+int main() {
+    Produto caneta("caneta", 3, 50);
+    Produto caderno{"caderno", 12, 8};
+    Produto regua = {"régua", 5, 20};
+
+    caneta.mostrar();
+    caderno.mostrar();
+    regua.mostrar();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/construtores">$ g++ -std=c++23 -Wall -Wextra parametros.cpp -o parametros
+$ ./parametros
+caneta: R$ 3 (50 no estoque)
+caderno: R$ 12 (8 no estoque)
+régua: R$ 5 (20 no estoque)</pre>
+
+<dl class="anatomy">
+  <dt>Produto(std::string n, int p, int e)</dt><dd>Construtor com três parâmetros. Os nomes curtos <code>n</code>, <code>p</code>, <code>e</code> evitam confusão com os atributos <code>nome</code>, <code>preco</code>, <code>estoque</code>. (Usar os mesmos nomes é possível, e a aula <a href="this.html">this</a> mostra como.)</dd>
+  <dt>Produto caneta("caneta", 3, 50);</dt><dd>Forma com <strong>parênteses</strong>: os valores vão para o construtor, na ordem dos parâmetros.</dd>
+  <dt>Produto caderno{"caderno", 12, 8};</dt><dd>Forma com <strong>chaves</strong>. Parece a da aula passada, mas agora quem recebe os valores é o construtor, não os atributos direto.</dd>
+  <dt>Produto regua = {"régua", 5, 20};</dt><dd>Forma com <strong>igual e chaves</strong>. Também chama o construtor.</dd>
+</dl>
+
+<div class="tip"><strong>Qual forma usar?</strong> As três funcionam aqui. O C++ moderno prefere as <strong>chaves</strong> (<code>Produto caderno{"caderno", 12, 8};</code>): elas servem para tudo, recusam conversões que perdem informação (como pôr <code>3.9</code> num <code>int</code>; veja <a href="conversao-tipos.html">Conversão de Tipos</a>) e evitam a armadilha dos parênteses vazios, que você vai ver em <a href="#errado">Quando dá errado</a>.</div>
+
+<hr>
+
+<h2>3. A lista de inicialização</h2>
+<p>O construtor acima funciona, mas faz as coisas em duas etapas. Antes de entrar nas chaves do construtor, o C++ <strong>já criou</strong> todos os atributos (o <code>nome</code> nasceu como string vazia; os <code>int</code>, com lixo). Só então o corpo roda e <strong>troca</strong> os valores. É como tirar a ficha do bloco, carimbar "sem nome" e depois apagar e escrever "caneta".</p>
+<p>A <strong>lista de inicialização</strong> cria cada atributo já com o valor certo, de uma vez:</p>
+
+<pre class="file" data-file="lista.cpp">class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    Produto(std::string n, int p, int e) : nome(n), preco(p), estoque(e) {
+    }
+
+    void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; " (" &lt;&lt; estoque &lt;&lt; " no estoque)\n";
+    }
+};
+</pre>
+
+<pre class="term" data-cwd="~/cpp/construtores">$ g++ -std=c++23 -Wall -Wextra lista.cpp -o lista
+$ ./lista
+caneta: R$ 3 (50 no estoque)</pre>
+
+<dl class="anatomy">
+  <dt>:</dt><dd>Os dois-pontos depois dos parênteses abrem a lista de inicialização.</dd>
+  <dt>nome(n)</dt><dd>"Crie o atributo <code>nome</code> com o valor de <code>n</code>." Os itens são separados por vírgula. Também vale com chaves: <code>nome{n}</code>.</dd>
+  <dt>{ }</dt><dd>O corpo continua obrigatório, mesmo vazio. Ele roda <em>depois</em> da lista; use-o para o que não é só guardar valores (conferir regras, mostrar algo).</dd>
+</dl>
+
+<h3>Por que preferir a lista</h3>
+<ol>
+  <li><strong>Faz uma vez só.</strong> Cada atributo nasce com o valor certo, em vez de nascer vazio e ser trocado depois. Para um <code>int</code>, a diferença é pequena; para uma string longa ou um vetor, é trabalho jogado fora.</li>
+  <li><strong>Algumas coisas só funcionam com ela.</strong> Um atributo <code>const</code> (um código de produto que nunca muda, por exemplo) não pode receber valor depois de criado. Veja o que acontece se você tentar no corpo:</li>
+</ol>
+
+<pre class="file" data-file="constante.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    const int codigo;
+    std::string nome;
+
+    Produto(int c, std::string n) {
+        codigo = c;
+        nome = n;
+    }
+};
+
+int main() {
+    Produto caneta{101, "caneta"};
+    std::cout &lt;&lt; caneta.codigo &lt;&lt; " " &lt;&lt; caneta.nome &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/construtores">$ g++ -std=c++23 -Wall -Wextra constante.cpp -o constante
+constante.cpp: In constructor ‘Produto::Produto(int, std::string)’:
+constante.cpp:9:5: error: uninitialized const member in ‘const int’ [-fpermissive]
+    9 |     Produto(int c, std::string n) {
+      |     ^~~~~~~
+constante.cpp:6:15: note: ‘const int Produto::codigo’ should be initialized
+    6 |     const int codigo;
+      |               ^~~~~~
+constante.cpp:10:16: error: assignment of read-only member ‘Produto::codigo’
+   10 |         codigo = c;
+      |         ~~~~~~~^~~</pre>
+
+<p>Dois erros que contam a história das "duas etapas": o primeiro diz que o membro <code>const</code> ficou sem valor na hora de nascer (<code>should be initialized</code>, "deveria ser inicializado"); o segundo, que a linha 10 tentou <strong>atribuir</strong> a um membro só de leitura (<code>read-only</code>). Com a lista de inicialização, o código nasce com o valor e pronto:</p>
+
+<pre class="file" data-file="constante2.cpp">    Produto(int c, std::string n) : codigo(c), nome(n) {
+    }
+</pre>
+
+<pre class="term" data-cwd="~/cpp/construtores">$ g++ -std=c++23 -Wall -Wextra constante2.cpp -o constante2
+$ ./constante2
+101 caneta</pre>
+
+<p>O mesmo vale para atributos que são <a href="referencias.html">referências</a> e para atributos de classes que não têm construtor padrão: só a lista consegue criá-los.</p>
+
+<div class="warning"><strong>A ordem que vale é a da declaração, não a da lista.</strong> Os atributos são criados sempre na ordem em que aparecem na classe, não importa como você escreveu a lista. Se a lista estiver em outra ordem, o <code>-Wall</code> avisa (<code>-Wreorder</code>). E, se um item usa outro, o resultado pode ser lixo:</div>
+
+<pre class="file" data-file="ordem.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    int preco;
+    int estoque;
+
+    Produto(int e) : estoque(e), preco(estoque * 2) {
+    }
+};
+
+int main() {
+    Produto x{10};
+    std::cout &lt;&lt; "estoque " &lt;&lt; x.estoque &lt;&lt; ", preço " &lt;&lt; x.preco &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/construtores">$ g++ -std=c++23 -Wall -Wextra ordem.cpp -o ordem
+ordem.cpp: In constructor ‘Produto::Produto(int)’:
+ordem.cpp:7:9: warning: ‘Produto::estoque’ will be initialized after [-Wreorder]
+    7 |     int estoque;
+      |         ^~~~~~~
+ordem.cpp:6:9: warning:   ‘int Produto::preco’ [-Wreorder]
+    6 |     int preco;
+      |         ^~~~~
+ordem.cpp:9:5: warning:   when initialized here [-Wreorder]
+    9 |     Produto(int e) : estoque(e), preco(estoque * 2) {
+      |     ^~~~~~~
+ordem.cpp:9:40: warning: member ‘Produto::estoque’ is used uninitialized [-Wuninitialized]
+    9 |     Produto(int e) : estoque(e), preco(estoque * 2) {
+      |                                        ^~~~~~~
+ordem.cpp: In constructor ‘Produto::Produto(int)’:
+ordem.cpp:9:40: warning: ‘*this.Produto::estoque’ is used uninitialized [-Wuninitialized]
+    9 |     Produto(int e) : estoque(e), preco(estoque * 2) {
+      |                                        ^~~~~~~
+$ ./ordem
+estoque 10, preço 0          « deveria ser 20</pre>
+
+<p>Os três primeiros avisos formam uma frase só: "<code>estoque</code> será inicializado depois de <code>preco</code>, quando inicializado aqui". Como <code>preco</code> vem primeiro na classe, ele foi criado primeiro, usando um <code>estoque</code> que ainda não existia (os avisos <code>is used uninitialized</code>). O "0" da saída é lixo que, desta vez, deu zero. <strong>Regra prática:</strong> escreva a lista sempre na mesma ordem da declaração, e não leve avisos na brincadeira.</p>
+
+<hr>
+
+<h2>4. O construtor padrão e quando ele some</h2>
+<p>Se você <strong>não escreve nenhum</strong> construtor, o C++ cria um construtor padrão invisível, que não faz quase nada (por isso <code>Produto p;</code> funcionava nas aulas anteriores, com lixo nos <code>int</code>). Mas, <strong>assim que você escreve qualquer construtor</strong>, o C++ entende que a classe agora tem regras de nascimento, e deixa de criar o padrão. Veja:</p>
+
+<pre class="file" data-file="sumiu.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    Produto(std::string n, int p, int e) : nome(n), preco(p), estoque(e) {
+    }
+};
+
+int main() {
+    Produto caneta{"caneta", 3, 50};
+    Produto vazio;
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/construtores">$ g++ -std=c++23 -Wall -Wextra sumiu.cpp -o sumiu
+sumiu.cpp: In function ‘int main()’:
+sumiu.cpp:16:13: error: no matching function for call to ‘Produto::Produto()’
+   16 |     Produto vazio;
+      |             ^~~~~
+sumiu.cpp:16:13: note: there are 3 candidates
+sumiu.cpp:10:5: note: candidate 1: ‘Produto::Produto(std::string, int, int)’
+   10 |     Produto(std::string n, int p, int e) : nome(n), preco(p), estoque(e) {
+      |     ^~~~~~~
+sumiu.cpp:10:5: note: candidate expects 3 arguments, 0 provided
+sumiu.cpp:4:7: note: candidate 2: ‘constexpr Produto::Produto(const Produto&amp;)’
+    4 | class Produto {
+      |       ^~~~~~~
+sumiu.cpp:4:7: note: candidate expects 1 argument, 0 provided
+sumiu.cpp:4:7: note: candidate 3: ‘constexpr Produto::Produto(Produto&amp;&amp;)’
+sumiu.cpp:4:7: note: candidate expects 1 argument, 0 provided</pre>
+
+<p>Leia a mensagem por partes:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>Significado</th></tr>
+<tr><td><code>no matching function for call to ‘Produto::Produto()’</code></td><td>"Nenhuma função serve para a chamada <code>Produto::Produto()</code>": você pediu um construtor sem argumentos, e ele não existe.</td></tr>
+<tr><td><code>there are 3 candidates</code></td><td>"Há 3 candidatos": os construtores que existem. O g++ lista cada um e diz por que não serve.</td></tr>
+<tr><td><code>candidate 1: ‘Produto::Produto(std::string, int, int)’</code> … <code>expects 3 arguments, 0 provided</code></td><td>O seu construtor: espera 3 argumentos, e você deu 0.</td></tr>
+<tr><td><code>candidate 2</code> e <code>candidate 3</code></td><td>Construtores de <strong>cópia</strong> (<code>const Produto&amp;</code>) e de <strong>movimento</strong> (<code>Produto&amp;&amp;</code>), que o C++ cria sozinho para toda classe. Eles servem para criar um produto a partir de outro (aula <a href="copia-movimento.html">Cópia e Movimento</a>) e também precisam de 1 argumento.</td></tr>
+</table>
+</div>
+
+<p>No editor do guia, o Clang resume tudo em <code>no matching constructor for initialization of 'Produto'</code> ("nenhum construtor serve para inicializar <code>Produto</code>"), seguido das notas com os candidatos.</p>
+
+<p>Isso não é um defeito: é proteção. Se a classe diz "todo produto nasce com nome, preço e estoque", um produto sem nada <strong>não deveria</strong> existir. Mas, se você quer permitir os dois jeitos, precisa escrever os dois construtores, como na próxima seção.</p>
+
+<div class="note"><strong>Onde mais esse erro aparece.</strong> Tudo que cria produtos "vazios" precisa do construtor padrão: <code>Produto p;</code>, <code>Produto p{};</code>, <code>std::vector&lt;Produto&gt; v(10);</code> (dez produtos vazios) e <code>std::array&lt;Produto, 3&gt; a;</code>. Se o construtor padrão sumiu, todas essas linhas dão o mesmo erro.</div>
+
+<hr>
+
+<h2>5. Vários construtores</h2>
+<p>Uma classe pode ter quantos construtores quiser, desde que os parâmetros sejam diferentes: é a mesma regra da <a href="sobrecarga.html">sobrecarga de funções</a>. O C++ escolhe o construtor pelos argumentos que você passa:</p>
+
+<pre class="file" data-file="varios.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    Produto() : nome("sem nome"), preco(0), estoque(0) {
+    }
+
+    Produto(std::string n, int p) : nome(n), preco(p), estoque(0) {
+    }
+
+    Produto(std::string n, int p, int e) : nome(n), preco(p), estoque(e) {
+    }
+
+    void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; " (" &lt;&lt; estoque &lt;&lt; " no estoque)\n";
+    }
+};
+
+int main() {
+    Produto a;
+    Produto b{"apontador", 2};
+    Produto c{"caneta", 3, 50};
+    a.mostrar();
+    b.mostrar();
+    c.mostrar();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/construtores">$ g++ -std=c++23 -Wall -Wextra varios.cpp -o varios
+$ ./varios
+sem nome: R$ 0 (0 no estoque)
+apontador: R$ 2 (0 no estoque)
+caneta: R$ 3 (50 no estoque)</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Criação</th><th>Construtor escolhido</th></tr>
+<tr><td><code>Produto a;</code></td><td><code>Produto()</code>, o padrão</td></tr>
+<tr><td><code>Produto b{"apontador", 2};</code></td><td><code>Produto(std::string, int)</code>: produto que ainda não chegou ao estoque</td></tr>
+<tr><td><code>Produto c{"caneta", 3, 50};</code></td><td><code>Produto(std::string, int, int)</code></td></tr>
+</table>
+</div>
+
+<p>Funciona, mas repare na repetição: "<code>estoque(0)</code>" aparece em dois construtores, "<code>preco(0)</code>" em outro. Se um dia o estoque inicial mudar, você precisa lembrar de mudar em vários lugares. A próxima seção resolve isso.</p>
+
+<div class="tip"><strong>Outras formas de evitar repetição.</strong> Um construtor pode <strong>chamar outro</strong> na lista de inicialização: <code>Produto(std::string n, int p) : Produto(n, p, 0) {}</code> (o "construtor delegante", desde o C++11). E parâmetros com <a href="valor-padrao.html">valor padrão</a> também valem em construtores: <code>Produto(std::string n, int p, int e = 0)</code> serve para 2 ou 3 argumentos.</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> apague o primeiro construtor, <code>Produto()</code>, e rode: qual linha do <code>main</code> deixa de compilar? Depois coloque-o de volta e acrescente um quarto produto, <code>Produto d{"cola", 6, 15};</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    Produto() : nome("sem nome"), preco(0), estoque(0) {
+    }
+
+    Produto(std::string n, int p) : nome(n), preco(p), estoque(0) {
+    }
+
+    Produto(std::string n, int p, int e) : nome(n), preco(p), estoque(e) {
+    }
+
+    void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; " (" &lt;&lt; estoque &lt;&lt; " no estoque)\n";
+    }
+};
+
+int main() {
+    Produto a;
+    Produto b{"apontador", 2};
+    Produto c{"caneta", 3, 50};
+    a.mostrar();
+    b.mostrar();
+    c.mostrar();
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>6. Valores iniciais na declaração e <code>= default</code></h2>
+<p>Desde o C++11, cada atributo pode ter um valor inicial escrito <strong>na própria declaração</strong>. Ele vale para todo construtor que não disser outra coisa na lista de inicialização:</p>
+
+<pre class="file" data-file="padrao.cpp">class Produto {
+public:
+    std::string nome = "sem nome";
+    int preco = 0;
+    int estoque = 0;
+
+    Produto() = default;
+
+    Produto(std::string n, int p) : nome(n), preco(p) {
+    }
+
+    Produto(std::string n, int p, int e) : nome(n), preco(p), estoque(e) {
+    }
+
+    void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; " (" &lt;&lt; estoque &lt;&lt; " no estoque)\n";
+    }
+};
+</pre>
+
+<pre class="term" data-cwd="~/cpp/construtores">$ g++ -std=c++23 -Wall -Wextra padrao.cpp -o padrao
+$ ./padrao
+sem nome: R$ 0 (0 no estoque)
+apontador: R$ 2 (0 no estoque)
+caneta: R$ 3 (50 no estoque)</pre>
+
+<p>Mesma saída da seção anterior, com menos repetição (o <code>main</code> é o mesmo):</p>
+
+<dl class="anatomy">
+  <dt>int estoque = 0;</dt><dd>Valor inicial na declaração (<em>default member initializer</em>). O construtor de 2 parâmetros não menciona <code>estoque</code> na lista, então ele nasce com 0. O de 3 parâmetros menciona, e aí vale o que a lista diz: o valor da lista sempre ganha.</dd>
+  <dt>Produto() = default;</dt><dd>"Quero o construtor padrão que o compilador sabe fazer." Ele <strong>traz de volta</strong> o construtor padrão que tinha sumido (seção 4). Como os atributos têm valores na declaração, o produto vazio nasce com "sem nome", 0 e 0, sem lixo.</dd>
+</dl>
+
+<div class="tip"><strong>Boa prática:</strong> dê um valor inicial a todo atributo de tipo simples (<code>int</code>, <code>double</code>, <code>bool</code>, ponteiro) direto na declaração. Assim, nenhum construtor, nem um que você escreva no futuro, deixa lixo para trás. Também vale chaves: <code>int preco{0};</code> ou só <code>int preco{};</code> (zero).</div>
+
+<p><code>= default</code> × escrever <code>Produto() {}</code> à mão: com valores na declaração, os dois dão o mesmo resultado. Prefira <code>= default</code>: deixa claro, para quem lê, que o construtor não faz nada de especial além do que as declarações já dizem.</p>
+
+<hr>
+
+<h2>7. <code>explicit</code> (só a ideia)</h2>
+<p>Um construtor que recebe <strong>um argumento só</strong> tem um efeito colateral: o C++ passa a usá-lo para <strong>converter</strong> sozinho. Veja um cupom de desconto da lojinha:</p>
+
+<pre class="file" data-file="cupom.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Cupom {
+public:
+    int percentual;
+
+    Cupom(int p) : percentual(p) {
+    }
+};
+
+void cobrar(int valor, Cupom c) {
+    int desconto = valor * c.percentual / 100;
+    std::cout &lt;&lt; "Total: R$ " &lt;&lt; valor - desconto &lt;&lt; "\n";
+}
+
+int main() {
+    cobrar(200, Cupom{10});
+    cobrar(200, 10);      // 10 o quê? reais? por cento?
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/construtores">$ g++ -std=c++23 -Wall -Wextra cupom.cpp -o cupom
+$ ./cupom
+Total: R$ 180
+Total: R$ 180</pre>
+
+<p>A segunda chamada passou um <code>int</code> onde se esperava um <code>Cupom</code>, e o C++ <strong>criou um cupom escondido</strong> com <code>Cupom(10)</code>. Funcionou, mas quem lê <code>cobrar(200, 10)</code> pode achar que são R$ 10 de desconto, e não 10%. Conversões silenciosas assim escondem erros.</p>
+
+<p>A palavra <code>explicit</code> na frente do construtor proíbe essa conversão automática. No arquivo <code>explicito.cpp</code>, só esta linha mudou em relação a <code>cupom.cpp</code>:</p>
+
+<pre class="file" data-file="explicito.cpp">    explicit Cupom(int p) : percentual(p) {
+    }
+</pre>
+
+<pre class="term" data-cwd="~/cpp/construtores">$ g++ -std=c++23 -Wall -Wextra explicito.cpp -o explicito
+explicito.cpp: In function ‘int main()’:
+explicito.cpp:19:17: error: could not convert ‘10’ from ‘int’ to ‘Cupom’
+   19 |     cobrar(200, 10);
+      |                 ^~
+      |                 |
+      |                 int</pre>
+
+<p>"Não foi possível converter <code>10</code> de <code>int</code> para <code>Cupom</code>": agora quem chama é obrigado a escrever <code>Cupom{10}</code>, e o código fica claro. <strong>Regra prática:</strong> marque com <code>explicit</code> todo construtor de um argumento só, a não ser que a conversão automática faça sentido de verdade (como de texto para <code>std::string</code>). Construtores de dois ou mais argumentos raramente precisam dele.</p>
+
+<hr>
+
+<h2>Formas de criar um objeto: qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Comentário</th></tr>
+<tr><td>Chaves</td><td><code>Produto c{"caneta", 3, 50};</code></td><td><strong>Recomendada.</strong> Funciona sempre e recusa conversões que perdem dados.</td></tr>
+<tr><td>Chaves vazias</td><td><code>Produto c{};</code></td><td>Usa o construtor padrão. Nunca confunde o compilador.</td></tr>
+<tr><td>Parênteses</td><td><code>Produto c("caneta", 3, 50);</code></td><td>Comum em código antigo. Funciona com argumentos; <strong>vazio, não</strong> (veja abaixo).</td></tr>
+<tr><td>Sem nada</td><td><code>Produto c;</code></td><td>Usa o construtor padrão. Seguro quando a classe dá valores iniciais a tudo.</td></tr>
+<tr><td>Igual + chaves</td><td><code>Produto c = {"caneta", 3, 50};</code></td><td>Funciona, mas não com construtores <code>explicit</code>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2 id="errado">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Parênteses vazios: o objeto que virou função</strong>
+<pre class="file" data-file="vexing.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome = "sem nome";
+    int preco = 0;
+    int estoque = 0;
+
+    void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; "\n";
+    }
+};
+
+int main() {
+    Produto p();
+    p.mostrar();
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/construtores">$ g++ -std=c++23 -Wall -Wextra vexing.cpp -o vexing
+vexing.cpp: In function ‘int main()’:
+vexing.cpp:16:14: warning: empty parentheses were disambiguated as a function declaration [-Wvexing-parse]
+   16 |     Produto p();
+      |              ^~
+vexing.cpp:16:14: note: remove parentheses to default-initialize a variable
+   16 |     Produto p();
+      |              ^~
+      |              --
+vexing.cpp:16:14: note: or replace parentheses with braces to aggregate-initialize a variable
+vexing.cpp:17:7: error: request for member ‘mostrar’ in ‘p’, which is of non-class type ‘Produto()’
+   17 |     p.mostrar();
+      |       ^~~~~~~</pre>
+<p><strong>O que aconteceu:</strong> <code>Produto p();</code> parece "crie <code>p</code> sem argumentos", mas, para o C++, é a <strong>declaração de uma função</strong> chamada <code>p</code>, que não recebe nada e devolve um <code>Produto</code> (igual a <code>int f();</code>). O aviso diz exatamente isso: "parênteses vazios foram interpretados como declaração de função". Essa armadilha é tão famosa que tem nome: <em>most vexing parse</em>, "a análise mais irritante". Por isso o erro da linha 17: <code>p</code> é do tipo <code>Produto()</code> (uma função), não uma classe, e não tem <code>mostrar</code>.</p>
+<p><strong>Como resolver:</strong> as próprias notas do g++ dão as duas saídas: tire os parênteses (<code>Produto p;</code>) ou troque por chaves (<code>Produto p{};</code>). É mais um motivo para preferir chaves.</p>
+</div>
+
+<div class="cenario">
+<strong>Construtor com tipo de retorno</strong>
+<pre class="file" data-file="retorno.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+
+    void Produto(std::string n, int p) : nome(n), preco(p) {
+    }
+};
+
+int main() {
+    Produto caneta{"caneta", 3};
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/construtores">$ g++ -std=c++23 -Wall -Wextra retorno.cpp -o retorno
+retorno.cpp:9:5: error: return type specification for constructor invalid
+    9 |     void Produto(std::string n, int p) : nome(n), preco(p) {
+      |     ^~~~
+retorno.cpp:9:10: error: bit-field ‘Produto::Produto(std::string, int)’ has non-integral type ‘void (Produto::)(std::string, int)’ {aka ‘void (Produto::)(std::__cxx11::basic_string&lt;char&gt;, int)’}
+    9 |     void Produto(std::string n, int p) : nome(n), preco(p) {
+      |          ^~~~~~~</pre>
+<p><strong>O que aconteceu:</strong> o primeiro erro é o que importa: "especificar tipo de retorno para construtor é inválido". Construtor não devolve nada, nem <code>void</code>. O segundo erro é o g++ se confundindo com o resto da linha (ele tentou ler os <code>:</code> como outra construção da linguagem, um <em>bit-field</em>); ignore-o, ele some quando você conserta o primeiro. Lembre da aula <a href="erros-compilacao.html">Lendo Erros do Compilador</a>: <strong>conserte sempre o primeiro erro primeiro</strong>. O Clang diz só <code>constructor cannot have a return type</code>.</p>
+<p><strong>Como resolver:</strong> apague o <code>void</code>: <code>Produto(std::string n, int p) : nome(n), preco(p) {}</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Criar sem argumentos depois de escrever um construtor</strong>
+<p>É o erro <code>no matching function for call to ‘Produto::Produto()’</code> da seção 4. <strong>Como resolver</strong>, conforme o que você quer: se um produto vazio faz sentido, acrescente <code>Produto() = default;</code> (e dê valores iniciais aos atributos); se não faz, o erro está certo, e quem precisa mudar é a linha que cria o objeto, passando os valores.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>Produto() { … }</code></td><td>Construtor padrão (sem parâmetros). Mesmo nome da classe, sem tipo de retorno.</td></tr>
+<tr><td><code>Produto(std::string n, int p) { … }</code></td><td>Construtor com parâmetros.</td></tr>
+<tr><td><code>: nome(n), preco(p)</code></td><td>Lista de inicialização: cria os atributos já com o valor. Use a ordem da declaração.</td></tr>
+<tr><td><code>int estoque = 0;</code></td><td>Valor inicial na declaração; vale quando a lista não diz outra coisa.</td></tr>
+<tr><td><code>Produto() = default;</code></td><td>Pede o construtor padrão do compilador (traz de volta o que sumiu).</td></tr>
+<tr><td><code>explicit Cupom(int p)</code></td><td>Proíbe a conversão automática de <code>int</code> para <code>Cupom</code>.</td></tr>
+<tr><td><code>Produto(std::string n, int p) : Produto(n, p, 0) {}</code></td><td>Construtor que delega para outro.</td></tr>
+<tr><td><code>Produto c{"caneta", 3, 50};</code></td><td>Cria o objeto chamando o construtor (forma recomendada).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A lista de inicialização</h3>
+<p>Complete o construtor de <code>class Cliente { std::string nome; int pontos; … };</code> usando lista de inicialização:</p>
+<div class="ex-code">Cliente(std::string n, int p) : <input data-answer="nome(n), pontos(p)|nome{n}, pontos{p}|nome(n),pontos(p)|nome{n},pontos{p}" aria-label="lista"> {}</div>
+</div>
+
+<div class="exercise">
+<h3>2. Trazer de volta</h3>
+<p>Complete para pedir ao compilador o construtor padrão:</p>
+<div class="ex-code">Cliente() = <input data-answer="default;|default" aria-label="palavra">  </div>
+</div>
+
+<div class="exercise">
+<h3>3. Sem conversão escondida</h3>
+<p>Que palavra se escreve antes de <code>Cupom(int p)</code> para proibir <code>cobrar(200, 10)</code>?</p>
+<div class="ex-code"><input data-answer="explicit" aria-label="palavra"> Cupom(int p) : percentual(p) {}</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. A classe tem só o construtor <code>Produto(std::string n, int p)</code>. O que acontece com <code>Produto x;</code>?</p>
+<label><input type="radio" name="q4"> Cria um produto com lixo nos números</label>
+<label><input type="radio" name="q4"> Cria um produto com nome vazio e preço 0</label>
+<label><input type="radio" name="q4"> Erro: <code>no matching function for call to ‘Produto::Produto()’</code></label>
+<label><input type="radio" name="q4"> Só um aviso</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Por que <code>Produto p();</code> não cria um produto?</p>
+<label><input type="radio" name="q5"> Porque o C++ lê a linha como a declaração de uma função <code>p</code> que devolve <code>Produto</code></label>
+<label><input type="radio" name="q5"> Porque falta o <code>new</code></label>
+<label><input type="radio" name="q5"> Porque os parênteses chamam o destrutor</label>
+<label><input type="radio" name="q5"> Cria sim, igual a <code>Produto p{};</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">6. Na classe, <code>preco</code> é declarado antes de <code>estoque</code>. A lista é <code>: estoque(e), preco(p)</code>. Em que ordem os atributos são criados?</p>
+<label><input type="radio" name="q6"> <code>estoque</code>, depois <code>preco</code>: vale a ordem da lista</label>
+<label><input type="radio" name="q6"> <code>preco</code>, depois <code>estoque</code>: vale a ordem da declaração (e o <code>-Wall</code> avisa)</label>
+<label><input type="radio" name="q6"> Ao mesmo tempo</label>
+<label><input type="radio" name="q6"> Dá erro de compilação</label>
+</div>
+
+<h3>Missão final: o construtor do Cliente</h3>
+
+<div class="trycpp" data-goal="out:Bia: 10 pontos,out:visitante: 0 pontos,src::\s*nome\s*[\(\{]\s*n\s*[\)\}],src:=\s*default">
+<p class="try-task"><strong>Missão:</strong> complete a classe <code>Cliente</code>. (1) Dê aos atributos os valores iniciais <code>"visitante"</code> e <code>0</code> na declaração. (2) Escreva o construtor padrão com <code>= default</code>. (3) Escreva o construtor <code>Cliente(std::string n, int p)</code> usando <strong>lista de inicialização</strong>. A saída deve ser:</p>
+<pre class="out">Bia: 10 pontos
+visitante: 0 pontos</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Cliente {
+public:
+    std::string nome;
+    int pontos;
+
+    // escreva os dois construtores aqui
+
+    void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; ": " &lt;&lt; pontos &lt;&lt; " pontos\n";
+    }
+};
+
+int main() {
+    Cliente bia{"Bia", 10};
+    Cliente alguem;
+    bia.mostrar();
+    alguem.mostrar();
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Cliente {
+public:
+    std::string nome = "visitante";
+    int pontos = 0;
+
+    Cliente() = default;
+
+    Cliente(std::string n, int p) : nome(n), pontos(p) {
+    }
+
+    void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; ": " &lt;&lt; pontos &lt;&lt; " pontos\n";
+    }
+};
+
+int main() {
+    Cliente bia{"Bia", 10};
+    Cliente alguem;
+    bia.mostrar();
+    alguem.mostrar();
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Construtor: função com o nome da classe, <strong>sem tipo de retorno</strong>, chamada automaticamente quando o objeto nasce.</li>
+  <li>Construtor padrão = sem parâmetros. O C++ cria um invisível só se você não escrever <strong>nenhum</strong> construtor; escreveu outro, ele some (<code>no matching function for call to ‘Produto::Produto()’</code>).</li>
+  <li>Prefira a <strong>lista de inicialização</strong> (<code>: nome(n), preco(p)</code>): cria cada atributo já com o valor e é obrigatória para membros <code>const</code> e referências. Escreva-a na ordem da declaração.</li>
+  <li>Vários construtores podem conviver, com parâmetros diferentes. Valores iniciais na declaração (<code>int estoque = 0;</code>) e <code>Produto() = default;</code> evitam repetição e lixo.</li>
+  <li><code>explicit</code> em construtores de um argumento evita conversões escondidas.</li>
+  <li>Crie objetos com chaves: <code>Produto p{};</code>. <code>Produto p();</code> declara uma função.</li>
+  <li>Próxima aula: proteger os dados para que ninguém crie um produto inválido depois do nascimento, em <a href="encapsulamento.html">public e private</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
