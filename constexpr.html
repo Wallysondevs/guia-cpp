@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ constexpr e consteval — calcular na compilação | Guia C++</title>
+<meta name="description" content="constexpr e consteval em C++ para quem está começando: variáveis e funções calculadas na compilação, a prova com static_assert, o estouro de int pego pelo compilador, consteval (C++20) e o erro ao chamar com valor da execução, constinit e a ideia do if constexpr, com mensagens reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">constexpr e consteval</span></h1>
+
+<p class="intro">Quando você compila um programa, o compilador já lê todo o código. Se uma conta só depende de valores escritos no próprio código (quantos segundos tem um dia, o fatorial de 10, o tamanho de uma tabela), por que fazer essa conta toda vez que o programa roda? Com <code>constexpr</code>, você pede ao compilador: "calcule isto <strong>agora, na compilação</strong>, e coloque só o resultado no programa". Nesta aula você vai provar que isso acontece mesmo, ver o compilador pegar erros que passariam despercebidos na execução e conhecer o <code>consteval</code>, que <strong>obriga</strong> o cálculo a ser feito na compilação.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A diferença entre "tempo de compilação" e "tempo de execução".</li>
+  <li>Variáveis <code>constexpr</code> e o que pode (e não pode) ir nelas.</li>
+  <li>Funções <code>constexpr</code>: as mesmas funções servem na compilação e na execução.</li>
+  <li>Como <strong>provar</strong> que algo foi calculado na compilação, com <code>static_assert</code>.</li>
+  <li>O compilador pegando um estouro de <code>int</code> que, na execução, passaria em silêncio.</li>
+  <li><code>consteval</code> <span class="versao">C++20</span>: "só na compilação", e o erro real ao chamar com um valor da execução.</li>
+  <li><code>constinit</code> (só o nome) e <code>if constexpr</code> (só a ideia).</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. A aula <a href="constantes.html">Constantes (const e constexpr)</a> já apresentou <code>constexpr</code> em variáveis simples; aqui vamos mais fundo, com funções. Você vai precisar de <a href="funcoes.html">Funções</a> e <a href="for.html">for</a>.</p>
+
+<hr>
+
+<h2>A ideia: a tabuada impressa</h2>
+<p>A professora da Ana pode fazer duas coisas: pedir que cada aluno calcule 7 × 8 na hora, toda vez que precisar, ou entregar uma <strong>tabuada já impressa</strong>. A tabuada impressa foi calculada uma vez só, antes da aula; durante a aula, basta olhar.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Tempo de compilação</th><th>Tempo de execução</th></tr>
+<tr><td>Quando</td><td>Quando você roda o <code>g++</code></td><td>Quando você roda <code>./programa</code></td></tr>
+<tr><td>Quem calcula</td><td>O compilador</td><td>O processador, com o programa pronto</td></tr>
+<tr><td>Quantas vezes</td><td>Uma vez</td><td>Toda vez que o programa roda</td></tr>
+<tr><td>Conhece</td><td>Só o que está escrito no código</td><td>Também o que o usuário digita, arquivos, a hora…</td></tr>
+<tr><td>Na analogia</td><td>Imprimir a tabuada</td><td>Calcular de cabeça na hora</td></tr>
+</table>
+</div>
+
+<p><code>constexpr</code> vem de <em>constant expression</em>, "expressão constante": uma expressão cujo valor pode ser descoberto na compilação.</p>
+
+<hr>
+
+<h2>1. Variáveis <code>constexpr</code></h2>
+<p>Uma variável <code>constexpr</code> é uma constante cujo valor <strong>tem</strong> de ser conhecido na compilação:</p>
+
+<pre class="file" data-file="variaveis.cpp">constexpr int dias_semana = 7;
+constexpr int segundos_dia = 24 * 60 * 60;   // o compilador faz a conta: 86400
+constexpr double pi = 3.14159;
+</pre>
+
+<p>Por ser constante, não dá para mudar depois (o compilador recusa, como com <code>const</code>). E por precisar ser conhecida na compilação, ela não pode depender de algo que só existe na execução, como o que o usuário digita:</p>
+
+<pre class="file" data-file="nao_constante.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 0;
+    std::cin &gt;&gt; idade;
+    constexpr int dobro = idade * 2;
+    std::cout &lt;&lt; dobro &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra nao_constante.cpp -o nao_constante
+nao_constante.cpp: In function ‘int main()’:
+nao_constante.cpp:6:27: error: the value of ‘idade’ is not usable in a constant expression
+    6 |     constexpr int dobro = idade * 2;
+      |                           ^~~~~
+nao_constante.cpp:4:9: note: ‘int idade’ is not const
+    4 |     int idade = 0;
+      |         ^~~~~</pre>
+
+<p><em>The value of ‘idade’ is not usable in a constant expression</em> = "o valor de <code>idade</code> não pode ser usado numa expressão constante". Faz sentido: na hora de compilar, ninguém digitou idade nenhuma ainda. Se o valor vem da execução, use <code>const</code> (constante, mas calculada na execução) ou uma variável comum.</p>
+
+<hr>
+
+<h2>2. Funções <code>constexpr</code></h2>
+<p>A parte mais poderosa: funções. Uma função marcada com <code>constexpr</code> <strong>pode</strong> ser executada pelo compilador, desde que receba valores conhecidos na compilação. E a mesma função continua funcionando normalmente na execução:</p>
+
+<pre class="file" data-file="fatorial.cpp">#include &lt;array&gt;
+#include &lt;iostream&gt;
+
+constexpr long long fatorial(int n) {
+    long long resultado = 1;
+    for (int i = 2; i &lt;= n; ++i) {
+        resultado *= i;
+    }
+    return resultado;
+}
+
+int main() {
+    constexpr long long f10 = fatorial(10);   // calculado na compilação
+    static_assert(fatorial(5) == 120);         // conferido na compilação
+
+    std::array&lt;int, fatorial(4)&gt; caixas{};     // tamanho 24, conhecido na compilação
+    std::cout &lt;&lt; "10! = " &lt;&lt; f10 &lt;&lt; '\n';
+    std::cout &lt;&lt; "Caixas: " &lt;&lt; caixas.size() &lt;&lt; '\n';
+
+    int n = 0;
+    std::cout &lt;&lt; "Fatorial de quanto? ";
+    std::cin &gt;&gt; n;
+    std::cout &lt;&lt; n &lt;&lt; "! = " &lt;&lt; fatorial(n) &lt;&lt; '\n';  // calculado na execução
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra fatorial.cpp -o fatorial
+$ echo 15 | ./fatorial
+10! = 3628800
+Caixas: 24
+Fatorial de quanto? 15! = 1307674368000</pre>
+
+<dl class="anatomy">
+  <dt>constexpr long long fatorial(int n)</dt><dd>Uma função comum, com <code>constexpr</code> na frente. O corpo pode ter variáveis, <code>for</code>, <code>if</code>… (aula <a href="funcoes.html">Funções</a>). O fatorial de n é 1 × 2 × 3 × … × n.</dd>
+  <dt>constexpr long long f10 = fatorial(10);</dt><dd>Como <code>f10</code> é <code>constexpr</code>, o compilador é <strong>obrigado</strong> a calcular <code>fatorial(10)</code> na compilação. O programa final contém só o número 3628800.</dd>
+  <dt>static_assert(fatorial(5) == 120);</dt><dd>Uma conferência feita <strong>pelo compilador</strong> (<em>assert</em> = "afirmar"). Se a condição for falsa, o programa nem compila.</dd>
+  <dt>std::array&lt;int, fatorial(4)&gt;</dt><dd>O tamanho de um <a href="std-array.html">std::array</a> precisa ser conhecido na compilação. Uma função <code>constexpr</code> serve.</dd>
+  <dt>fatorial(n)</dt><dd>Com <code>n</code> vindo do teclado, a mesma função roda normalmente, na execução.</dd>
+</dl>
+
+<p>O <code>echo 15 |</code> só "digita" 15 para o programa (é por isso que o <code>15! = …</code> aparece colado na pergunta: o 15 não foi digitado no terminal, então não aparece na tela).</p>
+
+<div class="note">
+<strong><code>constexpr</code> na função é uma permissão, não uma ordem</strong>
+<p>Marcar a função como <code>constexpr</code> diz "ela <strong>pode</strong> rodar na compilação". Quem decide se roda é o lugar onde ela é chamada: num lugar que exige uma constante (<code>constexpr</code>, <code>static_assert</code>, tamanho de array), ela roda na compilação; com um valor da execução, roda na execução. Com otimização (<code>-O2</code>), o compilador ainda pode adiantar outras contas por conta própria, mas aí é escolha dele, sem garantia.</p>
+</div>
+
+<h3>A prova: <code>static_assert</code></h3>
+<p>Como saber que o compilador calculou mesmo? Faça-o conferir uma resposta <strong>errada</strong>. Se ele reclama na compilação, é porque fez a conta:</p>
+
+<pre class="file" data-file="prova.cpp">constexpr long long fatorial(int n) {
+    long long resultado = 1;
+    for (int i = 2; i &lt;= n; ++i) {
+        resultado *= i;
+    }
+    return resultado;
+}
+
+static_assert(fatorial(5) == 100);
+
+int main() {}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra prova.cpp -o prova
+prova.cpp:9:27: error: static assertion failed
+    9 | static_assert(fatorial(5) == 100);
+      |               ~~~~~~~~~~~~^~~~~~
+prova.cpp:9:27: note: the comparison reduces to ‘(120 == 100)’</pre>
+
+<p>Leia a nota: <em>the comparison reduces to ‘(120 == 100)’</em> = "a comparação se reduz a 120 == 100". O compilador <strong>rodou o laço do fatorial</strong>, chegou em 120 e só então viu que não era 100. Nenhum <code>./prova</code> foi executado: o programa nem chegou a existir.</p>
+
+<p>O <code>static_assert</code> é ótimo para deixar "testes" dentro do próprio código: se alguém mudar a função e quebrar o resultado, o programa para de compilar na hora.</p>
+
+<div class="trycpp" data-goal="erro:static assertion failed">
+<p class="try-task"><strong>Missão:</strong> este programa compila e roda. Provoque o erro: troque o <code>120</code> do <code>static_assert</code> por <code>100</code> e clique em Rodar. O editor usa o Clang, que escreve a mensagem de outro jeito (<code>static assertion failed due to requirement…</code> e <code>expression evaluates to '120 == 100'</code>), mas a ideia é a mesma.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+constexpr long long fatorial(int n) {
+    long long resultado = 1;
+    for (int i = 2; i &lt;= n; ++i) {
+        resultado *= i;
+    }
+    return resultado;
+}
+
+static_assert(fatorial(5) == 120);
+
+int main() {
+    std::cout &lt;&lt; "5! = " &lt;&lt; fatorial(5) &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+constexpr long long fatorial(int n) {
+    long long resultado = 1;
+    for (int i = 2; i &lt;= n; ++i) {
+        resultado *= i;
+    }
+    return resultado;
+}
+
+static_assert(fatorial(5) == 100);
+
+int main() {
+    std::cout &lt;&lt; "5! = " &lt;&lt; fatorial(5) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<p>No laboratório, o mesmo erro com o <code>clang++</code> 21:</p>
+<pre class="term" data-cwd="~/cpp">$ clang++ -std=c++23 -Wall -Wextra prova2.cpp -o prova2
+prova2.cpp:11:15: error: static assertion failed due to requirement 'fatorial(5) == 100'
+   11 | static_assert(fatorial(5) == 100);
+      |               ^~~~~~~~~~~~~~~~~~
+prova2.cpp:11:27: note: expression evaluates to '120 == 100'
+   11 | static_assert(fatorial(5) == 100);
+      |               ~~~~~~~~~~~~^~~~~~
+1 error generated.</pre>
+
+<h3>O compilador pega erros que a execução esconde</h3>
+<p>Um <code>int</code> guarda até pouco mais de 2 bilhões (aula <a href="inteiros.html">Inteiros</a>), e 20! é bem maior que isso. Veja a mesma função com <code>int</code>, primeiro na execução:</p>
+
+<pre class="file" data-file="estouro_exec.cpp">#include &lt;iostream&gt;
+
+constexpr int fatorial(int n) {
+    int resultado = 1;
+    for (int i = 2; i &lt;= n; ++i) {
+        resultado *= i;
+    }
+    return resultado;
+}
+
+int main() {
+    int n = 20;
+    std::cout &lt;&lt; fatorial(n) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra estouro_exec.cpp -o estouro_exec
+$ ./estouro_exec
+-2102132736                          « um fatorial negativo! e nenhum aviso</pre>
+
+<p>O resultado estourou o <code>int</code> (isso é <a href="comportamento-indefinido.html">comportamento indefinido</a>) e saiu um número negativo, sem nenhum aviso. Agora peça o mesmo cálculo na compilação, com <code>constexpr int grande = fatorial(20);</code>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra estouro.cpp -o estouro
+estouro.cpp: In function ‘int main()’:
+estouro.cpp:10:36:   in ‘constexpr’ expansion of ‘fatorial(20)’
+estouro.cpp:4:19: error: overflow in constant expression [-fpermissive]
+    4 |         resultado *= i;
+      |         ~~~~~~~~~~^~~~
+estouro.cpp:4:19: error: overflow in constant expression [-fpermissive]
+                                     « … a mesma linha se repete mais 6 vezes</pre>
+
+<p><em>Overflow in constant expression</em> = "estouro numa expressão constante". Na compilação, o C++ <strong>não permite</strong> comportamento indefinido: o compilador vigia cada passo da conta e para no estouro. É uma vantagem a mais do <code>constexpr</code>: o que é calculado na compilação vem "conferido". (O <code>[-fpermissive]</code> é o nome de uma opção que rebaixaria esse erro a aviso; não use.)</p>
+
+<hr>
+
+<h2>3. <code>consteval</code>: só na compilação <span class="versao">C++20</span></h2>
+<p>Às vezes você quer <strong>garantir</strong> que uma função nunca rode na execução: um cálculo que deve estar pronto antes, ou uma conferência de um valor escrito no código. Para isso existe <code>consteval</code> (<em>constant evaluation</em>, "avaliação constante"): toda chamada tem de ser calculada na compilação.</p>
+
+<pre class="file" data-file="quadrado.cpp">#include &lt;iostream&gt;
+
+consteval int quadrado(int x) {
+    return x * x;
+}
+
+int main() {
+    constexpr int a = quadrado(7);
+    int b = quadrado(3) + 1;
+    std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; b &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra quadrado.cpp -o quadrado
+$ ./quadrado
+49 10</pre>
+
+<p>Mesmo em <code>int b = quadrado(3) + 1;</code>, uma variável comum, o <code>quadrado(3)</code> foi calculado na compilação, porque <code>3</code> é conhecido. Agora com um valor da execução:</p>
+
+<pre class="file" data-file="consteval_erro.cpp">#include &lt;iostream&gt;
+
+consteval int quadrado(int x) {
+    return x * x;
+}
+
+int main() {
+    int n = 0;
+    std::cin &gt;&gt; n;
+    std::cout &lt;&lt; quadrado(n) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra consteval_erro.cpp -o consteval_erro
+consteval_erro.cpp: In function ‘int main()’:
+consteval_erro.cpp:10:26: error: call to consteval function ‘quadrado(n)’ is not a constant expression
+   10 |     std::cout &lt;&lt; quadrado(n) &lt;&lt; '\n';
+      |                  ~~~~~~~~^~~
+consteval_erro.cpp:10:27: error: the value of ‘n’ is not usable in a constant expression
+   10 |     std::cout &lt;&lt; quadrado(n) &lt;&lt; '\n';
+      |                           ^
+consteval_erro.cpp:8:9: note: ‘int n’ is not const
+    8 |     int n = 0;
+      |         ^</pre>
+
+<dl class="anatomy">
+  <dt>call to consteval function ‘quadrado(n)’ is not a constant expression</dt><dd>"A chamada à função consteval <code>quadrado(n)</code> não é uma expressão constante": a chamada não pode ser feita na compilação.</dd>
+  <dt>the value of ‘n’ is not usable in a constant expression</dt><dd>O motivo: <code>n</code> só vai ter valor quando o usuário digitar.</dd>
+  <dt>note: ‘int n’ is not const</dt><dd>Uma pista: <code>n</code> é uma variável comum.</dd>
+</dl>
+
+<p>Com <code>constexpr</code> no lugar de <code>consteval</code>, esse programa compilaria e calcularia na execução. É essa a diferença:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>constexpr</code> (função)</th><th><code>consteval</code></th></tr>
+<tr><td>Pode rodar na compilação</td><td>Sim</td><td>Sim</td></tr>
+<tr><td>Pode rodar na execução</td><td>Sim</td><td><strong>Não</strong>: é erro de compilação</td></tr>
+<tr><td>Desde</td><td>C++11 (bem mais flexível a partir do C++14)</td><td>C++20</td></tr>
+<tr><td>Quando usar</td><td>Quase sempre: funções de conta simples que podem servir aos dois mundos</td><td>Quando rodar na execução seria um erro de projeto</td></tr>
+</table>
+</div>
+
+<p>Você já usou uma função <code>consteval</code> sem saber: o <code>std::format</code> (aula <a href="format-print.html">std::format e std::print</a>) confere o texto de formato na compilação com um construtor <code>consteval</code>. É por isso que um <code>{}</code> malformado no <code>format</code> dá erro de compilação, e não erro ao rodar.</p>
+
+<div class="trycpp" data-stdin="7" data-goal="compila,out:49,src:constexpr\s+int\s+quadrado">
+<p class="try-task"><strong>Missão:</strong> este programa não compila: o <code>quadrado</code> é <code>consteval</code> e recebe um número digitado. Troque <strong>uma palavra</strong> para que a função possa rodar também na execução. Com a entrada 7, a saída deve ser 49.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+consteval int quadrado(int x) {
+    return x * x;
+}
+
+int main() {
+    int n = 0;
+    std::cin &gt;&gt; n;
+    std::cout &lt;&lt; quadrado(n) &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+constexpr int quadrado(int x) {
+    return x * x;
+}
+
+int main() {
+    int n = 0;
+    std::cin &gt;&gt; n;
+    std::cout &lt;&lt; quadrado(n) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>4. <code>constinit</code>: só para conhecer <span class="versao">C++20</span></h2>
+<p>Existe uma terceira palavra parecida, <code>constinit</code> ("inicialização constante"). Ela vale para variáveis <strong>globais</strong> (fora de funções) ou <code>static</code>, e garante que o <strong>valor inicial</strong> é calculado na compilação, mas a variável <strong>pode mudar</strong> depois:</p>
+
+<pre class="file" data-file="constinit.cpp">#include &lt;iostream&gt;
+
+constinit int visitas = 0;
+
+int main() {
+    ++visitas;
+    ++visitas;
+    std::cout &lt;&lt; "Visitas: " &lt;&lt; visitas &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra constinit.cpp -o constinit
+$ ./constinit
+Visitas: 2</pre>
+
+<p>Ela resolve um problema de programas grandes, com variáveis globais em vários arquivos, que você dificilmente vai encontrar agora. Guarde só o resumo: <code>constexpr</code> = calculado na compilação <strong>e</strong> constante; <code>constinit</code> = começa calculado na compilação, mas pode mudar.</p>
+
+<hr>
+
+<h2>5. <code>if constexpr</code>: só a ideia</h2>
+<p>Um <code>if</code> comum decide na execução. O <code>if constexpr</code> <span class="versao">C++17</span> decide <strong>na compilação</strong>, e o lado que não foi escolhido nem entra no programa. Isso é útil em <a href="templates-funcao.html">templates</a>, funções que funcionam com vários tipos:</p>
+
+<pre class="file" data-file="se_constexpr.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;type_traits&gt;
+
+template &lt;typename T&gt;
+void descrever(const T&amp; valor) {
+    if constexpr (std::is_integral_v&lt;T&gt;) {
+        std::cout &lt;&lt; valor &lt;&lt; " é um número inteiro\n";
+    } else if constexpr (std::is_floating_point_v&lt;T&gt;) {
+        std::cout &lt;&lt; valor &lt;&lt; " é um número com vírgula\n";
+    } else {
+        std::cout &lt;&lt; "\"" &lt;&lt; valor &lt;&lt; "\" é outra coisa (tamanho " &lt;&lt; valor.size() &lt;&lt; ")\n";
+    }
+}
+
+int main() {
+    descrever(42);
+    descrever(3.14);
+    descrever(std::string("Ana"));
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra se_constexpr.cpp -o se_constexpr
+$ ./se_constexpr
+42 é um número inteiro
+3.14 é um número com vírgula
+"Ana" é outra coisa (tamanho 3)</pre>
+
+<p>Repare no <code>valor.size()</code> do último ramo: um <code>int</code> não tem <code>.size()</code>. Com um <code>if</code> comum, <code>descrever(42)</code> nem compilaria, porque os três ramos precisariam fazer sentido para <code>int</code>. Com <code>if constexpr</code>, para <code>int</code> só o primeiro ramo existe. Os detalhes (<code>template</code>, <code>std::is_integral_v</code>) ficam para as aulas de <a href="templates-funcao.html">Templates</a> e <a href="concepts.html">Concepts</a>.</p>
+
+<hr>
+
+<h2>Qual usar?</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você quer…</th><th>Use</th></tr>
+<tr><td>Uma constante com valor escrito no código (dias da semana, limites, π)</td><td><code>constexpr</code> na variável</td></tr>
+<tr><td>Uma constante que só se sabe na execução (o que o usuário digitou)</td><td><code>const</code></td></tr>
+<tr><td>Uma função de conta que pode servir nos dois momentos</td><td><code>constexpr</code> na função</td></tr>
+<tr><td>Uma função que <strong>nunca</strong> pode rodar na execução</td><td><code>consteval</code></td></tr>
+<tr><td>Conferir algo na compilação</td><td><code>static_assert(condição);</code></td></tr>
+<tr><td>Variável global que começa pronta mas muda depois</td><td><code>constinit</code></td></tr>
+</table>
+</div>
+<p>E no lugar de <code>#define PI 3.14</code>, o costume antigo do C, prefira <code>constexpr double pi = 3.14;</code>: tem tipo, respeita escopo e aparece nas mensagens de erro (aula <a href="preprocessador.html">O Pré-processador</a>).</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: the value of ‘x’ is not usable in a constant expression</code></strong>
+<p><strong>O que significa:</strong> algo que precisa ser conhecido na compilação (uma variável <code>constexpr</code>, um <code>static_assert</code>, o tamanho de um <code>std::array</code>, um argumento de função <code>consteval</code>) depende de uma variável comum, que só tem valor na execução.</p>
+<p><strong>Como consertar:</strong> se o valor realmente vem da execução, tire o <code>constexpr</code> da variável (use <code>const</code>) ou troque <code>consteval</code> por <code>constexpr</code>. Se o valor é fixo, declare a variável de origem como <code>constexpr</code> também.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: static assertion failed</code> / <code>note: the comparison reduces to ‘(120 == 100)’</code></strong>
+<p><strong>O que significa:</strong> a condição do <code>static_assert</code> é falsa. A nota mostra os valores que o compilador calculou.</p>
+<p><strong>Como consertar:</strong> descubra quem está errado, a função ou a expectativa, e corrija.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: overflow in constant expression [-fpermissive]</code></strong>
+<p><strong>O que significa:</strong> durante um cálculo na compilação, um número passou do limite do tipo. A linha <code>in ‘constexpr’ expansion of ‘fatorial(20)’</code> diz qual chamada causou.</p>
+<p><strong>Como consertar:</strong> use um tipo maior (<code>long long</code>) ou valores menores. E fique feliz: na execução, o mesmo estouro teria passado em silêncio.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: call to consteval function ‘…’ is not a constant expression</code></strong>
+<p><strong>O que significa:</strong> uma função <code>consteval</code> foi chamada com algo que só se sabe na execução.</p>
+<p><strong>Como consertar:</strong> passe valores fixos, ou troque <code>consteval</code> por <code>constexpr</code> se a função também deve servir na execução.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>constexpr int n = 10;</code></td><td>Constante calculada na compilação</td></tr>
+<tr><td><code>constexpr int f(int x) { … }</code></td><td>Função que pode rodar na compilação ou na execução</td></tr>
+<tr><td><code>constexpr int v = f(5);</code></td><td>Obriga <code>f(5)</code> a ser calculado na compilação</td></tr>
+<tr><td><code>static_assert(condição);</code></td><td>Conferência na compilação; falsa = erro</td></tr>
+<tr><td><code>static_assert(condição, "mensagem");</code></td><td>Idem, com sua mensagem</td></tr>
+<tr><td><code>consteval int f(int x) { … }</code></td><td>Função que só roda na compilação (C++20)</td></tr>
+<tr><td><code>constinit int g = 0;</code></td><td>Global com valor inicial da compilação, que pode mudar (C++20)</td></tr>
+<tr><td><code>if constexpr (condição) { … }</code></td><td><code>if</code> decidido na compilação (C++17, para templates)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Conferir na compilação</h3>
+<p>Complete para o compilador conferir que <code>dobro(4)</code> vale 8:</p>
+<div class="ex-code"><input data-answer="static_assert" aria-label="palavra">(dobro(4) == 8);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Só na compilação</h3>
+<p>Complete para que <code>cubo</code> nunca possa rodar na execução:</p>
+<div class="ex-code"><input data-answer="consteval" aria-label="palavra"> int cubo(int x) { return x * x * x; }</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Uma função <code>constexpr int f(int x)</code> é chamada como <code>f(n)</code>, com <code>n</code> lido do teclado. O que acontece?</p>
+<label><input type="radio" name="q3"> Erro de compilação</label>
+<label><input type="radio" name="q3"> Ela roda normalmente, na execução</label>
+<label><input type="radio" name="q3"> Ela devolve sempre 0</label>
+<label><input type="radio" name="q3"> O compilador pergunta o valor de <code>n</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Qual destas linhas <strong>não</strong> compila?</p>
+<label><input type="radio" name="q4"> <code>constexpr int a = 2 * 3;</code></label>
+<label><input type="radio" name="q4"> <code>const int b = a + 1;</code> (com <code>a</code> da linha anterior)</label>
+<label><input type="radio" name="q4"> <code>static_assert(2 + 2 == 4);</code></label>
+<label><input type="radio" name="q4"> <code>int x; std::cin &gt;&gt; x; constexpr int y = x;</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Por que <code>constexpr int g = fatorial(20);</code> (com <code>int</code>) dá erro, se na execução o mesmo cálculo "funciona"?</p>
+<label><input type="radio" name="q5"> Porque na compilação o estouro (comportamento indefinido) é proibido e detectado; na execução ele passa em silêncio, com resultado errado</label>
+<label><input type="radio" name="q5"> Porque o compilador não sabe multiplicar números grandes</label>
+<label><input type="radio" name="q5"> Porque funções <code>constexpr</code> não podem ter <code>for</code></label>
+<label><input type="radio" name="q5"> Porque faltou <code>#include &lt;climits&gt;</code></label>
+</div>
+
+<h3>Missão final: potência na compilação</h3>
+
+<div class="trycpp" data-goal="compila,out:2^10 = 1024,out:3^4 = 81,src:constexpr\s+long\s+long\s+potencia,src:static_assert\s*\(\s*potencia">
+<p class="try-task"><strong>Missão:</strong> escreva a função <code>constexpr long long potencia(long long base, int expoente)</code> (multiplique <code>base</code> por ela mesma <code>expoente</code> vezes, começando de 1). Prove que ela funciona na compilação com <code>static_assert(potencia(2, 10) == 1024);</code>. A saída deve ser:</p>
+<pre class="out">2^10 = 1024
+3^4 = 81</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+// escreva a função potencia aqui
+
+// e o static_assert aqui
+
+int main() {
+    // constexpr long long kb = potencia(2, 10);
+    // std::cout &lt;&lt; "2^10 = " &lt;&lt; kb &lt;&lt; '\n';
+    // std::cout &lt;&lt; "3^4 = " &lt;&lt; potencia(3, 4) &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+constexpr long long potencia(long long base, int expoente) {
+    long long resultado = 1;
+    for (int i = 0; i &lt; expoente; ++i) {
+        resultado *= base;
+    }
+    return resultado;
+}
+
+static_assert(potencia(2, 10) == 1024);
+static_assert(potencia(5, 0) == 1);
+
+int main() {
+    constexpr long long kb = potencia(2, 10);
+    std::cout &lt;&lt; "2^10 = " &lt;&lt; kb &lt;&lt; '\n';
+    std::cout &lt;&lt; "3^4 = " &lt;&lt; potencia(3, 4) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<p>A solução, no laboratório:</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra potencia.cpp -o potencia
+$ ./potencia
+2^10 = 1024
+3^4 = 81</pre>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Tempo de compilação = quando o <code>g++</code> roda; tempo de execução = quando o programa roda. <code>constexpr</code> adianta contas para a compilação.</li>
+  <li>Variável <code>constexpr</code>: constante com valor conhecido na compilação; não pode depender do que o usuário digita.</li>
+  <li>Função <code>constexpr</code>: pode rodar na compilação (quando o lugar exige uma constante) ou na execução (com valores comuns).</li>
+  <li><code>static_assert(condição)</code> confere na compilação e prova que o cálculo foi feito ali; a nota mostra os valores calculados.</li>
+  <li>Na compilação, comportamento indefinido como estouro de <code>int</code> vira erro.</li>
+  <li><code>consteval</code> (C++20): só na compilação; chamar com valor da execução é erro.</li>
+  <li><code>constinit</code>: valor inicial da compilação, mas pode mudar. <code>if constexpr</code>: <code>if</code> decidido na compilação, para templates.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
