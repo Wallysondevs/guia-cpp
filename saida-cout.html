@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Saída com cout — mostrar textos, números e contas | Guia C++</title>
+<meta name="description" content="std::cout para quem nunca programou: o operador << encadeado, textos e números juntos, contas (2 + 3) direto na saída, por que cout << 1 << 2 mostra 12, comparações entre parênteses, std::cerr e a saída de erros (redirecionar com > e 2> no terminal) e os erros reais do g++ 15 e do Clang 21 com <<.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Saída com cout</span></h1>
+
+<p class="intro">Até agora o seu programa mostrou só frases prontas. Nesta aula, o <code>std::cout</code> passa a mostrar <strong>vários pedaços de uma vez</strong>: textos, números e até o resultado de contas, tudo numa instrução só. Você também vai conhecer o irmão dele, o <code>std::cerr</code>, que serve para mensagens de erro, e entender por que essa separação importa no terminal.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Encadear vários <code>&lt;&lt;</code> numa instrução.</li>
+  <li>Misturar textos e números: <code>"Ana tem " &lt;&lt; 29 &lt;&lt; " anos."</code>.</li>
+  <li>Mostrar o resultado de contas: <code>std::cout &lt;&lt; 2 + 3</code>.</li>
+  <li>Por que <code>std::cout &lt;&lt; 1 &lt;&lt; 2</code> mostra <code>12</code>.</li>
+  <li>Por que comparações precisam de parênteses: <code>std::cout &lt;&lt; (5 &gt; 3)</code>.</li>
+  <li>O <code>std::cerr</code>, a saída de erros, e como separar as duas saídas no terminal com <code>&gt;</code> e <code>2&gt;</code>.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados na máquina da Ana com <code>g++ -std=c++23 -Wall -Wextra</code> (g++ 15.2), na pasta <code>~/cpp</code>.</p>
+
+<hr>
+
+<h2>A ideia: um tubo que leva até a tela</h2>
+<p>Imagine o <code>std::cout</code> como a boca de um tubo que termina na tela. O <code>&lt;&lt;</code> é uma seta mostrando para onde as coisas vão: <strong>para dentro do tubo</strong>. Você pode jogar várias coisas, uma atrás da outra, e elas saem do outro lado <strong>na mesma ordem</strong>, coladinhas, sem nada no meio. O tubo não põe espaços, não pula linha e não pergunta nada: mostra exatamente o que você colocou.</p>
+
+<p>O nome técnico desse tubo é <strong>fluxo</strong> (<em>stream</em>): o "stream" do <code>iostream</code>. O <code>cout</code> é o fluxo de saída; o <code>cin</code>, que você verá em <a href="entrada-cin.html">Entrada com cin</a>, é o fluxo de entrada, com a seta ao contrário (<code>&gt;&gt;</code>).</p>
+
+<hr>
+
+<h2>1. Encadear vários <code>&lt;&lt;</code></h2>
+<p>Em vez de uma instrução para cada pedaço, você pode encadear vários <code>&lt;&lt;</code> numa instrução só. As duas formas abaixo mostram exatamente a mesma coisa:</p>
+
+<pre class="file" data-file="encadeado.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Ana" &lt;&lt; " foi " &lt;&lt; "à feira.\n";
+
+    std::cout &lt;&lt; "Ana";
+    std::cout &lt;&lt; " foi ";
+    std::cout &lt;&lt; "à feira.\n";
+
+    std::cout &lt;&lt; "Arroz: "
+              &lt;&lt; 2
+              &lt;&lt; " pacotes\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra encadeado.cpp -o encadeado &amp;&amp; ./encadeado
+Ana foi à feira.         « a linha 4, encadeada
+Ana foi à feira.         « as linhas 6 a 8, separadas: mesmo resultado
+Arroz: 2 pacotes         « uma instrução espalhada em três linhas do código</pre>
+
+<dl class="anatomy">
+  <dt>std::cout</dt><dd>A boca do tubo.</dd>
+  <dt>&lt;&lt; "Ana"</dt><dd>Primeiro pedaço.</dd>
+  <dt>&lt;&lt; " foi "</dt><dd>Segundo pedaço. Os espaços <strong>dentro das aspas</strong> é que separam as palavras na tela.</dd>
+  <dt>&lt;&lt; "à feira.\n"</dt><dd>Terceiro pedaço, com a quebra de linha no fim.</dd>
+  <dt>;</dt><dd>Um <code>;</code> só, no fim da corrente inteira.</dd>
+</dl>
+
+<p>Como funciona por dentro: o computador faz <code>std::cout &lt;&lt; "Ana"</code> primeiro, e o resultado dessa operação é o próprio <code>std::cout</code>, pronto para o próximo <code>&lt;&lt;</code>. É por isso que dá para encadear quantos você quiser.</p>
+
+<p>Quando a corrente fica comprida, quebre-a em várias linhas, como no último exemplo. O costume é alinhar os <code>&lt;&lt;</code> uns embaixo dos outros. Lembre (aula <a href="sintaxe.html">Sintaxe</a>): para o compilador, a quebra de linha não importa; o que termina a instrução é o <code>;</code>.</p>
+
+<hr>
+
+<h2>2. Textos e números juntos</h2>
+<p>O <code>std::cout</code> sabe mostrar números também. Números se escrevem <strong>sem aspas</strong>:</p>
+
+<pre class="file" data-file="numeros.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Ana tem " &lt;&lt; 29 &lt;&lt; " anos.\n";
+    std::cout &lt;&lt; 3.5 &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra numeros.cpp -o numeros &amp;&amp; ./numeros
+Ana tem 29 anos.
+3.5</pre>
+
+<p>Três detalhes:</p>
+<ul>
+  <li><strong>Os espaços ficam nos textos</strong>: <code>"Ana tem "</code> termina com espaço e <code>" anos.\n"</code> começa com espaço. Sem eles, sairia <code>Ana tem29anos.</code>.</li>
+  <li><strong>Números com vírgula usam ponto</strong>: <code>3.5</code>, não <code>3,5</code>. O C++ segue a escrita americana, e a saída também sai com ponto. Como mostrar <code>3,50</code> e controlar as casas decimais é assunto de <a href="iomanip.html">Formatar com iomanip</a> e <a href="format-print.html">std::format</a>.</li>
+  <li><strong><code>29</code> e <code>"29"</code> são coisas diferentes.</strong> Na tela parecem iguais, mas <code>29</code> é um número (dá para fazer contas com ele) e <code>"29"</code> é um texto com os caracteres 2 e 9. A diferença aparece na próxima seção.</li>
+</ul>
+
+<p>Os números vão ficar ainda mais úteis quando estiverem guardados em <a href="variaveis.html">variáveis</a>: <code>std::cout &lt;&lt; "Idade: " &lt;&lt; idade</code> funciona do mesmo jeito.</p>
+
+<hr>
+
+<h2>3. Contas direto na saída</h2>
+<p>Você pode colocar uma conta (uma <strong>expressão</strong>) no lugar do número. O C++ calcula primeiro e mostra o resultado:</p>
+
+<pre class="file" data-file="contas.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "2 + 3 = " &lt;&lt; 2 + 3 &lt;&lt; "\n";
+    std::cout &lt;&lt; "2 + 3" &lt;&lt; "\n";
+    std::cout &lt;&lt; 10 * 4 &lt;&lt; "\n";
+    std::cout &lt;&lt; 7 / 2 &lt;&lt; "\n";
+    std::cout &lt;&lt; 7.0 / 2 &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra contas.cpp -o contas &amp;&amp; ./contas
+2 + 3 = 5                « o texto "2 + 3 = " e depois o resultado da conta
+2 + 3                    « entre aspas é texto: nada é calculado
+40                       « * é a multiplicação
+3                        « 7 / 2 com números inteiros: a parte decimal é descartada!
+3.5                      « com 7.0, a conta é feita com decimais</pre>
+
+<p>A linha 4 é a mais importante para entender: o mesmo <code>2 + 3</code> aparece duas vezes, uma entre aspas (texto, mostrado como está) e outra sem aspas (conta, mostrada como <code>5</code>).</p>
+
+<p>E o <code>7 / 2</code> dando <code>3</code>? Não é erro: em C++, a divisão de dois números <strong>inteiros</strong> dá um resultado inteiro. Isso, o resto da divisão (<code>%</code>) e todas as outras contas estão em <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>.</p>
+
+<div class="trycpp" data-goal="out:Ana tem 29 anos.,out:Daqui a 10 anos ela terá 39 anos.,src:29\s*\+\s*10">
+<p class="try-task"><strong>Missão:</strong> complete a segunda linha para mostrar <code>Daqui a 10 anos ela terá 39 anos.</code>, mas sem escrever o número 39: deixe o C++ fazer a conta <code>29 + 10</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Ana tem " &lt;&lt; 29 &lt;&lt; " anos.\n";
+    std::cout &lt;&lt; "Daqui a 10 anos ela terá ";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Ana tem " &lt;&lt; 29 &lt;&lt; " anos.\n";
+    std::cout &lt;&lt; "Daqui a 10 anos ela terá " &lt;&lt; 29 + 10 &lt;&lt; " anos.\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>4. Cuidado: o tubo não põe espaços</h2>
+<p>Lembra que o tubo cola tudo, sem nada no meio? Com textos, isso já atrapalha. Com números, engana:</p>
+
+<pre class="file" data-file="colado.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; 1 &lt;&lt; 2 &lt;&lt; "\n";
+    std::cout &lt;&lt; 1 &lt;&lt; " " &lt;&lt; 2 &lt;&lt; "\n";
+    std::cout &lt;&lt; "Arroz" &lt;&lt; "Feijão" &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra colado.cpp -o colado &amp;&amp; ./colado
+12                       « parece o número doze, mas são o 1 e o 2 grudados
+1 2
+ArrozFeijão</pre>
+
+<p>Quem olha a primeira linha pensa "doze". Não há aviso nem erro: o programa fez exatamente o que foi pedido. Sempre que mostrar dois valores seguidos, coloque um separador entre eles: <code>" "</code>, <code>", "</code>, <code>" | "</code> ou um <code>"\n"</code>.</p>
+
+<hr>
+
+<h2>5. Comparações precisam de parênteses</h2>
+<p>Você pode querer mostrar o resultado de uma comparação, como "5 é maior que 3?". Sem parênteses, dá erro:</p>
+
+<pre class="file" data-file="compara.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; 5 &gt; 3;
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra compara.cpp -o compara 2&gt;&amp;1 | head -n 8
+compara.cpp: In function ‘int main()’:
+compara.cpp:4:20: error: no match for ‘operator&gt;’ (operand types are ‘std::basic_ostream&lt;char&gt;::__ostream_type’ {aka ‘std::basic_ostream&lt;char&gt;’} and ‘int’)
+    4 |     std::cout &lt;&lt; 5 &gt; 3;
+      |     ~~~~~~~~~~~~~~ ^ ~
+      |               |      |
+      |               |      int
+      |               std::basic_ostream&lt;char&gt;::__ostream_type {aka std::basic_ostream&lt;char&gt;}
+compara.cpp:4:20: note: there are 22 candidates
+$ g++ -std=c++23 -Wall -Wextra compara.cpp -o compara 2&gt;&amp;1 | wc -l
+178                      « a mensagem inteira tem 178 linhas!</pre>
+
+<p>(O <code>2&gt;&amp;1 | head -n 8</code> é um truque do terminal para ver só as 8 primeiras linhas da mensagem; o <code>2&gt;</code> é explicado na seção 6.)</p>
+
+<p>O que aconteceu: o C++ faz o <code>&lt;&lt;</code> <strong>antes</strong> do <code>&gt;</code> (cada operador tem uma prioridade, a <a href="precedencia.html">precedência</a>). Então ele leu <code>(std::cout &lt;&lt; 5) &gt; 3</code>: "o tubo é maior que 3?". Não faz sentido comparar o tubo com um número, e o g++ despeja uma lista enorme de tentativas que não serviram. O Clang, que é o compilador do editor do guia, explica melhor e já sugere os parênteses:</p>
+
+<pre class="term" data-cwd="~/cpp">$ clang++ -std=c++23 -Wall -Wextra compara.cpp -o compara 2&gt;&amp;1 | head -n 12
+compara.cpp:4:20: warning: overloaded operator &lt;&lt; has higher precedence than comparison operator [-Woverloaded-shift-op-parentheses]
+    4 |     std::cout &lt;&lt; 5 &gt; 3;
+      |     ~~~~~~~~~~~~~~ ^ ~
+compara.cpp:4:15: note: place parentheses around the '&lt;&lt;' expression to silence this warning
+    4 |     std::cout &lt;&lt; 5 &gt; 3;
+      |               ^
+      |     (             )
+compara.cpp:4:20: note: place parentheses around comparison expression to evaluate it first
+    4 |     std::cout &lt;&lt; 5 &gt; 3;
+      |                    ^
+      |                  (    )
+compara.cpp:4:20: error: invalid operands to binary expression ('__ostream_type' (aka 'basic_ostream&lt;char, std::char_traits&lt;char&gt;&gt;') and 'int')</pre>
+
+<p>"O operador <code>&lt;&lt;</code> tem precedência maior que o de comparação"; "coloque parênteses em volta da comparação para calculá-la primeiro". Fazendo isso:</p>
+
+<pre class="file" data-file="compara2.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; (5 &gt; 3) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra compara2.cpp -o compara2 &amp;&amp; ./compara2
+1                        « 1 quer dizer "verdadeiro"</pre>
+
+<p>O <code>1</code> é o jeito do <code>cout</code> mostrar "verdadeiro" (e <code>0</code>, "falso"). Como mostrar <code>true</code> e <code>false</code> por extenso está em <a href="bool.html">Booleanos</a>. A regra prática: <strong>na dúvida, ponha parênteses</strong> em volta de qualquer conta que não seja simples.</p>
+
+<hr>
+
+<h2>6. <code>std::cerr</code>: a saída de erros</h2>
+<p>Todo programa no terminal tem <strong>duas</strong> saídas, e as duas aparecem na tela:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Saída</th><th>Nome no sistema</th><th>Em C++</th><th>Para quê</th></tr>
+<tr><td>Saída padrão</td><td><code>stdout</code> (número 1)</td><td><code>std::cout</code></td><td>O resultado do programa</td></tr>
+<tr><td>Saída de erros</td><td><code>stderr</code> (número 2)</td><td><code>std::cerr</code> (<em>character error</em>)</td><td>Erros, avisos, mensagens de andamento</td></tr>
+</table>
+</div>
+
+<p>O <code>std::cerr</code> se usa igual ao <code>std::cout</code>, com <code>&lt;&lt;</code>, e também vem do <code>&lt;iostream&gt;</code>:</p>
+
+<pre class="file" data-file="cerr.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Calculando o total...\n";
+    std::cerr &lt;&lt; "Aviso: preço do café não encontrado\n";
+    std::cout &lt;&lt; "Total: 25\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra cerr.cpp -o cerr &amp;&amp; ./cerr
+Calculando o total...
+Aviso: preço do café não encontrado
+Total: 25</pre>
+
+<p>Na tela, nenhuma diferença. Então para que duas saídas? Porque no terminal você pode mandar cada uma para um lugar. O <code>&gt;</code> manda a <strong>saída padrão</strong> para um arquivo:</p>
+
+<pre class="term" data-cwd="~/cpp">$ ./cerr &gt; saida.txt
+Aviso: preço do café não encontrado      « só o aviso apareceu na tela
+$ cat saida.txt
+Calculando o total...
+Total: 25                                « o resultado foi para o arquivo</pre>
+
+<p>O resultado foi para o arquivo, limpinho, e o aviso continuou na tela, onde a Ana consegue vê-lo. Se o aviso tivesse sido escrito com <code>std::cout</code>, ele teria ido parar no meio do arquivo, e ela nem saberia do problema. O contrário também funciona: <code>2&gt;</code> (o número 2 é o <code>stderr</code>) manda só os erros para um arquivo:</p>
+
+<pre class="term" data-cwd="~/cpp">$ ./cerr 2&gt; erros.txt
+Calculando o total...
+Total: 25
+$ cat erros.txt
+Aviso: preço do café não encontrado
+$ ./cerr &gt; saida.txt 2&gt; erros.txt        « cada saída no seu arquivo: a tela fica vazia
+$ ./cerr 2&gt; /dev/null                    « /dev/null é o "lixo" do sistema: os erros somem
+Calculando o total...
+Total: 25</pre>
+
+<p>Os redirecionamentos <code>&gt;</code> e <code>2&gt;</code> são do terminal, não do C++ (o Guia Bash tem uma aula inteira sobre eles). Do lado do C++, a regra é: <strong>resultado no <code>std::cout</code>, mensagens de erro no <code>std::cerr</code></strong>. Há ainda uma diferença de funcionamento: o <code>std::cerr</code> mostra cada mensagem na hora, sem esperar, o que é bom para erros; os detalhes estão em <a href="novas-linhas.html">Novas Linhas</a>.</p>
+
+<div class="note">
+<strong>O próprio g++ faz isso</strong>
+<p>As mensagens de erro do compilador saem pelo <code>stderr</code>. É por isso que, na seção 5, foi preciso escrever <code>2&gt;&amp;1</code> ("mande o 2 para onde vai o 1") antes do <code>| head</code>: sem isso, o <code>head</code> só receberia a saída padrão, que estava vazia.</p>
+</div>
+
+<hr>
+
+<h2>Outras formas de mostrar texto</h2>
+<p>O <code>std::cout</code> não é o único jeito. O mesmo resultado, de três formas:</p>
+
+<pre class="file" data-file="formas.cpp">#include &lt;cstdio&gt;
+#include &lt;iostream&gt;
+#include &lt;print&gt;
+
+int main() {
+    std::cout &lt;&lt; "Ana tem " &lt;&lt; 29 &lt;&lt; " anos.\n";
+    std::println("Ana tem {} anos.", 29);
+    std::printf("Ana tem %d anos.\n", 29);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra formas.cpp -o formas &amp;&amp; ./formas
+Ana tem 29 anos.
+Ana tem 29 anos.
+Ana tem 29 anos.</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>De onde vem</th><th>Quando usar</th></tr>
+<tr><td><code>std::cout &lt;&lt; …</code></td><td>C++ desde sempre (<code>&lt;iostream&gt;</code>)</td><td>Funciona em qualquer compilador; é o que você mais vai ver. O guia usa no Nível 1.</td></tr>
+<tr><td><code>std::println("… {} …", valor)</code> <span class="versao">C++23</span></td><td><code>&lt;print&gt;</code></td><td>Mais curto, quebra a linha sozinho, e o <code>{}</code> marca onde entra cada valor. Aula <a href="format-print.html">std::format e std::print</a>.</td></tr>
+<tr><td><code>std::printf("… %d …", valor)</code></td><td>Herança da linguagem C (<code>&lt;cstdio&gt;</code>)</td><td>Código antigo. Errar o <code>%d</code> causa erros que o compilador nem sempre pega; prefira os outros dois.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>expected ‘;’ before string constant</code>: esqueceu o <code>&lt;&lt;</code></strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semseta.cpp -o semseta   « std::cout "Olá!\n";
+semseta.cpp: In function ‘int main()’:
+semseta.cpp:4:14: error: expected ‘;’ before string constant
+    4 |     std::cout "Olá!\n";
+      |              ^~~~~~~~~
+      |              ;
+semseta.cpp:4:10: warning: statement has no effect [-Wunused-value]
+    4 |     std::cout "Olá!\n";
+      |     ~~~~~^~~~</pre>
+<p><strong>O que significa:</strong> sem o <code>&lt;&lt;</code>, o compilador vê <code>std::cout</code> sozinho e depois um texto solto (<em>string constant</em>). Ele acha que você esqueceu um <code>;</code> entre os dois. A sugestão dele está errada, mas o lugar está certo.</p>
+<p><strong>Como consertar:</strong> ponha o <code>&lt;&lt;</code> entre o <code>std::cout</code> e o texto.</p>
+</div>
+
+<div class="cenario">
+<strong><code>no match for ‘operator&gt;&gt;’</code>: a seta ao contrário</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra setaerrada.cpp -o setaerrada 2&gt;&amp;1 | head -12
+setaerrada.cpp: In function ‘int main()’:
+setaerrada.cpp:4:15: error: no match for ‘operator&gt;&gt;’ (operand types are ‘std::ostream’ {aka ‘std::basic_ostream&lt;char&gt;’} and ‘const char [7]’)
+    4 |     std::cout &gt;&gt; "Olá!\n";
+      |     ~~~~~~~~~ ^~ ~~~~~~~~
+      |          |       |
+      |          |       const char [7]
+      |          std::ostream {aka std::basic_ostream&lt;char&gt;}
+setaerrada.cpp:4:15: note: there are 9 candidates
+    4 |     std::cout &gt;&gt; "Olá!\n";
+      |     ~~~~~~~~~~^~~~~~~~~~~
+In file included from /usr/include/c++/15/string:57,
+                 from /usr/include/c++/15/bits/locale_classes.h:42,</pre>
+<p><strong>O que significa:</strong> <code>&gt;&gt;</code> é a seta do <code>std::cin</code> (entrada). Com o <code>cout</code> não existe <code>&gt;&gt;</code>: "nenhuma combinação para o operador <code>&gt;&gt;</code>". A mensagem completa tem 99 linhas listando tentativas; só as primeiras importam.</p>
+<p><strong>Como consertar:</strong> com <code>cout</code> (e <code>cerr</code>), a seta aponta para ele: <code>&lt;&lt;</code>. Pense: o texto vai <strong>para dentro</strong> do <code>cout</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Vírgula em vez de <code>&lt;&lt;</code>: um pedaço some</strong>
+<pre class="file" data-file="virgula.cpp · armadilha">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Arroz", "Feijão";
+    std::cout &lt;&lt; "\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra virgula.cpp -o virgula &amp;&amp; ./virgula
+virgula.cpp: In function ‘int main()’:
+virgula.cpp:4:35: warning: right operand of comma operator has no effect [-Wunused-value]
+    4 |     std::cout &lt;&lt; "Arroz", "Feijão";
+      |                                   ^
+Arroz                    « cadê o Feijão?</pre>
+<p><strong>O que significa:</strong> compila (é C++ válido, embora inútil), mas o <code>"Feijão"</code> depois da vírgula é ignorado: "o operando da direita do operador vírgula não tem efeito". Só o <code>-Wall</code> avisa. O Clang diz <code>expression result unused</code>.</p>
+<p><strong>Como consertar:</strong> no <code>cout</code>, os pedaços se separam com <code>&lt;&lt;</code>, nunca com vírgula. (No <code>std::println</code>, é ao contrário: os valores vêm separados por vírgula.)</p>
+</div>
+
+<div class="cenario">
+<strong><code>expected primary-expression before ‘;’ token</code>: <code>&lt;&lt;</code> sobrando no fim</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra setafim.cpp -o setafim   « std::cout &lt;&lt; "Olá!\n" &lt;&lt;;
+setafim.cpp: In function ‘int main()’:
+setafim.cpp:4:29: error: expected primary-expression before ‘;’ token
+    4 |     std::cout &lt;&lt; "Olá!\n" &lt;&lt;;
+      |                             ^</pre>
+<p><strong>O que significa:</strong> depois de um <code>&lt;&lt;</code> precisa vir alguma coisa para mostrar (uma "expressão"), e veio o <code>;</code>. Acontece muito quando você apaga o último pedaço da corrente e esquece a seta.</p>
+<p><strong>Como consertar:</strong> apague o <code>&lt;&lt;</code> que sobrou ou complete com o que faltava.</p>
+</div>
+
+<div class="cenario">
+<strong>Números grudados: <code>12</code> em vez de <code>1 2</code></strong>
+<p><strong>O que significa:</strong> o <code>cout</code> não põe nada entre os pedaços.</p>
+<p><strong>Como consertar:</strong> coloque separadores: <code>std::cout &lt;&lt; 1 &lt;&lt; " " &lt;&lt; 2</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Mostra</th></tr>
+<tr><td><code>std::cout &lt;&lt; "Oi";</code></td><td><code>Oi</code></td></tr>
+<tr><td><code>std::cout &lt;&lt; "a" &lt;&lt; "b" &lt;&lt; "\n";</code></td><td><code>ab</code> e quebra a linha</td></tr>
+<tr><td><code>std::cout &lt;&lt; "Idade: " &lt;&lt; 29;</code></td><td><code>Idade: 29</code></td></tr>
+<tr><td><code>std::cout &lt;&lt; 2 + 3;</code></td><td><code>5</code></td></tr>
+<tr><td><code>std::cout &lt;&lt; "2 + 3";</code></td><td><code>2 + 3</code></td></tr>
+<tr><td><code>std::cout &lt;&lt; 7 / 2;</code> e <code>7.0 / 2</code></td><td><code>3</code> e <code>3.5</code></td></tr>
+<tr><td><code>std::cout &lt;&lt; 1 &lt;&lt; 2;</code></td><td><code>12</code></td></tr>
+<tr><td><code>std::cout &lt;&lt; (5 &gt; 3);</code></td><td><code>1</code> (verdadeiro)</td></tr>
+<tr><td><code>std::cerr &lt;&lt; "Erro!\n";</code></td><td><code>Erro!</code>, pela saída de erros</td></tr>
+<tr><td><code>./prog &gt; arq</code> / <code>./prog 2&gt; arq</code></td><td>(terminal) manda o <code>cout</code> / o <code>cerr</code> para o arquivo</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O operador</h3>
+<p>Complete com o operador que leva o número para o <code>cout</code>:</p>
+<div class="ex-code">std::cout &lt;&lt; "Total: " <input data-answer="&lt;&lt;" aria-label="operador" size="3"> 25 &lt;&lt; "\n";</div>
+</div>
+
+<div class="exercise">
+<h3>2. A saída de erros</h3>
+<p>Complete para mostrar a mensagem pela saída de erros:</p>
+<div class="ex-code">std::<input data-answer="cerr" aria-label="saída" size="5"> &lt;&lt; "Arquivo não encontrado\n";</div>
+</div>
+
+<div class="exercise">
+<h3>3. Qual é a saída?</h3>
+<p>O que aparece na tela com <code>std::cout &lt;&lt; 4 &lt;&lt; 5 + 1 &lt;&lt; "\n";</code>?</p>
+<div class="ex-code">Saída: <input data-answer="46" aria-label="saída" size="5"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O que mostra <code>std::cout &lt;&lt; "10 + 5" &lt;&lt; "\n";</code>?</p>
+<label><input type="radio" name="q4"> <code>15</code></label>
+<label><input type="radio" name="q4"> <code>10 + 5</code></label>
+<label><input type="radio" name="q4"> <code>"10 + 5"</code>, com as aspas</label>
+<label><input type="radio" name="q4"> Dá erro</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. A Ana rodou <code>./relatorio &gt; resultado.txt</code> e uma mensagem ainda apareceu na tela. Por quê?</p>
+<label><input type="radio" name="q5"> O <code>&gt;</code> não funcionou</label>
+<label><input type="radio" name="q5"> O arquivo já existia</label>
+<label><input type="radio" name="q5"> A mensagem tinha <code>\n</code></label>
+<label><input type="radio" name="q5"> A mensagem foi escrita com <code>std::cerr</code>, e o <code>&gt;</code> só redireciona o <code>std::cout</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Por que <code>std::cout &lt;&lt; 5 &gt; 3;</code> não compila?</p>
+<label><input type="radio" name="q6"> Porque o <code>&lt;&lt;</code> é feito antes do <code>&gt;</code>, e o C++ tenta comparar o <code>cout</code> com 3; faltam parênteses</label>
+<label><input type="radio" name="q6"> Porque o <code>cout</code> não sabe mostrar números</label>
+<label><input type="radio" name="q6"> Porque falta o <code>\n</code></label>
+<label><input type="radio" name="q6"> Porque 5 não é maior que 3</label>
+</div>
+
+<h3>Missão final: o cupom da lojinha</h3>
+
+<div class="trycpp" data-goal="out:Cupom da Lojinha da Ana,out:Caderno x 3 = 36,out:Caneta x 2 = 5,out:Total: 41,src:3\s*\*\s*12,src:2\s*\*\s*2\.5">
+<p class="try-task"><strong>Missão:</strong> um caderno custa 12 reais e uma caneta custa 2.5. Mostre o cupom abaixo, deixando o C++ fazer as contas: <code>3 * 12</code> para os cadernos, <code>2 * 2.5</code> para as canetas e a soma das duas para o total (não escreva 36, 5 nem 41 direto). Cuidado com os espaços.</p>
+<pre class="out">Cupom da Lojinha da Ana
+Caderno x 3 = 36
+Caneta x 2 = 5
+Total: 41</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Cupom da Lojinha da Ana\n";
+    std::cout &lt;&lt; "Caderno x 3 = " &lt;&lt; 3 * 12 &lt;&lt; "\n";
+    // complete as outras linhas
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Cupom da Lojinha da Ana\n";
+    std::cout &lt;&lt; "Caderno x 3 = " &lt;&lt; 3 * 12 &lt;&lt; "\n";
+    std::cout &lt;&lt; "Caneta x 2 = " &lt;&lt; 2 * 2.5 &lt;&lt; "\n";
+    std::cout &lt;&lt; "Total: " &lt;&lt; 3 * 12 + 2 * 2.5 &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>std::cout</code> é o tubo até a tela; <code>&lt;&lt;</code> põe coisas nele, na ordem, sem nada no meio.</li>
+  <li>Vários <code>&lt;&lt;</code> podem ser encadeados numa instrução, com um <code>;</code> no fim.</li>
+  <li>Textos vão entre aspas; números e contas, sem aspas. <code>2 + 3</code> mostra <code>5</code>; <code>"2 + 3"</code> mostra <code>2 + 3</code>.</li>
+  <li>Os espaços entre palavras e números são responsabilidade sua: <code>1 &lt;&lt; 2</code> vira <code>12</code>.</li>
+  <li>Comparações e contas complicadas vão entre parênteses: <code>(5 &gt; 3)</code>.</li>
+  <li><code>std::cerr</code> é a saída de erros. No terminal, <code>&gt;</code> redireciona o <code>cout</code> e <code>2&gt;</code> redireciona o <code>cerr</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
