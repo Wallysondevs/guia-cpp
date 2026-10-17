@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Ponteiros — int*, &amp;x e *p explicados | Guia C++</title>
+<meta name="description" content="Ponteiros em C++ para quem nunca programou: int* p = &amp;x, desreferenciar com *p, mudar uma variável pelo ponteiro, trocar de alvo, o perigo do ponteiro não inicializado, ponteiro × referência e a seta -&gt; com structs, com saídas e erros reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Ponteiros</span></h1>
+
+<p class="intro">Na aula anterior você viu que toda variável mora num <strong>endereço</strong>, o número da casa, e que <code>&amp;x</code> mostra esse número. Um <strong>ponteiro</strong> é uma variável que <strong>guarda um endereço</strong>: um papelzinho com o número de uma casa anotado. Com ele, você pode ir até a casa e ver ou trocar o que tem lá dentro. Esta aula vai devagar: uma ideia por seção, com desenhos.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como criar um ponteiro: <code>int* p = &amp;x;</code>.</li>
+  <li>Como "seguir" o ponteiro até a variável: <code>*p</code> (desreferenciar).</li>
+  <li>Como mudar uma variável pelo ponteiro e como fazer o ponteiro apontar para outra.</li>
+  <li>Por que um ponteiro não inicializado é perigoso (e o aviso real do g++).</li>
+  <li>As diferenças entre ponteiro e referência, numa tabela.</li>
+  <li>A ideia da seta <code>-&gt;</code>, para usar um ponteiro para struct.</li>
+</ul>
+</div>
+
+<p>Antes, leia <a href="memoria.html">Como a Memória Funciona</a>: esta aula usa a rua de casinhas numeradas o tempo todo. Os programas foram compilados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>, Linux de 64 bits), na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Os endereços que você vai ver no seu computador serão outros: eles mudam a cada execução.</p>
+
+<hr>
+
+<h2>A ideia: um papel com o endereço anotado</h2>
+<p>A Ana deixou um bolo na casa da avó e quer que o Bruno vá buscar. Ela não entrega a casa para o Bruno (impossível) nem faz uma cópia da casa: ela entrega um <strong>papel com o endereço</strong>, "Rua das Flores, 52". Com o papel, o Bruno pode:</p>
+<ul>
+  <li><strong>ler o papel</strong>: saber qual é o endereço;</li>
+  <li><strong>ir até lá</strong>: chegar à casa e ver o que tem dentro;</li>
+  <li><strong>mexer lá dentro</strong>: trocar o bolo por uma torta;</li>
+  <li><strong>apagar e escrever outro endereço</strong> no mesmo papel.</li>
+</ul>
+<p>Um ponteiro é esse papel. Cada uma dessas quatro ações tem um jeito de escrever em C++, e esta aula mostra todas.</p>
+
+<hr>
+
+<h2>1. Criar um ponteiro</h2>
+
+<pre class="file" data-file="primeiro.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int pontos = 10;
+    int* p = &amp;pontos;    // p guarda o endereço de pontos
+
+    std::cout &lt;&lt; "pontos  = " &lt;&lt; pontos  &lt;&lt; "\n";
+    std::cout &lt;&lt; "&amp;pontos = " &lt;&lt; &amp;pontos &lt;&lt; "\n";
+    std::cout &lt;&lt; "p       = " &lt;&lt; p       &lt;&lt; "\n";
+    std::cout &lt;&lt; "*p      = " &lt;&lt; *p      &lt;&lt; "\n";
+    std::cout &lt;&lt; "&amp;p      = " &lt;&lt; &amp;p      &lt;&lt; "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>int*</dt><dd>Leia como "<strong>ponteiro para int</strong>". O <code>*</code> colado no tipo quer dizer: "esta variável não guarda um <code>int</code>, guarda o <strong>endereço</strong> de um <code>int</code>".</dd>
+  <dt>p</dt><dd>O nome do ponteiro. <code>p</code>, <code>ptr</code> ou <code>p_pontos</code> são nomes comuns.</dd>
+  <dt>= &amp;pontos</dt><dd>O valor inicial: o endereço de <code>pontos</code> (o <code>&amp;</code> da aula anterior). Dizemos que "<code>p</code> <strong>aponta para</strong> <code>pontos</code>".</dd>
+  <dt>p</dt><dd>Sozinho, numa expressão, é o conteúdo do papel: o endereço.</dd>
+  <dt>*p</dt><dd>Com <code>*</code> na frente, numa expressão: "vá até o endereço guardado em <code>p</code> e pegue o que está lá". Isso se chama <strong>desreferenciar</strong> o ponteiro.</dd>
+  <dt>&amp;p</dt><dd>O endereço do próprio ponteiro. O papel também é uma variável, e também mora numa casa.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra primeiro.cpp -o primeiro
+$ ./primeiro
+pontos  = 10
+&amp;pontos = 0x7ffc8c55102c       « onde pontos mora
+p       = 0x7ffc8c55102c       « o que está anotado no papel: o mesmo endereço
+*p      = 10                   « seguindo o papel até a casa: o valor de pontos
+&amp;p      = 0x7ffc8c551030       « onde o papel (p) mora</pre>
+
+<figure>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Endereço</th><th>Nome</th><th>Tipo</th><th>O que está guardado</th></tr>
+<tr><td><code>0x7ffc8c55102c</code></td><td><code>pontos</code></td><td><code>int</code> (4 bytes)</td><td><strong>10</strong></td></tr>
+<tr><td><code>0x7ffc8c551030</code></td><td><code>p</code></td><td><code>int*</code> (8 bytes)</td><td><strong>0x7ffc8c55102c</strong> → aponta para <code>pontos</code></td></tr>
+</table>
+</div>
+<figcaption>Duas variáveis, duas casas. Dentro de <code>p</code> não tem 10: tem o <strong>número da casa</strong> de <code>pontos</code>. O <code>*p</code> segue esse número.</figcaption>
+</figure>
+
+<p>Guarde as três perguntas que você pode fazer a um ponteiro:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você escreve</th><th>Pergunta</th><th>Resposta no exemplo</th></tr>
+<tr><td><code>p</code></td><td>"O que está anotado no papel?"</td><td><code>0x7ffc8c55102c</code></td></tr>
+<tr><td><code>*p</code></td><td>"O que tem na casa anotada?"</td><td><code>10</code></td></tr>
+<tr><td><code>&amp;p</code></td><td>"Onde o papel está guardado?"</td><td><code>0x7ffc8c551030</code></td></tr>
+</table>
+</div>
+
+<div class="warning">
+<strong>O <code>*</code> e o <code>&amp;</code> têm dois trabalhos cada</strong>
+<p>Este é o ponto que mais confunde, então vale uma tabela só para ele. O que decide o significado é <strong>onde</strong> o símbolo aparece:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Símbolo</th><th>Colado num <strong>tipo</strong> (numa declaração)</th><th>Na frente de uma <strong>variável</strong> (numa expressão)</th></tr>
+<tr><td><code>*</code></td><td><code>int* p</code>: "p é um ponteiro para int"</td><td><code>*p</code>: "o que está no endereço guardado em p"</td></tr>
+<tr><td><code>&amp;</code></td><td><code>int&amp; r</code>: "r é uma referência para int" (<a href="referencias.html">Referências</a>)</td><td><code>&amp;x</code>: "o endereço de x"</td></tr>
+</table>
+</div>
+<p>E o <code>*</code> entre dois números continua sendo multiplicação: <code>a * b</code>.</p>
+</div>
+
+<hr>
+
+<h2>2. Mudar a variável pelo ponteiro</h2>
+<p>Como <code>*p</code> é "a casa para onde <code>p</code> aponta", você pode escrever nela também:</p>
+
+<pre class="file" data-file="mudar.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int pontos = 10;
+    int* p = &amp;pontos;
+
+    *p = 25;             // vai até a casa e troca o que tem lá dentro
+    std::cout &lt;&lt; "pontos = " &lt;&lt; pontos &lt;&lt; "\n";
+
+    *p = *p + 5;         // lê pela seta, soma, guarda pela seta
+    std::cout &lt;&lt; "pontos = " &lt;&lt; pontos &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra mudar.cpp -o mudar
+$ ./mudar
+pontos = 25
+pontos = 30</pre>
+
+<ol class="passo">
+  <li><code>*p = 25;</code> → segue o endereço anotado em <code>p</code> e guarda 25 lá. Quem mora lá é <code>pontos</code>.</li>
+  <li><code>*p + 5</code> → segue o endereço, lê o 25 e soma: 30.</li>
+  <li><code>*p = 30</code> → segue o endereço de novo e guarda 30.</li>
+</ol>
+
+<p>Atenção ao <code>*</code>: sem ele, você mexe no <strong>papel</strong>, não na casa. <code>p = 25;</code> tentaria anotar "25" como endereço, e o g++ recusa (veja <a href="#quando-da-errado">Quando dá errado</a>).</p>
+
+<div class="trycpp" data-goal="out:pontos = 99,src:\n\s*\*\s*p\s*=">
+<p class="try-task"><strong>Missão:</strong> sem escrever <code>pontos =</code>, use o ponteiro <code>p</code> para mudar <code>pontos</code> para 99. Rode e confira a saída <code>pontos = 99</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int pontos = 10;
+    int* p = &amp;pontos;
+
+    // mude pontos para 99 usando p
+
+    std::cout &lt;&lt; "pontos = " &lt;&lt; pontos &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int pontos = 10;
+    int* p = &amp;pontos;
+
+    *p = 99;
+
+    std::cout &lt;&lt; "pontos = " &lt;&lt; pontos &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Apontar para outra variável</h2>
+<p>Aqui está a grande diferença em relação à referência: o ponteiro <strong>pode trocar de alvo</strong>. Basta anotar outro endereço no papel (atribuir sem <code>*</code>):</p>
+
+<pre class="file" data-file="alvo.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int ana = 7;
+    int bruno = 3;
+    int* p = &amp;ana;               // p aponta para a ana
+
+    std::cout &lt;&lt; "*p = " &lt;&lt; *p &lt;&lt; "\n";
+
+    p = &amp;bruno;                  // agora p aponta para o bruno
+    std::cout &lt;&lt; "*p = " &lt;&lt; *p &lt;&lt; "\n";
+
+    *p = 100;                    // muda o bruno
+    std::cout &lt;&lt; "ana = " &lt;&lt; ana &lt;&lt; ", bruno = " &lt;&lt; bruno &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra alvo.cpp -o alvo
+$ ./alvo
+*p = 7
+*p = 3
+ana = 7, bruno = 100         « a ana ficou intacta</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>Mexe em</th><th>Efeito</th></tr>
+<tr><td><code>p = &amp;bruno;</code></td><td>O <strong>papel</strong> (sem <code>*</code>)</td><td><code>p</code> passa a guardar o endereço do <code>bruno</code>.</td></tr>
+<tr><td><code>*p = 100;</code></td><td>A <strong>casa</strong> (com <code>*</code>)</td><td>A casa do <code>bruno</code> recebe 100.</td></tr>
+</table>
+</div>
+
+<p>Compare com a aula <a href="referencias.html">Referências</a>: lá, <code>r = bruno;</code> copiava o <strong>valor</strong> do bruno para a ana, porque a referência nunca troca de alvo.</p>
+
+<hr>
+
+<h2>4. O ponteiro não inicializado: lixo perigoso</h2>
+<p>Uma variável local que nasce sem valor guarda o que estava naquela casa antes, um "lixo" qualquer (veja <a href="variaveis.html">Variáveis</a>). Com um <code>int</code>, isso dá um número errado. Com um ponteiro, é pior: o lixo é tratado como <strong>endereço</strong>, e <code>*p</code> vai até uma casa desconhecida.</p>
+
+<pre class="file" data-file="lixo.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int* p;              // não inicializado: guarda um endereço qualquer
+    *p = 5;              // escreve numa casa desconhecida
+    std::cout &lt;&lt; "Escrevi 5 em " &lt;&lt; p &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra lixo.cpp -o lixo
+lixo.cpp: In function ‘int main()’:
+lixo.cpp:5:8: warning: ‘p’ is used uninitialized [-Wuninitialized]
+    5 |     *p = 5;              // escreve numa casa desconhecida
+      |     ~~~^~~
+lixo.cpp:4:10: note: ‘p’ was declared here
+    4 |     int* p;              // não inicializado: guarda um endereço qualquer
+      |          ^
+$ ./lixo
+Falha de segmentação     (imagem do núcleo gravada) ./lixo
+$ echo $?
+139</pre>
+
+<dl class="anatomy">
+  <dt>warning: ‘p’ is used uninitialized</dt><dd>"<code>p</code> foi usado sem ter sido inicializado". É só um aviso: o programa foi gerado.</dd>
+  <dt>note: ‘p’ was declared here</dt><dd>A linha onde <code>p</code> nasceu sem valor.</dd>
+  <dt>Falha de segmentação</dt><dd>Desta vez o lixo era um endereço proibido, e o sistema matou o programa (código 139). Em inglês: <code>Segmentation fault</code>.</dd>
+</dl>
+
+<p>Neste caso, a queda foi a <strong>sorte</strong>. Se o lixo fosse o endereço de outra variável do programa, o 5 seria escrito em cima dela, sem erro nenhum, e o programa seguiria com um valor trocado em algum lugar. Esse tipo de defeito pode levar dias para ser encontrado. É <a href="comportamento-indefinido.html">comportamento indefinido</a>.</p>
+
+<div class="tip">
+<strong>Regra: todo ponteiro nasce com um valor</strong>
+<p>Ou com o endereço de algo que já existe (<code>int* p = &amp;x;</code>), ou com <code>nullptr</code>, o "papel em branco" que quer dizer "não aponta para nada": <code>int* p = nullptr;</code>. O <code>nullptr</code> tem aula própria, a próxima depois de <a href="ponteiros-arrays.html">Ponteiros e Arrays</a>: <a href="nullptr.html">nullptr</a>.</p>
+</div>
+
+<hr>
+
+<h2>5. Detalhes que pegam iniciantes</h2>
+
+<h3>O tipo do ponteiro tem que combinar</h3>
+<p>Um <code>double*</code> só aceita o endereço de um <code>double</code>. O ponteiro precisa saber o tipo para ler o número certo de bytes na casa (4 para <code>int</code>, 8 para <code>double</code>):</p>
+
+<pre class="file" data-file="tipo.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 29;
+    double* p = &amp;idade;
+    std::cout &lt;&lt; *p &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tipo.cpp -o tipo
+tipo.cpp: In function ‘int main()’:
+tipo.cpp:5:17: error: cannot convert ‘int*’ to ‘double*’ in initialization
+    5 |     double* p = &amp;idade;
+      |                 ^~~~~~
+      |                 |
+      |                 int*</pre>
+
+<p>"Não dá para converter <code>int*</code> em <code>double*</code> na inicialização". O desenho embaixo do código mostra o tipo do que você entregou: <code>&amp;idade</code> é um <code>int*</code>. Conserto: <code>int* p = &amp;idade;</code>.</p>
+
+<h3>Um <code>*</code> por nome</h3>
+<p>Igual ao <code>&amp;</code> das referências: numa declaração com vírgula, o <code>*</code> vale só para o primeiro nome.</p>
+
+<pre class="file" data-file="virgula.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int x = 1;
+    int* a = &amp;x, b = &amp;x;   // b NÃO é ponteiro
+    std::cout &lt;&lt; *a &lt;&lt; " " &lt;&lt; b &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra virgula.cpp -o virgula
+virgula.cpp: In function ‘int main()’:
+virgula.cpp:5:22: error: invalid conversion from ‘int*’ to ‘int’ [-fpermissive]
+    5 |     int* a = &amp;x, b = &amp;x;   // b NÃO é ponteiro
+      |                      ^~
+      |                      |
+      |                      int*
+virgula.cpp:5:22: note: possible fix: dereference with ‘*’
+    5 |     int* a = &amp;x, b = &amp;x;   // b NÃO é ponteiro
+      |                      ^~
+      |                      *</pre>
+
+<p>O <code>b</code> é um <code>int</code> comum, e um endereço não cabe num <code>int</code>. A nota "possible fix" (conserto possível) sugere desreferenciar, mas aqui o conserto certo é outro: <strong>um ponteiro por linha</strong>, <code>int* b = &amp;x;</code>.</p>
+
+<h3>Todo ponteiro tem o mesmo tamanho</h3>
+<p>Um endereço é só um número de casa, não importa quem mora lá. No Linux de 64 bits, todo ponteiro ocupa 8 bytes:</p>
+
+<pre class="file" data-file="tamanho.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "int*:    " &lt;&lt; sizeof(int*) &lt;&lt; " bytes\n";
+    std::cout &lt;&lt; "double*: " &lt;&lt; sizeof(double*) &lt;&lt; " bytes\n";
+    std::cout &lt;&lt; "char*:   " &lt;&lt; sizeof(char*) &lt;&lt; " bytes\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tamanho.cpp -o tamanho
+$ ./tamanho
+int*:    8 bytes
+double*: 8 bytes
+char*:   8 bytes</pre>
+
+<p>O "64 bits" do nome do sistema é exatamente isso: endereços de 64 bits (8 bytes). No editor do guia, que roda em WebAssembly, os números podem ser outros.</p>
+
+<h3>Imprimir o endereço de um <code>char</code></h3>
+<p>Como você viu em <a href="memoria.html">Como a Memória Funciona</a>, <code>std::cout &lt;&lt; p</code> mostra o endereço para quase todos os tipos, menos <code>char*</code>, que ele trata como texto. Para ver o endereço, use <code>static_cast&lt;void*&gt;(p)</code>.</p>
+
+<hr>
+
+<h2>6. Ponteiros em funções</h2>
+<p>Antes de existirem referências (na linguagem C, avó do C++), o único jeito de uma função mudar a variável de quem a chamou era receber o <strong>endereço</strong> dela:</p>
+
+<pre class="file" data-file="funcao.cpp">#include &lt;iostream&gt;
+
+void dar_bonus(int* nota) {   // recebe um endereço
+    *nota = *nota + 1;
+}
+
+int main() {
+    int nota_ana = 8;
+    dar_bonus(&amp;nota_ana);       // manda o endereço
+    std::cout &lt;&lt; "Nota da Ana: " &lt;&lt; nota_ana &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra funcao.cpp -o funcao
+$ ./funcao
+Nota da Ana: 9</pre>
+
+<p>Funciona, mas tem mais símbolos para errar (<code>&amp;</code> na chamada, <code>*</code> em cada uso) e a função precisaria se proteger de receber um endereço inválido. Em C++, para "mudar a variável de quem chamou", prefira a referência (<code>void dar_bonus(int&amp; nota)</code>, veja <a href="passagem-referencia.html">Por Valor × Por Referência</a>). Você vai encontrar a versão com ponteiro em código antigo e em bibliotecas escritas em C.</p>
+
+<hr>
+
+<h2>7. Ponteiro × referência</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Referência (<code>int&amp; r = x;</code>)</th><th>Ponteiro (<code>int* p = &amp;x;</code>)</th></tr>
+<tr><td>O que é</td><td>Outro nome para a mesma variável</td><td>Uma variável que guarda um endereço</td></tr>
+<tr><td>Analogia</td><td>Um apelido ("Beto")</td><td>Um papel com o endereço anotado</td></tr>
+<tr><td>Precisa nascer ligada?</td><td>Sim, sempre (erro se não)</td><td>Não (mas deveria: aviso <code>-Wuninitialized</code>)</td></tr>
+<tr><td>Pode ficar "vazio"?</td><td>Não</td><td>Sim: <code>nullptr</code></td></tr>
+<tr><td>Pode trocar de alvo?</td><td>Não</td><td>Sim: <code>p = &amp;y;</code></td></tr>
+<tr><td>Como ler o valor</td><td><code>r</code></td><td><code>*p</code></td></tr>
+<tr><td>Ocupa memória própria?</td><td>Na prática, não aparece para você</td><td>Sim, 8 bytes (é uma variável)</td></tr>
+<tr><td>Pode andar pela memória?</td><td>Não</td><td>Sim: <code>p + 1</code> (<a href="ponteiros-arrays.html">Ponteiros e Arrays</a>)</td></tr>
+<tr><td>Use quando…</td><td>Quase sempre: parâmetros, <code>for</code>, apelidos</td><td>Precisa de "pode não ter nada" ou de trocar o alvo; código C</td></tr>
+</table>
+</div>
+
+<p><strong>Qual usar:</strong> se uma referência resolve, use referência. Ela é mais segura porque nunca está vazia e nunca muda de alvo. Ponteiros entram quando você realmente precisa dessas duas coisas. E, para memória do heap, o C++ moderno usa <a href="smart-pointers.html">ponteiros inteligentes</a>, que são ponteiros que se cuidam sozinhos.</p>
+
+<hr>
+
+<h2>8. A seta <code>-&gt;</code>: ponteiro para struct</h2>
+<p>Uma <a href="structs.html">struct</a> junta várias informações numa variável só, e você acessa cada uma com ponto: <code>caneta.preco</code>. Com um ponteiro para a struct, seria preciso escrever <code>(*p).preco</code>: primeiro segue o ponteiro, depois pega o campo. Como isso é muito comum, existe um atalho, a <strong>seta</strong> <code>p-&gt;preco</code>:</p>
+
+<pre class="file" data-file="seta.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco;
+};
+
+int main() {
+    Produto caneta{"caneta", 2.50};
+    Produto* p = &amp;caneta;
+
+    std::cout &lt;&lt; (*p).nome &lt;&lt; " custa " &lt;&lt; (*p).preco &lt;&lt; "\n";
+    p-&gt;preco = 3.00;             // o mesmo que (*p).preco = 3.00
+    std::cout &lt;&lt; p-&gt;nome &lt;&lt; " custa " &lt;&lt; p-&gt;preco &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra seta.cpp -o seta
+$ ./seta
+caneta custa 2.5
+caneta custa 3</pre>
+
+<p>A regra é curta: <strong>com a variável, ponto</strong> (<code>caneta.preco</code>); <strong>com um ponteiro, seta</strong> (<code>p-&gt;preco</code>). Os parênteses em <code>(*p).preco</code> são obrigatórios, porque o ponto vem antes do <code>*</code> na <a href="precedencia.html">precedência</a>. Se você usar ponto num ponteiro, o g++ até sugere a seta:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra seta-erro.cpp -o seta-erro
+seta-erro.cpp: In function ‘int main()’:
+seta-erro.cpp:12:20: error: request for member ‘preco’ in ‘p’, which is of pointer type ‘Produto*’ (maybe you meant to use ‘-&gt;’ ?)
+   12 |     std::cout &lt;&lt; p.preco &lt;&lt; "\n";
+      |                    ^~~~~</pre>
+
+<p>"Pedido do membro <code>preco</code> em <code>p</code>, que é do tipo ponteiro <code>Produto*</code> (talvez você quisesse usar <code>-&gt;</code>?)". Você vai usar muito a seta com <a href="smart-pointers.html">ponteiros inteligentes</a> e com <a href="this.html">this</a>.</p>
+
+<hr>
+
+<h2 id="quando-da-errado">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"invalid conversion from ‘int’ to ‘int*’": esqueceu o <code>*</code></strong>
+<pre class="file" data-file="esqueceu.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int pontos = 10;
+    int* p = &amp;pontos;
+    p = 20;
+    std::cout &lt;&lt; pontos &lt;&lt; "\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra esqueceu.cpp -o esqueceu
+esqueceu.cpp: In function ‘int main()’:
+esqueceu.cpp:6:9: error: invalid conversion from ‘int’ to ‘int*’ [-fpermissive]
+    6 |     p = 20;
+      |         ^~
+      |         |
+      |         int</pre>
+<p><strong>O que aconteceu:</strong> sem o <code>*</code>, <code>p = 20</code> tenta anotar "20" no papel, como se fosse um endereço. O C++ não deixa transformar um número comum em endereço.</p>
+<p><strong>Como resolver:</strong> para mudar a variável apontada, use <code>*p = 20;</code>. Para apontar para outra variável, use <code>p = &amp;outra;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"cannot convert ‘int*’ to ‘double*’"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tipo.cpp -o tipo
+tipo.cpp: In function ‘int main()’:
+tipo.cpp:5:17: error: cannot convert ‘int*’ to ‘double*’ in initialization
+    5 |     double* p = &amp;idade;
+      |                 ^~~~~~
+      |                 |
+      |                 int*</pre>
+<p><strong>O que aconteceu:</strong> o tipo do ponteiro não combina com o tipo da variável.</p>
+<p><strong>Como resolver:</strong> declare o ponteiro com o mesmo tipo da variável (<code>int*</code> para <code>int</code>). Se precisa do valor como <code>double</code>, converta o <strong>valor</strong>: <code>double d = idade;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"‘p’ is used uninitialized" e o programa cai</strong>
+<pre class="term" data-cwd="~/cpp">$ ./lixo
+Falha de segmentação     (imagem do núcleo gravada) ./lixo
+$ echo $?
+139</pre>
+<p><strong>O que aconteceu:</strong> o ponteiro foi usado sem receber um endereço. O compilador avisou com <code>-Wuninitialized</code>.</p>
+<p><strong>Como resolver:</strong> inicialize sempre: <code>int* p = &amp;x;</code> ou <code>int* p = nullptr;</code> e confira antes de usar (<a href="nullptr.html">nullptr</a>). Nunca ignore esse aviso.</p>
+</div>
+
+<div class="cenario">
+<strong>"request for member … which is of pointer type"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra seta-erro.cpp -o seta-erro
+seta-erro.cpp: In function ‘int main()’:
+seta-erro.cpp:12:20: error: request for member ‘preco’ in ‘p’, which is of pointer type ‘Produto*’ (maybe you meant to use ‘-&gt;’ ?)
+   12 |     std::cout &lt;&lt; p.preco &lt;&lt; "\n";
+      |                    ^~~~~</pre>
+<p><strong>O que aconteceu:</strong> você usou ponto com um ponteiro.</p>
+<p><strong>Como resolver:</strong> troque por seta: <code>p-&gt;preco</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>O que faz</th></tr>
+<tr><td><code>int* p = &amp;x;</code></td><td>Cria <code>p</code>, ponteiro para <code>int</code>, apontando para <code>x</code>.</td></tr>
+<tr><td><code>int* p = nullptr;</code></td><td>Cria um ponteiro que não aponta para nada (<a href="nullptr.html">nullptr</a>).</td></tr>
+<tr><td><code>p</code></td><td>O endereço guardado.</td></tr>
+<tr><td><code>*p</code></td><td>O valor que está nesse endereço (desreferenciar).</td></tr>
+<tr><td><code>*p = 5;</code></td><td>Guarda 5 na variável apontada.</td></tr>
+<tr><td><code>p = &amp;y;</code></td><td>Faz <code>p</code> apontar para <code>y</code>.</td></tr>
+<tr><td><code>&amp;p</code></td><td>O endereço do próprio ponteiro.</td></tr>
+<tr><td><code>p-&gt;campo</code></td><td>O mesmo que <code>(*p).campo</code>, para ponteiro de struct ou classe.</td></tr>
+<tr><td><code>sizeof(int*)</code></td><td>8 bytes num sistema de 64 bits (qualquer tipo de ponteiro).</td></tr>
+<tr><td><code>static_cast&lt;void*&gt;(p)</code></td><td>Mostra o endereço de um <code>char*</code> em vez do texto.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Declarar</h3>
+<p>Complete para criar <code>p</code>, um ponteiro para <code>double</code> que aponta para <code>altura</code>:</p>
+<div class="ex-code">double<input data-answer="*" aria-label="símbolo"> p = <input data-answer="&amp;" aria-label="símbolo">altura;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Desreferenciar</h3>
+<p>Complete para guardar 7 na variável para onde <code>p</code> aponta:</p>
+<div class="ex-code"><input data-answer="*p" aria-label="expressão"> = 7;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Depois de <code>int a = 1, b = 2; int* p = &amp;a; p = &amp;b; *p = 9;</code>, quanto valem <code>a</code> e <code>b</code>?</p>
+<label><input type="radio" name="q3"> <code>a = 9</code>, <code>b = 2</code></label>
+<label><input type="radio" name="q3"> <code>a = 1</code>, <code>b = 9</code></label>
+<label><input type="radio" name="q3"> <code>a = 9</code>, <code>b = 9</code></label>
+<label><input type="radio" name="q3"> Erro: um ponteiro não pode trocar de alvo</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Com <code>int x = 5; int* p = &amp;x;</code>, o que mostra <code>std::cout &lt;&lt; p;</code>?</p>
+<label><input type="radio" name="q4"> <code>5</code></label>
+<label><input type="radio" name="q4"> <code>*x</code></label>
+<label><input type="radio" name="q4"> O endereço de <code>p</code></label>
+<label><input type="radio" name="q4"> O endereço de <code>x</code>, algo como <code>0x7ffc…</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Qual destas afirmações é verdadeira?</p>
+<label><input type="radio" name="q5"> Uma referência pode trocar de alvo; um ponteiro não</label>
+<label><input type="radio" name="q5"> <code>int* p;</code> sem valor aponta automaticamente para <code>nullptr</code></label>
+<label><input type="radio" name="q5"> Um ponteiro pode ficar vazio (<code>nullptr</code>); uma referência não</label>
+<label><input type="radio" name="q5"> Com ponteiro de struct, usa-se ponto: <code>p.preco</code></label>
+</div>
+
+<h3>Missão final: um ponteiro, dois cofres</h3>
+
+<div class="trycpp" data-goal="out:cofre1 = 60,out:cofre2 = 120,src:p\s*=\s*&amp;\s*cofre2,src:\n\s*\*\s*p\s*=">
+<p class="try-task"><strong>Missão:</strong> a Ana tem dois cofres. Usando <strong>só o ponteiro <code>p</code></strong> (sem escrever <code>cofre1 =</code> nem <code>cofre2 =</code>), deposite 10 no <code>cofre1</code>, depois faça <code>p</code> apontar para o <code>cofre2</code> e deposite 20 nele. A saída deve ser:</p>
+<pre class="out">cofre1 = 60
+cofre2 = 120</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int cofre1 = 50;
+    int cofre2 = 100;
+    int* p = &amp;cofre1;
+
+    // deposite 10 no cofre1 usando p
+
+    // faça p apontar para o cofre2
+
+    // deposite 20 no cofre2 usando p
+
+    std::cout &lt;&lt; "cofre1 = " &lt;&lt; cofre1 &lt;&lt; "\n";
+    std::cout &lt;&lt; "cofre2 = " &lt;&lt; cofre2 &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int cofre1 = 50;
+    int cofre2 = 100;
+    int* p = &amp;cofre1;
+
+    *p = *p + 10;
+    p = &amp;cofre2;
+    *p = *p + 20;
+
+    std::cout &lt;&lt; "cofre1 = " &lt;&lt; cofre1 &lt;&lt; "\n";
+    std::cout &lt;&lt; "cofre2 = " &lt;&lt; cofre2 &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um ponteiro é uma variável que guarda um <strong>endereço</strong>: <code>int* p = &amp;x;</code>.</li>
+  <li><code>p</code> é o endereço; <code>*p</code> é o valor que está lá (desreferenciar); <code>*p = 5;</code> muda a variável apontada.</li>
+  <li><code>p = &amp;y;</code> troca o alvo. A referência não pode fazer isso.</li>
+  <li>Ponteiro sem valor guarda lixo: usar é comportamento indefinido (<code>-Wuninitialized</code>, falha de segmentação). Inicialize sempre, nem que seja com <code>nullptr</code>.</li>
+  <li>O tipo precisa combinar (<code>int*</code> para <code>int</code>), e o <code>*</code> vale para um nome só.</li>
+  <li>Com ponteiro de struct, use a seta: <code>p-&gt;preco</code>.</li>
+  <li>Prefira referências; use ponteiros quando precisar de "nada" ou de trocar o alvo. Próxima aula: <a href="ponteiros-arrays.html">Ponteiros e Arrays</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
