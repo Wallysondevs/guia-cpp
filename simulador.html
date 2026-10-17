@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ O Editor do Guia — como usar as caixas Experimente | Guia C++</title>
+<meta name="description" content="Como usar o editor Experimente do Guia C++: Rodar, o download do compilador na primeira vez, erros de compilação, entrada pelo teclado, argumentos, abas, Restaurar, Ver solução e missões. O Clang do editor comparado com o g++ do terminal (as mesmas falhas nos dois) e o que funciona diferente no navegador e no seu computador.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">O Editor do Guia</span></h1>
+
+<p class="intro">Em toda aula há caixas <strong>Experimente</strong>: um pequeno editor de código com um botão <strong>Rodar</strong>. Elas não são uma imitação: cada clique <strong>compila de verdade</strong> o seu código, com o compilador Clang funcionando dentro do navegador, e roda o programa gerado. Nesta aula você vai conhecer cada parte da caixa, entender o que aparece no terminal dela, aprender a digitar a entrada do programa, usar as abas e as missões, e saber em que o editor é diferente do compilador instalado no seu computador.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>As partes da caixa: abas, editor, Argumentos, Rodar, terminal, Restaurar e Ver solução.</li>
+  <li>O que acontece na primeira vez que você clica em Rodar (o download do compilador).</li>
+  <li>Como ler erros e avisos de compilação na caixa.</li>
+  <li>Como o programa recebe o que você digita (<code>std::cin</code>), os argumentos e os arquivos das abas.</li>
+  <li>Como funcionam as missões.</li>
+  <li>A mesma falha no <strong>Clang</strong> do editor e no <strong>g++</strong> do terminal, lado a lado.</li>
+  <li>O que funciona igual e o que é diferente no editor e no seu computador.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: um laboratório portátil</h2>
+<p>Na escola, o laboratório de ciências tem tudo pronto: você chega, faz o experimento e vai embora. O editor do guia é assim. O compilador fica guardado <strong>dentro da página</strong>, e o programa roda num "computador de mentirinha" que só existe enquanto a aba está aberta, com uma pasta da Ana (<code>/home/ana</code>). Nada do que você fizer ali toca no seu computador. Se algo der muito errado, recarregue a página.</p>
+
+<p>Por baixo, é o <strong>Clang 22</strong>, do projeto LLVM, o mesmo compilador que você instalaria no seu computador, só que transformado em <strong>WebAssembly</strong> (um formato de programa que os navegadores executam quase tão rápido quanto um programa comum). Ele faz as quatro etapas que você viu em <a href="como-funciona.html">Como o C++ Vira Programa</a>: pré-processar, compilar, montar e ligar. O resultado é um programa WebAssembly, que o navegador roda em seguida.</p>
+
+<hr>
+
+<h2>As partes da caixa</h2>
+<p>Rode esta caixa e acompanhe a explicação abaixo dela:</p>
+
+<div class="trycpp">
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!\n";
+    std::cout &lt;&lt; "2 + 3 = " &lt;&lt; 2 + 3 &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<dl class="anatomy">
+  <dt>Aba</dt><dd>O nome do arquivo que você está editando, como <code>programa.cpp</code>. Algumas caixas têm várias abas (veja <a href="#abas">Várias abas</a>).</dd>
+  <dt>Restaurar</dt><dd>Volta ao código original da aula, apagando as suas mudanças. Use sem medo: o original nunca se perde.</dd>
+  <dt>Editor</dt><dd>Clique e digite. Os números à esquerda são os <strong>números das linhas</strong>, os mesmos que as mensagens de erro citam.</dd>
+  <dt>Argumentos</dt><dd>Palavras que o programa recebe ao ser chamado, como no terminal (veja <a href="#args">Argumentos</a>). Quase sempre fica vazio.</dd>
+  <dt>▶ Rodar</dt><dd>Compila e roda. Enquanto o programa roda, o botão vira <strong>■ Parar</strong>.</dd>
+  <dt>Terminal</dt><dd>Aparece depois de rodar, com o título <code>Terminal — ana@notebook: ~</code>: o comando de compilação, as mensagens do compilador, o comando que roda o programa, a saída e o código de saída.</dd>
+</dl>
+
+<p>Depois de rodar, o terminal da caixa mostra:</p>
+
+<pre class="file" data-file="o que o editor mostra">$ clang++ -std=c++23 -Wall -Wextra programa.cpp -o programa
+$ ./programa
+Olá, mundo!
+2 + 3 = 5
+[código de saída: 0]</pre>
+
+<p>São exatamente os passos que você faria no terminal: compilar com o <code>clang++</code> (com as mesmas opções que o guia usa com o g++: <code>-std=c++23 -Wall -Wextra</code>) e rodar com <code>./programa</code>. Enquanto compila, aparece <code>(compilando…)</code>. O <code>[código de saída: 0]</code> é o número que o programa devolve ao terminar: <code>0</code> quer dizer "terminou bem". No terminal de verdade, ele fica escondido, e você o vê com <code>echo $?</code>; o editor mostra sempre.</p>
+
+<h3>A primeira vez: o download do compilador</h3>
+<p>Na <strong>primeira</strong> vez que você clica em Rodar, o navegador baixa o compilador e a biblioteca padrão do C++: cerca de <strong>33 MB</strong>. Aparece uma barra com a mensagem <code>Baixando o compilador C++ (≈ 33 MB, só na primeira vez)…</code> e a porcentagem, depois <code>Preparando o compilador…</code>. Leva de alguns segundos a um minuto, conforme a internet. Depois disso:</p>
+<ul>
+  <li>o navegador guarda tudo: nas outras caixas, nas outras aulas e nas próximas visitas não há download;</li>
+  <li>cada compilação leva menos de um segundo para programas que começam com <code>#include &lt;iostream&gt;</code> ou <code>#include &lt;print&gt;</code> (esses cabeçalhos vêm "pré-compilados"), e de 2 a 5 segundos para os outros;</li>
+  <li>se a internet cair no meio do download, aparece <code>Não consegui carregar o compilador: …</code> seguido de "Confira a internet e clique em Rodar de novo".</li>
+</ul>
+
+<p>Se você usa o celular com plano de dados, prefira o Wi-Fi na primeira vez. E repare na comparação: um compilador C++ instalado no computador ocupa centenas de megabytes; o do guia cabe em 33.</p>
+
+<h3>Atalhos do editor</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tecla</th><th>O que faz</th></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Enter</kbd> (Mac: <kbd>Cmd</kbd>+<kbd>Enter</kbd>)</td><td>Roda o código, sem tirar a mão do teclado.</td></tr>
+<tr><td><kbd>Tab</kbd></td><td>Insere o recuo (4 espaços). Com várias linhas selecionadas, recua todas.</td></tr>
+<tr><td><kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Tira um nível de recuo.</td></tr>
+<tr><td><kbd>Enter</kbd></td><td>Pula a linha mantendo o recuo; depois de <code>{</code>, <code>(</code> ou <code>[</code>, recua mais um nível. Um <code>}</code> sozinho na linha volta um nível.</td></tr>
+<tr><td><kbd>Esc</kbd></td><td>Sai do editor (para quem navega pelo teclado: depois, <kbd>Tab</kbd> vai para o próximo botão).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Erros e avisos de compilação</h2>
+<p>Quando o compilador reclama, as mensagens aparecem no terminal da caixa, coloridas como num terminal de verdade, e o programa <strong>não roda</strong> (não existe programa para rodar). A caixa abaixo tem um erro:</p>
+
+<div class="trycpp" data-goal="out:Olá\, mundo!">
+<p class="try-task"><strong>Missão:</strong> rode e leia a mensagem: ela diz a linha e a coluna do problema e até mostra o que falta. Conserte e rode de novo.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!\n"
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!\n";
+}
+</pre>
+</div>
+
+<pre class="file" data-file="o que o editor mostra">$ clang++ -std=c++23 -Wall -Wextra programa.cpp -o programa
+programa.cpp:4:34: error: expected ';' after expression
+    4 |     std::cout &lt;&lt; "Olá, mundo!\n"
+      |                                 ^
+      |                                 ;
+1 error generated.
+[código de saída: 1]</pre>
+
+<p>A mensagem diz: no arquivo <code>programa.cpp</code>, linha <code>4</code>, coluna <code>34</code>, um <code>error</code> ("erro"): <code>expected ';' after expression</code>, "esperava <code>;</code> depois da expressão". A setinha <code>^</code> aponta o lugar, e a linha de baixo mostra o <code>;</code> que falta. O <code>1 error generated.</code> conta os erros, e o <code>[código de saída: 1]</code> é o do compilador: deu errado, nada foi rodado. A aula <a href="erros-compilacao.html">Lendo Erros do Compilador</a> ensina a ler essas mensagens.</p>
+
+<p><strong>Avisos</strong> (<code>warning</code>) são diferentes: o programa compila e roda, mas o compilador desconfia de algo. Os dois aparecem no terminal, um antes do outro:</p>
+
+<pre class="file" data-file="o que o editor mostra">$ clang++ -std=c++23 -Wall -Wextra programa.cpp -o programa
+programa.cpp:4:9: warning: unused variable 'idade' [-Wunused-variable]
+    4 |     int idade = 29;
+      |         ^~~~~
+1 warning generated.
+$ ./programa
+Olá!
+[código de saída: 0]</pre>
+
+<p>A variável <code>idade</code> foi criada e nunca usada: não é erro, mas costuma ser esquecimento. A aula <a href="avisos.html">Avisos</a> mostra os mais comuns.</p>
+
+<hr>
+
+<h2>A entrada: o programa pergunta, você responde</h2>
+<p>Quando um programa lê o teclado com <code>std::cin</code> (aula <a href="entrada-cin.html">Entrada com cin</a>), a caixa <strong>pausa</strong> o programa e mostra um campo para você digitar, dentro do próprio terminal, logo depois da pergunta. Digite e tecle <kbd>Enter</kbd>. Rode e experimente:</p>
+
+<div class="trycpp">
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome;
+    std::cout &lt;&lt; "Qual é o seu nome? ";
+    std::cin &gt;&gt; nome;
+    std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "!\n";
+}
+</pre>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No campo de entrada</th><th>O que faz</th></tr>
+<tr><td><kbd>Enter</kbd></td><td>Envia a linha digitada para o programa.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd></td><td>Avisa "acabou a entrada" (fim de arquivo), como no terminal do Linux.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd> ou <strong>■ Parar</strong></td><td>Para o programa. O terminal mostra <code>^C</code> e o código de saída <code>130</code>, o mesmo que o Linux usa para "interrompido".</td></tr>
+</table>
+</div>
+
+<p>Algumas caixas já trazem a entrada pronta, num campo <strong>Entrada</strong> ao lado do botão Rodar: o que estiver ali é entregue ao programa, uma linha de cada vez, como se alguém digitasse. No terminal da caixa, cada linha aparece no ponto em que o programa a lê. Você pode mudar o texto do campo antes de rodar.</p>
+
+<div class="trycpp" data-stdin="Ana\n29" data-goal="out:Ana tem 29 anos.,src:idade">
+<p class="try-task"><strong>Missão:</strong> o programa lê o nome, mas ainda não lê a idade (a segunda linha da Entrada). Acrescente <code>int idade = 0;</code>, leia com <code>std::cin &gt;&gt; idade;</code> e troque a última linha para mostrar <code>Ana tem 29 anos.</code> usando as duas variáveis.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome;
+    std::cout &lt;&lt; "Nome: ";
+    std::cin &gt;&gt; nome;
+    std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome;
+    int idade = 0;
+    std::cout &lt;&lt; "Nome: ";
+    std::cin &gt;&gt; nome;
+    std::cout &lt;&lt; "Idade: ";
+    std::cin &gt;&gt; idade;
+    std::cout &lt;&lt; nome &lt;&lt; " tem " &lt;&lt; idade &lt;&lt; " anos.\n";
+}
+</pre>
+</div>
+
+<p>No terminal da Ana, a mesma ideia: quando o programa espera, o que ela digita aparece na tela (é o terminal que "ecoa" as teclas). Se a entrada vier de outro programa, pelo <code>|</code> (aula <a href="entrada-cin.html">Entrada com cin</a>), nada é ecoado, e a resposta sai grudada na pergunta:</p>
+
+<pre class="term" data-cwd="~/cpp/sim">$ echo Ana | ./nome
+Qual é o seu nome? Olá, Ana!                       « o "Ana" veio pelo |, sem eco</pre>
+
+<h3 id="args">Argumentos</h3>
+<p>O campo <strong>Argumentos</strong> faz o papel das palavras que vêm depois do nome do programa no terminal: <code>./programa maçã 'pera uva'</code>. Aspas juntam palavras num argumento só, como no bash. O programa os recebe no <code>argv</code> (aula <a href="funcoes.html">Funções</a> e, em detalhe, nos projetos):</p>
+
+<div class="trycpp" data-args="maçã 'pera uva'">
+<pre class="script">#include &lt;iostream&gt;
+
+int main(int argc, char* argv[]) {
+    for (int i = 0; i &lt; argc; i++) {
+        std::cout &lt;&lt; i &lt;&lt; ": " &lt;&lt; argv[i] &lt;&lt; "\n";
+    }
+}
+</pre>
+</div>
+
+<pre class="file" data-file="o que o editor mostra">$ clang++ -std=c++23 -Wall -Wextra programa.cpp -o programa
+$ ./programa 'maçã' 'pera uva'
+0: ./programa
+1: maçã
+2: pera uva
+[código de saída: 0]</pre>
+
+<p>O <code>argv[0]</code> é sempre o próprio nome do programa. Na linha do comando, o editor põe aspas em volta de <code>maçã</code> por precaução (por causa das letras acentuadas); o programa recebe a palavra sem as aspas. Troque o texto do campo e rode de novo.</p>
+
+<hr>
+
+<h2 id="abas">Várias abas: vários arquivos</h2>
+<p>Algumas caixas têm mais de uma aba. Cada aba é um arquivo da mesma pasta:</p>
+<ul>
+  <li>todos os arquivos <code>.cpp</code> são <strong>compilados juntos</strong> num programa só (aula <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>);</li>
+  <li>os outros (<code>.h</code>, <code>.txt</code>, <code>.csv</code>) ficam na pasta em que o programa roda, <code>/home/ana</code>, e o programa pode abri-los;</li>
+  <li>arquivos que o programa cria (com <code>std::ofstream</code>) vivem numa pasta na memória, que começa limpa a cada Rodar.</li>
+</ul>
+
+<div class="trycpp">
+<pre class="script" data-file="compras.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::ifstream arquivo("lista.txt");
+    std::string item;
+    int n = 0;
+    while (std::getline(arquivo, item)) {
+        n = n + 1;
+        std::cout &lt;&lt; n &lt;&lt; ". " &lt;&lt; item &lt;&lt; "\n";
+    }
+}
+</pre>
+<pre class="script" data-file="lista.txt">arroz
+feijão
+café
+</pre>
+</div>
+
+<p>O programa abre o <code>lista.txt</code> da outra aba e numera as linhas (a aula <a href="arquivos.html">Ler e Escrever Arquivos</a> explica cada linha). Clique na aba <code>lista.txt</code>, acrescente <code>leite</code> numa linha nova e rode outra vez. Repare também no comando de compilação: o executável se chama <code>compras</code>, o nome do primeiro <code>.cpp</code> sem a extensão.</p>
+
+<hr>
+
+<h2>Missões, Restaurar e Ver solução</h2>
+<p>Muitas caixas têm uma <strong>missão</strong>: um desafio escrito acima do editor. Embaixo da caixa aparece <code>Missão em andamento…</code>; a cada Rodar, o editor confere se o desafio foi cumprido e, quando foi, mostra <strong>✔ Missão cumprida!</strong>. Se faltar alguma coisa, a mensagem dá uma pista entre parênteses, como <code>(o código ainda não compila)</code> ou <code>(a saída ainda não é a esperada)</code>.</p>
+
+<p>O editor confere o <strong>resultado</strong>, não o jeito: se a missão pede que apareça <code>Olá, Ana!</code>, qualquer código que mostre isso vale. Algumas missões pedem também um recurso (por exemplo, "use <code>std::println</code>") ou um <strong>erro de propósito</strong>, para você ver a mensagem. Como esta:</p>
+
+<div class="trycpp" data-goal="erro:/expected ';'|expected ‘;’/">
+<p class="try-task"><strong>Missão:</strong> provoque o erro do <code>;</code>: apague o ponto e vírgula do fim da linha 4 e rode. A missão se cumpre quando a compilação <strong>falha</strong> com a mensagem <code>expected ';'</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Vou dar erro de propósito\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Vou dar erro de propósito\n"
+}
+</pre>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Botão</th><th>O que faz</th></tr>
+<tr><td><strong>Restaurar</strong></td><td>Volta ao código original da caixa. Útil quando você mexeu demais e se perdeu.</td></tr>
+<tr><td><strong>Ver solução</strong></td><td>Só nas missões. Pergunta <code>Trocar o seu código pela solução?</code>; com <strong>Sim, mostrar</strong>, o editor troca o código pelo de uma solução possível (com <strong>Cancelar</strong>, nada muda). Depois, Restaurar volta ao início.</td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>Tente antes de ver a solução</strong>
+<p>Errar faz parte: cada mensagem do compilador que você lê e entende é uma lição. Tente pelo menos duas ou três vezes antes de clicar em Ver solução. E, depois de ver, clique em Restaurar e faça de novo sozinho.</p>
+</div>
+
+<h3>Parar um programa</h3>
+<p>Um programa que não termina nunca (um "laço infinito", que você vai conhecer em <a href="while.html">while</a>) não trava a página: ele roda separado. Clique em <strong>■ Parar</strong>: aparece <code>^C</code> e o código de saída <code>130</code>. Se você não parar, o editor para sozinho depois de 15 segundos, com a mensagem <code>(o editor parou o programa: ele rodou mais de 15 segundos sem terminar — laço infinito?)</code>. O tempo em que o programa espera você digitar não conta. E um programa que escreve demais (mais de 2 MB de texto) também é interrompido.</p>
+
+<hr>
+
+<h2>Clang no editor × g++ no terminal</h2>
+<p>As caixas usam o <strong>Clang</strong>; os terminais das aulas mostram o <strong>g++</strong>. Os dois seguem o mesmo padrão C++23, então um programa <strong>correto</strong> dá o mesmo resultado nos dois. A diferença aparece quando algo dá errado: cada compilador escreve as mensagens com as suas palavras. Debaixo de toda caixa há uma nota lembrando disso. Veja as mesmas falhas nos dois compiladores, todas reais (o Clang da Ana, versão 21, dá as mesmas mensagens que o Clang 22 do editor).</p>
+
+<h3>1. Faltou o <code>;</code></h3>
+<pre class="term" data-cwd="~/cpp/sim">$ g++ -std=c++23 -Wall -Wextra erro.cpp -o erro
+erro.cpp: In function ‘int main()’:
+erro.cpp:4:33: error: expected ‘;’ before ‘}’ token
+    4 |     std::cout &lt;&lt; "Olá, mundo!\n"
+      |                                 ^
+      |                                 ;
+    5 | }
+      | ~
+$ clang++ -std=c++23 -Wall -Wextra erro.cpp -o erro
+erro.cpp:4:34: error: expected ';' after expression
+    4 |     std::cout &lt;&lt; "Olá, mundo!\n"
+      |                                 ^
+      |                                 ;
+1 error generated.</pre>
+
+<p>O g++ diz "esperava <code>;</code> antes do <code>}</code>"; o Clang, "esperava <code>;</code> depois da expressão". Mesmo diagnóstico, mesmo conserto. Repare em três diferenças de estilo:</p>
+<ul>
+  <li>o g++ começa dizendo em que função está (<code>In function ‘int main()’</code>);</li>
+  <li>o g++ usa aspas curvas (<code>‘;’</code>), o Clang aspas retas (<code>';'</code>);</li>
+  <li>a <strong>coluna</strong>: 33 no g++ e 34 no Clang. O Clang conta <strong>bytes</strong>, e o <code>á</code> de "Olá" ocupa dois bytes em UTF-8; o g++ conta caracteres. Numa linha sem acentos, os dois dão o mesmo número.</li>
+</ul>
+
+<h3>2. Um nome que não existe</h3>
+<pre class="term" data-cwd="~/cpp/sim">$ g++ -std=c++23 -Wall -Wextra total.cpp -o total
+total.cpp: In function ‘int main()’:
+total.cpp:5:39: error: ‘quantidade’ was not declared in this scope
+    5 |     std::cout &lt;&lt; "Total: " &lt;&lt; preco * quantidade &lt;&lt; "\n";
+      |                                       ^~~~~~~~~~
+$ clang++ -std=c++23 -Wall -Wextra total.cpp -o total
+total.cpp:5:39: error: use of undeclared identifier 'quantidade'
+    5 |     std::cout &lt;&lt; "Total: " &lt;&lt; preco * quantidade &lt;&lt; "\n";
+      |                                       ^~~~~~~~~~
+1 error generated.</pre>
+
+<p>g++: "<code>quantidade</code> não foi declarada neste escopo". Clang: "uso de identificador não declarado <code>quantidade</code>". As duas querem dizer: você usou um nome que o programa não conhece (esqueceu de criar a variável, ou escreveu o nome diferente). Essa dupla de frases vai aparecer muito no guia.</p>
+
+<h3>3. Aspas sem fechar: 391 linhas × 5</h3>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra aspas.cpp -o aspas 2&gt;&amp;1 | wc -l
+391                                                « o g++ se perde e escreve 391 linhas
+$ clang++ -std=c++23 -Wall -Wextra aspas.cpp -o aspas
+aspas.cpp:4:18: warning: missing terminating '"' character [-Winvalid-pp-token]
+    4 |     std::cout &lt;&lt; "Olá, mundo!\n;
+      |                  ^
+aspas.cpp:4:18: error: expected expression
+1 warning and 1 error generated.</pre>
+
+<p>Aqui a diferença é grande: depois de dizer <code>missing terminating " character</code> nas primeiras linhas, o g++ tenta entender o resto e despeja centenas de linhas de consequências (a aula <a href="editores.html">Editores e IDEs</a> mostra o começo). O Clang para logo. Nos dois, a lição é a mesma: <strong>a primeira mensagem é a que importa</strong>.</p>
+
+<h3>4. Erro do ligador</h3>
+<pre class="term" data-cwd="~/cpp/sim">$ g++ -std=c++23 -Wall -Wextra soma.cpp -o soma
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/cct8z3bi.o: na função "main":
+soma.cpp:(.text+0x13): referência não definida para "soma(int, int)"
+collect2: error: ld returned 1 exit status</pre>
+
+<pre class="file" data-file="o que o editor mostra">$ clang++ -std=c++23 -Wall -Wextra programa.cpp -o programa
+wasm-ld: error: /tmp/programa-62bf3f.o: undefined symbol: soma(int, int)
+clang++: error: linker command failed with exit code 1 (use -v to see invocation)
+[código de saída: 1]</pre>
+
+<p>A função <code>soma</code> foi declarada e nunca escrita (veja <a href="como-funciona.html">Como o C++ Vira Programa</a>). No Linux, o ligador é o <code>ld</code>, e a mensagem sai em português ("referência não definida"); no editor, o ligador é o <code>wasm-ld</code> (o ligador de WebAssembly), em inglês ("símbolo não definido"). Mesmo problema, mesma solução: escrever a função.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>g++ (terminais das aulas)</th><th>Clang (editor)</th></tr>
+<tr><td>Faltou <code>;</code></td><td><code>expected ‘;’ before ‘}’ token</code></td><td><code>expected ';' after expression</code></td></tr>
+<tr><td>Nome desconhecido</td><td><code>‘x’ was not declared in this scope</code></td><td><code>use of undeclared identifier 'x'</code></td></tr>
+<tr><td>Aspas sem fechar</td><td><code>missing terminating " character</code> + centenas de linhas</td><td><code>missing terminating '"' character</code> + <code>expected expression</code></td></tr>
+<tr><td>Variável não usada</td><td><code>unused variable ‘x’ [-Wunused-variable]</code></td><td><code>unused variable 'x' [-Wunused-variable]</code></td></tr>
+<tr><td>Função sem corpo</td><td><code>referência não definida para</code> (do <code>ld</code>)</td><td><code>undefined symbol:</code> (do <code>wasm-ld</code>)</td></tr>
+<tr><td>Contagem no fim</td><td>(não tem)</td><td><code>1 error generated.</code></td></tr>
+</table>
+</div>
+
+<p>Quando uma mensagem de um não fizer sentido, compare com a do outro: muitas vezes uma explica melhor que a outra.</p>
+
+<hr>
+
+<h2>O que funciona no editor</h2>
+<ul>
+  <li>Todo o C++23 que o guia ensina: <code>std::cout</code>, <code>std::print</code>/<code>std::println</code>, <code>std::format</code>, <code>std::string</code>, <code>std::vector</code> e os outros contêineres, ranges, lambdas, classes, templates, concepts, ponteiros inteligentes.</li>
+  <li>Exceções (<code>try</code>, <code>catch</code>, <code>throw</code>).</li>
+  <li>Entrada (<code>std::cin</code>, <code>std::getline</code>), argumentos, arquivos das abas e arquivos criados pelo programa.</li>
+  <li>Números aleatórios, <code>&lt;chrono&gt;</code>, <code>std::this_thread::sleep_for</code>.</li>
+  <li>Outras versões do C++, quando a caixa pede (aula <a href="versoes.html">Versões do C++</a> tem uma caixa em C++20).</li>
+</ul>
+
+<h2>O que não funciona (só no seu computador)</h2>
+<ul>
+  <li><strong>Threads:</strong> <code>std::thread</code> compila, mas, ao criar a thread, o programa termina com <code>thread constructor failed: Not supported</code>. A aula <a href="threads.html">Threads</a> usa o terminal.</li>
+  <li><strong><code>system()</code></strong> (rodar um comando do sistema) e <strong>rede</strong>: não há sistema nem rede dentro do navegador.</li>
+  <li><strong><code>import std;</code></strong>: use <code>#include</code> (aula <a href="modulos.html">Módulos</a>).</li>
+  <li><strong>Depurador e sanitizers</strong> (<code>gdb</code>, <code>-fsanitize</code>): as aulas <a href="depuracao-gdb.html">Depurar com o GDB</a> e <a href="sanitizers.html">Sanitizers</a> usam o terminal.</li>
+  <li><strong>Fuso horário:</strong> o relógio do editor está em UTC (horário de Greenwich), 3 horas à frente de Brasília.</li>
+  <li><strong>Limites:</strong> 15 segundos rodando, 2 MB de saída, 256 MB de memória.</li>
+</ul>
+
+<hr>
+
+<h2>O que é diferente no editor × no seu computador</h2>
+<p>O editor gera um programa <strong>WebAssembly de 32 bits</strong> e usa a biblioteca padrão do LLVM (a <strong>libc++</strong>). O g++ do Linux gera um programa <strong>x86-64 de 64 bits</strong> e usa a biblioteca do GCC (a <strong>libstdc++</strong>). Para programas corretos, isso quase nunca muda nada. Mas, quando o programa faz algo errado ou depende do tamanho dos tipos, as diferenças aparecem. Todas as linhas abaixo foram conferidas: no editor, com a ferramenta do guia que roda o mesmo compilador fora do navegador; no computador, com o g++ 15 da Ana.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Editor (Clang 22 + libc++)</th><th>g++ 15 no Linux (libstdc++)</th></tr>
+<tr><td>Exceção que ninguém trata</td><td><code>libc++abi: terminating due to uncaught exception of type std::runtime_error: deu ruim</code>, <code>Abortado (imagem do núcleo gravada)</code>, código 134</td><td><code>terminate called after throwing an instance of 'std::runtime_error'</code> / <code>  what():  deu ruim</code>, <code>Abortado</code>, código 134</td></tr>
+<tr><td>Usar um ponteiro nulo (<code>*p</code> com <code>p = nullptr</code>)</td><td><code>Falha de segmentação (imagem do núcleo gravada)</code>, código 139</td><td><code>Falha de segmentação</code>, código 139 (igual)</td></tr>
+<tr><td>Divisão inteira por zero</td><td><code>Exceção de ponto flutuante (imagem do núcleo gravada)</code>, código 136</td><td><code>Exceção de ponto flutuante</code>, código 136 (igual)</td></tr>
+<tr><td><code>v[10]</code> num vetor de 3 elementos</td><td>passa em silêncio: mostrou <code>0</code> e o programa continuou</td><td>no Ubuntu, o g++ vem com conferências ligadas: <code>Assertion '__n &lt; this-&gt;size()' failed.</code>, código 134</td></tr>
+<tr><td><code>delete</code> duas vezes no mesmo ponteiro</td><td>passa em silêncio, código 0</td><td><code>free(): double free detected in tcache 2</code>, <code>Abortado</code>, código 134</td></tr>
+<tr><td><code>sizeof(long)</code> e <code>sizeof</code> de um ponteiro</td><td><code>4</code> e <code>4</code> (32 bits)</td><td><code>8</code> e <code>8</code> (64 bits)</td></tr>
+<tr><td><code>sizeof(int)</code> e <code>sizeof(long long)</code></td><td><code>4</code> e <code>8</code></td><td><code>4</code> e <code>8</code> (igual)</td></tr>
+<tr><td><code>std::system("ls")</code></td><td><code>sh: 1: ls: not found</code></td><td>roda o <code>ls</code></td></tr>
+<tr><td><code>std::thread</code></td><td><code>thread constructor failed: Not supported</code>, <code>Abortado</code></td><td>funciona</td></tr>
+<tr><td>Erro de ligação</td><td><code>wasm-ld: error: …: undefined symbol: soma(int, int)</code></td><td><code>referência não definida para "soma(int, int)"</code></td></tr>
+</table>
+</div>
+
+<p>A lição mais importante está nas linhas do <code>v[10]</code> e do <code>delete</code> duplo: um erro que "passa em silêncio" <strong>continua sendo um erro</strong>. Em C++, acessar fora do vetor ou liberar a memória duas vezes é <strong>comportamento indefinido</strong>: o programa pode travar, pode mostrar lixo, pode até parecer funcionar, e o resultado muda de um computador para outro. O editor e o g++ fizeram coisas diferentes justamente por isso. A aula <a href="comportamento-indefinido.html">Comportamento Indefinido</a> trata do assunto, e as aulas <a href="sanitizers.html">Sanitizers</a> e <a href="depuracao-gdb.html">Depurar com o GDB</a> mostram as ferramentas que caçam esses erros no seu computador.</p>
+
+<p>Confira o tamanho dos tipos no editor. No terminal da Ana, o mesmo programa mostra <code>int: 4</code>, <code>long: 8</code>, <code>long long: 8</code> e <code>ponteiro: 8</code>:</p>
+
+<div class="trycpp">
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "int: " &lt;&lt; sizeof(int) &lt;&lt; "\n";
+    std::cout &lt;&lt; "long: " &lt;&lt; sizeof(long) &lt;&lt; "\n";
+    std::cout &lt;&lt; "long long: " &lt;&lt; sizeof(long long) &lt;&lt; "\n";
+    std::cout &lt;&lt; "ponteiro: " &lt;&lt; sizeof(int*) &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<p>Por isso o guia prefere <code>int</code> e <code>long long</code>, que têm o mesmo tamanho nos dois, e explica os tamanhos na aula <a href="inteiros.html">Inteiros</a>.</p>
+
+<p>No terminal da Ana, os programas que "quebram" mostram estas mensagens (o bash escreve o nome do sinal e o do programa):</p>
+
+<pre class="term" data-cwd="~/cpp/sim">$ ./nulo
+Falha de segmentação     (imagem do núcleo gravada) ./nulo
+$ ./divzero
+antes
+Exceção de ponto flutuante (imagem do núcleo gravada) ./divzero
+$ ./excecao
+antes
+terminate called after throwing an instance of 'std::runtime_error'
+  what():  deu ruim
+Abortado                   (imagem do núcleo gravada) ./excecao
+$ ./doublefree
+free(): double free detected in tcache 2
+Abortado                   (imagem do núcleo gravada) ./doublefree</pre>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"Cliquei em Rodar e fica <code>Baixando o compilador…</code> para sempre"</strong>
+<p><strong>O que significa:</strong> o download de cerca de 33 MB está lento ou foi interrompido. Se falhar, a caixa mostra <code>Não consegui carregar o compilador: …</code>.</p>
+<p><strong>Como consertar:</strong> confira a internet e clique em Rodar de novo. Bloqueadores de conteúdo muito agressivos e o modo "economia de dados" de alguns celulares podem atrapalhar. Depois que baixa uma vez, não baixa mais.</p>
+</div>
+
+<div class="cenario">
+<strong>"O programa ficou parado e não mostrou nada"</strong>
+<p><strong>O que significa:</strong> quase sempre ele está <strong>esperando você digitar</strong>: há um <code>std::cin</code> e a caixa mostrou o campo de entrada no terminal. Outra possibilidade: um laço infinito, que o editor para sozinho em 15 segundos.</p>
+<p><strong>Como consertar:</strong> clique no terminal da caixa, digite e tecle Enter. Ou clique em ■ Parar.</p>
+</div>
+
+<div class="cenario">
+<strong>"No editor funcionou, no meu computador deu erro" (ou o contrário)</strong>
+<p><strong>O que significa:</strong> três causas comuns. (1) Você compilou sem <code>-std=c++23</code> e o seu g++ usou o C++17 (aula <a href="versoes.html">Versões do C++</a>). (2) O programa tem comportamento indefinido (tabela acima). (3) O programa depende de algo que só um dos lados tem: threads, <code>system()</code>, o tamanho do <code>long</code>.</p>
+<p><strong>Como consertar:</strong> compile sempre com o comando padrão do guia, <code>g++ -std=c++23 -Wall -Wextra</code>, leia os avisos, e confira a tabela "O que é diferente".</p>
+</div>
+
+<div class="cenario">
+<strong>"A missão não se cumpre, mas a saída parece certa"</strong>
+<p><strong>O que significa:</strong> a comparação é exata: uma letra maiúscula, um acento, um espaço ou um ponto final a mais ou a menos fazem diferença. Algumas missões também pedem um recurso específico; a pista entre parênteses diz o que falta.</p>
+<p><strong>Como consertar:</strong> compare a sua saída com a pedida, caractere por caractere. Se ainda assim não sair, use Ver solução e compare os códigos.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No terminal da caixa</th><th>Significa</th></tr>
+<tr><td><code>$ clang++ -std=c++23 -Wall -Wextra programa.cpp -o programa</code></td><td>O comando de compilação (o editor usa o Clang)</td></tr>
+<tr><td><code>(compilando…)</code></td><td>O compilador está trabalhando</td></tr>
+<tr><td><code>arquivo:linha:coluna: error: …</code></td><td>Erro de compilação: o programa não roda</td></tr>
+<tr><td><code>arquivo:linha:coluna: warning: …</code></td><td>Aviso: o programa roda, mas confira</td></tr>
+<tr><td><code>$ ./programa …</code></td><td>O programa começou a rodar, com os argumentos</td></tr>
+<tr><td><code>Abortado</code>, <code>Falha de segmentação</code>, <code>Exceção de ponto flutuante</code> + <code>(imagem do núcleo gravada)</code></td><td>O programa "quebrou" (como no Linux)</td></tr>
+<tr><td><code>[código de saída: N]</code></td><td>Como terminou: <code>0</code> bem; outro número, problema (1 = a compilação falhou; 130 = interrompido; 134, 136, 139 = quebrou)</td></tr>
+</table>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ação</th><th>Como</th></tr>
+<tr><td>Rodar</td><td>▶ Rodar ou <kbd>Ctrl</kbd>+<kbd>Enter</kbd></td></tr>
+<tr><td>Parar</td><td>■ Parar ou <kbd>Ctrl</kbd>+<kbd>C</kbd> no campo de entrada</td></tr>
+<tr><td>Digitar a entrada</td><td>No campo que aparece no terminal; <kbd>Enter</kbd> envia, <kbd>Ctrl</kbd>+<kbd>D</kbd> encerra</td></tr>
+<tr><td>Voltar ao original</td><td>Restaurar</td></tr>
+<tr><td>Ver uma solução</td><td>Ver solução → Sim, mostrar</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">1. Qual compilador as caixas Experimente usam?</p>
+<label><input type="radio" name="q1"> O g++ instalado no seu computador.</label>
+<label><input type="radio" name="q1"> O Clang, funcionando dentro do navegador (WebAssembly).</label>
+<label><input type="radio" name="q1"> Nenhum: o editor só imita a saída.</label>
+<label><input type="radio" name="q1"> Um compilador num servidor da internet.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">2. O g++ diz <code>‘total’ was not declared in this scope</code>. O que o Clang do editor diz no mesmo caso?</p>
+<label><input type="radio" name="q2"> <code>expected ';' after expression</code></label>
+<label><input type="radio" name="q2"> <code>unused variable 'total'</code></label>
+<label><input type="radio" name="q2"> <code>undefined symbol: total</code></label>
+<label><input type="radio" name="q2"> <code>use of undeclared identifier 'total'</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Um programa lê um <code>v[10]</code> num vetor de 3 elementos. No editor, ele mostrou <code>0</code> e continuou. O que isso prova?</p>
+<label><input type="radio" name="q3"> Que o código está certo.</label>
+<label><input type="radio" name="q3"> Que o vetor cresce sozinho.</label>
+<label><input type="radio" name="q3"> Nada: é comportamento indefinido, e em outro computador o resultado pode ser outro (no g++ do Ubuntu, o programa aborta).</label>
+<label><input type="radio" name="q3"> Que o editor tem um defeito.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. O terminal da caixa terminou com <code>[código de saída: 130]</code>. O que aconteceu?</p>
+<label><input type="radio" name="q4"> O programa foi interrompido (■ Parar ou <kbd>Ctrl</kbd>+<kbd>C</kbd>).</label>
+<label><input type="radio" name="q4"> A compilação falhou.</label>
+<label><input type="radio" name="q4"> O programa terminou bem.</label>
+<label><input type="radio" name="q4"> Faltou internet.</label>
+</div>
+
+<div class="exercise">
+<h3>5. O tamanho do <code>long</code></h3>
+<p>Quantos bytes tem um <code>long</code> no editor do guia (WebAssembly de 32 bits)?</p>
+<div class="ex-code">sizeof(long) = <input data-answer="4" aria-label="bytes" size="3"></div>
+</div>
+
+<h3>Missão final: o código de saída</h3>
+
+<div class="trycpp" data-goal="out:Arquivo não encontrado.,exit:3">
+<p class="try-task"><strong>Missão:</strong> programas avisam que algo deu errado terminando com um código diferente de 0. Faça este programa mostrar <code>Arquivo não encontrado.</code> e terminar com o código <code>3</code>: troque o texto e o <code>return 0;</code>. Confira o <code>[código de saída: 3]</code> no fim do terminal da caixa.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Tudo certo.\n";
+    return 0;
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Arquivo não encontrado.\n";
+    return 3;
+}
+</pre>
+</div>
+
+<p>No terminal da Ana, o código aparece com <code>echo $?</code>:</p>
+
+<pre class="term" data-cwd="~/cpp/sim">$ ./saida
+Algo deu errado.
+$ echo $?
+3</pre>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>As caixas Experimente compilam C++ de verdade com o <strong>Clang 22</strong> em WebAssembly, no navegador, com <code>-std=c++23 -Wall -Wextra</code>, e rodam o programa.</li>
+  <li>Na primeira vez, o navegador baixa uns 33 MB; depois, fica guardado.</li>
+  <li>O terminal da caixa mostra o comando, os erros e avisos, a saída e o <code>[código de saída: N]</code>.</li>
+  <li><code>std::cin</code>: o programa pausa e você digita no terminal da caixa (Enter envia, <kbd>Ctrl</kbd>+<kbd>D</kbd> encerra, <kbd>Ctrl</kbd>+<kbd>C</kbd> para). Argumentos e abas funcionam como no terminal.</li>
+  <li>Missões conferem o resultado; Restaurar volta ao original; Ver solução mostra uma solução.</li>
+  <li>Clang e g++ dizem a mesma coisa com palavras diferentes: <code>use of undeclared identifier</code> × <code>was not declared in this scope</code>. Leia sempre a primeira mensagem.</li>
+  <li>Diferenças: <code>long</code> e ponteiros têm 4 bytes no editor e 8 no Linux; threads, <code>system()</code>, gdb e sanitizers só no seu computador; erros de memória podem passar em silêncio no editor.</li>
+  <li>Próximo passo: o seu primeiro programa, linha por linha, em <a href="primeiro-programa.html">Olá, Mundo</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
