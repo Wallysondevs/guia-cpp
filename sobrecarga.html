@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Sobrecarga de Funções — mesmo nome, parâmetros diferentes | Guia C++</title>
+<meta name="description" content="Sobrecarga de funções em C++ para quem nunca programou: várias funções com o mesmo nome e parâmetros diferentes, como o compilador escolhe qual chamar, o erro real call of overloaded … is ambiguous, sobrecarga × valor padrão e por que só o tipo de retorno diferente não basta (ambiguating new declaration). Com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Sobrecarga de Funções</span></h1>
+
+<p class="intro">Na aula <a href="funcoes.html">Funções</a>, duas funções com o mesmo nome deram o erro <code>redefinition</code>. Mas isso só vale quando elas têm também os <strong>mesmos parâmetros</strong>. Se os parâmetros forem diferentes (outros tipos ou outra quantidade), o C++ aceita várias funções com o mesmo nome, e escolhe a certa olhando os argumentos de cada chamada. Isso se chama <strong>sobrecarga</strong> (em inglês, <em>overloading</em>). Nesta aula você vai criar funções sobrecarregadas, entender como o compilador escolhe, e conhecer os três erros típicos: a chamada ambígua, a mistura com valor padrão e a tentativa de sobrecarregar só pelo retorno.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como criar várias funções com o mesmo nome e parâmetros diferentes.</li>
+  <li>Como o compilador escolhe qual delas chamar, e algumas escolhas surpreendentes.</li>
+  <li>O erro <code>call of overloaded ‘…’ is ambiguous</code> e como resolvê-lo.</li>
+  <li>Por que sobrecarga e valor padrão podem brigar entre si.</li>
+  <li>Por que mudar <strong>só</strong> o tipo de retorno não cria uma sobrecarga (<code>ambiguating new declaration</code>).</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com o comando padrão do guia, <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: "abrir" uma porta, uma lata, um arquivo</h2>
+<p>Em português, usamos o mesmo verbo para coisas bem diferentes: <strong>abrir</strong> a porta, <strong>abrir</strong> uma lata, <strong>abrir</strong> uma conta no banco. Ninguém se confunde, porque o <strong>complemento</strong> deixa claro o que fazer: com a porta, você gira a maçaneta; com a lata, usa o abridor.</p>
+
+<p>Na sobrecarga, o nome da função é o verbo, e os argumentos são o complemento. <code>mostrar(42)</code> e <code>mostrar("Ana")</code> usam o mesmo nome, mas o compilador vê que um argumento é número e o outro é texto, e chama a versão certa de cada um.</p>
+
+<hr>
+
+<h2>1. Mesmo nome, tipos diferentes</h2>
+<p>Sem sobrecarga, a Ana precisaria inventar um nome para cada tipo: <code>mostrarInt</code>, <code>mostrarDouble</code>, <code>mostrarTexto</code>. Com sobrecarga, todas se chamam <code>mostrar</code>:</p>
+
+<pre class="file" data-file="mostrar.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void mostrar(int x) {
+    std::cout &lt;&lt; "inteiro: " &lt;&lt; x &lt;&lt; "\n";
+}
+
+void mostrar(double x) {
+    std::cout &lt;&lt; "com vírgula: " &lt;&lt; x &lt;&lt; "\n";
+}
+
+void mostrar(std::string x) {
+    std::cout &lt;&lt; "texto: " &lt;&lt; x &lt;&lt; "\n";
+}
+
+int main() {
+    mostrar(42);
+    mostrar(3.14);
+    mostrar(std::string("Ana"));
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra mostrar.cpp -o mostrar
+$ ./mostrar
+inteiro: 42
+com vírgula: 3.14
+texto: Ana</pre>
+
+<dl class="anatomy">
+  <dt>void mostrar(int x)</dt><dd>A versão para inteiros.</dd>
+  <dt>void mostrar(double x)</dt><dd>Mesmo nome, parâmetro de outro tipo: é outra função. O compilador não reclama de redefinição, porque as duas são diferentes.</dd>
+  <dt>mostrar(42);</dt><dd><code>42</code> é um <code>int</code>: o compilador escolhe a primeira.</dd>
+  <dt>mostrar(3.14);</dt><dd><code>3.14</code> é um <code>double</code> (números com ponto são <code>double</code> em C++): a segunda.</dd>
+  <dt>mostrar(std::string("Ana"));</dt><dd>Um <code>std::string</code>: a terceira.</dd>
+</dl>
+
+<p>Para o compilador, uma função é identificada pelo <strong>nome junto com os tipos dos parâmetros</strong>. Esse conjunto se chama <strong>assinatura</strong>. <code>mostrar(int)</code>, <code>mostrar(double)</code> e <code>mostrar(std::string)</code> têm assinaturas diferentes, então são três funções. Repare que as mensagens de erro do g++ sempre mostram a assinatura completa, como <code>‘void item(std::string, int, double)’</code>: é assim que o compilador "chama" cada função.</p>
+
+<h3>Mesmo nome, quantidade diferente</h3>
+<p>A sobrecarga também vale quando o <strong>número</strong> de parâmetros muda:</p>
+
+<pre class="file" data-file="area.cpp">#include &lt;iostream&gt;
+
+double area(double lado) {
+    return lado * lado;
+}
+
+double area(double largura, double altura) {
+    return largura * altura;
+}
+
+int main() {
+    std::cout &lt;&lt; "Quadrado 3: " &lt;&lt; area(3) &lt;&lt; "\n";
+    std::cout &lt;&lt; "Retângulo 3 x 5: " &lt;&lt; area(3, 5) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra area.cpp -o area
+$ ./area
+Quadrado 3: 9
+Retângulo 3 x 5: 15</pre>
+
+<p>Um argumento: área do quadrado. Dois: área do retângulo. O nome conta a mesma história ("calcule a área"), e os argumentos dizem de quê.</p>
+
+<div class="tip">
+<strong>Você já usa sobrecarga</strong>
+<p>O <code>std::cout &lt;&lt;</code> mostra números, textos e caracteres porque o <code>&lt;&lt;</code> é sobrecarregado para cada tipo. <code>std::to_string</code> (<a href="string-numero.html">Texto ↔ Número</a>) tem uma versão para <code>int</code>, outra para <code>double</code>… E <code>std::abs</code> e <code>std::max</code> (<a href="matematica.html">Matemática</a>) também. Quando bem usada, a sobrecarga é invisível: você só pensa "mostrar", "converter", "valor absoluto".</p>
+</div>
+
+<h3>Um exemplo completo: o maior de dois</h3>
+<pre class="file" data-file="maior.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int maior(int a, int b) {
+    if (a &gt; b) {
+        return a;
+    }
+    return b;
+}
+
+double maior(double a, double b) {
+    if (a &gt; b) {
+        return a;
+    }
+    return b;
+}
+
+std::string maior(std::string a, std::string b) {
+    if (a.size() &gt; b.size()) {
+        return a;
+    }
+    return b;
+}
+
+int main() {
+    std::cout &lt;&lt; maior(3, 9) &lt;&lt; "\n";
+    std::cout &lt;&lt; maior(2.5, 1.5) &lt;&lt; "\n";
+    std::cout &lt;&lt; maior(std::string("Ana"), std::string("Bruno")) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra maior.cpp -o maior
+$ ./maior
+9
+2.5
+Bruno                    « para textos, "maior" aqui é o de mais letras</pre>
+
+<p>Cada versão pode devolver um tipo diferente (<code>int</code>, <code>double</code>, <code>std::string</code>): o que precisa mudar são os parâmetros. Repare também que as versões <code>int</code> e <code>double</code> são idênticas por dentro. Quando isso acontece, existe um recurso melhor que escrever a mesma função várias vezes: os <a href="templates-funcao.html">templates de função</a>, que você verá no Nível 3.</p>
+
+<hr>
+
+<h2>2. Como o compilador escolhe</h2>
+<p>Em cada chamada, o compilador olha os tipos dos argumentos e procura a versão que <strong>combina melhor</strong>. De forma simplificada, ele prefere, nesta ordem:</p>
+
+<ol>
+  <li><strong>Encaixe exato</strong>: o argumento já é do tipo do parâmetro (<code>42</code> para <code>int</code>).</li>
+  <li><strong>Promoção</strong>: um tipo "menor" que cabe sem perda num tipo maior parecido: <code>char</code> e <code>bool</code> viram <code>int</code>; <code>float</code> vira <code>double</code>.</li>
+  <li><strong>Conversão</strong>: as outras transformações, como <code>int</code> para <code>double</code>, <code>double</code> para <code>int</code>, ou um texto entre aspas para <code>std::string</code>.</li>
+</ol>
+
+<p>Veja o que acontece com argumentos que não são exatamente <code>int</code>, <code>double</code> ou <code>std::string</code>, com as mesmas três funções <code>mostrar</code> do começo:</p>
+
+<pre class="file" data-file="escolha.cpp">int main() {
+    mostrar('A');
+    mostrar(2.5f);
+    mostrar(true);
+    mostrar("Ana");
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra escolha.cpp -o escolha
+$ ./escolha
+inteiro: 65              « 'A' é um char: promovido a int (65 é o código do A)
+com vírgula: 2.5         « 2.5f é um float: promovido a double
+inteiro: 1               « true é um bool: promovido a int
+texto: Ana               « "Ana" convertido para std::string</pre>
+
+<p>As três primeiras são promoções, e cada uma encontrou o seu destino sem dúvida. A quarta é uma conversão, mas só existia uma versão capaz de receber texto. Nenhuma deu erro, mas duas (<code>'A'</code> e <code>true</code> virando números) provavelmente não eram o que a Ana queria. Sobrecarga com tipos "parecidos" pode surpreender.</p>
+
+<div class="warning">
+<strong>A pegadinha do <code>bool</code></strong>
+<p>Se existir uma versão para <code>bool</code>, um texto entre aspas vai para ela, e não para a de <code>std::string</code>:</p>
+<pre class="file" data-file="bool.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void mostrar(bool x) {
+    std::cout &lt;&lt; "sim/não: " &lt;&lt; x &lt;&lt; "\n";
+}
+
+void mostrar(std::string x) {
+    std::cout &lt;&lt; "texto: " &lt;&lt; x &lt;&lt; "\n";
+}
+
+int main() {
+    mostrar("Ana");
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra bool.cpp -o bool
+$ ./bool
+sim/não: 1               « sem erro, sem aviso</pre>
+<p>Um texto entre aspas não é um <code>std::string</code> (é um <code>const char*</code>, um endereço na memória), e a regra do C++ prefere transformá-lo em <code>bool</code> ("o endereço existe? sim") a criar um <code>std::string</code>. Para chamar a versão de texto, passe um <code>std::string</code> de verdade: <code>mostrar(std::string("Ana"))</code>, ou uma variável <code>std::string</code>. Foi por isso que o primeiro exemplo da aula usou <code>std::string("Ana")</code>.</p>
+</div>
+
+<hr>
+
+<h2>3. Quando o compilador não consegue escolher: ambiguidade</h2>
+<p>E se duas versões combinam <strong>igualmente bem</strong>? A Ana escreveu uma versão para <code>long</code> (inteiro grande, aula <a href="inteiros.html">Inteiros</a>) e outra para <code>double</code>, e chamou com um <code>int</code>:</p>
+
+<pre class="file" data-file="ambiguo.cpp">#include &lt;iostream&gt;
+
+void mostrar(long x) {
+    std::cout &lt;&lt; "long: " &lt;&lt; x &lt;&lt; "\n";
+}
+
+void mostrar(double x) {
+    std::cout &lt;&lt; "double: " &lt;&lt; x &lt;&lt; "\n";
+}
+
+int main() {
+    mostrar(5);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ambiguo.cpp -o ambiguo
+ambiguo.cpp: In function ‘int main()’:
+ambiguo.cpp:12:12: error: call of overloaded ‘mostrar(int)’ is ambiguous
+   12 |     mostrar(5);
+      |     ~~~~~~~^~~
+ambiguo.cpp:12:12: note: there are 2 candidates
+ambiguo.cpp:3:6: note: candidate 1: ‘void mostrar(long int)’
+    3 | void mostrar(long x) {
+      |      ^~~~~~~
+ambiguo.cpp:7:6: note: candidate 2: ‘void mostrar(double)’
+    7 | void mostrar(double x) {
+      |      ^~~~~~~</pre>
+
+<dl class="anatomy">
+  <dt>call of overloaded ‘mostrar(int)’ is ambiguous</dt><dd>"A chamada da função sobrecarregada <code>mostrar</code> com um <code>int</code> é ambígua". Ambígua = tem mais de um sentido possível.</dd>
+  <dt>note: there are 2 candidates</dt><dd>"Há 2 candidatas", e o g++ lista cada uma com a linha onde está.</dd>
+  <dt>candidate 1: ‘void mostrar(long int)’</dt><dd>De <code>int</code> para <code>long</code> é uma conversão.</dd>
+  <dt>candidate 2: ‘void mostrar(double)’</dt><dd>De <code>int</code> para <code>double</code> também é uma conversão. Empate: nenhuma é melhor que a outra, e o compilador se recusa a sortear.</dd>
+</dl>
+
+<p>Ambiguidade é <strong>erro de compilação</strong>, não aviso: o C++ prefere parar a adivinhar. Para resolver, deixe a chamada exata: <code>mostrar(5L)</code> (o <code>L</code> faz o número ser <code>long</code>), <code>mostrar(5.0)</code> (um <code>double</code>), ou acrescente uma versão <code>mostrar(int)</code>.</p>
+
+<p>Com vários parâmetros, o empate aparece quando cada versão ganha num argumento diferente:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra misto.cpp -o misto      « maior(3, 2.5) com as versões int e double
+misto.cpp: In function ‘int main()’:
+misto.cpp:18:23: error: call of overloaded ‘maior(int, double)’ is ambiguous
+   18 |     std::cout &lt;&lt; maior(3, 2.5) &lt;&lt; "\n";
+      |                  ~~~~~^~~~~~~~
+misto.cpp:18:23: note: there are 2 candidates
+misto.cpp:3:5: note: candidate 1: ‘int maior(int, int)’
+    3 | int maior(int a, int b) {
+      |     ^~~~~
+misto.cpp:10:8: note: candidate 2: ‘double maior(double, double)’
+   10 | double maior(double a, double b) {
+      |        ^~~~~</pre>
+
+<p>Para a versão <code>int</code>, o <code>3</code> encaixa exato e o <code>2.5</code> precisa de conversão; para a versão <code>double</code>, é o contrário. Empate de novo.</p>
+
+<div class="trycpp" data-goal="compila,out:3,src:int\s+maior\s*\(,src:double\s+maior\s*\(">
+<p class="try-task"><strong>Missão:</strong> rode e leia o erro (no editor, o Clang escreve <code>call to 'maior' is ambiguous</code>). Conserte <strong>só a chamada</strong>, sem apagar nenhuma das duas funções, para o programa mostrar <code>3</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int maior(int a, int b) {
+    if (a &gt; b) {
+        return a;
+    }
+    return b;
+}
+
+double maior(double a, double b) {
+    if (a &gt; b) {
+        return a;
+    }
+    return b;
+}
+
+int main() {
+    std::cout &lt;&lt; maior(3, 2.5) &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int maior(int a, int b) {
+    if (a &gt; b) {
+        return a;
+    }
+    return b;
+}
+
+double maior(double a, double b) {
+    if (a &gt; b) {
+        return a;
+    }
+    return b;
+}
+
+int main() {
+    std::cout &lt;&lt; maior(3.0, 2.5) &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>4. Sobrecarga × valor padrão</h2>
+<p>Na aula <a href="valor-padrao.html">Valores Padrão</a>, uma função só podia ser chamada com menos argumentos. A sobrecarga também permite isso. Misturar as duas coisas no mesmo nome pode criar um empate:</p>
+
+<pre class="file" data-file="padrao.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void saudar() {
+    std::cout &lt;&lt; "Olá!\n";
+}
+
+void saudar(std::string nome = "cliente") {
+    std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "!\n";
+}
+
+int main() {
+    saudar("Ana");
+    saudar();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra padrao.cpp -o padrao
+padrao.cpp: In function ‘int main()’:
+padrao.cpp:14:11: error: call of overloaded ‘saudar()’ is ambiguous
+   14 |     saudar();
+      |     ~~~~~~^~
+padrao.cpp:14:11: note: there are 2 candidates
+padrao.cpp:4:6: note: candidate 1: ‘void saudar()’
+    4 | void saudar() {
+      |      ^~~~~~
+padrao.cpp:8:6: note: candidate 2: ‘void saudar(std::string)’
+    8 | void saudar(std::string nome = "cliente") {
+      |      ^~~~~~</pre>
+
+<p>As duas funções, sozinhas, são válidas, e <code>saudar("Ana")</code> (linha 13) não teve problema: só a segunda aceita um texto. Mas <code>saudar()</code> sem argumentos combina com as duas: a primeira não pede nada, e a segunda tem tudo com padrão. Repare que o erro aparece <strong>na chamada</strong>, não na definição. Escolha um dos dois caminhos:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Caminho</th><th>Como fica</th><th>Melhor quando</th></tr>
+<tr><td>Só valor padrão</td><td><code>void saudar(std::string nome = "cliente")</code></td><td>As duas versões fazem a mesma coisa; só um valor muda. É mais curto: uma função só.</td></tr>
+<tr><td>Só sobrecarga</td><td><code>void saudar()</code> e <code>void saudar(std::string nome)</code></td><td>As versões fazem coisas diferentes (aqui, "Olá!" sem nome é uma frase diferente).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>5. Só o tipo de retorno diferente não basta</h2>
+<p>A Ana quis duas versões de <code>lerNumero</code>: uma que devolve <code>int</code> e outra que devolve <code>double</code>, ambas sem parâmetros:</p>
+
+<pre class="file" data-file="retorno.cpp">#include &lt;iostream&gt;
+
+int lerNumero() {
+    return 7;
+}
+
+double lerNumero() {
+    return 7.5;
+}
+
+int main() {
+    std::cout &lt;&lt; lerNumero() &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra retorno.cpp -o retorno
+retorno.cpp:7:8: error: ambiguating new declaration of ‘double lerNumero()’
+    7 | double lerNumero() {
+      |        ^~~~~~~~~
+retorno.cpp:3:5: note: old declaration ‘int lerNumero()’
+    3 | int lerNumero() {
+      |     ^~~~~~~~~</pre>
+
+<p><em>Ambiguating new declaration</em> = "nova declaração que cria ambiguidade"; a nota <em>old declaration</em> ("declaração antiga") mostra a primeira. O erro aparece já na <strong>definição</strong>, sem precisar de nenhuma chamada. O motivo: na chamada <code>lerNumero()</code>, o compilador só tem o nome e os argumentos para decidir. O que você vai fazer com o resultado (guardar num <code>int</code>, mostrar, somar) não entra na escolha. Como o tipo de retorno não faz parte da assinatura, as duas funções têm a mesma assinatura, <code>lerNumero()</code>.</p>
+
+<p>No editor do guia, o Clang diz isso com todas as letras: <code>functions that differ only in their return type cannot be overloaded</code> ("funções que diferem só no tipo de retorno não podem ser sobrecarregadas"). A saída é dar nomes diferentes: <code>lerInteiro()</code> e <code>lerDecimal()</code>.</p>
+
+<h3>Nomes de parâmetros diferentes também não contam</h3>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra nomes.cpp -o nomes      « int dobro(int x) e int dobro(int numero)
+nomes.cpp:7:5: error: redefinition of ‘int dobro(int)’
+    7 | int dobro(int numero) {
+      |     ^~~~~
+nomes.cpp:3:5: note: ‘int dobro(int)’ previously defined here
+    3 | int dobro(int x) {
+      |     ^~~~~</pre>
+<p>Para o compilador, as duas são <code>dobro(int)</code>: o nome do parâmetro não faz parte da assinatura. Resultado: redefinição.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que muda entre as duas funções</th><th>É sobrecarga válida?</th></tr>
+<tr><td>Tipos dos parâmetros: <code>f(int)</code> × <code>f(double)</code></td><td>Sim</td></tr>
+<tr><td>Quantidade de parâmetros: <code>f(int)</code> × <code>f(int, int)</code></td><td>Sim</td></tr>
+<tr><td>Ordem dos tipos: <code>f(int, double)</code> × <code>f(double, int)</code></td><td>Sim (mas confunde quem lê; evite)</td></tr>
+<tr><td>Só o tipo de retorno: <code>int f()</code> × <code>double f()</code></td><td><strong>Não</strong>: <code>ambiguating new declaration</code></td></tr>
+<tr><td>Só o nome dos parâmetros: <code>f(int x)</code> × <code>f(int y)</code></td><td><strong>Não</strong>: <code>redefinition</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando usar sobrecarga</h2>
+<ul>
+  <li><strong>Use</strong> quando as versões fazem a <strong>mesma coisa</strong> com tipos ou quantidades diferentes de informação: <code>area(lado)</code> e <code>area(largura, altura)</code>; <code>mostrar(int)</code> e <code>mostrar(std::string)</code>.</li>
+  <li><strong>Não use</strong> quando as versões fazem coisas diferentes: <code>processar(int)</code> que salva e <code>processar(std::string)</code> que apaga é uma armadilha para quem lê. Dê nomes diferentes.</li>
+  <li><strong>Evite</strong> sobrecargas com tipos "vizinhos" (<code>int</code>/<code>long</code>/<code>double</code>, <code>bool</code>/<code>std::string</code>): é onde moram as ambiguidades e as escolhas surpreendentes.</li>
+  <li>Se o corpo das versões é idêntico e só o tipo muda, prefira um <a href="templates-funcao.html">template</a>.</li>
+</ul>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: call of overloaded ‘…’ is ambiguous</code></strong>
+<p><strong>O que significa:</strong> mais de uma versão da função combina igualmente bem com os argumentos da chamada. A nota <code>there are N candidates</code> lista as versões empatadas.</p>
+<p><strong>Como consertar:</strong> deixe os argumentos com o tipo exato de uma das versões (<code>5.0</code> em vez de <code>5</code>, <code>5L</code> para <code>long</code>, <code>std::string("…")</code> para texto); ou acrescente a versão que falta; ou, se o empate é com um valor padrão, tire o padrão ou a sobrecarga.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: ambiguating new declaration of ‘double lerNumero()’</code></strong>
+<p><strong>O que significa:</strong> duas funções com o mesmo nome e os mesmos parâmetros, diferindo só no tipo de retorno.</p>
+<p><strong>Como consertar:</strong> dê nomes diferentes às funções, ou faça os parâmetros serem diferentes.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: redefinition of ‘int dobro(int)’</code></strong>
+<p><strong>O que significa:</strong> duas funções com a mesma assinatura. Mudar o nome dos parâmetros não basta.</p>
+<p><strong>Como consertar:</strong> apague uma, ou mude o <strong>tipo</strong> ou a quantidade dos parâmetros, se a ideia era uma sobrecarga.</p>
+</div>
+
+<div class="cenario">
+<strong>O compilador chamou a versão "errada", sem erro nenhum</strong>
+<p><strong>O que significa:</strong> o argumento foi promovido ou convertido para outro tipo: <code>'A'</code> foi para a versão <code>int</code>, <code>"Ana"</code> foi para a versão <code>bool</code>.</p>
+<p><strong>Como consertar:</strong> passe argumentos do tipo exato da versão desejada, ou acrescente a versão para o tipo que você está usando (por exemplo, <code>mostrar(char)</code>).</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Termo</th><th>Significado</th></tr>
+<tr><td>Sobrecarga (<em>overloading</em>)</td><td>Várias funções com o mesmo nome e parâmetros diferentes</td></tr>
+<tr><td>Assinatura</td><td>Nome + tipos dos parâmetros. O retorno e os nomes dos parâmetros não entram</td></tr>
+<tr><td>Encaixe exato &gt; promoção &gt; conversão</td><td>A ordem de preferência do compilador ao escolher a versão</td></tr>
+<tr><td><code>call of overloaded … is ambiguous</code></td><td>Empate entre duas ou mais versões</td></tr>
+<tr><td><code>ambiguating new declaration</code></td><td>Tentou sobrecarregar só pelo tipo de retorno</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Qual é chamada?</h3>
+<p>Existem <code>void f(int)</code> e <code>void f(double)</code>. Qual versão a chamada <code>f(2.0)</code> usa? Responda <code>int</code> ou <code>double</code>.</p>
+<div class="ex-code"><input data-answer="double" aria-label="tipo"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Promoção</h3>
+<p>Existem <code>void f(int)</code> e <code>void f(std::string)</code>. Que número aparece se <code>f(int)</code> mostra o valor recebido e a chamada é <code>f('B')</code>? (O código do <code>'B'</code> é um a mais que o do <code>'A'</code>.)</p>
+<div class="ex-code"><input data-answer="66" aria-label="número"></div>
+</div>
+
+<div class="exercise">
+<h3>3. A assinatura</h3>
+<p>Escreva a assinatura (nome e tipos, como o g++ mostra, sem o retorno) de <code>double media(double a, double b, double c)</code>:</p>
+<div class="ex-code"><input data-answer="media(double, double, double)|media(double,double,double)" aria-label="assinatura"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Qual par de funções <strong>não</strong> pode existir no mesmo programa?</p>
+<label><input type="radio" name="q4"> <code>void f(int)</code> e <code>void f(int, int)</code></label>
+<label><input type="radio" name="q4"> <code>void f(int)</code> e <code>void f(std::string)</code></label>
+<label><input type="radio" name="q4"> <code>int f(int)</code> e <code>double f(int)</code></label>
+<label><input type="radio" name="q4"> <code>void f(double)</code> e <code>void f(char)</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Existem <code>void tocar()</code> e <code>void tocar(int vezes = 1)</code>. O que acontece com <code>tocar(3)</code> e com <code>tocar()</code>?</p>
+<label><input type="radio" name="q5"> <code>tocar(3)</code> funciona; <code>tocar()</code> dá <code>call of overloaded ‘tocar()’ is ambiguous</code></label>
+<label><input type="radio" name="q5"> As duas funcionam</label>
+<label><input type="radio" name="q5"> As duas dão erro</label>
+<label><input type="radio" name="q5"> O erro aparece já na definição das funções</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">6. Existem <code>void mostrar(bool)</code> e <code>void mostrar(std::string)</code>. O que <code>mostrar("Oi")</code> chama?</p>
+<label><input type="radio" name="q6"> A versão <code>std::string</code></label>
+<label><input type="radio" name="q6"> A versão <code>bool</code>, sem erro nem aviso</label>
+<label><input type="radio" name="q6"> Dá erro de ambiguidade</label>
+<label><input type="radio" name="q6"> Nenhuma: dá erro de tipo</label>
+</div>
+
+<h3>Missão final: três etiquetas, um nome</h3>
+
+<div class="trycpp" data-goal="out:borracha: consulte o preço,out:caneta: R$ 2.5,out:3 x caderno: R$ 30,semaviso,src:void\s+etiqueta\s*\(\s*std::string\s+\w+\s*\)">
+<p class="try-task"><strong>Missão:</strong> crie <strong>três</strong> funções chamadas <code>etiqueta</code>, sem usar valores padrão. <code>etiqueta(std::string produto)</code> mostra <code>produto: consulte o preço</code>; <code>etiqueta(std::string produto, double preco)</code> mostra <code>produto: R$ preco</code>; <code>etiqueta(std::string produto, int quantidade, double preco)</code> mostra <code>quantidade x produto: R$ total</code>. Saída esperada:</p>
+<pre class="out">borracha: consulte o preço
+caneta: R$ 2.5
+3 x caderno: R$ 30</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+// crie as três funções etiqueta aqui
+
+int main() {
+    etiqueta("borracha");
+    etiqueta("caneta", 2.5);
+    etiqueta("caderno", 3, 10.0);
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void etiqueta(std::string produto) {
+    std::cout &lt;&lt; produto &lt;&lt; ": consulte o preço\n";
+}
+
+void etiqueta(std::string produto, double preco) {
+    std::cout &lt;&lt; produto &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; "\n";
+}
+
+void etiqueta(std::string produto, int quantidade, double preco) {
+    std::cout &lt;&lt; quantidade &lt;&lt; " x " &lt;&lt; produto &lt;&lt; ": R$ " &lt;&lt; quantidade * preco &lt;&lt; "\n";
+}
+
+int main() {
+    etiqueta("borracha");
+    etiqueta("caneta", 2.5);
+    etiqueta("caderno", 3, 10.0);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>Sobrecarga</strong>: várias funções com o mesmo nome, desde que os <strong>parâmetros</strong> sejam diferentes (tipo ou quantidade).</li>
+  <li>O compilador escolhe pela <strong>assinatura</strong> (nome + tipos dos parâmetros), preferindo encaixe exato, depois promoção (<code>char</code>/<code>bool</code> → <code>int</code>, <code>float</code> → <code>double</code>), depois conversão.</li>
+  <li>Empate entre versões: <code>call of overloaded ‘…’ is ambiguous</code>. Resolva deixando o argumento com o tipo exato.</li>
+  <li>Sobrecarga + valor padrão no mesmo nome pode empatar na chamada sem argumentos. Escolha um dos dois.</li>
+  <li>Só o tipo de retorno diferente não é sobrecarga: <code>ambiguating new declaration</code>. Só o nome do parâmetro diferente: <code>redefinition</code>.</li>
+  <li>Cuidado com tipos vizinhos: <code>"Ana"</code> prefere <code>bool</code> a <code>std::string</code>.</li>
+  <li>Próxima aula: <a href="escopo.html">Escopo</a>, onde cada variável existe.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
