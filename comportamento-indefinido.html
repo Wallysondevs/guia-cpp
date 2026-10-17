@@ -129,7 +129,7 @@ int main() {
 <hr>
 
 <h2>2. Índice fora do array</h2>
-<p>O operador <code>[ ]</code> dos arrays e do <code>std::vector</code> <strong>não confere</strong> se a posição existe (veja <a href="arrays.html">Arrays</a>). Pedir uma posição que não existe é UB: o programa lê (ou pior, escreve) a memória que estiver logo depois. O erro clássico é o <code>&lt;=</code> no lugar do <code>&lt;</code>:</p>
+<p>Pelo padrão, o operador <code>[ ]</code> dos arrays e do <code>std::vector</code> <strong>não precisa conferir</strong> se a posição existe (veja <a href="arrays.html">Arrays</a>). Pedir uma posição que não existe é UB: o programa lê (ou pior, escreve) a memória que estiver logo depois. O erro clássico é o <code>&lt;=</code> no lugar do <code>&lt;</code>:</p>
 
 <pre class="file" data-file="fora.cpp">#include &lt;iostream&gt;
 
@@ -187,6 +187,19 @@ $ echo $?
 134</pre>
 
 <p>O programa ainda está errado, mas agora o erro <strong>aparece</strong>, com a explicação: "a posição pedida (4) é maior ou igual ao tamanho (4)". Melhor ainda é não precisar de índice: o <a href="for-range.html">for de intervalo</a> (<code>for (int n : notas)</code>) percorre exatamente os elementos que existem.</p>
+
+<div class="note">
+<strong>Uma ajuda do g++ 15: o <code>[ ]</code> do <code>std::vector</code> conferido sem <code>-O2</code></strong>
+<p>A biblioteca do g++ 15 (a libstdc++) liga sozinha umas conferências extras quando você compila <strong>sem otimização</strong>. O mesmo erro do <code>&lt;=</code>, agora com um <code>std::vector</code> e o <code>[ ]</code> (<code>estouro.cpp</code>, igual ao <code>seguro.cpp</code> com <code>notas[i]</code> no lugar de <code>notas.at(i)</code>):</p>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra estouro.cpp -o estouro
+$ ./estouro
+/usr/include/c++/15/bits/stl_vector.h:1263: constexpr std::vector&lt; &lt;template-parameter-1-1&gt;, &lt;template-parameter-1-2&gt; &gt;::reference std::vector&lt; &lt;template-parameter-1-1&gt;, &lt;template-parameter-1-2&gt; &gt;::operator[](size_type) [with _Tp = int; _Alloc = std::allocator&lt;int&gt;; reference = int&amp;; size_type = long unsigned int]: Assertion '__n &lt; this-&gt;size()' failed.
+Abortado                   (imagem do núcleo gravada) ./estouro
+$ g++ -std=c++23 -Wall -Wextra -O2 estouro.cpp -o estouro-O2
+$ ./estouro-O2
+Soma: 34                   « com -O2, nenhuma conferência: leu além do fim e, por sorte, somou 0</pre>
+<p>No meio do texto comprido, o que importa é o fim: <em>Assertion '__n &lt; this-&gt;size()' failed</em> = "a conferência 'posição &lt; tamanho' falhou". Ótimo para achar o erro, mas não conte com isso: com <code>-O2</code>, em outros compiladores e no editor do guia, o <code>[ ]</code> não confere nada. O <code>at()</code> confere sempre.</p>
+</div>
 
 <hr>
 
