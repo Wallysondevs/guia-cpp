@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Lendo Erros do Compilador — arquivo:linha:coluna e os erros mais comuns | Guia C++</title>
+<meta name="description" content="Como ler uma mensagem de erro do g++ (arquivo:linha:coluna: error: mensagem, a linha copiada e o ^) e os erros mais comuns de iniciante com a mensagem real do g++ 15 e do Clang 21: falta de ponto e vírgula, cout sem std::, #include faltando, aspas não fechadas, chave faltando ou sobrando, nome errado, tipo errado. O erro na linha de baixo, um erro que vira centenas de linhas e os erros de ligação (undefined reference).">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Lendo Erros do Compilador</span></h1>
+
+<p class="intro">Todo programador, do primeiro dia ao vigésimo ano, vê erros de compilação o tempo todo. A diferença é que quem tem experiência <strong>lê</strong> a mensagem e sabe onde olhar em segundos. As mensagens do g++ estão em inglês e às vezes parecem enormes, mas seguem sempre o mesmo formato e usam um vocabulário pequeno. Nesta aula você aprende a ler esse formato, conhece os erros mais comuns de quem começa, com a mensagem real e a correção, e descobre por que um erro às vezes aparece na linha errada, ou vira centenas de linhas.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>As partes de uma mensagem: <code>arquivo:linha:coluna: error: mensagem</code>, a linha copiada e o <code>^</code>.</li>
+  <li>Um método para consertar erros sem se perder.</li>
+  <li>As palavras em inglês que mais aparecem.</li>
+  <li>Os erros mais comuns: <code>;</code> faltando, <code>std::</code> faltando, <code>#include</code> faltando, aspas e chaves, nome errado, tipo errado.</li>
+  <li>Por que o erro às vezes aparece na linha <strong>de baixo</strong>.</li>
+  <li>Por que um erro só pode gerar dezenas de mensagens, e como achar a que importa.</li>
+  <li>A diferença entre erro de <strong>compilação</strong> e erro de <strong>ligação</strong> (<code>undefined reference</code>).</li>
+  <li>As mesmas mensagens no Clang, o compilador do editor do guia.</li>
+</ul>
+</div>
+
+<p>Todos os códigos desta aula têm erros <strong>de propósito</strong>. Eles foram compilados na máquina da Ana com <code>g++ -std=c++23 -Wall -Wextra</code> (g++ 15.2) e, quando indicado, com o clang++ 21.1, numa pasta <code>~/erros</code>. As mensagens foram copiadas sem mudar nada, inclusive as aspas tipográficas ‘assim’ que o g++ usa. Uma lista maior, para consulta, está em <a href="ref-erros.html">Mensagens de Erro</a>.</p>
+
+<hr>
+
+<h2>A ideia: o corretor ortográfico</h2>
+<p>Quando você escreve um texto no celular, o corretor sublinha uma palavra em vermelho e sugere outra. Ele não entende o que você quis dizer: só sabe que aquela palavra não existe no dicionário dele. Às vezes a sugestão é perfeita; às vezes é engraçada.</p>
+
+<p>O compilador é um corretor muito mais rígido. Ele lê o seu código do começo ao fim e, quando algo não se encaixa nas regras do C++, anota <strong>onde</strong> percebeu o problema e <strong>o que</strong> esperava encontrar. Duas coisas para guardar desde já:</p>
+<ul>
+  <li><strong>Um erro de compilação não estraga nada.</strong> O programa só não é criado até você consertar. Pode errar à vontade.</li>
+  <li><strong>O compilador diz onde <em>percebeu</em> o erro</strong>, e isso nem sempre é onde você <em>errou</em>. Você vai ver por quê.</li>
+</ul>
+
+<hr>
+
+<h2>1. Anatomia de uma mensagem</h2>
+<p>A Ana esqueceu o ponto e vírgula no fim da linha 4:</p>
+
+<pre class="file" data-file="pv.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Lista de compras\n"
+    std::cout &lt;&lt; "Arroz\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra pv.cpp -o pv
+pv.cpp: In function ‘int main()’:
+pv.cpp:4:38: error: expected ‘;’ before ‘std’
+    4 |     std::cout &lt;&lt; "Lista de compras\n"
+      |                                      ^
+      |                                      ;
+    5 |     std::cout &lt;&lt; "Arroz\n";
+      |     ~~~                               </pre>
+
+<p>A linha mais importante é a terceira. Ela tem cinco partes, separadas por dois-pontos:</p>
+
+<dl class="anatomy">
+  <dt>pv.cpp:</dt><dd>O <strong>arquivo</strong> onde está o problema. Em programas com vários arquivos, isso importa muito.</dd>
+  <dt>4:</dt><dd>A <strong>linha</strong>. Os editores mostram o número das linhas na margem; no VS Code, <kbd>Ctrl</kbd> + <kbd>G</kbd> pula direto para uma linha.</dd>
+  <dt>38:</dt><dd>A <strong>coluna</strong>: em que caractere da linha, contando da esquerda. Na prática, quem mostra a coluna é o <code>^</code>, logo abaixo.</dd>
+  <dt>error:</dt><dd>O <strong>tipo</strong> da mensagem. <code>error</code> = o programa não foi criado. Outros tipos: <code>warning</code> (aviso, o programa é criado), <code>note</code> (nota, uma informação extra sobre a mensagem anterior) e <code>fatal error</code> (o compilador nem conseguiu continuar).</dd>
+  <dt>expected ‘;’ before ‘std’</dt><dd>A <strong>descrição</strong>: "esperava <code>;</code> antes de <code>std</code>".</dd>
+</dl>
+
+<p>E as outras linhas:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha da mensagem</th><th>O que é</th></tr>
+<tr><td><code>pv.cpp: In function ‘int main()’:</code></td><td>Contexto: "na função <code>int main()</code>". Diz em qual função estão os erros que vêm a seguir.</td></tr>
+<tr><td><code>    4 |     std::cout &lt;&lt; "Lista de compras\n"</code></td><td>A linha 4 do seu código, copiada, para você não precisar procurar.</td></tr>
+<tr><td><code>      |                                      ^</code></td><td>O <strong>acento circunflexo</strong> aponta a coluna exata: logo depois das aspas finais.</td></tr>
+<tr><td><code>      |                                      ;</code></td><td>Uma <strong>sugestão de correção</strong> (<em>fix-it</em>): o g++ desenha o <code>;</code> onde ele deveria estar.</td></tr>
+<tr><td><code>    5 |     std::cout …</code> e <code>~~~</code></td><td>A linha 5, com o <code>std</code> sublinhado (<code>~~~</code>): é o "<code>std</code>" da descrição, a primeira coisa que o g++ viu depois do lugar onde faltou o <code>;</code>.</td></tr>
+</table>
+</div>
+
+<p>Depois de um erro, o programa <strong>não</strong> é criado, e o g++ termina com o código de saída 1 (aula <a href="primeiro-programa.html">Olá, Mundo</a>):</p>
+
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra pv.cpp -o pv; echo "código de saída: $?"
+pv.cpp: In function ‘int main()’:
+pv.cpp:4:38: error: expected ‘;’ before ‘std’
+    4 |     std::cout &lt;&lt; "Lista de compras\n"
+      |                                      ^
+      |                                      ;
+    5 |     std::cout &lt;&lt; "Arroz\n";
+      |     ~~~
+código de saída: 1
+$ ls
+pv.cpp                   « nenhum programa "pv" foi criado</pre>
+
+<hr>
+
+<h2>2. O vocabulário das mensagens</h2>
+<p>Você não precisa saber inglês para ler erros de compilação. Umas vinte palavras resolvem quase tudo:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Em inglês</th><th>Em português</th><th>Exemplo</th></tr>
+<tr><td><code>expected</code></td><td>esperava (e não achou)</td><td><code>expected ‘;’</code></td></tr>
+<tr><td><code>before</code> / <code>after</code></td><td>antes de / depois de</td><td><code>before ‘}’ token</code></td></tr>
+<tr><td><code>token</code></td><td>"pedaço": cada palavra ou símbolo do código</td><td><code>‘}’ token</code></td></tr>
+<tr><td><code>declared</code> / <code>not declared</code></td><td>declarado (criado) / não declarado</td><td><code>‘x’ was not declared</code></td></tr>
+<tr><td><code>undeclared identifier</code></td><td>nome não declarado (forma do Clang)</td><td><code>use of undeclared identifier 'x'</code></td></tr>
+<tr><td><code>scope</code></td><td>escopo: a parte do código onde um nome vale</td><td><code>in this scope</code></td></tr>
+<tr><td><code>member of</code></td><td>membro de (algo que mora dentro de)</td><td><code>not a member of ‘std’</code></td></tr>
+<tr><td><code>did you mean</code></td><td>você quis dizer</td><td><code>did you mean ‘cout’?</code></td></tr>
+<tr><td><code>missing</code></td><td>faltando</td><td><code>missing terminating " character</code></td></tr>
+<tr><td><code>terminating</code></td><td>de fechamento</td><td>idem</td></tr>
+<tr><td><code>at end of input</code></td><td>no fim do arquivo</td><td><code>expected ‘}’ at end of input</code></td></tr>
+<tr><td><code>invalid conversion</code></td><td>conversão inválida (tipo errado)</td><td><code>from ‘const char*’ to ‘int’</code></td></tr>
+<tr><td><code>no match for</code></td><td>nenhuma combinação serve para</td><td><code>no match for ‘operator&lt;&lt;’</code></td></tr>
+<tr><td><code>ambiguous</code></td><td>ambíguo: mais de uma opção serve</td><td><code>reference to ‘size’ is ambiguous</code></td></tr>
+<tr><td><code>stray</code></td><td>perdido, solto</td><td><code>stray ‘\’ in program</code></td></tr>
+<tr><td><code>undefined reference</code></td><td>referência indefinida (erro de ligação)</td><td><code>undefined reference to `main'</code></td></tr>
+<tr><td><code>candidate</code></td><td>candidato: uma opção que o compilador tentou</td><td><code>note: candidate 1: …</code></td></tr>
+<tr><td><code>In file included from</code></td><td>no arquivo incluído a partir de</td><td>o caminho até um cabeçalho da biblioteca</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>3. O método: um erro de cada vez</h2>
+<ol class="passo">
+  <li><strong>Leia só o primeiro <code>error:</code></strong>. Os seguintes podem ser consequência dele.</li>
+  <li><strong>Vá até a linha e a coluna</strong> indicadas.</li>
+  <li><strong>Leia a descrição</strong> com o vocabulário acima. Se houver <code>did you mean</code> ou uma sugestão desenhada embaixo da linha, considere-a (mas não obedeça cegamente).</li>
+  <li><strong>Se a linha parece certa, olhe a de cima.</strong> Ponto e vírgula, aspas e chaves esquecidos são percebidos depois.</li>
+  <li><strong>Corrija só esse erro e compile de novo.</strong> Muitas vezes os outros somem junto.</li>
+</ol>
+
+<div class="tip">
+<strong>Erros aparecem também no editor</strong>
+<p>Editores como o VS Code (com a extensão de C++ ou o <code>clangd</code>) sublinham os erros em vermelho enquanto você digita, com a mesma mensagem do compilador ao passar o mouse. Veja <a href="editores.html">Editores e IDEs</a>. Mesmo assim, saber ler a mensagem do terminal é essencial: ela é a palavra final.</p>
+</div>
+
+<hr>
+
+<h2>4. Os erros mais comuns de quem começa</h2>
+
+<h3>4.1. Faltou o ponto e vírgula, e o erro aparece na linha de baixo</h3>
+<p>Você já viu o <code>pv.cpp</code>: o <code>;</code> faltava na linha 4, e o g++ apontou a linha 4. Mas nem sempre é assim. Aqui o <code>;</code> falta no fim de uma linha que cria uma variável (variáveis são da aula <a href="variaveis.html">Variáveis</a>):</p>
+
+<pre class="file" data-file="pv2.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 29
+    std::cout &lt;&lt; idade &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra pv2.cpp -o pv2
+pv2.cpp: In function ‘int main()’:
+pv2.cpp:5:5: error: expected ‘,’ or ‘;’ before ‘std’
+    5 |     std::cout &lt;&lt; idade &lt;&lt; "\n";
+      |     ^~~
+pv2.cpp:4:9: warning: unused variable ‘idade’ [-Wunused-variable]
+    4 |     int idade = 29
+      |         ^~~~~</pre>
+
+<p>O erro está na linha 4, mas o g++ apontou a <strong>linha 5</strong>, coluna 5. Por quê? Lembre que, para o compilador, a quebra de linha não significa nada (aula <a href="sintaxe.html">Sintaxe</a>). Ele leu <code>int idade = 29 std::cout …</code> como uma coisa só, e só percebeu o problema ao chegar no <code>std</code>, que não tem como continuar a frase. A descrição ajuda: "esperava <code>,</code> ou <code>;</code> <strong>antes</strong> de <code>std</code>". Antes do <code>std</code> está o fim da linha 4.</p>
+
+<p>E o aviso de "variável não usada"? É um efeito colateral: como a linha 5 não foi entendida, o compilador acha que a <code>idade</code> nunca foi usada. Consertando o erro, o aviso some.</p>
+
+<p>O Clang, nesse caso, aponta direto para o lugar certo (é por isso que o editor do guia às vezes é mais preciso que o terminal):</p>
+
+<pre class="term" data-cwd="~/erros">$ clang++ -std=c++23 -Wall -Wextra pv2.cpp -o pv2
+pv2.cpp:4:19: error: expected ';' at end of declaration
+    4 |     int idade = 29
+      |                   ^
+      |                   ;
+1 error generated.
+$ clang++ -std=c++23 -Wall -Wextra pv.cpp -o pv
+pv.cpp:4:38: error: expected ';' after expression
+    4 |     std::cout &lt;&lt; "Lista de compras\n"
+      |                                      ^
+      |                                      ;
+1 error generated.</pre>
+
+<p>"Esperava <code>;</code> no fim da declaração" / "depois da expressão". O Clang termina sempre com uma contagem: <code>1 error generated.</code> ("1 erro gerado").</p>
+
+<p><strong>Correção:</strong> o <code>;</code> no fim da linha <strong>de cima</strong> da que foi apontada (no g++) ou exatamente onde o <code>^</code> indica (no Clang).</p>
+
+<h3>4.2. Faltou o <code>std::</code></h3>
+<pre class="file" data-file="semstd.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int main() {
+    cout &lt;&lt; "Olá!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra semstd.cpp -o semstd
+semstd.cpp: In function ‘int main()’:
+semstd.cpp:4:5: error: ‘cout’ was not declared in this scope; did you mean ‘std::cout’?
+    4 |     cout &lt;&lt; "Olá!\n";
+      |     ^~~~
+      |     std::cout
+In file included from semstd.cpp:1:
+/usr/include/c++/15/iostream:65:18: note: ‘std::cout’ declared here
+   65 |   extern ostream cout;          ///&lt; Linked to standard output
+      |                  ^~~~
+$ clang++ -std=c++23 -Wall -Wextra semstd.cpp -o semstd
+semstd.cpp:4:5: error: use of undeclared identifier 'cout'; did you mean 'std::cout'?
+    4 |     cout &lt;&lt; "Olá!\n";
+      |     ^~~~
+      |     std::cout
+/usr/lib/gcc/x86_64-linux-gnu/15/../../../../include/c++/15/iostream:65:18: note: 'std::cout' declared here
+   65 |   extern ostream cout;          ///&lt; Linked to standard output
+      |                  ^
+1 error generated.</pre>
+
+<p>g++: "<code>cout</code> não foi declarado neste escopo; você quis dizer <code>std::cout</code>?". Clang: "uso de identificador não declarado <code>cout</code>; você quis dizer <code>std::cout</code>?". Mesma ideia, palavras diferentes. A <code>note</code> mostra onde o <code>std::cout</code> de verdade foi declarado, dentro da biblioteca: é só informação, você não precisa mexer lá.</p>
+<p><strong>Correção:</strong> <code>std::cout</code> (aula <a href="sintaxe.html">Sintaxe</a>).</p>
+
+<h3>4.3. Faltou o <code>#include</code></h3>
+<pre class="file" data-file="inc.cpp · erro de propósito">int main() {
+    std::cout &lt;&lt; "Olá!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra inc.cpp -o inc
+inc.cpp: In function ‘int main()’:
+inc.cpp:2:10: error: ‘cout’ is not a member of ‘std’
+    2 |     std::cout &lt;&lt; "Olá!\n";
+      |          ^~~~
+inc.cpp:1:1: note: ‘std::cout’ is defined in header ‘&lt;iostream&gt;’; this is probably fixable by adding ‘#include &lt;iostream&gt;’
+  +++ |+#include &lt;iostream&gt;
+    1 | int main() {
+$ clang++ -std=c++23 -Wall -Wextra inc.cpp -o inc
+inc.cpp:2:5: error: use of undeclared identifier 'std'
+    2 |     std::cout &lt;&lt; "Olá!\n";
+      |     ^
+1 error generated.</pre>
+
+<p>O g++ é generoso aqui: "<code>cout</code> não é membro de <code>std</code>", e a nota diz "<code>std::cout</code> é definido no cabeçalho <code>&lt;iostream&gt;</code>; provavelmente se resolve acrescentando <code>#include &lt;iostream&gt;</code>". A linha com <code>+++ |+</code> mostra a linha que ele acrescentaria. O Clang é mais seco: nem o <code>std</code> existe, porque nada da biblioteca foi incluído.</p>
+<p><strong>Correção:</strong> o <code>#include</code> do cabeçalho certo no topo do arquivo. Cada recurso da biblioteca mora num cabeçalho; as aulas sempre dizem qual.</p>
+
+<h3>4.4. Aspas que não fecham</h3>
+<pre class="file" data-file="aspas.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, Ana!\n;
+}
+</pre>
+
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra aspas.cpp -o aspas
+aspas.cpp:4:18: warning: missing terminating " character
+    4 |     std::cout &lt;&lt; "Olá, Ana!\n;
+      |                  ^
+aspas.cpp:4:18: error: missing terminating " character
+    4 |     std::cout &lt;&lt; "Olá, Ana!\n;
+      |                  ^~~~~~~~~~~~~
+aspas.cpp: In function ‘int main()’:
+aspas.cpp:5:1: error: expected primary-expression before ‘}’ token
+    5 | }
+      | ^</pre>
+
+<p>"Falta o caractere <code>"</code> de fechamento". O <code>^~~~</code> sublinha o texto que ficou aberto: das aspas de abertura até o fim da linha. Repare que o <code>;</code> foi parar <strong>dentro</strong> do texto, e por isso veio o segundo erro na linha 5. Corrigindo as aspas, ele some.</p>
+<p><strong>Correção:</strong> feche as aspas: <code>"Olá, Ana!\n";</code>. Os editores pintam o texto de uma cor só até as aspas fecharem, o que ajuda a enxergar.</p>
+
+<h3>4.5. Chave faltando ou sobrando</h3>
+<pre class="file" data-file="chave.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá!\n";
+</pre>
+
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra chave.cpp -o chave
+chave.cpp: In function ‘int main()’:
+chave.cpp:4:27: error: expected ‘}’ at end of input
+    4 |     std::cout &lt;&lt; "Olá!\n";
+      |                           ^
+chave.cpp:3:12: note: to match this ‘{’
+    3 | int main() {
+      |            ^</pre>
+
+<p>"Esperava <code>}</code> no fim da entrada" (no fim do arquivo). A <code>note</code> é a parte útil: "para combinar com esta <code>{</code>", e aponta a chave que ficou aberta. Em programas grandes, a chave que falta pode estar bem longe do fim do arquivo; o recuo bem-feito (aula <a href="sintaxe.html">Sintaxe</a>) é o que permite achá-la.</p>
+
+<p>Com uma chave a <strong>mais</strong>:</p>
+
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra chave2.cpp -o chave2          « a linha 6 tem uma } sobrando
+chave2.cpp:6:1: error: expected declaration before ‘}’ token
+    6 | }
+      | ^
+$ clang++ -std=c++23 -Wall -Wextra chave2.cpp -o chave2
+chave2.cpp:6:1: error: extraneous closing brace ('}')
+    6 | }
+      | ^
+1 error generated.</pre>
+
+<p>O g++ diz "esperava uma declaração antes de <code>}</code>"; o Clang é mais direto: "chave de fechamento sobrando".</p>
+<p><strong>Correção:</strong> toda <code>{</code> tem a sua <code>}</code>. Muitos editores destacam o par quando o cursor está numa chave.</p>
+
+<h3>4.6. Nome escrito errado</h3>
+<pre class="file" data-file="nome.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 29;
+    std::cout &lt;&lt; idadi &lt;&lt; "\n";
+    std::cot &lt;&lt; "Fim\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra nome.cpp -o nome
+nome.cpp: In function ‘int main()’:
+nome.cpp:5:18: error: ‘idadi’ was not declared in this scope; did you mean ‘idade’?
+    5 |     std::cout &lt;&lt; idadi &lt;&lt; "\n";
+      |                  ^~~~~
+      |                  idade
+nome.cpp:6:10: error: ‘cot’ is not a member of ‘std’; did you mean ‘oct’?
+    6 |     std::cot &lt;&lt; "Fim\n";
+      |          ^~~
+      |          oct
+nome.cpp:4:9: warning: unused variable ‘idade’ [-Wunused-variable]
+    4 |     int idade = 29;
+      |         ^~~~~</pre>
+
+<p>Dois erros independentes (aqui, sim, vale a pena ler os dois). O primeiro tem a sugestão certa: <code>idadi</code> → <code>idade</code>. O segundo mostra que o compilador <strong>chuta</strong>: para <code>cot</code>, ele sugeriu <code>oct</code> (uma coisa que existe na biblioteca, para mostrar números em base 8), e não o <code>cout</code> que você queria. O Clang acertou este:</p>
+
+<pre class="term" data-cwd="~/erros">$ clang++ -std=c++23 -Wall -Wextra nome.cpp -o nome 2&gt;&amp;1 | grep error
+nome.cpp:5:18: error: use of undeclared identifier 'idadi'; did you mean 'idade'?
+nome.cpp:6:10: error: no member named 'cot' in namespace 'std'; did you mean 'cout'?
+2 errors generated.</pre>
+
+<p><strong>Correção:</strong> o nome exato, com as mesmas maiúsculas. Use a sugestão como pista, não como ordem.</p>
+
+<h3>4.7. Tipo errado</h3>
+<pre class="file" data-file="tipo.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int main() {
+    int idade = "vinte e nove";
+    std::cout &lt;&lt; idade &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra tipo.cpp -o tipo
+tipo.cpp: In function ‘int main()’:
+tipo.cpp:4:17: error: invalid conversion from ‘const char*’ to ‘int’ [-fpermissive]
+    4 |     int idade = "vinte e nove";
+      |                 ^~~~~~~~~~~~~~
+      |                 |
+      |                 const char*
+$ clang++ -std=c++23 -Wall -Wextra tipo.cpp -o tipo
+tipo.cpp:4:9: error: cannot initialize a variable of type 'int' with an lvalue of type 'const char[13]'
+    4 |     int idade = "vinte e nove";
+      |         ^       ~~~~~~~~~~~~~~
+1 error generated.</pre>
+
+<p>Uma variável <code>int</code> guarda números inteiros, e a Ana tentou guardar um texto. O g++ diz "conversão inválida de <code>const char*</code> para <code>int</code>"; embaixo do texto, ele até escreve o tipo que encontrou (<code>const char*</code>, o jeito do C++ chamar um texto entre aspas). O Clang: "não é possível inicializar uma variável do tipo <code>int</code> com um valor do tipo <code>const char[13]</code>" (um texto de 13 <em>bytes</em>: as letras, os dois espaços e um marcador de fim). Nomes de tipo assustam no começo; o que importa é perceber "um lado é número, o outro é texto". Tipos são o assunto de <a href="tipos-dados.html">Tipos de Dados</a>.</p>
+<p><strong>Correção:</strong> o valor do tipo certo (<code>int idade = 29;</code>) ou uma variável do tipo certo (<code>std::string</code>, aula <a href="strings.html">Strings</a>). O <code>[-fpermissive]</code> no fim é uma opção que transformaria o erro em aviso: <strong>nunca</strong> use, o erro é real.</p>
+
+<div class="trycpp" data-goal="out:Feira da Ana,out:Total: 30,semaviso">
+<p class="try-task"><strong>Missão:</strong> este programa tem <strong>quatro</strong> erros, de quatro tipos desta seção. Rode, conserte só o primeiro erro que aparecer, rode de novo, e repita. (O editor usa o Clang, então as mensagens são as da segunda forma mostrada acima.)</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Feira da Ana\n"
+    int total = 30;
+    cout &lt;&lt; "Total: " &lt;&lt; totl &lt;&lt; "\n;
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Feira da Ana\n";
+    int total = 30;
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>5. Um erro, centenas de linhas</h2>
+<p>Às vezes um erro bobo produz uma parede de texto. A Ana esqueceu de fechar as aspas na primeira linha de uma lista:</p>
+
+<pre class="file" data-file="cascata.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Lista de compras:\n;
+    std::cout &lt;&lt; "Arroz\n";
+    std::cout &lt;&lt; "Feijão\n";
+    std::cout &lt;&lt; "Café\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra cascata.cpp -o cascata 2&gt;&amp;1 | wc -l
+391                      « 391 linhas de mensagem!
+$ g++ -std=c++23 -Wall -Wextra cascata.cpp -o cascata 2&gt;&amp;1 | grep -c 'error:'
+5                        « mas só 5 erros; o resto são notas
+$ g++ -std=c++23 -Wall -Wextra cascata.cpp -o cascata 2&gt;&amp;1 | head -n 8
+cascata.cpp:4:18: warning: missing terminating " character
+    4 |     std::cout &lt;&lt; "Lista de compras:\n;
+      |                  ^
+cascata.cpp:4:18: error: missing terminating " character
+    4 |     std::cout &lt;&lt; "Lista de compras:\n;
+      |                  ^~~~~~~~~~~~~~~~~~~~~
+cascata.cpp: In function ‘int main()’:
+cascata.cpp:4:15: error: no match for ‘operator&lt;&lt;’ (operand types are ‘std::ostream’ {aka ‘std::basic_ostream&lt;char&gt;’} and ‘std::ostream’ {aka ‘std::basic_ostream&lt;char&gt;’})</pre>
+
+<p>(O <code>2&gt;&amp;1 | wc -l</code> conta as linhas da mensagem, o <code>grep -c</code> conta as que têm <code>error:</code> e o <code>head -n 8</code> mostra só as 8 primeiras. São ferramentas do terminal, explicadas no Guia Bash.)</p>
+
+<p>O primeiro erro é o verdadeiro: as aspas da linha 4. Sem elas, o compilador "costurou" a linha 4 com a 5 e tentou mandar um <code>std::cout</code> para dentro do outro (<code>no match for ‘operator&lt;&lt;’</code>). Para cada tentativa frustrada, ele lista todas as formas de <code>&lt;&lt;</code> que conhece (os "candidatos"), dezenas delas, com o caminho de cada uma dentro da biblioteca. Nada disso tem a ver com o seu erro.</p>
+
+<p>O Clang, nesse caso, para no essencial:</p>
+
+<pre class="term" data-cwd="~/erros">$ clang++ -std=c++23 -Wall -Wextra cascata.cpp -o cascata
+cascata.cpp:4:18: warning: missing terminating '"' character [-Winvalid-pp-token]
+    4 |     std::cout &lt;&lt; "Lista de compras:\n;
+      |                  ^
+cascata.cpp:4:18: error: expected expression
+1 warning and 1 error generated.</pre>
+
+<div class="tip">
+<strong>Mostrar só o primeiro erro</strong>
+<p>A opção <code>-fmax-errors=1</code> faz o g++ parar no primeiro erro:</p>
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra -fmax-errors=1 cascata.cpp -o cascata
+cascata.cpp:4:18: warning: missing terminating " character
+    4 |     std::cout &lt;&lt; "Lista de compras:\n;
+      |                  ^
+cascata.cpp:4:18: error: missing terminating " character
+    4 |     std::cout &lt;&lt; "Lista de compras:\n;
+      |                  ^~~~~~~~~~~~~~~~~~~~~
+compilation terminated due to -fmax-errors=1.</pre>
+<p>Sem essa opção, role a tela até o <strong>topo</strong> da mensagem. A regra é sempre a mesma: <strong>o primeiro erro primeiro</strong>.</p>
+</div>
+
+<hr>
+
+<h2>6. Erros de ligação: <code>undefined reference</code></h2>
+<p>Até aqui, todos os erros foram do <strong>compilador</strong>, que lê o seu código e confere as regras. Mas fazer um programa tem uma última etapa: a <strong>ligação</strong> (<em>linking</em>). O <strong>ligador</strong> (<code>ld</code>, de <em>linker</em>) junta o seu código já compilado com o código da biblioteca e monta o arquivo executável (o caminho todo está em <a href="como-funciona.html">Como o C++ Vira Programa</a>). Ele tem os próprios erros, com outra cara.</p>
+
+<p>Neste programa, a Ana <strong>anunciou</strong> uma função <code>saudar</code> (a linha 3 diz "existe uma função chamada <code>saudar</code>") mas esqueceu de escrevê-la. Funções são do Nível 2 (<a href="funcoes.html">Funções</a>); aqui basta saber que o compilador acredita no anúncio:</p>
+
+<pre class="file" data-file="ligacao.cpp · erro de propósito">#include &lt;iostream&gt;
+
+void saudar();
+
+int main() {
+    saudar();
+    std::cout &lt;&lt; "Fim\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra ligacao.cpp -o ligacao
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccfHe46T.o: na função "main":
+ligacao.cpp:(.text+0x9): referência não definida para "saudar()"
+collect2: error: ld returned 1 exit status</pre>
+
+<p>Olhe como é diferente:</p>
+<ul>
+  <li>Não há <code>arquivo:linha:coluna</code>. O ligador trabalha com o código já traduzido, então só sabe dizer "na função <code>main</code>". O <code>(.text+0x9)</code> é uma posição dentro do código traduzido, que você pode ignorar.</li>
+  <li>A mensagem está em <strong>português</strong>! O ligador do Ubuntu tem tradução (o g++ não tem). Em inglês, que é como você vai encontrá-la em pesquisas, ela é assim:</li>
+</ul>
+
+<pre class="term" data-cwd="~/erros">$ LANG=C g++ -std=c++23 -Wall -Wextra ligacao.cpp -o ligacao
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/cc000u8J.o: in function `main':
+ligacao.cpp:(.text+0x9): undefined reference to `saudar()'
+collect2: error: ld returned 1 exit status</pre>
+
+<p>(<code>LANG=C</code> na frente do comando pede as mensagens sem tradução. O <code>/tmp/cc….o</code> é um arquivo temporário com o código compilado, que muda de nome a cada vez.)</p>
+
+<p>Dá para ver as duas etapas separadas. A opção <code>-c</code> manda o g++ só <strong>compilar</strong>, sem ligar: o resultado é um arquivo <code>.o</code> ("objeto"). Repare que a compilação passa sem reclamar, e o erro só aparece na ligação:</p>
+
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra -c ligacao.cpp
+$ ls ligacao*
+ligacao.cpp
+ligacao.o                « compilou! o compilador acreditou no anúncio da função
+$ g++ ligacao.o -o ligacao
+/usr/bin/x86_64-linux-gnu-ld.bfd: ligacao.o: na função "main":
+ligacao.cpp:(.text+0x9): referência não definida para "saudar()"
+collect2: error: ld returned 1 exit status</pre>
+
+<p>O Clang usa o mesmo ligador, então a mensagem é quase igual, com a última linha própria:</p>
+
+<pre class="term" data-cwd="~/erros">$ clang++ -std=c++23 -Wall -Wextra ligacao.cpp -o ligacao
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ligacao-9ad276.o: na função "main":
+ligacao.cpp:(.text+0x5): referência não definida para "saudar()"
+clang++: error: linker command failed with exit code 1 (use -v to see invocation)</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Erro de compilação</th><th>Erro de ligação</th></tr>
+<tr><td>Quem reclama</td><td>O compilador (<code>cc1plus</code> no g++)</td><td>O ligador (<code>ld</code>, chamado pelo <code>collect2</code>)</td></tr>
+<tr><td>Como começa</td><td><code>arquivo.cpp:linha:coluna: error:</code></td><td><code>…/ld…: …: na função "…"</code> / <code>in function</code></td></tr>
+<tr><td>Frase típica</td><td><code>expected</code>, <code>not declared</code>…</td><td><code>undefined reference to</code> / <code>referência não definida para</code>; <code>multiple definition of</code></td></tr>
+<tr><td>Última linha</td><td>(nenhuma especial)</td><td><code>collect2: error: ld returned 1 exit status</code></td></tr>
+<tr><td>Causas comuns no começo</td><td>Sintaxe, nomes, tipos</td><td><code>main</code> faltando ou escrita errada (<code>Main</code>); função anunciada e não escrita; arquivo <code>.cpp</code> esquecido no comando (<a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>); biblioteca esquecida (<a href="bibliotecas.html">Bibliotecas Externas</a>)</td></tr>
+</table>
+</div>
+
+<p>O erro de ligação mais comum do começo você já viu nas aulas anteriores: <code>referência não definida para "main"</code>, quando a <code>main</code> não existe ou foi escrita <code>Main</code> (aula <a href="sintaxe.html">Sintaxe</a>).</p>
+
+<hr>
+
+<h2>7. Erro, aviso e erro na hora de rodar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Quando aparece</th><th>O programa é criado?</th><th>Aula</th></tr>
+<tr><td><code>error:</code> de compilação</td><td>Ao compilar</td><td>Não</td><td>Esta</td></tr>
+<tr><td>Erro de ligação</td><td>Ao compilar, no fim</td><td>Não</td><td>Esta</td></tr>
+<tr><td><code>warning:</code></td><td>Ao compilar</td><td>Sim, mas provavelmente com um engano</td><td><a href="avisos.html">Avisos</a></td></tr>
+<tr><td>Erro em tempo de execução</td><td>Ao <strong>rodar</strong>: o programa quebra ou dá resultado errado</td><td>Sim</td><td><a href="excecoes.html">Exceções</a>, <a href="comportamento-indefinido.html">Comportamento Indefinido</a>, <a href="depuracao-gdb.html">GDB</a></td></tr>
+</table>
+</div>
+
+<p>Os erros de compilação são os <strong>melhores</strong> erros que existem: aparecem na hora, dizem a linha e não deixam um programa errado chegar a ninguém. Os piores são os que só aparecem ao rodar. É por isso que, na próxima aula, você vai pedir ao compilador que avise o máximo possível.</p>
+
+<hr>
+
+<h2>Referência rápida: g++ × Clang</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>g++ 15</th><th>Clang 21 (editor do guia)</th></tr>
+<tr><td>Falta <code>;</code></td><td><code>expected ‘;’ before ‘…’</code> / <code>expected ‘,’ or ‘;’ before ‘…’</code></td><td><code>expected ';' after expression</code> / <code>at end of declaration</code></td></tr>
+<tr><td>Falta <code>std::</code></td><td><code>‘cout’ was not declared in this scope; did you mean ‘std::cout’?</code></td><td><code>use of undeclared identifier 'cout'; did you mean 'std::cout'?</code></td></tr>
+<tr><td>Falta <code>#include</code></td><td><code>‘cout’ is not a member of ‘std’</code> + nota <code>probably fixable by adding ‘#include &lt;iostream&gt;’</code></td><td><code>use of undeclared identifier 'std'</code></td></tr>
+<tr><td>Aspas abertas</td><td><code>missing terminating " character</code></td><td><code>missing terminating '"' character</code> + <code>expected expression</code></td></tr>
+<tr><td>Falta <code>}</code></td><td><code>expected ‘}’ at end of input</code></td><td><code>expected '}'</code></td></tr>
+<tr><td>Sobra <code>}</code></td><td><code>expected declaration before ‘}’ token</code></td><td><code>extraneous closing brace ('}')</code></td></tr>
+<tr><td>Nome errado</td><td><code>‘x’ was not declared in this scope</code> / <code>‘x’ is not a member of ‘std’</code></td><td><code>use of undeclared identifier 'x'</code> / <code>no member named 'x' in namespace 'std'</code></td></tr>
+<tr><td>Tipo errado</td><td><code>invalid conversion from ‘const char*’ to ‘int’</code></td><td><code>cannot initialize a variable of type 'int' with …</code></td></tr>
+<tr><td>Ligação</td><td><code>undefined reference to `saudar()'</code> + <code>ld returned 1 exit status</code></td><td>o mesmo + <code>linker command failed</code></td></tr>
+</table>
+</div>
+
+<p>Mais mensagens, em ordem alfabética: <a href="ref-erros.html">Mensagens de Erro</a>.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Qual linha?</h3>
+<p>Em <code>jogo.cpp:12:7: error: expected ‘;’ before ‘return’</code>, em que linha o g++ percebeu o erro?</p>
+<div class="ex-code">Linha: <input data-answer="12" aria-label="linha" size="4"></div>
+</div>
+
+<div class="exercise">
+<h3>2. E o erro de verdade?</h3>
+<p>Na mesma mensagem, o <code>;</code> provavelmente falta no fim de qual linha?</p>
+<div class="ex-code">Linha: <input data-answer="11" aria-label="linha" size="4"></div>
+</div>
+
+<div class="exercise">
+<h3>3. Só o primeiro</h3>
+<p>Complete a opção que faz o g++ parar no primeiro erro:</p>
+<div class="ex-code">g++ -std=c++23 -Wall -Wextra <input data-answer="-fmax-errors=1" aria-label="opção" size="16"> jogo.cpp -o jogo</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O g++ mostrou 40 erros. O que fazer primeiro?</p>
+<label><input type="radio" name="q4"> Corrigir o último, que é o mais recente</label>
+<label><input type="radio" name="q4"> Corrigir o primeiro e compilar de novo: os outros podem ser consequência dele</label>
+<label><input type="radio" name="q4"> Apagar o arquivo e começar do zero</label>
+<label><input type="radio" name="q4"> Usar <code>-fpermissive</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Qual destas mensagens é de um erro de <strong>ligação</strong>?</p>
+<label><input type="radio" name="q5"> <code>error: expected ‘}’ at end of input</code></label>
+<label><input type="radio" name="q5"> <code>error: ‘idade’ was not declared in this scope</code></label>
+<label><input type="radio" name="q5"> <code>warning: unused variable ‘x’</code></label>
+<label><input type="radio" name="q5"> <code>undefined reference to `main'</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. O compilador sugeriu <code>did you mean ‘oct’?</code> para um <code>std::cot</code>. O que isso ensina?</p>
+<label><input type="radio" name="q6"> A sugestão é um palpite: confira se faz sentido antes de aceitar</label>
+<label><input type="radio" name="q6"> Que <code>oct</code> é o certo, sempre</label>
+<label><input type="radio" name="q6"> Que o arquivo está corrompido</label>
+<label><input type="radio" name="q6"> Que falta um <code>#include</code></label>
+</div>
+
+<h3>Missão final: o conserto completo</h3>
+
+<div class="trycpp" data-goal="out:Boletim,out:Nota de Matemática: 9,out:Nota de História: 8,semaviso">
+<p class="try-task"><strong>Missão:</strong> a Ana escreveu este boletim com pressa e o compilador recusou. Há um <code>#include</code> faltando, uma chave, um nome errado e um tipo errado. Use o método: primeiro erro, corrigir, compilar de novo. No fim, a compilação deve ficar sem nenhum aviso.</p>
+<pre class="out">Boletim
+Nota de Matemática: 9
+Nota de História: 8</pre>
+<pre class="script">int main() {
+    int matematica = 9;
+    int historia = "8";
+    std::cout &lt;&lt; "Boletim\n";
+    std::cout &lt;&lt; "Nota de Matemática: " &lt;&lt; matematica &lt;&lt; "\n";
+    std::cout &lt;&lt; "Nota de História: " &lt;&lt; historai &lt;&lt; "\n";
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int matematica = 9;
+    int historia = 8;
+    std::cout &lt;&lt; "Boletim\n";
+    std::cout &lt;&lt; "Nota de Matemática: " &lt;&lt; matematica &lt;&lt; "\n";
+    std::cout &lt;&lt; "Nota de História: " &lt;&lt; historia &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Formato: <code>arquivo:linha:coluna: error: descrição</code>, depois a linha copiada e o <code>^</code> apontando a coluna. <code>note:</code> complementa a mensagem anterior.</li>
+  <li>Método: o <strong>primeiro</strong> erro primeiro; vá à linha; se ela parece certa, olhe a de cima; corrija e compile de novo.</li>
+  <li><code>;</code>, aspas e chaves esquecidos costumam ser percebidos <strong>depois</strong> do lugar do erro.</li>
+  <li>Um erro pode gerar centenas de linhas de notas; o que importa está no topo. <code>-fmax-errors=1</code> ajuda.</li>
+  <li><code>did you mean</code> é um palpite, quase sempre bom, às vezes não.</li>
+  <li>Erro de ligação (<code>undefined reference</code> / <code>referência não definida</code>) vem do <code>ld</code>, sem número de linha: algo foi anunciado mas não existe (a <code>main</code>, uma função).</li>
+  <li>O g++ e o Clang dizem o mesmo com palavras diferentes; o editor do guia usa o Clang.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
