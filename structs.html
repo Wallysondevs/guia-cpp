@@ -1,0 +1,814 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Structs — agrupar dados num tipo próprio | Guia C++</title>
+<meta name="description" content="Structs em C++ para quem nunca programou: criar o seu próprio tipo (struct Aluno), acessar os campos com ponto, valores padrão, inicialização com chaves e designada (C++20), vetor de structs, passar para funções por const&amp;, a seta -&gt; e a diferença entre struct e class, com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Structs</span></h1>
+
+<p class="intro">Até aqui, cada informação morava numa variável separada: <code>nome</code>, <code>idade</code>, <code>nota</code>. Isso funciona para uma aluna. Para uma turma inteira, vira uma bagunça de variáveis soltas. Uma <strong>struct</strong> junta várias informações que andam juntas num <strong>tipo novo</strong>, criado por você: o tipo <code>Aluno</code>, que tem nome, idade e nota. Nesta aula você vai criar a sua primeira struct, preencher, guardar várias num <code>std::vector</code> e passar para funções.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma struct e como declarar uma: <code>struct Aluno { … };</code>.</li>
+  <li>Como criar uma variável do tipo <code>Aluno</code> e acessar os campos com o ponto: <code>a.nome</code>.</li>
+  <li>Por que dar valores padrão aos campos, e o que acontece quando você esquece.</li>
+  <li>Como preencher tudo de uma vez com chaves <code>{}</code>, inclusive pelo nome do campo (<code>.nome = …</code>, C++20).</li>
+  <li>Como guardar uma turma inteira num <code>std::vector&lt;Aluno&gt;</code>.</li>
+  <li>Como passar uma struct para uma função sem copiar (<code>const Aluno&amp;</code>).</li>
+  <li>O que é a seta <code>-&gt;</code> e qual a diferença entre <code>struct</code> e <code>class</code>.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code> (veja <a href="compilar.html">Compilar com g++</a>). Você pode repetir cada um no editor do guia.</p>
+
+<hr>
+
+<h2>A ideia: uma ficha de cadastro</h2>
+<p>Pense na secretaria de uma escola. Para cada aluno existe uma <strong>ficha</strong> de papel, sempre com os mesmos espaços: <em>Nome</em>, <em>Idade</em>, <em>Nota</em>. A ficha em branco é o <strong>modelo</strong>; cada ficha preenchida é um aluno de verdade.</p>
+
+<p>A struct é o modelo da ficha. Ela diz quais espaços existem e o tipo de cada um. Depois você cria quantas fichas preenchidas quiser, todas do mesmo formato.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na secretaria</th><th>Em C++</th><th>Exemplo</th></tr>
+<tr><td>O modelo da ficha</td><td>a <strong>struct</strong> (um tipo novo)</td><td><code>struct Aluno { … };</code></td></tr>
+<tr><td>Cada espaço da ficha</td><td>um <strong>campo</strong> (ou <strong>membro</strong>)</td><td><code>std::string nome;</code></td></tr>
+<tr><td>Uma ficha preenchida</td><td>uma <strong>variável</strong> do tipo <code>Aluno</code></td><td><code>Aluno a;</code></td></tr>
+<tr><td>Ler o espaço "Nome" de uma ficha</td><td>o operador <strong>ponto</strong></td><td><code>a.nome</code></td></tr>
+</table>
+</div>
+
+<p>O nome vem do inglês <em>structure</em>, "estrutura": uma estrutura de dados montada com peças menores.</p>
+
+<hr>
+
+<h2>1. Declarar a struct e criar uma variável</h2>
+
+<pre class="file" data-file="aluno.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+struct Aluno {
+    std::string nome;
+    int idade;
+    double nota;
+};
+
+int main() {
+    Aluno a;
+    a.nome = "Ana";
+    a.idade = 20;
+    a.nota = 8.5;
+
+    std::cout &lt;&lt; a.nome &lt;&lt; " tem " &lt;&lt; a.idade &lt;&lt; " anos e tirou " &lt;&lt; a.nota &lt;&lt; '\n';
+
+    a.nota = 9.0;
+    std::cout &lt;&lt; "Nota corrigida: " &lt;&lt; a.nota &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>struct Aluno</dt><dd>Começa a declaração de um tipo novo chamado <code>Aluno</code>. Por costume, nomes de tipos próprios começam com letra maiúscula (<code>Aluno</code>, <code>Produto</code>), e variáveis com minúscula.</dd>
+  <dt>{ … };</dt><dd>Entre as chaves ficam os campos. Repare no <strong>ponto e vírgula depois da chave</strong>: ele é obrigatório na struct (e esquecê-lo é um erro clássico, que você vai ver daqui a pouco).</dd>
+  <dt>std::string nome;</dt><dd>Um campo: tipo + nome, igual a declarar uma variável. Os campos podem ter tipos diferentes entre si.</dd>
+  <dt>Aluno a;</dt><dd>Cria uma variável chamada <code>a</code> do tipo <code>Aluno</code>. Agora <code>Aluno</code> funciona como <code>int</code> ou <code>std::string</code>: é um tipo como outro qualquer.</dd>
+  <dt>a.nome = "Ana";</dt><dd>O <strong>ponto</strong> entra na ficha <code>a</code> e pega o campo <code>nome</code>. Cada campo se comporta como uma variável comum: dá para guardar, ler e mudar.</dd>
+</dl>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra aluno.cpp -o aluno
+$ ./aluno
+Ana tem 20 anos e tirou 8.5
+Nota corrigida: 9</pre>
+
+<p>O <code>9.0</code> aparece como <code>9</code> porque o <code>cout</code> não mostra zeros desnecessários (veja <a href="ponto-flutuante.html">float e double</a>).</p>
+
+<div class="tip">
+<strong>Onde declarar a struct</strong>
+<p>Declare a struct <strong>fora</strong> do <code>main</code>, lá em cima, depois dos <code>#include</code>. Assim todas as funções do arquivo conhecem o tipo <code>Aluno</code>. Em projetos maiores, ela vai para um arquivo <code>.h</code> (veja <a href="headers.html">Arquivos .h e .cpp</a>).</p>
+</div>
+
+<h3>Cada variável tem a sua própria ficha</h3>
+<p>Duas variáveis do tipo <code>Aluno</code> são duas fichas separadas. Copiar uma struct com <code>=</code> copia <strong>todos</strong> os campos, e a cópia é independente:</p>
+
+<pre class="file" data-file="copia.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+struct Aluno {
+    std::string nome;
+    int idade = 0;
+    double nota = 0.0;
+};
+
+void dar_bonus(Aluno a) {
+    a.nota += 1.0;
+    std::cout &lt;&lt; "Dentro da função: " &lt;&lt; a.nota &lt;&lt; '\n';
+}
+
+int main() {
+    Aluno ana{"Ana", 20, 6.5};
+    dar_bonus(ana);
+    std::cout &lt;&lt; "No main: " &lt;&lt; ana.nota &lt;&lt; '\n';
+
+    Aluno outra = ana;
+    outra.nome = "Bia";
+    std::cout &lt;&lt; ana.nome &lt;&lt; " e " &lt;&lt; outra.nome &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra copia.cpp -o copia
+$ ./copia
+Dentro da função: 7.5
+No main: 6.5          « a função mudou a cópia dela, não a Ana do main
+Ana e Bia             « mudar a outra não muda a ana</pre>
+
+<p>Guarde esse comportamento da função <code>dar_bonus</code>: na seção 5 você vai ver como mudar a struct de verdade.</p>
+
+<hr>
+
+<h2>2. Campos sem valor: lixo da memória</h2>
+<p>O que tem dentro de <code>a.idade</code> se você nunca guardou nada lá? Em C++, um <code>int</code> ou <code>double</code> sem valor inicial <strong>não vale zero</strong>: vale o que estava naquele pedaço da memória antes, um "lixo" (veja <a href="variaveis.html">Variáveis</a>). Com campos de struct é igual. Só o <code>std::string</code> começa vazio sozinho.</p>
+
+<pre class="file" data-file="lixo.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+struct Aluno {
+    std::string nome;
+    int idade;
+    double nota;
+};
+
+int main() {
+    Aluno a;
+    a.nome = "Ana";
+    std::cout &lt;&lt; a.nome &lt;&lt; ", " &lt;&lt; a.idade &lt;&lt; " anos, nota " &lt;&lt; a.nota &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra lixo.cpp -o lixo
+$ ./lixo
+Ana, 658842208 anos, nota 6.31316e-310
+$ ./lixo
+Ana, 1597478448 anos, nota 6.31785e-310      « outro número a cada execução</pre>
+
+<p>Repare: o g++ <strong>não deu nenhum aviso</strong>, nem com <code>-Wall -Wextra</code>. O programa compilou e mostrou números sem sentido, diferentes a cada vez. Ler um valor que nunca foi guardado é <a href="comportamento-indefinido.html">comportamento indefinido</a>: o C++ não promete nada.</p>
+
+<h3>A solução: valores padrão nos campos</h3>
+<p>Desde o C++11, você pode dar um valor inicial a cada campo, direto na struct. Toda ficha nova já nasce com esses valores:</p>
+
+<pre class="file" data-file="padrao.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+struct Aluno {
+    std::string nome = "sem nome";
+    int idade = 0;
+    double nota = 0.0;
+};
+
+int main() {
+    Aluno a;
+    std::cout &lt;&lt; a.nome &lt;&lt; ", " &lt;&lt; a.idade &lt;&lt; " anos, nota " &lt;&lt; a.nota &lt;&lt; '\n';
+    a.nome = "Ana";
+    std::cout &lt;&lt; a.nome &lt;&lt; ", " &lt;&lt; a.idade &lt;&lt; " anos, nota " &lt;&lt; a.nota &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra padrao.cpp -o padrao
+$ ./padrao
+sem nome, 0 anos, nota 0
+Ana, 0 anos, nota 0</pre>
+
+<p>Agora não existe mais lixo: o que você não preencher fica com o valor padrão. <strong>Dê sempre um valor padrão aos campos numéricos.</strong> Daqui em diante, todos os exemplos usam <code>int idade = 0;</code> e <code>double nota = 0.0;</code>. O <code>nome</code> fica sem valor padrão porque um <code>std::string</code> já começa vazio.</p>
+
+<div class="trycpp" data-goal="out:Bia tem 19 anos e nota 7.5">
+<p class="try-task"><strong>Missão:</strong> a variável <code>a</code> já existe. Preencha os três campos com o ponto, para a tela mostrar <code>Bia tem 19 anos e nota 7.5</code>. Rode primeiro sem mudar nada e veja os valores padrão.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+struct Aluno {
+    std::string nome;
+    int idade = 0;
+    double nota = 0.0;
+};
+
+int main() {
+    Aluno a;
+    // preencha os três campos de a aqui
+
+    std::cout &lt;&lt; a.nome &lt;&lt; " tem " &lt;&lt; a.idade &lt;&lt; " anos e nota " &lt;&lt; a.nota &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+struct Aluno {
+    std::string nome;
+    int idade = 0;
+    double nota = 0.0;
+};
+
+int main() {
+    Aluno a;
+    a.nome = "Bia";
+    a.idade = 19;
+    a.nota = 7.5;
+
+    std::cout &lt;&lt; a.nome &lt;&lt; " tem " &lt;&lt; a.idade &lt;&lt; " anos e nota " &lt;&lt; a.nota &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Preencher tudo de uma vez com chaves</h2>
+<p>Preencher campo por campo dá trabalho. Você pode criar a variável já preenchida, colocando os valores entre chaves, <strong>na ordem em que os campos foram declarados</strong>: primeiro o nome, depois a idade, depois a nota.</p>
+
+<pre class="file" data-file="chaves.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+struct Aluno {
+    std::string nome;
+    int idade = 0;
+    double nota = 0.0;
+};
+
+int main() {
+    Aluno a{"Ana", 20, 8.5};
+    Aluno b{"Bruno", 19};
+    Aluno c{};
+    Aluno d{.nome = "Carla", .idade = 22, .nota = 9.5};
+    Aluno e{.nome = "Davi", .nota = 6.0};
+
+    std::cout &lt;&lt; a.nome &lt;&lt; " | " &lt;&lt; a.idade &lt;&lt; " | " &lt;&lt; a.nota &lt;&lt; '\n';
+    std::cout &lt;&lt; b.nome &lt;&lt; " | " &lt;&lt; b.idade &lt;&lt; " | " &lt;&lt; b.nota &lt;&lt; '\n';
+    std::cout &lt;&lt; "[" &lt;&lt; c.nome &lt;&lt; "] | " &lt;&lt; c.idade &lt;&lt; " | " &lt;&lt; c.nota &lt;&lt; '\n';
+    std::cout &lt;&lt; d.nome &lt;&lt; " | " &lt;&lt; d.idade &lt;&lt; " | " &lt;&lt; d.nota &lt;&lt; '\n';
+    std::cout &lt;&lt; e.nome &lt;&lt; " | " &lt;&lt; e.idade &lt;&lt; " | " &lt;&lt; e.nota &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra chaves.cpp -o chaves
+$ ./chaves
+Ana | 20 | 8.5
+Bruno | 19 | 0          « faltou a nota: ficou o valor padrão
+[] | 0 | 0              « {} vazio: tudo no valor padrão (o nome, texto vazio)
+Carla | 22 | 9.5
+Davi | 0 | 6            « pulou a idade: ficou o valor padrão</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>Aluno a{"Ana", 20, 8.5};</code></td><td>Preenche os campos pela ordem: <code>nome</code>, <code>idade</code>, <code>nota</code>.</td></tr>
+<tr><td><code>Aluno b{"Bruno", 19};</code></td><td>Valores a menos: os campos do fim ficam com o valor padrão.</td></tr>
+<tr><td><code>Aluno c{};</code></td><td>Chaves vazias: todos os campos com o valor padrão (ou zero, se o campo não tiver padrão). É a forma segura de criar uma ficha "em branco".</td></tr>
+<tr><td><code>Aluno d{.nome = "Carla", .idade = 22, .nota = 9.5};</code></td><td><strong>Inicialização designada</strong> <span class="versao">C++20</span>: cada valor vem com o nome do campo, com um ponto na frente. Mais fácil de ler.</td></tr>
+<tr><td><code>Aluno e{.nome = "Davi", .nota = 6.0};</code></td><td>Na designada, dá para pular campos. Os pulados ficam com o valor padrão.</td></tr>
+</table>
+</div>
+
+<p>A forma designada é ótima quando a struct tem vários campos do mesmo tipo: em <code>{20, 22}</code> você precisa lembrar qual número é qual; em <code>{.idade = 20, .sala = 22}</code>, não. Antes do C++20, ela não existia em C++ (só na linguagem C): use a forma pela ordem.</p>
+
+<h3>As regras das chaves</h3>
+<p>As chaves conferem o que você escreve. Três erros comuns, com as mensagens reais do g++:</p>
+
+<p><strong>Na designada, a ordem tem de ser a da declaração.</strong> Você pode pular campos, mas não pode trocar a ordem:</p>
+<pre class="file" data-file="ordem.cpp">#include &lt;string&gt;
+
+struct Aluno {
+    std::string nome;
+    int idade = 0;
+    double nota = 0.0;
+};
+
+int main() {
+    Aluno a{.idade = 20, .nome = "Ana"};
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra ordem.cpp -o ordem
+ordem.cpp: In function ‘int main()’:
+ordem.cpp:10:39: warning: missing initializer for member ‘Aluno::nome’ [-Wmissing-field-initializers]
+   10 |     Aluno a{.idade = 20, .nome = "Ana"};
+      |                                       ^
+ordem.cpp:10:39: error: designator order for field ‘Aluno::nome’ does not match declaration order in ‘Aluno’</pre>
+<p><em>designator order … does not match declaration order</em> = "a ordem dos nomes não bate com a ordem da declaração". O aviso de cima é consequência: depois de <code>.idade</code>, o g++ esperava que o <code>nome</code> já tivesse ficado para trás. Conserto: <code>Aluno a{.nome = "Ana", .idade = 20};</code>.</p>
+
+<div class="note">
+<strong>No editor do guia, isso é só um aviso</strong>
+<p>O compilador do editor é o Clang, que aceita a ordem trocada e só avisa: <code>warning: ISO C++ requires field designators to be specified in declaration order</code> (o padrão do C++ exige a ordem da declaração). O g++ recusa. Escreva sempre na ordem e o código funciona nos dois.</p>
+</div>
+
+<p><strong>Valores a mais não cabem:</strong></p>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra demais.cpp -o demais
+demais.cpp: In function ‘int main()’:
+demais.cpp:10:30: error: too many initializers for ‘Aluno’
+   10 |     Aluno a{"Ana", 20, 8.5, 3};
+      |                              ^</pre>
+<p><em>too many initializers</em> = "valores iniciais demais": o <code>Aluno</code> tem três campos e você passou quatro valores.</p>
+
+<p><strong>As chaves não deixam perder parte de um número:</strong></p>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra estreita.cpp -o estreita
+estreita.cpp: In function ‘int main()’:
+estreita.cpp:10:20: error: narrowing conversion of ‘2.05e+1’ from ‘double’ to ‘int’ [-Wnarrowing]
+   10 |     Aluno a{"Ana", 20.5, 8.5};
+      |                    ^~~~</pre>
+<p>A idade é <code>int</code>, e <code>20.5</code> perderia o <code>.5</code>. Isso se chama <strong>conversão que estreita</strong> (<em>narrowing</em>), e com chaves ela vira erro (veja <a href="conversao-tipos.html">Conversão de Tipos</a>). O <code>2.05e+1</code> é o jeito do g++ escrever 20.5 (2,05 × 10¹). É uma proteção: com <code>a.idade = 20.5;</code> o número seria cortado em silêncio.</p>
+
+<hr>
+
+<h2>4. Uma turma inteira: vetor de structs</h2>
+<p>Aqui a struct mostra a sua força. Um <code>std::vector&lt;Aluno&gt;</code> é uma lista de fichas (veja <a href="vector.html">std::vector</a>). Cada elemento é um <code>Aluno</code> completo:</p>
+
+<pre class="file" data-file="turma.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Aluno {
+    std::string nome;
+    int idade = 0;
+    double nota = 0.0;
+};
+
+int main() {
+    std::vector&lt;Aluno&gt; turma = {
+        {"Ana", 20, 8.5},
+        {"Bruno", 19, 6.0},
+        {"Carla", 22, 9.5},
+    };
+    turma.push_back({"Davi", 21, 7.0});
+
+    double soma = 0.0;
+    for (const auto&amp; aluno : turma) {
+        std::cout &lt;&lt; aluno.nome &lt;&lt; ": " &lt;&lt; aluno.nota &lt;&lt; '\n';
+        soma += aluno.nota;
+    }
+    std::cout &lt;&lt; "Alunos: " &lt;&lt; turma.size() &lt;&lt; '\n';
+    std::cout &lt;&lt; "Média da turma: " &lt;&lt; soma / turma.size() &lt;&lt; '\n';
+    std::cout &lt;&lt; "Primeiro: " &lt;&lt; turma[0].nome &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>std::vector&lt;Aluno&gt; turma = { … };</dt><dd>Um vetor de alunos. Cada <code>{"Ana", 20, 8.5}</code> lá dentro vira um <code>Aluno</code>, pelas mesmas regras da seção 3. A vírgula depois do último é permitida e facilita acrescentar linhas.</dd>
+  <dt>turma.push_back({"Davi", 21, 7.0});</dt><dd>Acrescenta mais um aluno no fim. As chaves criam o <code>Aluno</code> ali mesmo.</dd>
+  <dt>for (const auto&amp; aluno : turma)</dt><dd>Percorre a turma (veja <a href="for-range.html">for de Intervalo</a>). O <code>const auto&amp;</code> olha cada ficha <strong>sem copiar</strong> e sem poder mudá-la.</dd>
+  <dt>aluno.nota</dt><dd>Dentro do laço, <code>aluno</code> é uma ficha; o ponto pega o campo.</dd>
+  <dt>turma[0].nome</dt><dd>Primeiro o <code>[0]</code> pega a ficha da posição 0; depois o <code>.nome</code> pega o campo dela.</dd>
+</dl>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra turma.cpp -o turma
+$ ./turma
+Ana: 8.5
+Bruno: 6
+Carla: 9.5
+Davi: 7
+Alunos: 4
+Média da turma: 7.75
+Primeiro: Ana</pre>
+
+<p>Sem struct, você precisaria de três vetores separados (<code>nomes</code>, <code>idades</code>, <code>notas</code>) e de cuidado para que a posição 2 de cada um fosse sempre a mesma pessoa. Com a struct, cada pessoa é uma peça só, e ordenar ou apagar um aluno nunca separa o nome da nota.</p>
+
+<div class="trycpp" data-goal="out:Carla: 9.5,src:Carla">
+<p class="try-task"><strong>Missão:</strong> acrescente a Carla (22 anos, nota 9.5) à turma com <code>push_back</code>, para ela aparecer na lista. Se quiser, use a forma designada dentro do <code>push_back</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Aluno {
+    std::string nome;
+    int idade = 0;
+    double nota = 0.0;
+};
+
+int main() {
+    std::vector&lt;Aluno&gt; turma = {
+        {"Ana", 20, 8.5},
+        {"Bruno", 19, 6.0},
+    };
+    // acrescente a Carla (22 anos, nota 9.5) aqui
+
+    for (const auto&amp; aluno : turma) {
+        std::cout &lt;&lt; aluno.nome &lt;&lt; ": " &lt;&lt; aluno.nota &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Aluno {
+    std::string nome;
+    int idade = 0;
+    double nota = 0.0;
+};
+
+int main() {
+    std::vector&lt;Aluno&gt; turma = {
+        {"Ana", 20, 8.5},
+        {"Bruno", 19, 6.0},
+    };
+    turma.push_back({.nome = "Carla", .idade = 22, .nota = 9.5});
+
+    for (const auto&amp; aluno : turma) {
+        std::cout &lt;&lt; aluno.nome &lt;&lt; ": " &lt;&lt; aluno.nota &lt;&lt; '\n';
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>5. Struct e funções</h2>
+<p>Uma struct pode ser parâmetro e retorno de função, como qualquer tipo. A questão é <strong>como</strong> passar. Você já viu as três formas em <a href="passagem-referencia.html">Por Valor × Por Referência</a>; com structs, a escolha pesa mais, porque uma struct pode ser grande (um <code>Aluno</code> carrega um <code>std::string</code> inteiro).</p>
+
+<pre class="file" data-file="funcao.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+struct Aluno {
+    std::string nome;
+    int idade = 0;
+    double nota = 0.0;
+};
+
+void mostrar(const Aluno&amp; a) {
+    std::cout &lt;&lt; a.nome &lt;&lt; " (" &lt;&lt; a.idade &lt;&lt; " anos): " &lt;&lt; a.nota &lt;&lt; '\n';
+}
+
+bool aprovado(const Aluno&amp; a) {
+    return a.nota &gt;= 7.0;
+}
+
+void dar_bonus(Aluno&amp; a, double pontos) {
+    a.nota += pontos;
+}
+
+Aluno criar(std::string nome) {
+    return {nome, 18, 0.0};
+}
+
+int main() {
+    Aluno ana{"Ana", 20, 6.5};
+    mostrar(ana);
+    std::cout &lt;&lt; "Aprovada? " &lt;&lt; (aprovado(ana) ? "sim" : "não") &lt;&lt; '\n';
+
+    dar_bonus(ana, 1.0);
+    mostrar(ana);
+    std::cout &lt;&lt; "Aprovada? " &lt;&lt; (aprovado(ana) ? "sim" : "não") &lt;&lt; '\n';
+
+    Aluno novo = criar("Eva");
+    mostrar(novo);
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra funcao.cpp -o funcao
+$ ./funcao
+Ana (20 anos): 6.5
+Aprovada? não
+Ana (20 anos): 7.5       « o bônus mudou a Ana do main
+Aprovada? sim
+Eva (18 anos): 0</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parâmetro</th><th>O que acontece</th><th>Quando usar</th></tr>
+<tr><td><code>const Aluno&amp; a</code></td><td>A função <strong>olha</strong> a ficha original, sem copiar, e não pode mudar nada.</td><td>O padrão para structs: <code>mostrar</code>, <code>aprovado</code>.</td></tr>
+<tr><td><code>Aluno&amp; a</code></td><td>A função mexe na ficha original.</td><td>Quando o objetivo é mudar: <code>dar_bonus</code>.</td></tr>
+<tr><td><code>Aluno a</code></td><td>A função recebe uma <strong>cópia</strong> inteira; mudanças se perdem (você viu em <code>copia.cpp</code>).</td><td>Raramente; quando a função precisa de uma cópia para mexer à vontade.</td></tr>
+</table>
+</div>
+
+<p>E o retorno? <code>Aluno criar(…)</code> devolve uma struct inteira. O <code>return {nome, 18, 0.0};</code> monta o <code>Aluno</code> com chaves direto no <code>return</code>: o compilador sabe que o tipo é <code>Aluno</code> por causa da declaração da função. Devolver struct por valor é normal e barato no C++ moderno.</p>
+
+<h3>O <code>const</code> protege a ficha</h3>
+<p>Se uma função recebe <code>const Aluno&amp;</code> e tenta mudar um campo, o compilador barra:</p>
+
+<pre class="file" data-file="constmuda.cpp">#include &lt;string&gt;
+
+struct Aluno {
+    std::string nome;
+    int idade = 0;
+    double nota = 0.0;
+};
+
+void dar_bonus(const Aluno&amp; a) {
+    a.nota += 1.0;
+}
+
+int main() {
+    Aluno ana{"Ana", 20, 6.5};
+    dar_bonus(ana);
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra constmuda.cpp -o constmuda
+constmuda.cpp: In function ‘void dar_bonus(const Aluno&amp;)’:
+constmuda.cpp:10:12: error: assignment of member ‘Aluno::nota’ in read-only object
+   10 |     a.nota += 1.0;
+      |     ~~~~~~~^~~~~~</pre>
+<p><em>assignment of member ‘Aluno::nota’ in read-only object</em> = "atribuição ao campo <code>nota</code> de um objeto somente leitura". <code>Aluno::nota</code> quer dizer "o campo <code>nota</code> que pertence a <code>Aluno</code>". Se a função deve mudar a ficha, tire o <code>const</code>; se não deve, o erro acabou de achar um engano seu.</p>
+
+<hr>
+
+<h2>6. A seta <code>-&gt;</code>: quando você tem um ponteiro</h2>
+<p>Se em vez da struct você tem um <strong>ponteiro</strong> para ela (veja <a href="ponteiros.html">Ponteiros</a>), o ponto não serve direto. Você pode escrever <code>(*p).nome</code>, mas existe um atalho: a seta <code>p-&gt;nome</code>, que quer dizer exatamente a mesma coisa.</p>
+
+<pre class="file" data-file="seta.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+struct Aluno {
+    std::string nome;
+    int idade = 0;
+    double nota = 0.0;
+};
+
+int main() {
+    Aluno ana{"Ana", 20, 8.5};
+    Aluno* p = &amp;ana;
+
+    std::cout &lt;&lt; (*p).nome &lt;&lt; '\n';
+    std::cout &lt;&lt; p-&gt;nome &lt;&lt; '\n';
+    p-&gt;nota = 10.0;
+    std::cout &lt;&lt; ana.nota &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra seta.cpp -o seta
+$ ./seta
+Ana
+Ana
+10</pre>
+
+<p>Regra para lembrar: <strong>variável ou referência → ponto</strong>; <strong>ponteiro → seta</strong>. Você vai encontrar a seta com <a href="smart-pointers.html">ponteiros inteligentes</a> e em código mais antigo. Para structs comuns, vetores e referências, é sempre o ponto.</p>
+
+<hr>
+
+<h2>7. <code>struct</code> × <code>class</code></h2>
+<p>No Nível 3 você vai aprender <a href="classes-objetos.html">classes</a>. Spoiler: em C++, <code>struct</code> e <code>class</code> são <strong>quase a mesma coisa</strong>. As duas podem ter campos, funções dentro e construtores. A única diferença é o padrão de acesso:</p>
+
+<ul>
+  <li>na <code>struct</code>, tudo é <strong>público</strong> (<code>public</code>) se você não disser nada: qualquer parte do programa pode ler e mudar os campos;</li>
+  <li>na <code>class</code>, tudo é <strong>privado</strong> (<code>private</code>) se você não disser nada: só o código de dentro da classe mexe nos campos.</li>
+</ul>
+
+<pre class="file" data-file="classe.cpp">#include &lt;iostream&gt;
+
+struct PontoS {
+    int x = 0;
+    int y = 0;
+};
+
+class PontoC {
+    int x = 0;
+    int y = 0;
+};
+
+int main() {
+    PontoS s;
+    s.x = 3;
+    PontoC c;
+    c.x = 3;
+    std::cout &lt;&lt; s.x &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra classe.cpp -o classe
+classe.cpp: In function ‘int main()’:
+classe.cpp:17:7: error: ‘int PontoC::x’ is private within this context
+   17 |     c.x = 3;
+      |       ^
+classe.cpp:9:9: note: declared private here
+    9 |     int x = 0;
+      |         ^</pre>
+
+<p>O <code>s.x = 3</code> da struct passou; o <code>c.x = 3</code> da classe deu <em>is private within this context</em> ("é privado neste contexto"). O costume da comunidade C++: use <strong>struct</strong> para um "pacote de dados" simples, sem regras (como o <code>Aluno</code>); use <strong>class</strong> quando o tipo precisa proteger os seus dados (uma conta bancária que não pode ficar com saldo negativo). Isso é assunto de <a href="encapsulamento.html">public e private</a>.</p>
+
+<hr>
+
+<h2>Formas de criar uma struct: qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Quando usar</th></tr>
+<tr><td>Campo por campo</td><td><code>Aluno a; a.nome = "Ana";</code></td><td>Quando os valores chegam aos poucos (lidos do teclado, por exemplo). Exige valores padrão nos campos.</td></tr>
+<tr><td>Chaves pela ordem</td><td><code>Aluno a{"Ana", 20, 8.5};</code></td><td>Structs pequenas, com tipos diferentes, em listas (<code>vector</code>).</td></tr>
+<tr><td>Designada <span class="versao">C++20</span></td><td><code>Aluno a{.nome = "Ana", .nota = 8.5};</code></td><td>Structs com muitos campos ou campos do mesmo tipo. A mais legível.</td></tr>
+<tr><td>Chaves vazias</td><td><code>Aluno a{};</code></td><td>Uma ficha em branco, com tudo no padrão ou zerado, mesmo sem valores padrão na struct.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"expected ‘;’ after struct definition"</strong>
+<pre class="file" data-file="semponto.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+struct Aluno {
+    std::string nome;
+    int idade;
+    double nota;
+}
+
+int main() {
+    Aluno a;
+    a.nome = "Ana";
+    std::cout &lt;&lt; a.nome &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra semponto.cpp -o semponto
+semponto.cpp:8:2: error: expected ‘;’ after struct definition
+    8 | }
+      |  ^
+      |  ;</pre>
+<p><strong>O que aconteceu:</strong> a chave que fecha a struct precisa de <code>;</code> depois. Funções não precisam (<code>int main() { … }</code>), structs precisam; é a diferença que mais engana.</p>
+<p><strong>Como resolver:</strong> o g++ até mostra onde: o <code>^</code> aponta logo depois da <code>}</code> e a linha de baixo sugere o <code>;</code>. No editor do guia, o Clang diz <code>expected ';' after struct</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"has no member named"</strong>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra membro.cpp -o membro
+membro.cpp: In function ‘int main()’:
+membro.cpp:12:20: error: ‘struct Aluno’ has no member named ‘email’
+   12 |     std::cout &lt;&lt; a.email &lt;&lt; '\n';
+      |                    ^~~~~</pre>
+<p><strong>O que aconteceu:</strong> o <code>Aluno</code> não tem o campo <code>email</code>. Acontece por erro de digitação (<code>a.Nome</code> em vez de <code>a.nome</code>) ou porque você esqueceu de declarar o campo.</p>
+<p><strong>Como resolver:</strong> confira o nome exato na declaração da struct (maiúsculas contam) ou acrescente o campo lá.</p>
+</div>
+
+<div class="cenario">
+<strong>"no match for ‘operator&lt;&lt;’": mostrar a struct inteira com <code>cout</code></strong>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra imprimir.cpp -o imprimir
+imprimir.cpp: In function ‘int main()’:
+imprimir.cpp:12:15: error: no match for ‘operator&lt;&lt;’ (operand types are ‘std::ostream’ {aka ‘std::basic_ostream&lt;char&gt;’} and ‘Aluno’)
+   12 |     std::cout &lt;&lt; ana &lt;&lt; '\n';
+      |     ~~~~~~~~~ ^~ ~~~
+      |          |       |
+      |          |       Aluno
+      |          std::ostream {aka std::basic_ostream&lt;char&gt;}
+imprimir.cpp:12:15: note: there are 52 candidates
+«… mais de 360 linhas listando os 52 "candidatos" que não serviram …»</pre>
+<p><strong>O que aconteceu:</strong> o <code>cout</code> sabe mostrar números e textos, mas não sabe mostrar um <code>Aluno</code>: você criou o tipo, ninguém ensinou o <code>cout</code> a escrevê-lo. O g++ então lista tudo o que ele tentou (378 linhas ao todo). <strong>Leia só a primeira linha de <code>error</code>.</strong></p>
+<p><strong>Como resolver:</strong> mostre campo por campo (<code>ana.nome</code>, <code>ana.nota</code>) ou escreva uma função <code>mostrar(const Aluno&amp;)</code>, como na seção 5. Ensinar o <code>&lt;&lt;</code> a escrever um <code>Aluno</code> é assunto de <a href="sobrecarga-operadores.html">Sobrecarga de Operadores</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>Números estranhos como <code>658842208 anos</code></strong>
+<p><strong>O que aconteceu:</strong> o campo nunca recebeu valor e não tem valor padrão. Você leu lixo da memória (seção 2). O compilador nem sempre avisa.</p>
+<p><strong>Como resolver:</strong> dê valor padrão aos campos (<code>int idade = 0;</code>) ou crie a variável com chaves (<code>Aluno a{};</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>A função mudou a struct, mas no <code>main</code> nada mudou</strong>
+<p><strong>O que aconteceu:</strong> o parâmetro é <code>Aluno a</code> (por valor). A função mexeu numa cópia, como em <code>copia.cpp</code>.</p>
+<p><strong>Como resolver:</strong> receba por referência: <code>void dar_bonus(Aluno&amp; a)</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Significado</th></tr>
+<tr><td><code>struct Aluno { std::string nome; int idade = 0; };</code></td><td>Declara um tipo novo com dois campos (não esqueça o <code>;</code> final).</td></tr>
+<tr><td><code>Aluno a;</code></td><td>Cria uma variável; campos com o valor padrão (ou lixo, se não houver padrão).</td></tr>
+<tr><td><code>Aluno a{};</code></td><td>Cria com tudo no padrão ou zerado.</td></tr>
+<tr><td><code>Aluno a{"Ana", 20};</code></td><td>Preenche pela ordem dos campos.</td></tr>
+<tr><td><code>Aluno a{.nome = "Ana"};</code></td><td>Preenche pelo nome do campo <span class="versao">C++20</span>, na ordem da declaração.</td></tr>
+<tr><td><code>a.nome</code></td><td>Acessa um campo (ler ou mudar).</td></tr>
+<tr><td><code>p-&gt;nome</code></td><td>Acessa um campo por um ponteiro; o mesmo que <code>(*p).nome</code>.</td></tr>
+<tr><td><code>Aluno b = a;</code></td><td>Copia todos os campos; <code>b</code> é independente.</td></tr>
+<tr><td><code>std::vector&lt;Aluno&gt; turma;</code></td><td>Uma lista de structs.</td></tr>
+<tr><td><code>void f(const Aluno&amp; a)</code></td><td>Passa sem copiar e sem deixar mudar: o padrão para structs.</td></tr>
+<tr><td><code>void f(Aluno&amp; a)</code></td><td>Passa sem copiar, deixando a função mudar o original.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Declarar um campo</h3>
+<p>Complete a struct <code>Produto</code> com um campo <code>preco</code> do tipo <code>double</code>, valendo <code>0.0</code> por padrão:</p>
+<div class="ex-code">struct Produto { std::string nome; <input data-answer="double preco = 0.0;|double preco = 0;|double preco{0.0};|double preco{};" aria-label="campo preco"> };</div>
+</div>
+
+<div class="exercise">
+<h3>2. Acessar o campo</h3>
+<p>A variável <code>p</code> é um <code>Produto</code>. Complete para mostrar o nome dele:</p>
+<div class="ex-code">std::cout &lt;&lt; <input data-answer="p.nome" aria-label="acesso ao nome"> &lt;&lt; '\n';</div>
+</div>
+
+<div class="exercise">
+<h3>3. Parâmetro sem cópia</h3>
+<p>Complete o parâmetro da função, que só <strong>mostra</strong> um <code>Produto</code> (sem copiar e sem poder mudá-lo):</p>
+<div class="ex-code">void mostrar(<input data-answer="const Produto&amp; p|const Produto &amp;p|const Produto &amp; p|Produto const&amp; p" aria-label="parâmetro">) { … }</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Com <code>struct Aluno { std::string nome; int idade = 0; double nota = 0.0; };</code>, o que vale <code>b.nota</code> depois de <code>Aluno b{"Bruno", 19};</code>?</p>
+<label><input type="radio" name="q4"> 19</label>
+<label><input type="radio" name="q4"> 0</label>
+<label><input type="radio" name="q4"> Um lixo qualquer da memória</label>
+<label><input type="radio" name="q4"> Dá erro de compilação: faltou um valor</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Qual é a única diferença entre <code>struct</code> e <code>class</code> em C++?</p>
+<label><input type="radio" name="q5"> Só a <code>class</code> pode ter funções dentro.</label>
+<label><input type="radio" name="q5"> Só a <code>struct</code> pode ir num <code>std::vector</code>.</label>
+<label><input type="radio" name="q5"> Na <code>struct</code> os membros são públicos por padrão; na <code>class</code>, privados.</label>
+<label><input type="radio" name="q5"> A <code>struct</code> não precisa de <code>;</code> no fim.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. <code>p</code> é um ponteiro para um <code>Aluno</code>. Como se lê o nome?</p>
+<label><input type="radio" name="q6"> <code>p-&gt;nome</code></label>
+<label><input type="radio" name="q6"> <code>p.nome</code></label>
+<label><input type="radio" name="q6"> <code>*p.nome</code></label>
+<label><input type="radio" name="q6"> <code>&amp;p.nome</code></label>
+</div>
+
+<h3>Missão final: o estoque da lojinha</h3>
+<div class="trycpp" data-goal="out:Valor do estoque: R$ 52.5,src:const\s*std::vector&lt;Produto&gt;\s*&amp;">
+<p class="try-task"><strong>Missão:</strong> a lojinha da Ana guarda cada produto numa struct <code>Produto</code>. Escreva a função <code>double valor_total(const std::vector&lt;Produto&gt;&amp; estoque)</code>, que soma <code>preco * quantidade</code> de todos os produtos, e mostre o resultado no <code>main</code>: <code>Valor do estoque: R$ 52.5</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+};
+
+// escreva aqui a função valor_total
+
+int main() {
+    std::vector&lt;Produto&gt; estoque = {
+        {"caderno", 12.5, 2},
+        {"caneta", 2.5, 5},
+        {"borracha", 1.5, 10},
+    };
+    // mostre "Valor do estoque: R$ " seguido do resultado de valor_total(estoque)
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Produto {
+    std::string nome;
+    double preco = 0.0;
+    int quantidade = 0;
+};
+
+double valor_total(const std::vector&lt;Produto&gt;&amp; estoque) {
+    double total = 0.0;
+    for (const auto&amp; p : estoque) {
+        total += p.preco * p.quantidade;
+    }
+    return total;
+}
+
+int main() {
+    std::vector&lt;Produto&gt; estoque = {
+        {"caderno", 12.5, 2},
+        {"caneta", 2.5, 5},
+        {"borracha", 1.5, 10},
+    };
+    std::cout &lt;&lt; "Valor do estoque: R$ " &lt;&lt; valor_total(estoque) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma <strong>struct</strong> cria um tipo novo que agrupa vários campos: <code>struct Aluno { std::string nome; int idade = 0; double nota = 0.0; };</code>. Não esqueça o <code>;</code> depois da chave.</li>
+  <li>Acesse cada campo com o <strong>ponto</strong>: <code>a.nome</code>. Com ponteiro, use a <strong>seta</strong>: <code>p-&gt;nome</code>.</li>
+  <li>Campo numérico sem valor = lixo. Dê <strong>valores padrão</strong> aos campos ou crie com <code>{}</code>.</li>
+  <li>Preencha de uma vez com chaves: <code>{"Ana", 20, 8.5}</code> (pela ordem) ou <code>{.nome = "Ana", .nota = 8.5}</code> (designada, C++20, na ordem da declaração).</li>
+  <li><code>std::vector&lt;Aluno&gt;</code> guarda uma turma inteira; percorra com <code>for (const auto&amp; a : turma)</code>.</li>
+  <li>Passe structs para funções por <code>const Aluno&amp;</code> (só ler) ou <code>Aluno&amp;</code> (mudar). Por valor, a função recebe uma cópia.</li>
+  <li><code>struct</code> e <code>class</code> só diferem no padrão: struct é pública; class é privada.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
