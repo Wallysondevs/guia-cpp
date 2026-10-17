@@ -1,0 +1,899 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Mensagens de Erro — g++ 15 e clang++ explicados | Guia C++</title>
+<meta name="description" content="As mensagens de erro e aviso do g++ 15 que um aluno de C++ encontra, provocadas de verdade: causa, correção e aula de cada uma, a versão do clang++ lado a lado, erros de ligação (undefined reference, multiple definition), erros de execução (Segmentation fault, Floating point exception, terminate called after throwing, double free), relatórios dos sanitizers e os códigos de saída 134, 136 e 139.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Mensagens de Erro</span></h1>
+
+<p class="intro">O compilador de C++ é exigente e fala inglês. Quando algo dá errado, ele escreve o <strong>arquivo</strong>, a <strong>linha</strong>, a <strong>coluna</strong> e uma frase curta, às vezes seguida de dezenas de linhas de "notas". Esta página junta as mensagens que você mais vai encontrar: de <strong>compilação</strong>, de <strong>ligação</strong> e de <strong>execução</strong>. Cada uma vem com o código que a provoca, o que ela quer dizer, como consertar e a aula onde o assunto é explicado. Todas foram <strong>provocadas de verdade</strong> no g++ 15.2 e no clang++ 21 da máquina da Ana.</p>
+
+<div class="note">
+<strong>Como usar esta página</strong>
+<ul>
+  <li>Copie um pedaço da mensagem que apareceu para você (por exemplo, <code>was not declared</code>) e procure aqui com <kbd>Ctrl</kbd>+<kbd>F</kbd>.</li>
+  <li>Os programas ficam na pasta <code>~/erros</code> da Ana. No seu computador, o nome do arquivo e o número da linha serão outros; o <strong>texto</strong> da mensagem é o mesmo.</li>
+  <li>As mensagens do <strong>g++</strong> saem em inglês, com aspas tipográficas ‘assim’. As do <strong>ligador</strong> (<code>ld</code>) e do <strong>terminal</strong> saem em português na máquina da Ana, porque esses programas têm tradução instalada; a versão em inglês aparece logo ao lado.</li>
+  <li>O <strong>editor do guia</strong> usa o <strong>Clang</strong>, não o g++. Por isso, os 10 erros mais comuns têm as duas versões <a href="#top10">lado a lado</a>. Veja também <a href="simulador.html">O Editor do Guia</a>.</li>
+  <li>Todos os programas foram compilados com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code> (veja <a href="compilar.html">Compilar com g++</a>).</li>
+</ul>
+</div>
+
+<p>Atalhos: <a href="#ler">Ler uma mensagem</a> · <a href="#fases">Compilação, ligação ou execução?</a> · <a href="#top10">Os 10 mais comuns (g++ × clang++)</a> · <a href="#compilacao">Outros erros de compilação</a> · <a href="#templates">Mensagens gigantes</a> · <a href="#avisos">Avisos</a> · <a href="#ligacao">Erros de ligação</a> · <a href="#execucao">Erros de execução</a> · <a href="#sinais">Códigos de saída</a> · <a href="#sanitizers">Sanitizers</a></p>
+
+<hr>
+
+<h2 id="ler">Como ler uma mensagem do g++</h2>
+<p>A Ana escreveu um programa para a lojinha com três descuidos: esqueceu um <code>;</code>, esqueceu o <code>std::</code> e digitou um nome errado.</p>
+<pre class="file" data-file="loja.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int preco = 10
+    int quantidade = 3;
+    cout &lt;&lt; "Total: " &lt;&lt; preco * quantidade &lt;&lt; '\n';
+    std::cout &lt;&lt; "Itens: " &lt;&lt; quantdade &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra loja.cpp -o loja
+loja.cpp: In function ‘int main()’:
+loja.cpp:5:5: error: expected ‘,’ or ‘;’ before ‘int’
+    5 |     int quantidade = 3;
+      |     ^~~
+loja.cpp:6:5: error: ‘cout’ was not declared in this scope; did you mean ‘std::cout’?
+    6 |     cout &lt;&lt; "Total: " &lt;&lt; preco * quantidade &lt;&lt; '\n';
+      |     ^~~~
+      |     std::cout
+In file included from loja.cpp:1:
+/usr/include/c++/15/iostream:65:18: note: ‘std::cout’ declared here
+   65 |   extern ostream cout;          ///&lt; Linked to standard output
+      |                  ^~~~
+loja.cpp:6:34: error: ‘quantidade’ was not declared in this scope
+    6 |     cout &lt;&lt; "Total: " &lt;&lt; preco * quantidade &lt;&lt; '\n';
+      |                                  ^~~~~~~~~~
+loja.cpp:7:31: error: ‘quantdade’ was not declared in this scope
+    7 |     std::cout &lt;&lt; "Itens: " &lt;&lt; quantdade &lt;&lt; '\n';
+      |                               ^~~~~~~~~
+$ echo $?
+1</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pedaço</th><th>O que quer dizer</th></tr>
+<tr><td><code>loja.cpp: In function ‘int main()’:</code></td><td>Contexto: "dentro da função <code>main</code>". Não é um erro; diz onde estão os próximos.</td></tr>
+<tr><td><code>loja.cpp:5:5:</code></td><td><strong>Arquivo:linha:coluna</strong>. Linha 5, coluna 5. Seu editor pula direto para lá.</td></tr>
+<tr><td><code>error:</code></td><td>O <strong>tipo</strong>: <code>error</code> impede o programa de ser criado; <code>warning</code> (aviso) deixa criar, mas avisa de algo suspeito; <code>note</code> (nota) é uma informação extra sobre a mensagem anterior.</td></tr>
+<tr><td><code>expected ‘,’ or ‘;’ before ‘int’</code></td><td>O texto: "esperava <code>,</code> ou <code>;</code> antes de <code>int</code>". O erro está no fim da linha <strong>4</strong>, mas o compilador só percebe na linha 5, quando encontra o <code>int</code>.</td></tr>
+<tr><td><code>    5 |     int quantidade = 3;</code><br><code>      |     ^~~</code></td><td>A linha do código, com o <code>^</code> apontando a coluna e os <code>~</code> sublinhando o trecho.</td></tr>
+<tr><td><code>      |     std::cout</code></td><td>Uma <strong>sugestão de conserto</strong>, escrita embaixo do trecho.</td></tr>
+<tr><td><code>In file included from …</code><br><code>note: ‘std::cout’ declared here</code></td><td>Uma nota apontando para dentro da biblioteca, só para mostrar onde o <code>std::cout</code> existe. Você <strong>não</strong> mexe nesse arquivo.</td></tr>
+<tr><td><code>[-Wunused-variable]</code>, <code>[-fpermissive]</code></td><td>No fim de algumas mensagens: o nome da opção ligada a ela. <code>[-Wxxx]</code> é o nome do aviso (veja <a href="#avisos">Avisos</a>). <code>[-fpermissive]</code> quer dizer que uma opção antiga transformaria o erro em aviso: <strong>não use</strong>, conserte o código.</td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>Regra de ouro: conserte o primeiro erro e compile de novo</strong>
+<p>Repare no terceiro erro: <code>‘quantidade’ was not declared</code>. Mas a variável está declarada na linha 5! Por causa do <code>;</code> que faltou, o compilador entendeu as linhas 4 e 5 como uma coisa só e "perdeu" a declaração. Um erro costuma provocar outros, em <strong>cascata</strong>. Por isso: leia o <strong>primeiro</strong>, conserte, compile de novo. A aula <a href="erros-compilacao.html">Lendo Erros do Compilador</a> treina isso com calma.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Total: 30,out:Itens: 3">
+<p class="try-task"><strong>Missão:</strong> este é o programa da lojinha. Clique em Rodar, leia as mensagens (aqui elas vêm do Clang, com outras palavras) e conserte os três erros até aparecer <code>Total: 30</code> e <code>Itens: 3</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int preco = 10
+    int quantidade = 3;
+    cout &lt;&lt; "Total: " &lt;&lt; preco * quantidade &lt;&lt; '\n';
+    std::cout &lt;&lt; "Itens: " &lt;&lt; quantdade &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int preco = 10;
+    int quantidade = 3;
+    std::cout &lt;&lt; "Total: " &lt;&lt; preco * quantidade &lt;&lt; '\n';
+    std::cout &lt;&lt; "Itens: " &lt;&lt; quantidade &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<h2 id="fases">Compilação, ligação ou execução?</h2>
+<p>Um programa C++ passa por etapas (veja <a href="como-funciona.html">Como o C++ Vira Programa</a>), e cada etapa tem o seu jeito de reclamar. Saber em qual etapa o erro aconteceu já diz metade da solução.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Etapa</th><th>Como a mensagem começa</th><th>O que aconteceu</th><th>Seção</th></tr>
+<tr><td><strong>Compilação</strong></td><td><code>arquivo.cpp:5:5: error: …</code></td><td>O compilador não entendeu o código ou achou um erro de tipo. Nenhum programa é criado.</td><td><a href="#top10">Os 10 mais comuns</a>, <a href="#compilacao">outros</a></td></tr>
+<tr><td>Compilação (aviso)</td><td><code>arquivo.cpp:2:9: warning: …</code></td><td>O programa foi criado, mas há algo suspeito. Quase sempre é um defeito de verdade.</td><td><a href="#avisos">Avisos</a></td></tr>
+<tr><td><strong>Ligação</strong></td><td><code>/usr/bin/x86_64-linux-gnu-ld.bfd: …</code><br><code>collect2: error: ld returned 1 exit status</code></td><td>Cada arquivo compilou, mas, na hora de juntar as peças, falta uma (ou sobra uma repetida).</td><td><a href="#ligacao">Ligação</a></td></tr>
+<tr><td><strong>Execução</strong></td><td><code>Falha de segmentação</code>, <code>terminate called after throwing…</code>, <code>Abortado</code></td><td>O programa foi criado e rodou, mas morreu no meio.</td><td><a href="#execucao">Execução</a></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2 id="top10">Os 10 erros mais comuns: g++ × clang++</h2>
+<p>A primeira linha de cada mensagem, nos dois compiladores. O editor do guia mostra a coluna do <strong>clang++</strong>. Abaixo da tabela, cada um em detalhe.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>#</th><th>Causa</th><th>g++ 15</th><th>clang++ 21 (editor do guia)</th></tr>
+<tr><td><a href="#e1">1</a></td><td>Faltou o <code>;</code></td><td><code>error: expected ‘;’ before ‘}’ token</code><br><code>error: expected ‘,’ or ‘;’ before ‘std’</code></td><td><code>error: expected ';' after expression</code><br><code>error: expected ';' at end of declaration</code></td></tr>
+<tr><td><a href="#e2">2</a></td><td>Nome não declarado (ou digitado errado)</td><td><code>error: ‘totl’ was not declared in this scope; did you mean ‘total’?</code></td><td><code>error: use of undeclared identifier 'totl'; did you mean 'total'?</code></td></tr>
+<tr><td><a href="#e3">3</a></td><td>Esqueceu o <code>std::</code></td><td><code>error: ‘cout’ was not declared in this scope; did you mean ‘std::cout’?</code><br><code>error: ‘string’ was not declared in this scope</code></td><td><code>error: use of undeclared identifier 'cout'; did you mean 'std::cout'?</code><br><code>error: unknown type name 'string'; did you mean 'std::string'?</code></td></tr>
+<tr><td><a href="#e4">4</a></td><td>Faltou um <code>#include</code></td><td><code>error: ‘setw’ is not a member of ‘std’</code><br>+ <code>note: ‘std::setw’ is defined in header ‘&lt;iomanip&gt;’</code></td><td><code>error: no member named 'setw' in namespace 'std'</code> (e às vezes uma sugestão sem sentido)</td></tr>
+<tr><td><a href="#e5">5</a></td><td>Nome do <code>#include</code> errado</td><td><code>fatal error: iostrem: Arquivo ou diretório inexistente</code></td><td><code>fatal error: 'iostrem' file not found</code></td></tr>
+<tr><td><a href="#e6">6</a></td><td>Valor de um tipo onde se espera outro</td><td><code>error: invalid conversion from ‘const char*’ to ‘int’ [-fpermissive]</code></td><td><code>error: cannot initialize a variable of type 'int' with an lvalue of type 'const char[3]'</code></td></tr>
+<tr><td><a href="#e7">7</a></td><td><code>cout &lt;&lt;</code> de algo que ele não sabe mostrar</td><td><code>error: no match for ‘operator&lt;&lt;’ (operand types are ‘std::ostream’ … and ‘std::vector&lt;int&gt;’)</code></td><td><code>error: invalid operands to binary expression ('ostream' … and 'std::vector&lt;int&gt;')</code></td></tr>
+<tr><td><a href="#e8">8</a></td><td>Número errado de argumentos</td><td><code>error: too few arguments to function ‘int soma(int, int)’</code></td><td><code>error: no matching function for call to 'soma'</code></td></tr>
+<tr><td><a href="#e9">9</a></td><td>Mudar uma constante</td><td><code>error: assignment of read-only variable ‘maximo’</code></td><td><code>error: cannot assign to variable 'maximo' with const-qualified type 'const int'</code></td></tr>
+<tr><td><a href="#e10">10</a></td><td>Faltou fechar uma <code>}</code></td><td><code>error: expected ‘}’ at end of input</code></td><td><code>error: expected '}'</code></td></tr>
+<tr><td><a href="#ligacao">+</a></td><td>Função declarada, mas não definida (ligação)</td><td><code>referência não definida para "soma(int, int)"</code><br>(em inglês: <code>undefined reference to `soma(int, int)'</code>)<br><code>collect2: error: ld returned 1 exit status</code></td><td>a mesma do <code>ld</code>, e no fim:<br><code>clang++: error: linker command failed with exit code 1 (use -v to see invocation)</code></td></tr>
+</table>
+</div>
+
+<div class="cenario" id="e1">
+<strong>1. <code>expected ‘;’ before …</code> — faltou o ponto e vírgula</strong>
+<pre class="file" data-file="pontovirgula2.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá" &lt;&lt; '\n'
+}
+</pre>
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra pontovirgula2.cpp -o pontovirgula2
+pontovirgula2.cpp: In function ‘int main()’:
+pontovirgula2.cpp:4:31: error: expected ‘;’ before ‘}’ token
+    4 |     std::cout &lt;&lt; "Olá" &lt;&lt; '\n'
+      |                               ^
+      |                               ;
+    5 | }
+      | ~
+$ clang++ -std=c++23 -Wall -Wextra pontovirgula2.cpp -o pontovirgula2
+pontovirgula2.cpp:4:32: error: expected ';' after expression
+    4 |     std::cout &lt;&lt; "Olá" &lt;&lt; '\n'
+      |                               ^
+      |                               ;
+1 error generated.</pre>
+<p>Quando falta o <code>;</code> numa <strong>declaração</strong> (<code>int idade = 30</code>), o g++ escreve <code>expected ‘,’ or ‘;’ before ‘std’</code> (com a palavra que veio depois) e o clang++, <code>expected ';' at end of declaration</code>.</p>
+<p><strong>Como consertar:</strong> o g++ aponta o lugar onde <strong>percebeu</strong> a falta, que muitas vezes é o começo da linha <strong>seguinte</strong>. Olhe o fim da linha anterior. Aula: <a href="sintaxe.html">Sintaxe</a>.</p>
+</div>
+
+<div class="cenario" id="e2">
+<strong>2. <code>‘x’ was not declared in this scope</code> — nome que não existe</strong>
+<pre class="file" data-file="naodeclarada.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int total = 10;
+    std::cout &lt;&lt; totl &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra naodeclarada.cpp -o naodeclarada
+naodeclarada.cpp: In function ‘int main()’:
+naodeclarada.cpp:5:18: error: ‘totl’ was not declared in this scope; did you mean ‘total’?
+    5 |     std::cout &lt;&lt; totl &lt;&lt; '\n';
+      |                  ^~~~
+      |                  total
+naodeclarada.cpp:4:9: warning: unused variable ‘total’ [-Wunused-variable]
+    4 |     int total = 10;
+      |         ^~~~~
+$ clang++ -std=c++23 -Wall -Wextra naodeclarada.cpp -o naodeclarada
+naodeclarada.cpp:5:18: error: use of undeclared identifier 'totl'; did you mean 'total'?
+    5 |     std::cout &lt;&lt; totl &lt;&lt; '\n';
+      |                  ^~~~
+      |                  total
+naodeclarada.cpp:4:9: note: 'total' declared here
+    4 |     int total = 10;
+      |         ^
+1 error generated.</pre>
+<p><strong>O que significa:</strong> "<code>totl</code> não foi declarado neste escopo". As causas: nome digitado diferente (maiúsculas contam: <code>Total</code> ≠ <code>total</code>), variável criada <strong>depois</strong> da linha, ou criada dentro de outro bloco <code>{ }</code> (veja <a href="escopo.html">Escopo</a>). Sem nenhum tipo antes (<code>idade = 30;</code>), a mensagem é a mesma: em C++, toda variável precisa ser declarada com um tipo.</p>
+<p><strong>Como consertar:</strong> aceite a sugestão <code>did you mean</code> se ela fizer sentido, ou declare a variável antes de usar: <code>int idade = 30;</code>. Aula: <a href="variaveis.html">Variáveis</a>.</p>
+</div>
+
+<div class="cenario" id="e3">
+<strong>3. <code>‘cout’ was not declared … did you mean ‘std::cout’?</code> — faltou o <code>std::</code></strong>
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra semstd.cpp -o semstd
+semstd.cpp: In function ‘int main()’:
+semstd.cpp:4:5: error: ‘cout’ was not declared in this scope; did you mean ‘std::cout’?
+    4 |     cout &lt;&lt; "Olá\n";
+      |     ^~~~
+      |     std::cout
+In file included from semstd.cpp:1:
+/usr/include/c++/15/iostream:65:18: note: ‘std::cout’ declared here
+   65 |   extern ostream cout;          ///&lt; Linked to standard output
+      |                  ^~~~
+$ clang++ -std=c++23 -Wall -Wextra semstd.cpp -o semstd
+semstd.cpp:4:5: error: use of undeclared identifier 'cout'; did you mean 'std::cout'?
+    4 |     cout &lt;&lt; "Olá\n";
+      |     ^~~~
+      |     std::cout
+/usr/lib/gcc/x86_64-linux-gnu/15/../../../../include/c++/15/iostream:65:18: note: 'std::cout' declared here
+   65 |   extern ostream cout;          ///&lt; Linked to standard output
+      |                  ^
+1 error generated.</pre>
+<p>Com <code>string nome = "Ana";</code> o g++ escreve <code>error: ‘string’ was not declared in this scope</code> e lista <code>note: suggested alternatives:</code> <code>‘std::string’</code>; o clang++, <code>error: unknown type name 'string'; did you mean 'std::string'?</code>. Com <code>endl</code>: <code>‘endl’ was not declared in this scope; did you mean ‘std::endl’?</code>.</p>
+<p><strong>O que significa:</strong> tudo da biblioteca padrão mora no "sobrenome" <code>std</code> (um <a href="namespaces.html">namespace</a>).</p>
+<p><strong>Como consertar:</strong> escreva <code>std::cout</code>, <code>std::string</code>, <code>std::endl</code>. Aula: <a href="saida-cout.html">Saída com cout</a>.</p>
+</div>
+
+<div class="cenario" id="e4">
+<strong>4. <code>‘setw’ is not a member of ‘std’</code> — faltou um <code>#include</code></strong>
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra semiomanip.cpp -o semiomanip
+semiomanip.cpp: In function ‘int main()’:
+semiomanip.cpp:4:23: error: ‘setw’ is not a member of ‘std’
+    4 |     std::cout &lt;&lt; std::setw(5) &lt;&lt; 42 &lt;&lt; '\n';
+      |                       ^~~~
+semiomanip.cpp:2:1: note: ‘std::setw’ is defined in header ‘&lt;iomanip&gt;’; this is probably fixable by adding ‘#include &lt;iomanip&gt;’
+    1 | #include &lt;iostream&gt;
+  +++ |+#include &lt;iomanip&gt;
+    2 |
+$ clang++ -std=c++23 -Wall -Wextra semiomanip.cpp -o semiomanip
+semiomanip.cpp:4:18: error: no member named 'setw' in namespace 'std'; did you mean 'getw'?
+    4 |     std::cout &lt;&lt; std::setw(5) &lt;&lt; 42 &lt;&lt; '\n';
+      |                  ^~~~~~~~~
+      |                  getw
+/usr/include/stdio.h:647:12: note: 'getw' declared here
+  647 | extern int getw (FILE *__stream) __nonnull ((1));
+      |            ^
+semiomanip.cpp:4:28: error: cannot initialize a parameter of type 'FILE *' (aka '_IO_FILE *') with an rvalue of type 'int'
+    4 |     std::cout &lt;&lt; std::setw(5) &lt;&lt; 42 &lt;&lt; '\n';
+      |                            ^
+/usr/include/stdio.h:647:24: note: passing argument to parameter '__stream' here
+  647 | extern int getw (FILE *__stream) __nonnull ((1));
+      |                        ^
+2 errors generated.</pre>
+<p><strong>O que significa:</strong> "<code>setw</code> não é membro de <code>std</code>": o cabeçalho que o traz não foi incluído. O g++ ainda diz <strong>qual</strong> incluir (<code>+++ |+#include &lt;iomanip&gt;</code> mostra a linha a acrescentar). O clang++ tenta adivinhar um nome parecido (<code>getw</code>), que não tem nada a ver: ignore a sugestão.</p>
+<p>Outras formas do mesmo problema: sem <code>&lt;map&gt;</code>, <code>‘map’ is not a member of ‘std’</code> (clang++: <code>no template named 'map' in namespace 'std'; did you mean 'max'?</code>); sem <code>&lt;cmath&gt;</code>, <code>‘sqrt’ was not declared in this scope</code>; sem <code>&lt;vector&gt;</code>, uma mensagem estranha: <code>error: wrong number of template arguments (1, should be 2)</code> (clang++: <code>too few template arguments for class template 'vector'</code>).</p>
+<p><strong>Como consertar:</strong> acrescente o <code>#include</code> certo no topo. Cuidado: às vezes um cabeçalho traz outro "de carona" e o programa compila sem o <code>#include</code> (no g++ 15, <code>std::string</code> funcionou só com <code>&lt;iostream&gt;</code>). Não conte com isso: inclua sempre o que usa. Aula: <a href="preprocessador.html">O Pré-processador</a>.</p>
+</div>
+
+<div class="cenario" id="e5">
+<strong>5. <code>fatal error: iostrem: Arquivo ou diretório inexistente</code></strong>
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra arquivo.cpp -o arquivo
+arquivo.cpp:1:10: fatal error: iostrem: Arquivo ou diretório inexistente
+    1 | #include &lt;iostrem&gt;
+      |          ^~~~~~~~~
+compilation terminated.
+$ clang++ -std=c++23 -Wall -Wextra arquivo.cpp -o arquivo
+arquivo.cpp:1:10: fatal error: 'iostrem' file not found
+    1 | #include &lt;iostrem&gt;
+      |          ^~~~~~~~~
+1 error generated.</pre>
+<p><strong>O que significa:</strong> o arquivo pedido no <code>#include</code> não existe. <code>fatal error</code> para a compilação na hora (<code>compilation terminated</code>). O pedaço "Arquivo ou diretório inexistente" vem do sistema, por isso está em português; em inglês: <code>No such file or directory</code>.</p>
+<p><strong>Como consertar:</strong> confira a grafia (<code>iostream</code>). Para um arquivo seu, use aspas e confira a pasta: <code>#include "soma.h"</code>. Aula: <a href="headers.html">Arquivos .h e .cpp</a>.</p>
+</div>
+
+<div class="cenario" id="e6">
+<strong>6. <code>invalid conversion from ‘const char*’ to ‘int’</code> — tipo errado</strong>
+<pre class="term" data-cwd="~/erros">$ cat tipo.cpp
+int main() {
+    int idade = "30";
+    return idade;
+}
+$ g++ -std=c++23 -Wall -Wextra tipo.cpp -o tipo
+tipo.cpp: In function ‘int main()’:
+tipo.cpp:2:17: error: invalid conversion from ‘const char*’ to ‘int’ [-fpermissive]
+    2 |     int idade = "30";
+      |                 ^~~~
+      |                 |
+      |                 const char*
+$ clang++ -std=c++23 -Wall -Wextra tipo.cpp -o tipo
+tipo.cpp:2:9: error: cannot initialize a variable of type 'int' with an lvalue of type 'const char[3]'
+    2 |     int idade = "30";
+      |         ^       ~~~~
+1 error generated.</pre>
+<p><strong>O que significa:</strong> <code>"30"</code>, entre aspas, é <strong>texto</strong> (para o compilador, <code>const char*</code> ou <code>const char[3]</code>: dois caracteres mais o final invisível), e a variável é <code>int</code>. O C++ não converte texto em número sozinho.</p>
+<p>Parentes: <code>char letra = "A";</code> dá <code>invalid conversion from ‘const char*’ to ‘char’</code> (use aspas simples: <code>'A'</code>); <code>std::string s = 5;</code> dá <code>conversion from ‘int’ to non-scalar type ‘std::string’ … requested</code> (clang++: <code>no viable conversion from 'int' to 'std::string'</code>).</p>
+<p><strong>Como consertar:</strong> tire as aspas (<code>int idade = 30;</code>) ou, se o texto vem de fora, converta com <code>std::stoi</code>. Aulas: <a href="tipos-dados.html">Tipos de Dados</a>, <a href="string-numero.html">Texto ↔ Número</a>, <a href="char.html">char</a>.</p>
+</div>
+
+<div class="cenario" id="e7">
+<strong>7. <code>no match for ‘operator&lt;&lt;’</code> — o <code>cout</code> não sabe mostrar isso</strong>
+<pre class="file" data-file="coutvector.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; v{1, 2, 3};
+    std::cout &lt;&lt; v &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra coutvector.cpp -o coutvector
+coutvector.cpp: In function ‘int main()’:
+coutvector.cpp:6:15: error: no match for ‘operator&lt;&lt;’ (operand types are ‘std::ostream’ {aka ‘std::basic_ostream&lt;char&gt;’} and ‘std::vector&lt;int&gt;’)
+    6 |     std::cout &lt;&lt; v &lt;&lt; '\n';
+      |     ~~~~~~~~~ ^~ ~
+      |          |       |
+      |          |       std::vector&lt;int&gt;
+      |          std::ostream {aka std::basic_ostream&lt;char&gt;}
+coutvector.cpp:6:15: note: there are 52 candidates
+«  … mais 360 linhas de "candidate N: …", uma para cada tipo que o cout sabe mostrar …
+$ clang++ -std=c++23 -Wall -Wextra coutvector.cpp -o coutvector
+coutvector.cpp:6:15: error: invalid operands to binary expression ('ostream' (aka 'basic_ostream&lt;char&gt;') and 'std::vector&lt;int&gt;')
+    6 |     std::cout &lt;&lt; v &lt;&lt; '\n';
+      |     ~~~~~~~~~ ^  ~
+«  … mais 145 linhas de "candidate … not viable" …</pre>
+<p><strong>O que significa:</strong> "não existe <code>&lt;&lt;</code> que receba um <code>ostream</code> e um <code>std::vector&lt;int&gt;</code>". O <code>cout</code> sabe mostrar números, texto e caracteres, mas não um vetor inteiro (nem uma <code>struct</code> sua). As 52 "candidatas" são as versões de <code>&lt;&lt;</code> que existem; nenhuma serve.</p>
+<p><strong>Como consertar:</strong> mostre item por item com um <a href="for-range.html">for de intervalo</a>, ou use <code>std::println("{}", v);</code> do C++23, que sabe mostrar vetores (<a href="format-print.html">std::format e std::print</a>). Para uma classe sua, ensine o <code>&lt;&lt;</code> a ela (<a href="sobrecarga-operadores.html">Sobrecarga de Operadores</a>).</p>
+</div>
+
+<div class="cenario" id="e8">
+<strong>8. <code>too few arguments to function</code> / <code>no matching function for call to</code></strong>
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra argumentos.cpp -o argumentos
+argumentos.cpp: In function ‘int main()’:
+argumentos.cpp:6:16: error: too few arguments to function ‘int soma(int, int)’
+    6 |     return soma(2);
+      |            ~~~~^~~
+argumentos.cpp:1:5: note: declared here
+    1 | int soma(int a, int b) {
+      |     ^~~~
+$ clang++ -std=c++23 -Wall -Wextra argumentos.cpp -o argumentos
+argumentos.cpp:6:12: error: no matching function for call to 'soma'
+    6 |     return soma(2);
+      |            ^~~~
+argumentos.cpp:1:5: note: candidate function not viable: requires 2 arguments, but 1 was provided
+    1 | int soma(int a, int b) {
+      |     ^    ~~~~~~~~~~~~
+1 error generated.</pre>
+<p><strong>O que significa:</strong> "argumentos de menos para a função <code>soma(int, int)</code>": ela pede dois, você deu um. Com argumentos demais, <code>too many arguments</code>. Quando há várias versões da função (<a href="sobrecarga.html">sobrecarga</a>) e nenhuma serve, o g++ também diz <code>no matching function for call to ‘…’</code> e lista as candidatas.</p>
+<p><strong>Como consertar:</strong> confira a assinatura que a nota <code>declared here</code> mostra e passe os argumentos na quantidade e nos tipos certos. Aulas: <a href="parametros.html">Parâmetros e Argumentos</a>, <a href="valor-padrao.html">Valores Padrão</a>.</p>
+</div>
+
+<div class="cenario" id="e9">
+<strong>9. <code>assignment of read-only variable</code> — mudar uma constante</strong>
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra const.cpp -o const
+const.cpp: In function ‘int main()’:
+const.cpp:3:12: error: assignment of read-only variable ‘maximo’
+    3 |     maximo = 20;
+      |     ~~~~~~~^~~~
+$ clang++ -std=c++23 -Wall -Wextra const.cpp -o const
+const.cpp:3:12: error: cannot assign to variable 'maximo' with const-qualified type 'const int'
+    3 |     maximo = 20;
+      |     ~~~~~~ ^
+const.cpp:2:15: note: variable 'maximo' declared const here
+    2 |     const int maximo = 10;
+      |     ~~~~~~~~~~^~~~~~~~~~~
+1 error generated.</pre>
+<p><strong>O que significa:</strong> "atribuição a variável somente leitura": <code>maximo</code> foi declarada <code>const</code>. O compilador está fazendo o trabalho dele: proteger um valor que você mesmo disse que não muda.</p>
+<p><strong>Como consertar:</strong> se o valor precisa mudar, tire o <code>const</code>; se não, não mude. Aula: <a href="constantes.html">Constantes</a>.</p>
+</div>
+
+<div class="cenario" id="e10">
+<strong>10. <code>expected ‘}’ at end of input</code> — faltou fechar uma chave</strong>
+<pre class="term" data-cwd="~/erros">$ cat chave.cpp
+#include &lt;iostream&gt;
+
+int main() {
+    if (true) {
+        std::cout &lt;&lt; "oi\n";
+}
+$ g++ -std=c++23 -Wall -Wextra chave.cpp -o chave
+chave.cpp: In function ‘int main()’:
+chave.cpp:6:2: error: expected ‘}’ at end of input
+    6 | }
+      |  ^
+chave.cpp:3:12: note: to match this ‘{’
+    3 | int main() {
+      |            ^
+$ clang++ -std=c++23 -Wall -Wextra chave.cpp -o chave
+chave.cpp:6:2: error: expected '}'
+    6 | }
+      |  ^
+chave.cpp:3:12: note: to match this '{'
+    3 | int main() {
+      |            ^
+1 error generated.</pre>
+<p><strong>O que significa:</strong> o arquivo acabou ("end of input") com uma <code>{</code> ainda aberta. A nota aponta a chave que ficou sem par, mas atenção: o compilador casa cada <code>}</code> com a <code>{</code> aberta mais recente, então a chave que <strong>de fato</strong> ficou sem fechar (aqui, a do <code>if</code>) pode ser outra.</p>
+<p>O contrário, uma <code>}</code> sobrando, dá <code>expected declaration before ‘}’ token</code> (clang++: <code>extraneous closing brace ('}')</code>).</p>
+<p><strong>Como consertar:</strong> mantenha a indentação certinha (o editor ajuda) e confira bloco por bloco. Aula: <a href="sintaxe.html">Sintaxe</a>.</p>
+</div>
+
+<hr>
+
+<h2 id="compilacao">Outros erros de compilação</h2>
+<p>A primeira linha da mensagem do g++ 15 (e, quando muda muito, a do clang++), a causa e a correção. Os nomes (<code>x</code>, <code>Aluno</code>…) são dos exemplos; no seu código, serão outros.</p>
+
+<h3 id="c-sintaxe">Sintaxe e texto</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem</th><th>Causa típica</th><th>Correção</th><th>Aula</th></tr>
+<tr><td><code>expected primary-expression before ‘;’ token</code><br>clang++: <code>expected expression</code></td><td>Faltou um pedaço da conta: <code>int x = 5 * ;</code>. Também aparece em cascata depois de outro erro.</td><td>Complete a expressão.</td><td><a href="operadores-aritmeticos.html">Aritméticos</a></td></tr>
+<tr><td><code>‘x’ does not name a type</code><br>clang++: <code>a type specifier is required for all declarations</code></td><td>Uma instrução (<code>x = 5;</code>) <strong>fora</strong> de qualquer função. Fora de funções só cabem declarações.</td><td>Mova a instrução para dentro do <code>main</code> ou de outra função.</td><td><a href="funcoes.html">Funções</a></td></tr>
+<tr><td><code>‘::main’ must return ‘int’</code></td><td><code>void main()</code>, comum em livros antigos.</td><td>Use <code>int main()</code>.</td><td><a href="primeiro-programa.html">Olá, Mundo</a></td></tr>
+<tr><td><code>redeclaration of ‘int x’</code><br>clang++: <code>redefinition of 'x'</code></td><td>Duas variáveis com o mesmo nome no mesmo bloco.</td><td>Para mudar o valor, tire o tipo: <code>x = 2;</code>.</td><td><a href="variaveis.html">Variáveis</a></td></tr>
+<tr><td><code>‘else’ without a previous ‘if’</code><br>clang++: <code>expected expression</code></td><td>Um <code>;</code> logo depois do <code>if (…)</code>, ou um <code>else</code> sobrando.</td><td>Tire o <code>;</code>: <code>if (x &gt; 0) {</code>.</td><td><a href="if-else.html">if e else</a></td></tr>
+<tr><td><code>extended character “ is not valid in an identifier</code><br>clang++: <code>unexpected character &lt;U+201C&gt;</code></td><td>Aspas "curvas" (<code>“Olá”</code>), coladas de um site, do Word ou de um PDF.</td><td>Troque pelas aspas retas do teclado: <code>"Olá"</code>.</td><td><a href="strings.html">Strings</a></td></tr>
+<tr><td><code>missing terminating " character</code></td><td>Abriu aspas e não fechou: <code>"Olá &lt;&lt; '\n';</code>. Vem junto com outros erros em cascata.</td><td>Feche as aspas na mesma linha.</td><td><a href="strings.html">Strings</a></td></tr>
+<tr><td><code>invalid operands of types ‘const char [7]’ and ‘const char [4]’ to binary ‘operator+’</code></td><td>Somar dois textos entre aspas: <code>"Olá, " + "Ana"</code>.</td><td>Faça um deles virar <code>std::string</code>: <code>std::string("Olá, ") + "Ana"</code>, ou junte numa só: <code>"Olá, Ana"</code>.</td><td><a href="concatenacao.html">Juntar Strings</a></td></tr>
+<tr><td><code>no match for ‘operator==’ (operand types are ‘std::string’ … and ‘char’)</code></td><td>Comparar texto com um caractere: <code>nome == 'A'</code>.</td><td>Use aspas duplas (<code>nome == "A"</code>) ou compare um caractere (<code>nome[0] == 'A'</code>).</td><td><a href="acessar-caracteres.html">Acessar Caracteres</a></td></tr>
+<tr><td><code>narrowing conversion of ‘3.7000000000000002e+0’ from ‘double’ to ‘int’ [-Wnarrowing]</code></td><td><code>int x{3.7};</code>: as chaves não deixam perder informação.</td><td>Use o tipo certo (<code>double x{3.7};</code>) ou converta de propósito: <code>static_cast&lt;int&gt;(3.7)</code>.</td><td><a href="conversao-tipos.html">Conversão de Tipos</a></td></tr>
+</table>
+</div>
+
+<h3 id="c-funcoes">Funções, tipos e referências</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem</th><th>Causa típica</th><th>Correção</th><th>Aula</th></tr>
+<tr><td><code>void value not ignored as it ought to be</code><br>clang++: <code>cannot initialize a variable of type 'int' with an rvalue of type 'void'</code></td><td>Guardar o resultado de uma função <code>void</code>: <code>int x = ola();</code>.</td><td>Faça a função devolver um valor, ou só chame: <code>ola();</code>.</td><td><a href="retorno.html">Retorno</a></td></tr>
+<tr><td><code>return-statement with no value, in function returning ‘int’ [-fpermissive]</code><br>clang++: <code>non-void function 'pega' should return a value</code></td><td><code>return;</code> sozinho numa função que promete um <code>int</code>.</td><td><code>return 0;</code> (ou o valor certo).</td><td><a href="retorno.html">Retorno</a></td></tr>
+<tr><td><code>lvalue required as left operand of assignment</code><br>clang++: <code>expression is not assignable</code></td><td>Do lado esquerdo do <code>=</code> há uma conta, não uma variável: <code>if (x + 1 = 2)</code>. Quase sempre era <code>==</code>.</td><td>Para comparar, use <code>==</code>.</td><td><a href="operadores-comparacao.html">Comparação</a></td></tr>
+<tr><td><code>cannot bind non-const lvalue reference of type ‘int&amp;’ to an rvalue of type ‘int’</code><br>clang++: <code>no matching function for call to 'dobra'</code></td><td>Passar um valor solto (<code>dobra(5)</code>) para um parâmetro <code>int&amp;</code>, que precisa de uma variável para mudar.</td><td>Passe uma variável, ou use <code>const int&amp;</code> se a função não muda o valor.</td><td><a href="passagem-referencia.html">Por Referência</a></td></tr>
+<tr><td><code>call of overloaded ‘f(long int)’ is ambiguous</code><br>clang++: <code>call to 'f' is ambiguous</code></td><td>Duas versões da função servem igualmente bem.</td><td>Passe o tipo exato (<code>f(5)</code>, <code>f(5.0)</code>) ou converta.</td><td><a href="sobrecarga.html">Sobrecarga</a></td></tr>
+<tr><td><code>switch quantity not an integer</code></td><td><code>switch</code> com <code>std::string</code>.</td><td>Use <code>if</code>/<code>else if</code>, ou um <code>enum</code>.</td><td><a href="switch.html">switch</a></td></tr>
+<tr><td><code>jump to case label</code> + <code>note: crosses initialization of ‘int x’</code></td><td>Uma variável criada dentro de um <code>case</code> sem chaves.</td><td>Ponha o <code>case</code> entre chaves: <code>case 1: { int x = 5; … }</code>.</td><td><a href="switch.html">switch</a></td></tr>
+<tr><td><code>‘println’ is not a member of ‘std’</code> + <code>note: ‘std::println’ is only available from C++23 onwards</code></td><td>Compilou sem <code>-std=c++23</code>: o g++ 15 usa C++17 se você não pedir outro.</td><td>Use o comando padrão: <code>g++ -std=c++23 …</code>.</td><td><a href="compilar.html">Compilar</a></td></tr>
+<tr><td><code>call to consteval function ‘std::basic_format_string&lt;…&gt;("{} tem {} anos")’ is not a constant expression</code></td><td><code>std::format</code>/<code>std::println</code> com mais <code>{}</code> do que valores. O erro é pego na compilação.</td><td>Um valor para cada <code>{}</code>.</td><td><a href="format-print.html">std::format</a></td></tr>
+</table>
+</div>
+
+<h3 id="c-classes">Classes, ponteiros e containers</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem</th><th>Causa típica</th><th>Correção</th><th>Aula</th></tr>
+<tr><td><code>‘class std::vector&lt;int&gt;’ has no member named ‘length’</code><br>clang++: <code>no member named 'length' in 'std::vector&lt;int&gt;'</code></td><td>Método que não existe nesse tipo (no vetor, o tamanho é <code>size()</code>).</td><td>Confira o nome do método na referência.</td><td><a href="ref-containers.html">Containers</a></td></tr>
+<tr><td><code>request for member ‘size’ in ‘p’, which is of pointer type … (maybe you meant to use ‘-&gt;’ ?)</code></td><td>Usar <code>.</code> num ponteiro.</td><td><code>p-&gt;size()</code>.</td><td><a href="ponteiros.html">Ponteiros</a></td></tr>
+<tr><td><code>‘double Conta::saldo’ is private within this context</code><br>clang++: <code>'saldo' is a private member of 'Conta'</code></td><td>Mexer num membro <code>private</code> de fora da classe (numa <code>class</code>, tudo é privado até um <code>public:</code>).</td><td>Use um método público, ou reveja o <code>public:</code>.</td><td><a href="encapsulamento.html">public e private</a></td></tr>
+<tr><td><code>no matching function for call to ‘Aluno::Aluno()’</code><br>clang++: <code>no matching constructor for initialization of 'Aluno'</code></td><td><code>Aluno a;</code> sem argumentos, mas a classe só tem construtor que pede um nome.</td><td>Passe os argumentos (<code>Aluno a{"Ana"};</code>) ou crie um construtor padrão.</td><td><a href="construtores.html">Construtores</a></td></tr>
+<tr><td><code>passing ‘const Aluno’ as ‘this’ argument discards qualifiers [-fpermissive]</code><br>clang++: <code>'this' argument to member function 'nome' has type 'const Aluno', but function is not marked const</code></td><td>Chamar um método não-<code>const</code> num objeto <code>const</code> (por exemplo, recebido por <code>const Aluno&amp;</code>).</td><td>Marque o método como <code>const</code>: <code>std::string nome() const</code>.</td><td><a href="metodos-const.html">Métodos const</a></td></tr>
+<tr><td><code>cannot declare variable ‘f’ to be of abstract type ‘Forma’</code><br>clang++: <code>variable type 'Forma' is an abstract class</code></td><td>Criar um objeto de uma classe com método virtual puro (<code>= 0</code>).</td><td>Crie um objeto de uma classe filha que implemente o método.</td><td><a href="classes-abstratas.html">Classes Abstratas</a></td></tr>
+<tr><td><code>‘void Gato::som()’ marked ‘override’, but does not override</code></td><td>A assinatura não bate com a da classe mãe (aqui faltou o <code>const</code>).</td><td>Copie a assinatura exata: <code>void som() const override</code>.</td><td><a href="polimorfismo.html">Polimorfismo</a></td></tr>
+<tr><td><code>use of deleted function ‘std::unique_ptr&lt;…&gt;::unique_ptr(const std::unique_ptr&lt;…&gt;&amp;)’</code><br>clang++: <code>call to deleted constructor of …</code></td><td>Copiar um <code>std::unique_ptr</code> (<code>auto b = a;</code>): ele tem um dono só.</td><td>Transfira com <code>auto b = std::move(a);</code>, ou use <code>std::shared_ptr</code>.</td><td><a href="smart-pointers.html">Ponteiros Inteligentes</a></td></tr>
+<tr><td><code>wrong number of template arguments (1, should be 2)</code></td><td>Usou <code>std::vector&lt;int&gt;</code> sem <code>#include &lt;vector&gt;</code>.</td><td>Inclua <code>&lt;vector&gt;</code>.</td><td><a href="vector.html">std::vector</a></td></tr>
+</table>
+</div>
+
+<h2 id="templates">Mensagens gigantes (templates e concepts)</h2>
+<p>Quando o erro acontece dentro de um <strong>template</strong> da biblioteca (<code>std::sort</code>, <code>std::vector</code>, <code>cout &lt;&lt;</code>…), o compilador mostra o caminho inteiro por dentro dela. O <code>cout &lt;&lt; v</code> do <a href="#e7">erro 7</a> rende <strong>378 linhas</strong> no g++. Não se assuste; procure três coisas:</p>
+<ol class="passo">
+  <li>a primeira linha com <code>error:</code>;</li>
+  <li>a linha <code>required from here</code> que aponta um arquivo <strong>seu</strong> (é a sua linha que causou tudo);</li>
+  <li>com concepts, a linha <code>the expression ‘…’ evaluated to ‘false’</code> ou <code>required for the satisfaction of ‘…’</code>, que diz qual exigência não foi cumprida.</li>
+</ol>
+<p>Um filtro ajuda. Aqui, o <code>std::sort</code> numa <code>std::list</code> (veja a <a href="ref-algoritmos.html#armadilhas">armadilha em Algoritmos</a>), de 29 linhas reduzidas a 2:</p>
+<pre class="term" data-cwd="~/cpp/alg">$ g++ -std=c++23 -Wall -Wextra lista.cpp -o lista 2&gt;&amp;1 | grep -E "error|required from here"
+lista.cpp:6:14:   required from here
+/usr/include/c++/15/bits/stl_algo.h:1907:50: error: no match for ‘operator-’ (operand types are ‘std::_List_iterator&lt;int&gt;’ and ‘std::_List_iterator&lt;int&gt;’)</pre>
+<p>(O <code>2&gt;&amp;1</code> manda as mensagens, que saem na saída de erro, para o <code>grep</code>.)</p>
+
+<p>Com <strong>concepts</strong> <span class="versao">C++20</span>, a mensagem fica mais legível. Uma função que só aceita inteiros, chamada com <code>2.5</code>:</p>
+<pre class="file" data-file="concept.cpp">#include &lt;concepts&gt;
+
+template &lt;std::integral T&gt;
+T dobro(T x) { return 2 * x; }
+
+int main() {
+    dobro(2.5);
+}
+</pre>
+<pre class="term" data-cwd="~/erros">$ g++ -std=c++23 -Wall -Wextra concept.cpp -o concept
+concept.cpp: In function ‘int main()’:
+concept.cpp:7:10: error: no matching function for call to ‘dobro(double)’
+    7 |     dobro(2.5);
+      |     ~~~~~^~~~~
+concept.cpp:7:10: note: there is 1 candidate
+concept.cpp:4:3: note: candidate 1: ‘template&lt;class T&gt;  requires  integral&lt;T&gt; T dobro(T)’
+    4 | T dobro(T x) { return 2 * x; }
+      |   ^~~~~
+concept.cpp:4:3: note: template argument deduction/substitution failed:
+concept.cpp:4:3: note: constraints not satisfied
+In file included from concept.cpp:1:
+/usr/include/c++/15/concepts: In substitution of ‘template&lt;class T&gt;  requires  integral&lt;T&gt; T dobro(T) [with T = double]’:
+concept.cpp:7:10:   required from here
+    7 |     dobro(2.5);
+      |     ~~~~~^~~~~
+/usr/include/c++/15/concepts:109:13:   required for the satisfaction of ‘integral&lt;T&gt;’ [with T = double]
+/usr/include/c++/15/concepts:109:24: note: the expression ‘is_integral_v&lt;_Tp&gt; [with _Tp = double]’ evaluated to ‘false’
+  109 |     concept integral = is_integral_v&lt;_Tp&gt;;
+      |                        ^~~~~~~~~~~~~~~~~~
+$ clang++ -std=c++23 -Wall -Wextra concept.cpp -o concept
+concept.cpp:7:5: error: no matching function for call to 'dobro'
+    7 |     dobro(2.5);
+      |     ^~~~~
+concept.cpp:4:3: note: candidate template ignored: constraints not satisfied [with T = double]
+    4 | T dobro(T x) { return 2 * x; }
+      |   ^
+concept.cpp:3:11: note: because 'double' does not satisfy 'integral'
+    3 | template &lt;std::integral T&gt;
+      |           ^
+/usr/lib/gcc/x86_64-linux-gnu/15/../../../../include/c++/15/concepts:109:24: note: because 'is_integral_v&lt;double&gt;' evaluated to false
+  109 |     concept integral = is_integral_v&lt;_Tp&gt;;
+      |                        ^
+1 error generated.</pre>
+<p>Leitura: "não há <code>dobro(double)</code>; a única candidata exige <code>integral&lt;T&gt;</code>, e com <code>T = double</code> isso deu <code>false</code>". O clang++ diz direto: <code>'double' does not satisfy 'integral'</code>. Aulas: <a href="templates-funcao.html">Templates de Função</a>, <a href="concepts.html">Concepts</a>.</p>
+
+<hr>
+
+<h2 id="avisos">Avisos (<code>-Wall -Wextra</code>)</h2>
+<p>Um aviso (<code>warning</code>) não impede o programa de ser criado, mas quase sempre aponta um defeito. Compile sempre com <code>-Wall -Wextra</code> e deixe a saída <strong>limpa</strong>. O nome entre colchetes é a opção que liga o aviso. Veja a aula <a href="avisos.html">Avisos</a>.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Aviso do g++ 15</th><th>clang++ 21</th><th>Causa e correção</th></tr>
+<tr><td><code>unused variable ‘x’ [-Wunused-variable]</code></td><td><code>unused variable 'x'</code></td><td>Criou e nunca usou. Apague, ou use. Aula: <a href="variaveis.html">Variáveis</a>.</td></tr>
+<tr><td><code>unused parameter ‘b’ [-Wunused-parameter]</code></td><td><code>unused parameter 'b'</code></td><td>Parâmetro que a função ignora. Se for de propósito, tire o nome: <code>int f(int a, int)</code>. Aula: <a href="parametros.html">Parâmetros</a>.</td></tr>
+<tr><td><code>variable ‘x’ set but not used [-Wunused-but-set-variable]</code></td><td>igual</td><td>Recebe valores, mas ninguém lê. Sobra de código antigo.</td></tr>
+<tr><td><code>comparison of integer expressions of different signedness: ‘int’ and ‘std::vector&lt;int&gt;::size_type’ {aka ‘long unsigned int’} [-Wsign-compare]</code></td><td><code>comparison of integers of different signs: 'int' and 'size_type' (aka 'unsigned long')</code></td><td><code>for (int i = 0; i &lt; v.size(); i++)</code>: <code>size()</code> é sem sinal. Use <code>std::size_t i</code> ou, melhor, um <a href="for-range.html">for de intervalo</a>. Aula: <a href="inteiros.html">Inteiros</a>.</td></tr>
+<tr><td><code>suggest parentheses around assignment used as truth value [-Wparentheses]</code></td><td><code>using the result of an assignment as a condition without parentheses</code></td><td><code>if (x = 5)</code> <strong>atribui</strong> 5 e é sempre verdadeiro. Quase sempre era <code>==</code>. Aula: <a href="operadores-comparacao.html">Comparação</a>.</td></tr>
+<tr><td><code>‘soma’ is used uninitialized [-Wuninitialized]</code></td><td><code>variable 'soma' is uninitialized when used here</code> + sugestão <code>= 0</code></td><td><code>int soma; soma += 10;</code>: o valor inicial é lixo. Inicialize: <code>int soma = 0;</code>. Aula: <a href="comportamento-indefinido.html">Comportamento Indefinido</a>.</td></tr>
+<tr><td><code>no return statement in function returning non-void [-Wreturn-type]</code></td><td><code>non-void function does not return a value</code></td><td>A função promete um valor e acaba sem <code>return</code>. <strong>Compila</strong>, mas o resultado é indefinido. Aula: <a href="retorno.html">Retorno</a>.</td></tr>
+<tr><td><code>address of local variable ‘x’ returned [-Wreturn-local-addr]</code></td><td><code>address of stack memory associated with local variable 'x' returned</code></td><td>Devolver <code>&amp;x</code> de uma variável que morre no fim da função. Devolva o valor. Aula: <a href="memoria.html">Como a Memória Funciona</a>.</td></tr>
+<tr><td><code>this statement may fall through [-Wimplicit-fallthrough=]</code></td><td>(o clang++ não avisa com <code>-Wall -Wextra</code>)</td><td>Um <code>case</code> sem <code>break</code> "cai" no próximo. Ponha o <code>break;</code> (ou <code>[[fallthrough]];</code> se for de propósito). Aula: <a href="switch.html">switch</a>.</td></tr>
+<tr><td><code>suggest braces around empty body in an ‘if’ statement [-Wempty-body]</code></td><td><code>if statement has empty body</code></td><td><code>if (x &gt; 0);</code>: o <code>;</code> é o corpo inteiro do <code>if</code>. Tire o <code>;</code>. Aula: <a href="if-else.html">if e else</a>.</td></tr>
+<tr><td><code>this ‘if’ clause does not guard... [-Wmisleading-indentation]</code></td><td><code>misleading indentation; statement is not part of the previous 'if'</code></td><td>Duas linhas recuadas debaixo de um <code>if</code> sem chaves: só a primeira é dele. Use sempre <code>{ }</code>.</td></tr>
+<tr><td><code>division by zero [-Wdiv-by-zero]</code></td><td><code>division by zero is undefined</code></td><td><code>x / 0</code> escrito no código. Ao rodar, o programa morre (<a href="#e-fpe">veja abaixo</a>).</td></tr>
+<tr><td><code>integer overflow in expression of type ‘int’ results in ‘-2147483648’ [-Woverflow]</code></td><td><code>overflow in expression; result is -2'147'483'648 with type 'int'</code></td><td>A conta passa do maior <code>int</code>. Use <code>long long</code>. Aula: <a href="inteiros.html">Inteiros</a>.</td></tr>
+<tr><td><code>comparison of unsigned expression in ‘&gt;= 0’ is always true [-Wtype-limits]</code></td><td>(não avisa)</td><td><code>for (unsigned i = 10; i &gt;= 0; i--)</code> nunca termina: um <code>unsigned</code> nunca é negativo. Use <code>int</code>.</td></tr>
+<tr><td><code>narrowing conversion of ‘preco’ from ‘double’ to ‘int’ [-Wnarrowing]</code></td><td><strong>erro</strong>: <code>type 'double' cannot be narrowed to 'int' in initializer list</code></td><td><code>int x{preco};</code> com uma <strong>variável</strong> <code>double</code>: o g++ só avisa, o clang++ recusa. Use <code>static_cast&lt;int&gt;(preco)</code>. Aula: <a href="conversao-tipos.html">Conversão</a>.</td></tr>
+<tr><td><code>infinite recursion detected [-Winfinite-recursion]</code></td><td>—</td><td>Função que chama a si mesma sem caso de parada. Aula: <a href="recursao.html">Recursão</a>.</td></tr>
+<tr><td><code>ignoring return value of ‘…std::remove…’, declared with attribute ‘nodiscard’ [-Wunused-result]</code></td><td><code>ignoring return value of function declared with 'nodiscard' attribute</code></td><td>Jogou fora um resultado importante. Veja <a href="ref-algoritmos.html#armadilhas">Algoritmos</a>.</td></tr>
+<tr><td><code>deleting object of polymorphic class type ‘Base’ which has non-virtual destructor might cause undefined behavior [-Wdelete-non-virtual-dtor]</code></td><td><code>delete called on non-final 'Base' that has virtual functions but non-virtual destructor</code></td><td>Classe base com métodos <code>virtual</code> precisa de <code>virtual ~Base() = default;</code>. Aula: <a href="polimorfismo.html">Polimorfismo</a>.</td></tr>
+<tr><td><code>‘virtual void Animal::som() const’ was hidden [-Woverloaded-virtual=]</code></td><td>—</td><td>A classe filha criou um método com o mesmo nome e outra assinatura, escondendo o da mãe.</td></tr>
+</table>
+</div>
+
+<div class="trycpp" data-goal="semaviso,out:soma: 24">
+<p class="try-task"><strong>Missão:</strong> o programa funciona, mas o compilador dá <strong>três avisos</strong>. Elimine todos (sem apagar a mensagem de saída) até a caixa compilar sem nenhum aviso e mostrar <code>soma: 24</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 9, 8};
+    int soma = 0;
+    int maior = 0;
+    for (int i = 0; i &lt; notas.size(); i++) {
+        soma += notas[i];
+    }
+    if (soma = 24) {
+        std::cout &lt;&lt; "soma: " &lt;&lt; soma &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 9, 8};
+    int soma = 0;
+    for (std::size_t i = 0; i &lt; notas.size(); i++) {
+        soma += notas[i];
+    }
+    if (soma == 24) {
+        std::cout &lt;&lt; "soma: " &lt;&lt; soma &lt;&lt; '\n';
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="ligacao">Erros de ligação (<code>ld</code>)</h2>
+<p>Depois de compilar cada <code>.cpp</code>, o g++ chama o <strong>ligador</strong> (<code>ld</code>, de <em>linker</em>), que junta as peças num programa só. Os erros dele não têm número de linha: em vez de <code>arquivo.cpp:5:5:</code>, aparecem nomes de arquivos temporários (<code>/tmp/ccsEstGP.o</code>) e a frase <code>collect2: error: ld returned 1 exit status</code> ("o ld terminou com erro"). Na máquina da Ana, o <code>ld</code> fala português; com o sistema em inglês (<code>LANG=C</code>), a mesma mensagem fica como na segunda parte de cada exemplo. Aulas: <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a> e <a href="headers.html">Arquivos .h e .cpp</a>.</p>
+
+<div class="cenario" id="undefined">
+<strong><code>referência não definida para</code> / <code>undefined reference to</code></strong>
+<p>O <code>main.cpp</code> inclui <code>soma.h</code> (que só <strong>declara</strong> <code>int soma(int a, int b);</code>), mas a Ana compilou só o <code>main.cpp</code>, esquecendo o <code>soma.cpp</code>, onde a função é <strong>definida</strong>:</p>
+<pre class="term" data-cwd="~/erros/lig">$ g++ -std=c++23 -Wall -Wextra main.cpp -o main
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccsEstGP.o: na função "main":
+main.cpp:(.text+0x13): referência não definida para "soma(int, int)"
+collect2: error: ld returned 1 exit status
+$ LANG=C g++ -std=c++23 -Wall -Wextra main.cpp -o main
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccTr6gcB.o: in function `main':
+main.cpp:(.text+0x13): undefined reference to `soma(int, int)'
+collect2: error: ld returned 1 exit status
+$ clang++ -std=c++23 -Wall -Wextra main.cpp -o main
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/main-e08580.o: na função "main":
+main.cpp:(.text+0xf): referência não definida para "soma(int, int)"
+clang++: error: linker command failed with exit code 1 (use -v to see invocation)
+$ g++ -std=c++23 -Wall -Wextra main.cpp soma.cpp -o main
+$ ./main
+5</pre>
+<p><strong>O que significa:</strong> "dentro da função <code>main</code>, há uma chamada a <code>soma(int, int)</code>, mas ninguém a definiu". O compilador aceitou a chamada porque viu a declaração no <code>.h</code>; o ligador não achou o corpo da função.</p>
+<p><strong>Causas e consertos:</strong></p>
+<ul>
+  <li>esqueceu um <code>.cpp</code> no comando: <code>g++ … main.cpp soma.cpp -o main</code>;</li>
+  <li>o nome ou os parâmetros da definição não batem com a declaração (<code>int Soma(int a, int b)</code> no <code>.cpp</code>, <code>int soma(int, int)</code> no <code>.h</code>: maiúscula conta);</li>
+  <li>a função foi declarada e nunca escrita;</li>
+  <li>uma biblioteca externa não foi ligada (falta um <code>-lnome</code>; veja <a href="bibliotecas.html">Usar Bibliotecas Externas</a>).</li>
+</ul>
+<p>Um arquivo sem <code>main</code> dá a mesma família de erro: <code>(.text+0x1b): referência não definida para "main"</code> (em inglês, <code>undefined reference to `main'</code>), vinda de <code>Scrt1.o: na função "_start"</code>, o código que o sistema roda antes do seu <code>main</code>.</p>
+</div>
+
+<div class="cenario" id="multiple">
+<strong><code>múltiplas definições de</code> / <code>multiple definition of</code></strong>
+<p>O cabeçalho <code>config.h</code> <strong>define</strong> uma variável (<code>int total = 0;</code>) e é incluído em <code>a.cpp</code> e em <code>b.cpp</code>. Cada arquivo ganha a sua cópia, e o ligador não sabe com qual ficar:</p>
+<pre class="term" data-cwd="~/erros/lig">$ g++ -std=c++23 -Wall -Wextra a.cpp b.cpp -o prog
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccfu3U3T.o:(.bss+0x0): múltiplas definições de "total"; /tmp/cciF57P8.o:(.bss+0x0): definido primeiro aqui
+collect2: error: ld returned 1 exit status
+$ LANG=C g++ -std=c++23 -Wall -Wextra a.cpp b.cpp -o prog
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccV3ztVv.o:(.bss+0x0): multiple definition of `total'; /tmp/ccw6qlvg.o:(.bss+0x0): first defined here
+collect2: error: ld returned 1 exit status</pre>
+<p>O <code>#pragma once</code> não resolve: ele evita incluir o mesmo <code>.h</code> duas vezes <strong>no mesmo</strong> <code>.cpp</code>, não em dois <code>.cpp</code> diferentes.</p>
+<p><strong>Como consertar:</strong> no <code>.h</code>, use <code>inline int total = 0;</code> <span class="versao">C++17</span> (uma variável compartilhada, permitida em vários arquivos), ou declare com <code>extern int total;</code> no <code>.h</code> e defina <code>int total = 0;</code> num <code>.cpp</code> só. Para funções escritas no <code>.h</code>, a mesma regra: marque-as <code>inline</code>.</p>
+</div>
+
+<div class="trycpp" data-goal="out:5">
+<p class="try-task"><strong>Missão:</strong> o programa tem três arquivos (abas). Clique em Rodar: a compilação passa, mas a <strong>ligação</strong> falha, porque a função chamada no <code>main.cpp</code> não foi definida com o mesmo nome. Conserte o <code>soma.cpp</code> até o programa mostrar <code>5</code>.</p>
+<pre class="script" data-file="main.cpp">#include &lt;iostream&gt;
+#include "soma.h"
+
+int main() {
+    std::cout &lt;&lt; soma(2, 3) &lt;&lt; '\n';
+}
+</pre>
+<pre class="script" data-file="soma.h">#pragma once
+
+int soma(int a, int b);
+</pre>
+<pre class="script" data-file="soma.cpp">#include "soma.h"
+
+int Soma(int a, int b) {
+    return a + b;
+}
+</pre>
+<pre class="solucao" data-file="soma.cpp">#include "soma.h"
+
+int soma(int a, int b) {
+    return a + b;
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="execucao">Erros de execução</h2>
+<p>O programa compilou, ligou, começou a rodar… e morreu. Quem escreve a mensagem final é o <strong>terminal</strong> (o bash), que na máquina da Ana fala português; a versão em inglês está ao lado. "Imagem do núcleo gravada" (<em>core dumped</em>) quer dizer que o sistema pode ter salvado uma "foto" da memória do programa para análise (veja <a href="depuracao-gdb.html">Depurar com o GDB</a>). As saídas abaixo foram feitas num terminal de verdade.</p>
+
+<div class="cenario" id="e-segv">
+<strong><code>Falha de segmentação</code> / <code>Segmentation fault</code> — código 139</strong>
+<pre class="file" data-file="nulo.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int* p = nullptr;
+    std::cout &lt;&lt; "antes\n";
+    std::cout &lt;&lt; *p &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/erros/run">$ g++ -std=c++23 -Wall -Wextra nulo.cpp -o nulo
+$ ./nulo
+antes
+Falha de segmentação     (imagem do núcleo gravada) ./nulo
+$ echo $?
+139</pre>
+<p>Em inglês: <code>Segmentation fault         (core dumped) ./nulo</code>.</p>
+<p><strong>O que significa:</strong> o programa tentou ler ou escrever numa parte da memória que não é dele, e o sistema o matou com o sinal <code>SIGSEGV</code>. Causas típicas: usar um ponteiro nulo (<code>*p</code> com <code>p = nullptr</code>), um ponteiro para algo que já foi apagado, um índice muito fora do array, ou uma <a href="recursao.html">recursão</a> sem fim, que estoura a pilha (a <code>conta(n + 1)</code> sem caso de parada deu a mesma mensagem e o mesmo 139).</p>
+<p><strong>Como consertar:</strong> confira ponteiros antes de usar (<code>if (p != nullptr)</code>), prefira <code>std::vector</code> e <a href="smart-pointers.html">ponteiros inteligentes</a>, e use o <a href="depuracao-gdb.html">gdb</a> ou os <a href="#sanitizers">sanitizers</a> para achar a linha. Aulas: <a href="ponteiros.html">Ponteiros</a>, <a href="nullptr.html">nullptr</a>.</p>
+</div>
+
+<div class="cenario" id="e-fpe">
+<strong><code>Exceção de ponto flutuante</code> / <code>Floating point exception</code> — código 136</strong>
+<pre class="file" data-file="divisao.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int total = 10, pessoas = 0;
+    std::cin &gt;&gt; pessoas;
+    std::cout &lt;&lt; total / pessoas &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/erros/run">$ echo 0 | ./divisao
+Exceção de ponto flutuante (imagem do núcleo gravada) echo 0 | ./divisao
+$ echo $?
+136</pre>
+<p>Em inglês: <code>Floating point exception   (core dumped) echo 0 | ./divisao</code>.</p>
+<p><strong>O que significa:</strong> apesar do nome, é uma divisão <strong>inteira</strong> por zero (ou o resto <code>%</code> por zero). O processador recusa a conta e o sistema mata o programa com o sinal <code>SIGFPE</code>. Com <code>double</code>, dividir por zero não mata o programa: dá <code>inf</code> ou <code>nan</code>.</p>
+<p><strong>Como consertar:</strong> confira o divisor antes: <code>if (pessoas == 0) { … }</code>. Aulas: <a href="operadores-aritmeticos.html">Aritméticos</a>, <a href="validar-entrada.html">Validar a Entrada</a>.</p>
+</div>
+
+<div class="cenario" id="e-terminate">
+<strong><code>terminate called after throwing an instance of …</code> + <code>Abortado</code> — código 134</strong>
+<pre class="file" data-file="at.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 9, 8};
+    std::cout &lt;&lt; notas.at(10) &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/erros/run">$ ./at
+terminate called after throwing an instance of 'std::out_of_range'
+  what():  vector::_M_range_check: __n (which is 10) &gt;= this-&gt;size() (which is 3)
+Abortado                   (imagem do núcleo gravada) ./at
+$ echo $?
+134</pre>
+<p>Em inglês, a última linha fica <code>Aborted                    (core dumped) ./at</code>.</p>
+<p><strong>O que significa:</strong> uma <a href="excecoes.html">exceção</a> foi lançada e ninguém a capturou com <code>try</code>/<code>catch</code>. O C++ então chama <code>std::terminate</code>, que mostra o <strong>tipo</strong> da exceção (<code>std::out_of_range</code>) e a mensagem dela (<code>what():</code>), e aborta o programa com o sinal <code>SIGABRT</code>. Aqui: "índice 10 ≥ tamanho 3".</p>
+<p>As que mais aparecem (todas reais, todas com código 134):</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo e <code>what()</code></th><th>Quem lança</th><th>Aula</th></tr>
+<tr><td><code>'std::out_of_range'</code><br><code>what():  vector::_M_range_check: __n (which is 10) &gt;= this-&gt;size() (which is 3)</code></td><td><code>v.at(i)</code> ou <code>s.at(i)</code> com índice fora do tamanho.</td><td><a href="vector.html">std::vector</a></td></tr>
+<tr><td><code>'std::invalid_argument'</code><br><code>what():  stoi</code></td><td><code>std::stoi("trinta")</code>: o texto não começa com um número.</td><td><a href="string-numero.html">Texto ↔ Número</a></td></tr>
+<tr><td><code>'std::runtime_error'</code><br><code>what():  saldo insuficiente</code></td><td>O seu próprio <code>throw std::runtime_error("saldo insuficiente");</code>.</td><td><a href="excecoes.html">Exceções</a></td></tr>
+<tr><td><code>'int'</code> (sem <code>what()</code>)</td><td><code>throw 42;</code>: dá para lançar qualquer coisa, mas prefira as classes de <code>&lt;stdexcept&gt;</code>.</td><td><a href="excecoes.html">Exceções</a></td></tr>
+<tr><td><code>'std::bad_alloc'</code><br><code>what():  std::bad_alloc</code></td><td>Faltou memória (aqui, um <code>std::vector&lt;int&gt;</code> de 5 bilhões de itens com a memória limitada por <code>ulimit -v</code>).</td><td><a href="new-delete.html">new e delete</a></td></tr>
+<tr><td><code>'std::bad_optional_access'</code><br><code>what():  bad optional access</code></td><td><code>x.value()</code> num <code>std::optional</code> vazio.</td><td><a href="optional-variant.html">optional e variant</a></td></tr>
+</table>
+</div>
+<p><strong>Como consertar:</strong> evite a causa (confira o índice, valide o texto) ou capture a exceção onde você sabe o que fazer: <code>try { … } catch (const std::exception&amp; e) { std::cout &lt;&lt; e.what(); }</code>.</p>
+</div>
+
+<div class="cenario" id="e-assert">
+<strong><code>Assertion '__n &lt; this-&gt;size()' failed.</code> — índice fora com <code>[ ]</code></strong>
+<pre class="term" data-cwd="~/erros/run">$ cat colchete.cpp
+#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 9, 8};
+    std::cout &lt;&lt; notas[10] &lt;&lt; '\n';
+}
+$ g++ -std=c++23 -Wall -Wextra colchete.cpp -o colchete
+$ ./colchete
+/usr/include/c++/15/bits/stl_vector.h:1263: constexpr std::vector&lt; &lt;template-parameter-1-1&gt;, &lt;template-parameter-1-2&gt; &gt;::reference std::vector&lt; &lt;template-parameter-1-1&gt;, &lt;template-parameter-1-2&gt; &gt;::operator[](size_type) [with _Tp = int; _Alloc = std::allocator&lt;int&gt;; reference = int&amp;; size_type = long unsigned int]: Assertion '__n &lt; this-&gt;size()' failed.
+Abortado                   (imagem do núcleo gravada) ./colchete
+$ g++ -std=c++23 -Wall -Wextra -O2 colchete.cpp -o colchete 2&gt;/dev/null
+$ ./colchete
+0</pre>
+<p><strong>O que significa:</strong> o <code>[ ]</code> do vetor <strong>não</strong> confere o índice, ao contrário do <code>.at()</code>. Mas a biblioteca do g++ 15, quando você compila <strong>sem otimização</strong> (sem <code>-O2</code>), liga umas conferências extras ("asserções") que pegam o erro e abortam (código 134). Com <code>-O2</code>, as conferências somem e o programa simplesmente lê lixo da memória e mostra <code>0</code> (ou qualquer outra coisa): é <a href="comportamento-indefinido.html">comportamento indefinido</a>.</p>
+<p><strong>Como consertar:</strong> confira o índice (<code>i &lt; notas.size()</code>), use <code>for</code> de intervalo, ou <code>.at()</code> quando o índice vem de fora.</p>
+</div>
+
+<div class="cenario" id="e-doublefree">
+<strong><code>free(): double free detected in tcache 2</code> — apagou duas vezes</strong>
+<pre class="term" data-cwd="~/erros/run">$ cat doublefree.cpp
+int main() {
+    int* p = new int(5);
+    delete p;
+    delete p;
+}
+$ ./doublefree
+free(): double free detected in tcache 2
+Abortado                   (imagem do núcleo gravada) ./doublefree
+$ echo $?
+134</pre>
+<p><strong>O que significa:</strong> o mesmo bloco de memória foi devolvido duas vezes. A biblioteca C percebeu e abortou. (<code>tcache</code> é o nome de uma "gaveta" interna do gerenciador de memória.) Nem sempre o erro é pego: às vezes o programa continua e falha bem depois, num lugar sem relação.</p>
+<p><strong>Como consertar:</strong> não use <code>new</code>/<code>delete</code> à mão: <code>std::unique_ptr</code>, <code>std::vector</code> e <code>std::string</code> liberam a memória sozinhos, uma vez só. Aulas: <a href="new-delete.html">new e delete</a>, <a href="smart-pointers.html">Ponteiros Inteligentes</a>, <a href="destrutores-raii.html">RAII</a>.</p>
+</div>
+
+<h3 id="sinais">Códigos de saída e sinais</h3>
+<p>Depois que o programa termina, <code>echo $?</code> mostra o <strong>código de saída</strong>. Quando o sistema mata o programa com um <strong>sinal</strong>, o código é <strong>128 + o número do sinal</strong>. Os nomes dos sinais vêm do comando <code>kill -l</code>:</p>
+<pre class="term">$ kill -l 6 8 9 11
+ABRT
+FPE
+KILL
+SEGV</pre>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>Sinal</th><th>Mensagem do terminal (pt / en)</th><th>Causas típicas</th></tr>
+<tr><td><code>0</code></td><td>—</td><td>nenhuma</td><td>Deu tudo certo (o <code>main</code> terminou ou fez <code>return 0</code>).</td></tr>
+<tr><td><code>1</code> (ou outro pequeno)</td><td>—</td><td>nenhuma</td><td>O próprio programa escolheu: <code>return 1;</code>. Também é o código de um relatório do AddressSanitizer e do <code>g++</code> quando a compilação falha.</td></tr>
+<tr><td><code>124</code></td><td>—</td><td>nenhuma</td><td>O comando <code>timeout</code> parou o programa porque o tempo acabou (um laço infinito, por exemplo).</td></tr>
+<tr><td><code>134</code></td><td>6, <code>SIGABRT</code></td><td><code>Abortado</code> / <code>Aborted</code></td><td>Exceção não capturada (<code>terminate called…</code>), <code>double free</code>, asserção que falhou, <code>std::abort()</code>.</td></tr>
+<tr><td><code>136</code></td><td>8, <code>SIGFPE</code></td><td><code>Exceção de ponto flutuante</code> / <code>Floating point exception</code></td><td>Divisão inteira (ou <code>%</code>) por zero.</td></tr>
+<tr><td><code>137</code></td><td>9, <code>SIGKILL</code></td><td><code>Morto</code> / <code>Killed</code></td><td>Morto à força: <code>kill -9</code>, <code>timeout -s KILL</code>, ou o sistema sem memória.</td></tr>
+<tr><td><code>139</code></td><td>11, <code>SIGSEGV</code></td><td><code>Falha de segmentação</code> / <code>Segmentation fault</code></td><td>Ponteiro nulo ou inválido, índice muito fora, recursão infinita.</td></tr>
+</table>
+</div>
+
+<h2 id="sanitizers">Relatórios dos sanitizers (resumidos)</h2>
+<p>Os <strong>sanitizers</strong> são "fiscais" que o compilador põe dentro do programa para pegar erros de memória e comportamento indefinido <strong>na linha exata</strong>, mesmo quando o programa parece funcionar. Compile com <code>-g -fsanitize=address,undefined</code>. Aula completa: <a href="sanitizers.html">Sanitizers</a>.</p>
+
+<p>Um exemplo inteiro: o laço vai até <code>i &lt;= 3</code> num array de 3 itens criado com <code>new</code>.</p>
+<pre class="file" data-file="heapnew.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int* notas = new int[3]{7, 9, 8};
+    int soma = 0;
+    for (int i = 0; i &lt;= 3; i++) {
+        soma += notas[i];
+    }
+    std::cout &lt;&lt; soma &lt;&lt; '\n';
+    delete[] notas;
+}
+</pre>
+<pre class="term" data-cwd="~/erros/run">$ g++ -std=c++23 -Wall -Wextra -g -fsanitize=address,undefined heapnew.cpp -o heapnew &amp;&amp; ./heapnew
+=================================================================
+==534580==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x73adb6be001c at pc 0x624669b21612 bp 0x7fff3740ad40 sp 0x7fff3740ad30
+READ of size 4 at 0x73adb6be001c thread T0
+    #0 0x624669b21611 in main /home/ana/erros/run/heapnew.cpp:7
+    #1 0x778db782a600 in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+    #2 0x778db782a717 in __libc_start_main_impl ../csu/libc-start.c:360
+    #3 0x624669b21264 in _start (/home/ana/erros/run/heapnew+0x2264) (BuildId: 6e911907011ca067d2d483d8ef96462400e25fcf)
+
+0x73adb6be001c is located 0 bytes after 12-byte region [0x73adb6be0010,0x73adb6be001c)
+allocated by thread T0 here:
+    #0 0x778db892c8cf in operator new[](unsigned long) ../../../../src/libsanitizer/asan/asan_new_delete.cpp:111
+    #1 0x624669b21345 in main /home/ana/erros/run/heapnew.cpp:4
+«  … (#2 a #4: as mesmas linhas de inicialização de cima) …
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow /home/ana/erros/run/heapnew.cpp:7 in main
+Shadow bytes around the buggy address:
+«  … 30 linhas de "bytes-sombra" (o mapa interno da memória): pode pular …
+==534580==ABORTING
+$ echo $?
+1</pre>
+<p>Como ler: <code>ERROR: AddressSanitizer: heap-buffer-overflow</code> é o <strong>tipo</strong> do erro; <code>READ of size 4</code>, "leitura de 4 bytes" (um <code>int</code>); <code>#0 … in main …/heapnew.cpp:7</code>, a <strong>linha</strong> culpada; <code>0 bytes after 12-byte region</code>, "logo depois de um bloco de 12 bytes" (3 <code>int</code>s); <code>allocated by thread T0 here: … heapnew.cpp:4</code>, onde o bloco foi criado. A linha <code>SUMMARY</code> resume tudo. O número <code>==534580==</code> é o número do processo.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha principal do relatório (real)</th><th>O que aconteceu</th></tr>
+<tr><td><code>ERROR: AddressSanitizer: heap-buffer-overflow on address …</code></td><td>Leu ou escreveu além do fim (ou antes do começo) de um bloco criado com <code>new</code> (ou dentro de um <code>vector</code>, <code>string</code>…).</td></tr>
+<tr><td><code>ERROR: AddressSanitizer: stack-buffer-overflow on address …</code><br><code>[32, 44) 'a' (line 4) &lt;== Memory access at offset 44 overflows this variable</code></td><td>O mesmo, num array local (<code>int a[3]</code> lido em <code>a[3]</code>). O relatório até diz qual variável.</td></tr>
+<tr><td><code>ERROR: AddressSanitizer: heap-use-after-free on address …</code><br>com <code>freed by thread T0 here:</code> e <code>previously allocated by thread T0 here:</code></td><td>Usou memória depois do <code>delete</code>. O relatório mostra três linhas: onde usou, onde apagou, onde criou.</td></tr>
+<tr><td><code>ERROR: LeakSanitizer: detected memory leaks</code><br><code>Direct leak of 40 byte(s) in 1 object(s) allocated from:</code><br><code>SUMMARY: AddressSanitizer: 40 byte(s) leaked in 1 allocation(s).</code></td><td><strong>Vazamento</strong>: um <code>new int[10]</code> (40 bytes) nunca foi apagado. Aparece no fim do programa.</td></tr>
+<tr><td><code>overflow.cpp:6:7: runtime error: signed integer overflow: 2147483647 + 1 cannot be represented in type 'int'</code></td><td>(UndefinedBehaviorSanitizer) A conta passou do maior <code>int</code>. O programa continua e mostra <code>-2147483648</code>. Aula: <a href="inteiros.html">Inteiros</a>.</td></tr>
+<tr><td><code>pilhaarray.cpp:6:21: runtime error: index 3 out of bounds for type 'int [3]'</code></td><td>(UBSan) Índice fora de um array comum, avisado antes mesmo do AddressSanitizer.</td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>E no editor do guia?</strong>
+<p>O editor compila com o Clang e roda o programa como WebAssembly, dentro do navegador. Os <strong>erros de compilação</strong> são os da coluna do clang++. Os de <strong>ligação</strong> e de <strong>execução</strong> não vêm do <code>ld</code> nem do bash do Linux, então o texto muda (não há "Falha de segmentação" nem código 139 no navegador). Veja o que o editor mostra em <a href="simulador.html">O Editor do Guia</a>. Para ver as mensagens exatamente como nesta página, compile no seu terminal (<a href="instalar-linux.html">Instalar no Linux</a>).</p>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">1. A mensagem é <code>main.cpp:(.text+0x13): undefined reference to `soma(int, int)'</code> seguida de <code>collect2: error: ld returned 1 exit status</code>. Em que etapa está o problema?</p>
+<label><input type="radio" name="q1"> Compilação: falta o <code>#include "soma.h"</code></label>
+<label><input type="radio" name="q1"> Ligação: a função foi declarada, mas sua definição não entrou no programa</label>
+<label><input type="radio" name="q1"> Execução: o programa chamou uma função que travou</label>
+<label><input type="radio" name="q1"> É só um aviso; o programa foi criado</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">2. Um programa morre e <code>echo $?</code> mostra <code>136</code>. Qual é a causa mais provável?</p>
+<label><input type="radio" name="q2"> Um ponteiro nulo</label>
+<label><input type="radio" name="q2"> Uma exceção não capturada</label>
+<label><input type="radio" name="q2"> Uma divisão inteira por zero</label>
+<label><input type="radio" name="q2"> O <code>main</code> terminou com <code>return 1</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">3. O g++ mostrou quatro erros. O primeiro é <code>expected ‘,’ or ‘;’ before ‘int’</code> na linha 5. Qual é a melhor atitude?</p>
+<label><input type="radio" name="q3"> Pôr o <code>;</code> que falta no fim da linha 4 e compilar de novo antes de olhar os outros</label>
+<label><input type="radio" name="q3"> Consertar o último erro primeiro, que é o mais recente</label>
+<label><input type="radio" name="q3"> Acrescentar <code>-fpermissive</code> ao comando</label>
+<label><input type="radio" name="q3"> Apagar a linha 5</label>
+</div>
+
+<div class="exercise">
+<h3>4. Qual cabeçalho?</h3>
+<p>O g++ disse <code>‘setw’ is not a member of ‘std’</code>. Complete a linha que resolve:</p>
+<div class="ex-code">#include &lt;<input data-answer="iomanip" aria-label="cabeçalho">&gt;</div>
+</div>
+
+<div class="exercise">
+<h3>5. 128 + sinal</h3>
+<p>O sinal <code>SIGSEGV</code> é o número 11. Que código de saída aparece em <code>echo $?</code> depois de uma "Falha de segmentação"?</p>
+<div class="ex-code"><input data-answer="139" aria-label="código"></div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Leia <code>arquivo:linha:coluna: error: texto</code>, conserte o <strong>primeiro</strong> erro e compile de novo: os outros costumam ser cascata.</li>
+  <li><code>error</code> impede o programa; <code>warning</code> deixa criar, mas aponta defeito; <code>note</code> explica a mensagem anterior. Compile com <code>-Wall -Wextra</code> e zere os avisos.</li>
+  <li>O editor do guia usa o Clang: as palavras mudam (<code>was not declared</code> × <code>use of undeclared identifier</code>), o sentido é o mesmo.</li>
+  <li>Erro de <strong>ligação</strong> (<code>undefined reference</code>, <code>multiple definition</code>, <code>ld returned 1 exit status</code>): falta ou sobra uma peça entre os arquivos.</li>
+  <li>Erros de <strong>execução</strong>: 139 = <code>Segmentation fault</code>, 136 = <code>Floating point exception</code>, 134 = <code>Aborted</code> (exceção não capturada, <code>double free</code>, asserção).</li>
+  <li>Para achar a linha de um erro de memória, use <code>-g -fsanitize=address,undefined</code> e leia o <code>SUMMARY</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
