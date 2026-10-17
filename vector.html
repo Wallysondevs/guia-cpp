@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ std::vector — a lista que cresce | Guia C++</title>
+<meta name="description" content="std::vector em C++ para quem nunca programou: criar, push_back, size, [] e at, pop_back, front e back, clear e empty, percorrer com for de intervalo, insert e erase com begin(), a lista de compras da Ana, reserve e capacity, com saídas e erros reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">std::vector</span></h1>
+
+<p class="intro">Arrays e <code>std::array</code> têm tamanho fixo: você decide quantos elementos cabem quando escreve o programa. Mas quantos itens a Ana vai pôr na lista de compras hoje? Quantos produtos o cliente vai colocar no carrinho? Não dá para saber. O <code>std::vector</code> (<em>vector</em> = vetor) é uma <strong>lista que cresce e diminui</strong> enquanto o programa roda. Ele é o <strong>container padrão</strong> do C++: quando precisar de uma lista e não tiver um bom motivo para outra coisa, use <code>std::vector</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como criar um vetor vazio, com valores ou com N elementos.</li>
+  <li>Como acrescentar no fim (<code>push_back</code>) e tirar do fim (<code>pop_back</code>).</li>
+  <li>Como saber o tamanho (<code>size</code>), se está vazio (<code>empty</code>) e como esvaziar (<code>clear</code>).</li>
+  <li>Como acessar com <code>[i]</code>, <code>at(i)</code>, <code>front()</code> e <code>back()</code>.</li>
+  <li>Como percorrer, inclusive o aviso de "sinais diferentes" com <code>size()</code>.</li>
+  <li>Como inserir e apagar no meio com <code>insert</code> e <code>erase</code> (o básico de <code>begin()</code>).</li>
+  <li>A ideia de <code>capacity</code> e <code>reserve</code>.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Você já viu o <code>std::vector</code> de passagem no <a href="for-range.html">for de intervalo</a>; agora é a vez dele.</p>
+
+<hr>
+
+<h2>A ideia: um caderno de lista de compras</h2>
+<p>O array é como uma <strong>cartela de ovos</strong>: tem 12 buracos e pronto. O <code>std::vector</code> é como uma <strong>lista num caderno</strong>:</p>
+<ul>
+  <li>começa vazia, ou com alguns itens;</li>
+  <li>você escreve um item novo <strong>no fim</strong> sempre que lembra de algo;</li>
+  <li>pode riscar o último, ou um do meio;</li>
+  <li>a qualquer momento, conta quantos itens há.</li>
+</ul>
+<p>E, quando a página enche, o caderno "vira a folha" sozinho: o vetor arruma mais espaço automaticamente, sem você precisar se preocupar.</p>
+
+<hr>
+
+<h2>1. Criar um vetor</h2>
+
+<pre class="file" data-file="criar.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; vazio;
+    std::vector&lt;int&gt; notas = {7, 9, 6};
+    std::vector&lt;int&gt; zeros(5);
+    std::vector&lt;int&gt; setes(3, 7);
+
+    std::cout &lt;&lt; "vazio: " &lt;&lt; vazio.size() &lt;&lt; " itens\n";
+    std::cout &lt;&lt; "notas: " &lt;&lt; notas.size() &lt;&lt; " itens\n";
+    std::cout &lt;&lt; "zeros: ";
+    for (int x : zeros) std::cout &lt;&lt; x &lt;&lt; ' ';
+    std::cout &lt;&lt; "\nsetes: ";
+    for (int x : setes) std::cout &lt;&lt; x &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;vector&gt;</dt><dd>O cabeçalho do <code>std::vector</code>.</dd>
+  <dt>std::vector&lt;int&gt;</dt><dd>"Um vetor de <code>int</code>". Entre <code>&lt; &gt;</code> vai só o <strong>tipo</strong> dos elementos. Não há tamanho: ele muda durante a execução.</dd>
+  <dt>vazio;</dt><dd>Sem nada depois: um vetor <strong>vazio</strong>, com 0 elementos. Diferente de <code>int x;</code>, aqui não há lixo: um vetor sempre começa num estado válido.</dd>
+  <dt>notas = {7, 9, 6};</dt><dd>Com valores iniciais, entre chaves.</dd>
+  <dt>zeros(5)</dt><dd>Com <strong>parênteses</strong>: 5 elementos, todos 0.</dd>
+  <dt>setes(3, 7)</dt><dd>3 elementos, todos valendo 7.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra criar.cpp -o criar
+$ ./criar
+vazio: 0 itens
+notas: 3 itens
+zeros: 0 0 0 0 0
+setes: 7 7 7 </pre>
+
+<div class="warning">
+<strong>Parênteses e chaves não são a mesma coisa</strong>
+<p>Com <code>std::vector</code>, <code>(5)</code> quer dizer "5 elementos" e <code>{5}</code> quer dizer "um elemento que vale 5":</p>
+<pre class="file" data-file="chaves.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; a(5);
+    std::vector&lt;int&gt; b{5};
+    std::cout &lt;&lt; "a(5): " &lt;&lt; a.size() &lt;&lt; " itens\n";
+    std::cout &lt;&lt; "b{5}: " &lt;&lt; b.size() &lt;&lt; " item, que vale " &lt;&lt; b[0] &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra chaves.cpp -o chaves
+$ ./chaves
+a(5): 5 itens
+b{5}: 1 item, que vale 5</pre>
+<p>Regra prática: chaves para <strong>listar os valores</strong>; parênteses para dizer <strong>quantos</strong>.</p>
+</div>
+
+<hr>
+
+<h2>2. Acrescentar no fim: <code>push_back</code></h2>
+<p>O jeito mais comum de usar um vetor é começar vazio e ir acrescentando. <code>push_back(valor)</code> ("empurrar para trás") coloca o valor <strong>no fim</strong> da lista, e o tamanho aumenta em 1:</p>
+
+<pre class="file" data-file="push.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas;
+    std::cout &lt;&lt; "Começo: " &lt;&lt; notas.size() &lt;&lt; " notas\n";
+
+    notas.push_back(7);
+    notas.push_back(9);
+    notas.push_back(6);
+    std::cout &lt;&lt; "Depois de 3 push_back: " &lt;&lt; notas.size() &lt;&lt; " notas\n";
+
+    for (int nota : notas) {
+        std::cout &lt;&lt; nota &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra push.cpp -o push
+$ ./push
+Começo: 0 notas
+Depois de 3 push_back: 3 notas
+7 9 6 </pre>
+
+<p><code>.size()</code> responde quantos elementos há <strong>agora</strong>. Os elementos ficam na ordem em que foram acrescentados.</p>
+
+<h3>A lista de compras da Ana</h3>
+<p>Juntando <code>push_back</code> com o <code>while (true)</code> e o <code>break</code> da aula <a href="break-continue.html">break e continue</a>, e o <a href="getline.html">getline</a> (que lê uma linha inteira, com espaços), sai um programa de verdade: a Ana digita os itens, um por linha, e uma linha vazia termina a lista.</p>
+
+<pre class="file" data-file="lista.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; lista;
+    std::string item;
+
+    std::cout &lt;&lt; "Digite os itens (linha vazia para terminar):\n";
+    while (true) {
+        std::cout &lt;&lt; "Item: ";
+        std::getline(std::cin, item);
+        if (item.empty()) {
+            break;
+        }
+        lista.push_back(item);
+    }
+
+    std::cout &lt;&lt; "\nLista de compras (" &lt;&lt; lista.size() &lt;&lt; " itens):\n";
+    for (std::size_t i = 0; i &lt; lista.size(); i++) {
+        std::cout &lt;&lt; i + 1 &lt;&lt; ". " &lt;&lt; lista[i] &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra lista.cpp -o lista
+$ ./lista
+Digite os itens (linha vazia para terminar):
+Item: arroz
+Item: feijão
+Item: café com leite
+Item: detergente
+Item:
+
+Lista de compras (4 itens):
+1. arroz
+2. feijão
+3. café com leite
+4. detergente</pre>
+
+<ul>
+  <li><code>std::vector&lt;std::string&gt;</code>: um vetor de textos. Qualquer tipo serve.</li>
+  <li><code>item.empty()</code> é verdadeiro quando a linha veio vazia (só <kbd>Enter</kbd>): é a saída do laço.</li>
+  <li>Antes de rodar, o programa não sabe quantos itens haverá. Com um array, você teria que chutar um tamanho máximo; com o vetor, tanto faz se forem 2 ou 2000.</li>
+  <li>O laço final usa índice para numerar. O tipo <code>std::size_t</code> é o tipo que o <code>.size()</code> devolve; a seção 5 explica por quê.</li>
+</ul>
+
+<div class="trycpp" data-goal="out:3 itens,out:café,src:push_back">
+<p class="try-task"><strong>Missão:</strong> o vetor <code>lista</code> começa vazio. Acrescente <code>"arroz"</code>, <code>"feijão"</code> e <code>"café"</code> com <code>push_back</code>. O resto do programa mostra o tamanho e os itens.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; lista;
+    // acrescente os itens aqui
+
+    std::cout &lt;&lt; lista.size() &lt;&lt; " itens\n";
+    for (const auto&amp; item : lista) {
+        std::cout &lt;&lt; "- " &lt;&lt; item &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; lista;
+    lista.push_back("arroz");
+    lista.push_back("feijão");
+    lista.push_back("café");
+    std::cout &lt;&lt; lista.size() &lt;&lt; " itens\n";
+    for (const auto&amp; item : lista) {
+        std::cout &lt;&lt; "- " &lt;&lt; item &lt;&lt; '\n';
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Acessar: <code>[i]</code>, <code>at(i)</code>, <code>front()</code>, <code>back()</code></h2>
+<p>O acesso é igual ao do <a href="std-array.html">std::array</a>: <code>[i]</code> sem garantia de conferência, <code>.at(i)</code> sempre conferido. Os índices vão de <code>0</code> a <code>size() − 1</code>:</p>
+
+<pre class="file" data-file="acesso.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas = {7, 9, 6};
+    notas[1] = 10;
+    std::cout &lt;&lt; "notas[1]: " &lt;&lt; notas[1] &lt;&lt; '\n';
+    std::cout &lt;&lt; "notas.at(2): " &lt;&lt; notas.at(2) &lt;&lt; '\n';
+    std::cout &lt;&lt; "notas.at(5): " &lt;&lt; notas.at(5) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra acesso.cpp -o acesso
+$ ./acesso
+notas[1]: 10
+notas.at(2): 6
+terminate called after throwing an instance of 'std::out_of_range'
+  what():  vector::_M_range_check: __n (which is 5) &gt;= this-&gt;size() (which is 3)
+Abortado                   (imagem do núcleo gravada) ./acesso
+$ echo $?
+134</pre>
+
+<p>A mensagem diz: na conferência de intervalo do vetor (<code>_M_range_check</code>), o índice pedido (5) é maior ou igual ao tamanho (3). Como no <code>std::array</code>, a exceção pode ser tratada com <code>try</code>/<code>catch</code> (veja <a href="std-array.html#at">std::array</a> e <a href="excecoes.html">Exceções</a>).</p>
+
+<div class="warning">
+<strong><code>[i]</code> não cria elementos</strong>
+<p>Num vetor vazio, <code>notas[0] = 7;</code> <strong>não</strong> acrescenta nada: a posição 0 não existe, e escrever nela é comportamento indefinido. O g++ 15 sem otimização pega o erro e aborta (veja <a href="#erros">Quando dá errado</a>); com <code>-O2</code>, ninguém confere. Para acrescentar, sempre <code>push_back</code>.</p>
+</div>
+
+<h3>As pontas e tirar do fim</h3>
+<p><code>.front()</code> é o primeiro elemento; <code>.back()</code>, o último. <code>.pop_back()</code> ("tirar de trás") <strong>remove</strong> o último, como tirar o prato de cima de uma pilha:</p>
+
+<pre class="file" data-file="pontas.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; pilha = {"prato azul", "prato verde", "prato branco"};
+    std::cout &lt;&lt; "Primeiro: " &lt;&lt; pilha.front() &lt;&lt; '\n';
+    std::cout &lt;&lt; "Último: " &lt;&lt; pilha.back() &lt;&lt; '\n';
+
+    pilha.pop_back();
+    std::cout &lt;&lt; "Depois do pop_back, último: " &lt;&lt; pilha.back()
+              &lt;&lt; " (" &lt;&lt; pilha.size() &lt;&lt; " itens)\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra pontas.cpp -o pontas
+$ ./pontas
+Primeiro: prato azul
+Último: prato branco
+Depois do pop_back, último: prato verde (2 itens)</pre>
+
+<p>Repare que <code>pop_back()</code> não devolve o elemento removido: se você precisa dele, leia com <code>back()</code> <strong>antes</strong>. E nunca chame <code>pop_back()</code>, <code>front()</code> ou <code>back()</code> num vetor vazio; confira com <code>empty()</code> antes.</p>
+
+<hr>
+
+<h2>4. Vazio ou não: <code>empty</code> e <code>clear</code></h2>
+
+<pre class="file" data-file="limpar.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; carrinho = {3, 1, 2};
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "Vazio? " &lt;&lt; carrinho.empty() &lt;&lt; " (" &lt;&lt; carrinho.size() &lt;&lt; " itens)\n";
+    carrinho.clear();
+    std::cout &lt;&lt; "Vazio? " &lt;&lt; carrinho.empty() &lt;&lt; " (" &lt;&lt; carrinho.size() &lt;&lt; " itens)\n";
+    if (carrinho.empty()) {
+        std::cout &lt;&lt; "O carrinho está vazio.\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra limpar.cpp -o limpar
+$ ./limpar
+Vazio? false (3 itens)
+Vazio? true (0 itens)
+O carrinho está vazio.</pre>
+
+<ul>
+  <li><code>.empty()</code> pergunta "está vazio?" e devolve <code>true</code> ou <code>false</code>. É a forma recomendada (mais clara que <code>size() == 0</code>).</li>
+  <li><code>.clear()</code> apaga <strong>todos</strong> os elementos. O vetor continua existindo, pronto para receber outros.</li>
+</ul>
+
+<div class="trycpp" data-stdin="7 9 6 8 0" data-goal="out:4 notas\, maior: 9,src:push_back">
+<p class="try-task"><strong>Missão:</strong> a entrada traz as notas <code>7 9 6 8</code> e um <code>0</code> no fim. Leia num laço, guardando cada nota no vetor com <code>push_back</code> até vir o 0. Depois, se o vetor não estiver vazio, mostre quantas notas há e a maior: <code>4 notas, maior: 9</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas;
+    // leia as notas até o 0
+
+    if (!notas.empty()) {
+        int maior = notas.front();
+        for (int n : notas) {
+            if (n &gt; maior) {
+                maior = n;
+            }
+        }
+        std::cout &lt;&lt; notas.size() &lt;&lt; " notas, maior: " &lt;&lt; maior &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas;
+    while (true) {
+        int n = 0;
+        std::cin &gt;&gt; n;
+        if (n == 0) {
+            break;
+        }
+        notas.push_back(n);
+    }
+    if (!notas.empty()) {
+        int maior = notas.front();
+        for (int n : notas) {
+            if (n &gt; maior) {
+                maior = n;
+            }
+        }
+        std::cout &lt;&lt; notas.size() &lt;&lt; " notas, maior: " &lt;&lt; maior &lt;&lt; '\n';
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="percorrer">5. Percorrer</h2>
+<p>Tudo o que você viu nas aulas de laços vale para o vetor:</p>
+<ul>
+  <li><strong>Sem índice</strong> (o mais comum): <code>for (const auto&amp; item : lista)</code> para ler, <code>for (auto&amp; item : lista)</code> para alterar (veja <a href="for-range.html">for de intervalo</a>).</li>
+  <li><strong>Com índice</strong>: <code>for (std::size_t i = 0; i &lt; lista.size(); i++)</code>, quando você precisa da posição.</li>
+</ul>
+
+<p>Por que <code>std::size_t</code> e não <code>int</code>? Porque <code>.size()</code> devolve um número <strong>sem sinal</strong>, e o g++ avisa quando você compara os dois:</p>
+
+<pre class="file" data-file="sinal.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas = {7, 9, 6};
+    for (int i = 0; i &lt; notas.size(); i++) {
+        std::cout &lt;&lt; notas[i] &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sinal.cpp -o sinal
+sinal.cpp: In function ‘int main()’:
+sinal.cpp:6:23: warning: comparison of integer expressions of different signedness: ‘int’ and ‘std::vector&lt;int&gt;::size_type’ {aka ‘long unsigned int’} [-Wsign-compare]
+    6 |     for (int i = 0; i &lt; notas.size(); i++) {
+      |                     ~~^~~~~~~~~~~~~~</pre>
+
+<p>"Comparação de inteiros com sinais diferentes: <code>int</code> e o <code>size_type</code> do vetor (que é <code>long unsigned int</code>)". O programa funciona, mas o aviso é bem-vindo: misturar com e sem sinal dá resultados absurdos com números negativos (por exemplo, <code>i &lt; notas.size() - 1</code> num vetor vazio, veja <a href="inteiros.html">Inteiros</a>). As saídas: <code>std::size_t i</code>, ou, se não precisa do índice, o for de intervalo.</p>
+
+<hr>
+
+<h2>6. Inserir e apagar no meio: <code>insert</code> e <code>erase</code></h2>
+<p><code>push_back</code> e <code>pop_back</code> trabalham no <strong>fim</strong>. Para mexer no meio, existem <code>insert</code> (inserir) e <code>erase</code> (apagar). Eles não recebem um índice, e sim um <strong>iterador</strong>: um "marcador de posição" dentro do vetor. Por enquanto, basta saber dois:</p>
+<ul>
+  <li><code>lista.begin()</code>: marca o <strong>primeiro</strong> elemento. <code>lista.begin() + 2</code> marca o elemento de índice 2.</li>
+  <li><code>lista.end()</code>: marca a posição <strong>depois do último</strong> (não é um elemento!). <code>lista.end() - 1</code> marca o último.</li>
+</ul>
+
+<pre class="file" data-file="inserir.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+void mostrar(const std::vector&lt;std::string&gt;&amp; lista) {
+    for (const auto&amp; item : lista) {
+        std::cout &lt;&lt; item &lt;&lt; " | ";
+    }
+    std::cout &lt;&lt; '\n';
+}
+
+int main() {
+    std::vector&lt;std::string&gt; lista = {"arroz", "feijão", "café"};
+    mostrar(lista);
+
+    lista.insert(lista.begin(), "pão");
+    mostrar(lista);
+
+    lista.insert(lista.begin() + 2, "leite");
+    mostrar(lista);
+
+    lista.erase(lista.begin() + 1);
+    mostrar(lista);
+
+    lista.erase(lista.end() - 1);
+    mostrar(lista);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra inserir.cpp -o inserir
+$ ./inserir
+arroz | feijão | café |
+pão | arroz | feijão | café |
+pão | arroz | leite | feijão | café |
+pão | leite | feijão | café |
+pão | leite | feijão | </pre>
+
+<dl class="anatomy">
+  <dt>insert(lista.begin(), "pão")</dt><dd>Insere <code>"pão"</code> <strong>antes</strong> da posição marcada: no começo. Todos os outros andam uma casa para a frente.</dd>
+  <dt>insert(lista.begin() + 2, "leite")</dt><dd>Insere antes do índice 2: o <code>"leite"</code> vira o novo índice 2.</dd>
+  <dt>erase(lista.begin() + 1)</dt><dd>Apaga o elemento de índice 1 (o <code>"arroz"</code>, naquele momento). Os seguintes andam uma casa para trás.</dd>
+  <dt>erase(lista.end() - 1)</dt><dd>Apaga o último (o mesmo que <code>pop_back()</code>).</dd>
+</dl>
+
+<p>A função <code>mostrar</code> existe só para não repetir o laço cinco vezes; <code>const std::vector&lt;std::string&gt;&amp;</code> quer dizer "leia este vetor sem copiá-lo" (veja <a href="funcoes.html">Funções</a> e <a href="passagem-referencia.html">Por Valor × Por Referência</a>). Os iteradores têm aula própria: <a href="iteradores.html">Iteradores</a>.</p>
+
+<div class="note">
+<strong>Inserir e apagar no meio dá trabalho ao computador</strong>
+<p>Para abrir espaço no começo de um vetor de 1 milhão de itens, o computador precisa mover 1 milhão de itens uma casa para a frente. No fim (<code>push_back</code>/<code>pop_back</code>), não há nada para mover. Por isso o vetor é ótimo para acrescentar e tirar do fim, e menos bom para mexer no começo. Se o seu programa vive inserindo no começo, existem outros containers (<a href="list-deque.html">list e deque</a>).</p>
+</div>
+
+<hr>
+
+<h2>7. Por dentro: <code>capacity</code> e <code>reserve</code></h2>
+<p>Como o vetor "cresce"? Ele reserva um bloco de memória com espaço para alguns elementos. Quando o bloco enche, ele pede um bloco <strong>maior</strong> (no g++, o dobro), copia tudo para lá e libera o antigo. <code>.size()</code> diz quantos elementos existem; <code>.capacity()</code> ("capacidade") diz para quantos há espaço reservado:</p>
+
+<pre class="file" data-file="capacidade.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; v;
+    for (int i = 1; i &lt;= 10; i++) {
+        v.push_back(i);
+        std::cout &lt;&lt; "size " &lt;&lt; v.size() &lt;&lt; ", capacity " &lt;&lt; v.capacity() &lt;&lt; '\n';
+    }
+
+    std::vector&lt;int&gt; w;
+    w.reserve(100);
+    std::cout &lt;&lt; "Depois do reserve(100): size " &lt;&lt; w.size()
+              &lt;&lt; ", capacity " &lt;&lt; w.capacity() &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra capacidade.cpp -o capacidade
+$ ./capacidade
+size 1, capacity 1
+size 2, capacity 2
+size 3, capacity 4
+size 4, capacity 4
+size 5, capacity 8
+size 6, capacity 8
+size 7, capacity 8
+size 8, capacity 8
+size 9, capacity 16
+size 10, capacity 16
+Depois do reserve(100): size 0, capacity 100</pre>
+
+<p>A capacidade pulou 1 → 2 → 4 → 8 → 16: cada pulo é uma "mudança de casa". Como os pulos dobram, eles ficam raros conforme o vetor cresce, e o <code>push_back</code> continua rápido em média. Se você já sabe que vão vir uns 100 elementos, <code>.reserve(100)</code> reserva o espaço de uma vez: o tamanho continua 0, mas os próximos 100 <code>push_back</code> não precisam mudar de casa. É só uma otimização; programas pequenos não precisam dela. (Os números exatos da capacidade dependem da biblioteca; estes são os do g++.)</p>
+
+<hr>
+
+<h2>O container padrão</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th></tr>
+<tr><td>Uma lista qualquer, de tamanho que muda (o caso comum)</td><td><code>std::vector</code></td></tr>
+<tr><td>Quantidade fixa, conhecida ao escrever o programa</td><td><a href="std-array.html">std::array</a></td></tr>
+<tr><td>Uma tabela de linhas e colunas de tamanho variável</td><td><code>std::vector&lt;std::vector&lt;T&gt;&gt;</code> (veja <a href="arrays-multidimensionais.html">Arrays Multidimensionais</a>)</td></tr>
+<tr><td>Achar um valor por uma chave (nome → telefone)</td><td><a href="map.html">std::map</a></td></tr>
+<tr><td>Muitas inserções no começo e no fim</td><td><a href="list-deque.html">std::deque</a></td></tr>
+</table>
+</div>
+<p>Na dúvida, comece com <code>std::vector</code>: ele é simples, rápido e é o que a maioria dos programas C++ usa. A lista completa de funções do vetor (e dos outros containers) está em <a href="ref-containers.html">Referência: Containers</a>, e o assunto continua em <a href="stl.html">O que é a STL</a> e em <a href="algoritmos.html">Algoritmos</a>, onde você vai ordenar e procurar em vetores com uma linha.</p>
+
+<hr>
+
+<h2 id="erros">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"vector::_M_range_check: __n (which is 5) &gt;= this-&gt;size() (which is 3)"</strong>
+<p><strong>O que aconteceu:</strong> um <code>.at(5)</code> num vetor de 3 elementos lançou <code>std::out_of_range</code>, e o programa foi encerrado (código 134).</p>
+<p><strong>Como consertar:</strong> confira de onde vem o índice; índices válidos vão de <code>0</code> a <code>size() − 1</code>. Se o índice pode estar errado, teste antes (<code>if (i &lt; v.size())</code>) ou trate a exceção.</p>
+</div>
+
+<div class="cenario">
+<strong>"Assertion '__n &lt; this-&gt;size()' failed" (escrever num vetor vazio com <code>[ ]</code>)</strong>
+<pre class="file" data-file="colchete.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas;
+    notas[0] = 7;
+    std::cout &lt;&lt; notas[0] &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra colchete.cpp -o colchete
+$ ./colchete
+/usr/include/c++/15/bits/stl_vector.h:1263: constexpr std::vector&lt; &lt;template-parameter-1-1&gt;, &lt;template-parameter-1-2&gt; &gt;::reference std::vector&lt; &lt;template-parameter-1-1&gt;, &lt;template-parameter-1-2&gt; &gt;::operator[](size_type) [with _Tp = int; _Alloc = std::allocator&lt;int&gt;; reference = int&amp;; size_type = long unsigned int]: Assertion '__n &lt; this-&gt;size()' failed.
+Abortado                   (imagem do núcleo gravada) ./colchete
+$ echo $?
+134</pre>
+<p><strong>O que significa:</strong> no meio do texto comprido, o que importa é o fim: <code>operator[]</code> (o <code>[ ]</code>) e <code>Assertion '__n &lt; this-&gt;size()' failed</code>, "a conferência de que o índice é menor que o tamanho falhou". O vetor está vazio; não existe posição 0. Essa conferência é do g++ 15 <strong>sem otimização</strong>; com <code>-O2</code>, o programa seguiria escrevendo em memória que não é dele.</p>
+<p><strong>Como consertar:</strong> para acrescentar, <code>notas.push_back(7);</code>. Se queria um vetor com posições prontas, crie com tamanho: <code>std::vector&lt;int&gt; notas(5);</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Assertion '!this-&gt;empty()' failed" (<code>pop_back</code> num vetor vazio)</strong>
+<pre class="file" data-file="popvazio.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; v;
+    v.pop_back();
+    std::cout &lt;&lt; "Fim\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra popvazio.cpp -o popvazio
+$ ./popvazio
+/usr/include/c++/15/bits/stl_vector.h:1459: constexpr void std::vector&lt; &lt;template-parameter-1-1&gt;, &lt;template-parameter-1-2&gt; &gt;::pop_back() [with _Tp = int; _Alloc = std::allocator&lt;int&gt;]: Assertion '!this-&gt;empty()' failed.
+Abortado                   (imagem do núcleo gravada) ./popvazio
+$ echo $?
+134</pre>
+<p><strong>O que significa:</strong> "a conferência de que o vetor <strong>não</strong> está vazio falhou", dentro do <code>pop_back()</code>. Não há o que tirar. O mesmo vale para <code>front()</code> e <code>back()</code> num vetor vazio. Com <code>-O2</code>, é comportamento indefinido sem aviso.</p>
+<p><strong>Como consertar:</strong> <code>if (!v.empty()) { v.pop_back(); }</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"no matching function for call to ‘push_back(const char [5])’"</strong>
+<pre class="file" data-file="tipo.cpp">#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas;
+    notas.push_back("sete");
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tipo.cpp -o tipo
+tipo.cpp: In function ‘int main()’:
+tipo.cpp:5:20: error: no matching function for call to ‘push_back(const char [5])’
+    5 |     notas.push_back("sete");
+      |     ~~~~~~~~~~~~~~~^~~~~~~~
+tipo.cpp:5:20: note: there are 2 candidates     « (as notas sobre os 2 candidatos foram cortadas)
+tipo.cpp:5:21: error: invalid conversion from ‘const char*’ to ‘std::vector&lt;int&gt;::value_type’ {aka ‘int’} [-fpermissive]
+    5 |     notas.push_back("sete");
+      |                     ^~~~~~
+      |                     |
+      |                     const char*</pre>
+<p><strong>O que significa:</strong> "nenhuma função <code>push_back</code> aceita um texto". O vetor é de <code>int</code> (<code>value_type</code>, o tipo dos elementos, é <code>int</code>), e <code>"sete"</code> é um texto. O compilador lista as versões de <code>push_back</code> que existem e explica por que nenhuma serve: não dá para converter texto em <code>int</code>.</p>
+<p><strong>Como consertar:</strong> acrescente um valor do tipo certo (<code>notas.push_back(7);</code>) ou, se a lista é de textos, declare <code>std::vector&lt;std::string&gt;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"comparison of integer expressions of different signedness"</strong>
+<p><strong>O que aconteceu:</strong> um <code>int</code> comparado com <code>.size()</code>, que é sem sinal (<a href="#percorrer">seção 5</a>).</p>
+<p><strong>Como consertar:</strong> <code>std::size_t i</code> no laço, ou for de intervalo.</p>
+</div>
+
+<div class="cenario">
+<strong>O vetor tem 1 elemento em vez de 5 (ou o contrário)</strong>
+<p><strong>O que aconteceu:</strong> <code>std::vector&lt;int&gt; v{5};</code> cria um elemento que vale 5; <code>std::vector&lt;int&gt; v(5);</code> cria 5 zeros.</p>
+<p><strong>Como consertar:</strong> chaves para listar valores, parênteses para dizer quantos.</p>
+</div>
+
+<div class="cenario">
+<strong>Acrescentar ou apagar enquanto percorre</strong>
+<p><strong>O que acontece:</strong> fazer <code>push_back</code>, <code>insert</code> ou <code>erase</code> no mesmo vetor <strong>dentro</strong> de um for de intervalo que o percorre é comportamento indefinido: se o vetor "mudar de casa" (seção 7), o laço continua olhando a casa antiga.</p>
+<p><strong>Como evitar:</strong> junte as mudanças num segundo vetor e aplique depois do laço. Formas seguras de apagar vários itens estão em <a href="algoritmos.html">Algoritmos</a>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que faz</th></tr>
+<tr><td><code>std::vector&lt;T&gt; v;</code></td><td>Vetor vazio (<code>#include &lt;vector&gt;</code>).</td></tr>
+<tr><td><code>std::vector&lt;T&gt; v = {a, b, c};</code></td><td>Com valores.</td></tr>
+<tr><td><code>std::vector&lt;T&gt; v(n);</code> / <code>v(n, x)</code></td><td><code>n</code> elementos zerados / valendo <code>x</code>.</td></tr>
+<tr><td><code>v.push_back(x)</code></td><td>Acrescenta <code>x</code> no fim.</td></tr>
+<tr><td><code>v.pop_back()</code></td><td>Remove o último (vetor não pode estar vazio).</td></tr>
+<tr><td><code>v.size()</code></td><td>Quantos elementos há (sem sinal).</td></tr>
+<tr><td><code>v.empty()</code></td><td><code>true</code> se não há elementos.</td></tr>
+<tr><td><code>v.clear()</code></td><td>Remove todos.</td></tr>
+<tr><td><code>v[i]</code> / <code>v.at(i)</code></td><td>Elemento <code>i</code>: sem conferência garantida / conferido (<code>std::out_of_range</code>).</td></tr>
+<tr><td><code>v.front()</code> / <code>v.back()</code></td><td>Primeiro / último.</td></tr>
+<tr><td><code>v.insert(v.begin() + i, x)</code></td><td>Insere <code>x</code> antes do índice <code>i</code>.</td></tr>
+<tr><td><code>v.erase(v.begin() + i)</code></td><td>Apaga o elemento de índice <code>i</code>.</td></tr>
+<tr><td><code>v.capacity()</code> / <code>v.reserve(n)</code></td><td>Espaço reservado / reservar espaço para <code>n</code>.</td></tr>
+<tr><td><code>b = a;</code>, <code>a == b</code></td><td>Copia / compara elemento por elemento (como no <code>std::array</code>).</td></tr>
+</table>
+</div>
+<p>Referência completa: <a href="ref-containers.html">Containers</a>.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Acrescentar</h3>
+<p>Complete para acrescentar <code>42</code> no fim de <code>v</code>:</p>
+<div class="ex-code">v.<input data-answer="push_back(42)" aria-label="chamada" size="14">;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Está vazio?</h3>
+<p>Complete o teste para mostrar a mensagem só se o carrinho estiver vazio:</p>
+<div class="ex-code">if (carrinho.<input data-answer="empty()" aria-label="chamada" size="8">) { std::cout &lt;&lt; "Nada no carrinho\n"; }</div>
+</div>
+
+<div class="exercise">
+<h3>3. Apagar o primeiro</h3>
+<p>Complete para apagar o <strong>primeiro</strong> elemento de <code>lista</code>:</p>
+<div class="ex-code">lista.erase(<input data-answer="lista.begin()|lista.begin() + 0" aria-label="posição" size="14">);</div>
+</div>
+
+<div class="exercise">
+<h3>4. Quanto mede?</h3>
+<p>Depois de <code>std::vector&lt;int&gt; v = {1, 2, 3}; v.push_back(4); v.pop_back(); v.pop_back();</code>, quanto vale <code>v.size()</code>?</p>
+<div class="ex-code"><input data-answer="2|dois" aria-label="tamanho" size="4"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. O que <code>std::vector&lt;int&gt; v(3);</code> cria?</p>
+<label><input type="radio" name="q5"> Um vetor com um elemento valendo 3.</label>
+<label><input type="radio" name="q5"> Um vetor vazio com capacidade 3.</label>
+<label><input type="radio" name="q5"> Um vetor com 3 elementos valendo 0.</label>
+<label><input type="radio" name="q5"> Erro de compilação.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">6. Num vetor vazio, <code>v[0] = 5;</code>…</p>
+<label><input type="radio" name="q6"> acrescenta o 5, como <code>push_back</code>.</label>
+<label><input type="radio" name="q6"> é comportamento indefinido: a posição 0 não existe.</label>
+<label><input type="radio" name="q6"> lança <code>std::out_of_range</code> sempre.</label>
+<label><input type="radio" name="q6"> não compila.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">7. Para uma lista cujo tamanho só se sabe quando o programa roda, o container recomendado é…</p>
+<label><input type="radio" name="q7"> <code>std::vector</code></label>
+<label><input type="radio" name="q7"> <code>std::array</code></label>
+<label><input type="radio" name="q7"> um array estilo C bem grande</label>
+<label><input type="radio" name="q7"> várias variáveis separadas</label>
+</div>
+
+<h3>Missão final: riscar um item da lista</h3>
+<div class="trycpp" data-goal="outre:- arroz\n- feijão\n- café\n,src:erase">
+<p class="try-task"><strong>Missão:</strong> o <code>"sabão"</code> entrou por engano na lista de compras, na posição de índice 1. Apague-o com <code>erase</code> e <code>lista.begin()</code>. A lista deve ficar <code>arroz</code>, <code>feijão</code>, <code>café</code>, nessa ordem.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; lista = {"arroz", "sabão", "feijão", "café"};
+    // apague o sabão aqui
+
+    for (const auto&amp; item : lista) {
+        std::cout &lt;&lt; "- " &lt;&lt; item &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; lista = {"arroz", "sabão", "feijão", "café"};
+    lista.erase(lista.begin() + 1);
+    for (const auto&amp; item : lista) {
+        std::cout &lt;&lt; "- " &lt;&lt; item &lt;&lt; '\n';
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>std::vector&lt;T&gt;</code> é uma lista que cresce e diminui durante a execução; é o container padrão do C++.</li>
+  <li>Crie vazio, com <code>{valores}</code>, ou com <code>(quantidade)</code>; chaves e parênteses são diferentes.</li>
+  <li><code>push_back</code> acrescenta no fim; <code>pop_back</code> tira do fim; <code>insert</code> e <code>erase</code> mexem no meio, com <code>begin() + i</code>.</li>
+  <li><code>size()</code> conta, <code>empty()</code> pergunta se está vazio, <code>clear()</code> esvazia.</li>
+  <li><code>[i]</code> não tem conferência garantida; <code>at(i)</code> lança <code>std::out_of_range</code>. <code>[i]</code> nunca acrescenta elementos.</li>
+  <li>Percorra com <code>for (const auto&amp; x : v)</code>; com índice, use <code>std::size_t</code> para evitar o aviso de sinais.</li>
+  <li><code>capacity</code> é o espaço reservado; <code>reserve(n)</code> reserva antes. Referência completa: <a href="ref-containers.html">Containers</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
