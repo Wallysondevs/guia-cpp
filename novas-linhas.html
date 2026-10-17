@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Novas Linhas — \n, std::endl, linhas em branco e \t | Guia C++</title>
+<meta name="description" content="Quebrar linhas em C++ para quem nunca programou: o \n, linhas em branco, a tabulação \t, o std::endl e a diferença real entre os dois (o flush, o buffer e o desempenho, medidos), o prompt grudado quando falta a nova linha, /n no lugar de \n e outros erros reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Novas Linhas</span> (\n e endl)</h1>
+
+<p class="intro">O <code>std::cout</code> mostra exatamente o que você manda, e nada mais: ele <strong>não</strong> pula linha sozinho. Quem decide onde cada linha termina é você, com o <code>\n</code> ou com o <code>std::endl</code>. Nesta aula você vê o que acontece quando a quebra de linha falta, como deixar linhas em branco e alinhar com tabulações, e qual é a diferença de verdade entre <code>\n</code> e <code>std::endl</code>, com medições reais.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que o prompt do terminal "gruda" no fim da saída.</li>
+  <li>O <code>\n</code>: onde colocar, quantos colocar, e o <code>'\n'</code> com aspas simples.</li>
+  <li>Linhas em branco e a tabulação <code>\t</code>.</li>
+  <li>O <code>std::endl</code>, o que é o <strong>buffer</strong> de saída e o <strong>flush</strong>.</li>
+  <li>Quando a diferença entre <code>\n</code> e <code>std::endl</code> aparece: velocidade e programas que quebram.</li>
+  <li>Os erros comuns: <code>/n</code> no lugar de <code>\n</code>, <code>endl</code> sem <code>std::</code>, <code>\</code> antes das aspas.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados na máquina da Ana com <code>g++ -std=c++23 -Wall -Wextra</code> (g++ 15.2) e rodados no terminal dela, na pasta <code>~/cpp</code>.</p>
+
+<hr>
+
+<h2>A ideia: a alavanca da máquina de escrever</h2>
+<p>Nas máquinas de escrever antigas, o papel ia andando para a esquerda a cada letra. Ao fim de uma linha, a datilógrafa puxava uma alavanca, e o papel voltava para o começo e subia uma linha. Se ela não puxasse a alavanca, a frase seguinte continuava na mesma linha.</p>
+
+<p>O <code>\n</code> é essa alavanca. O <code>std::cout</code> só escreve; puxar a alavanca é com você.</p>
+
+<hr>
+
+<h2>1. Sem quebra de linha: tudo gruda</h2>
+<p>Primeiro, o problema. Este Olá, mundo esqueceu o <code>\n</code>:</p>
+
+<pre class="file" data-file="grudado.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra grudado.cpp -o grudado &amp;&amp; ./grudado
+Olá, mundo!ana@notebook:~/cpp$          « o prompt veio grudado no fim do texto</pre>
+
+<p>O programa funcionou: mostrou <code>Olá, mundo!</code>. Mas o cursor ficou parado logo depois da exclamação, e o terminal escreveu o prompt ali mesmo. Não há erro nem aviso, porque o compilador não tem como saber que você queria pular linha.</p>
+
+<p>O mesmo acontece entre instruções. Cada <code>std::cout</code> continua de onde o anterior parou:</p>
+
+<pre class="file" data-file="linhas.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Lista de compras";
+    std::cout &lt;&lt; "Arroz";
+    std::cout &lt;&lt; "Feijão";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ ./linhas
+Lista de comprasArrozFeijãoana@notebook:~/cpp$</pre>
+
+<p>Três instruções em três linhas do código não fazem três linhas na tela. A quebra de linha <strong>do código</strong> (o <kbd>Enter</kbd> no editor) não tem nada a ver com a quebra de linha <strong>da saída</strong>.</p>
+
+<hr>
+
+<h2>2. O <code>\n</code></h2>
+<p>A barra invertida seguida de <code>n</code>, dentro das aspas, é a quebra de linha (<em>new line</em>, "nova linha"). Os dois caracteres juntos viram <strong>um</strong> caractere invisível, que faz o terminal pular para o começo da próxima linha. Ele pode ficar em qualquer posição do texto, quantas vezes você quiser:</p>
+
+<pre class="file" data-file="linhas2.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Lista de compras\n";
+    std::cout &lt;&lt; "\n";
+    std::cout &lt;&lt; "Arroz\nFeijão\n";
+    std::cout &lt;&lt; "Café" &lt;&lt; std::endl;
+    std::cout &lt;&lt; "\n\nFim\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra linhas2.cpp -o linhas2 &amp;&amp; ./linhas2
+Lista de compras
+                         « linha 5: um "\n" sozinho = uma linha em branco
+Arroz                    « linha 6: um texto, duas linhas na tela
+Feijão
+Café                     « linha 7: o std::endl também quebra a linha (seção 4)
+                         « linha 8: o primeiro "\n" fecha uma linha vazia…
+                         « …o segundo, outra…
+Fim                      « …e o terceiro termina a linha do "Fim"</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Resultado</th></tr>
+<tr><td><code>"Texto\n"</code></td><td>Mostra o texto e pula para a linha de baixo (o jeito mais comum)</td></tr>
+<tr><td><code>"\n"</code></td><td>Só pula a linha. Se o cursor já estava no começo de uma linha, ela fica em branco</td></tr>
+<tr><td><code>"Arroz\nFeijão\n"</code></td><td>Duas linhas com um texto só</td></tr>
+<tr><td><code>"\n\n"</code></td><td>Duas quebras seguidas: uma linha em branco depois do texto anterior</td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>Regra de bolso</strong>
+<p>Termine <strong>toda</strong> linha de saída com <code>\n</code>, inclusive a última do programa. Assim o prompt sempre volta no lugar certo, e o seu programa se comporta bem quando outro programa ou script lê a saída dele.</p>
+</div>
+
+<h3><code>"\n"</code> ou <code>'\n'</code>?</h3>
+<p>Você vai ver as duas formas:</p>
+
+<pre class="file" data-file="aspasimples.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Arroz" &lt;&lt; '\n';
+    std::cout &lt;&lt; "Feijão" &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra aspasimples.cpp -o aspasimples &amp;&amp; ./aspasimples
+Arroz
+Feijão</pre>
+
+<p>O resultado é o mesmo. A diferença: aspas <strong>duplas</strong> fazem um <strong>texto</strong> (uma string, que pode ter vários caracteres); aspas <strong>simples</strong> fazem <strong>um caractere só</strong> (um <code>char</code>, aula <a href="char.html">Caracteres</a>). Como o <code>\n</code> é um caractere só, as duas formas servem. O guia usa <code>"\n"</code>, que pode ser grudado no fim do texto (<code>"Arroz\n"</code>).</p>
+
+<div class="trycpp" data-goal="outre:^Lista da Ana\n\n- arroz\n- feijão\n- café\n$">
+<p class="try-task"><strong>Missão:</strong> este programa mostra tudo numa linha só. Acrescente <code>\n</code> nos lugares certos (sem criar novos <code>std::cout</code>) para a saída ficar assim, com uma linha em branco depois do título:</p>
+<pre class="out">Lista da Ana
+
+- arroz
+- feijão
+- café</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Lista da Ana";
+    std::cout &lt;&lt; "- arroz";
+    std::cout &lt;&lt; "- feijão- café";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Lista da Ana\n\n";
+    std::cout &lt;&lt; "- arroz\n";
+    std::cout &lt;&lt; "- feijão\n- café\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. A tabulação: <code>\t</code></h2>
+<p>Outra sequência que começa com barra invertida: <code>\t</code> (de <em>tab</em>), a <strong>tabulação</strong>, o mesmo que apertar a tecla <kbd>Tab</kbd>. Ela empurra o cursor até a próxima "parada", que no terminal fica a cada 8 colunas. É um jeito simples de fazer colunas:</p>
+
+<pre class="file" data-file="tab.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Produto\tQtd\tPreço\n";
+    std::cout &lt;&lt; "Arroz\t2\t25\n";
+    std::cout &lt;&lt; "Feijão\t1\t9\n";
+    std::cout &lt;&lt; "Macarrão integral\t3\t6\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tab.cpp -o tab &amp;&amp; ./tab
+Produto	Qtd	Preço
+Arroz	2	25
+Feijão	1	9
+Macarrão integral	3	6</pre>
+
+<p>As três primeiras linhas ficaram alinhadas. A última, não: "Macarrão integral" passa de 8 letras, então o <code>\t</code> pulou para a parada <strong>seguinte</strong>, e as colunas escorregaram. O <code>\t</code> é bom para tabelas rápidas com palavras curtas. Para alinhar colunas de verdade, com largura fixa, use <a href="iomanip.html">iomanip</a> (<code>std::setw</code>) ou <a href="format-print.html">std::format</a>.</p>
+
+<p>Existem outras sequências com barra invertida, como <code>\"</code> (aspas dentro do texto) e <code>\\</code> (a própria barra). Elas são o assunto de <a href="escapes.html">Caracteres Especiais e Raw Strings</a>.</p>
+
+<hr>
+
+<h2>4. <code>std::endl</code>: quebra a linha e "despeja" a saída</h2>
+<p>Em muitos livros e cursos, a quebra de linha é escrita assim:</p>
+
+<pre class="file" data-file="endl.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!" &lt;&lt; std::endl;
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>std::cout</dt><dd>A saída, como sempre.</dd>
+  <dt>&lt;&lt; "Olá, mundo!"</dt><dd>O texto, <strong>sem</strong> <code>\n</code>.</dd>
+  <dt>&lt;&lt; std::endl</dt><dd><em>end line</em>, "fim de linha". Não fica entre aspas: é um nome da biblioteca padrão, por isso leva <code>std::</code>. Ele faz duas coisas: (1) coloca um <code>\n</code>; (2) faz um <strong>flush</strong>, que você vai entender agora.</dd>
+  <dt>;</dt><dd>Fim da instrução.</dd>
+</dl>
+
+<p>Na tela, o resultado é idêntico ao do <code>\n</code>. A diferença está na parte (2).</p>
+
+<h3>O buffer: o caminhão de lixo</h3>
+<p>Mandar texto para a tela (ou para um arquivo) dá trabalho ao sistema operacional. Fazer isso a cada letra seria como chamar o caminhão de lixo a cada papel jogado fora. Então o <code>std::cout</code> junta o texto num depósito, o <strong>buffer</strong>, e só manda tudo de uma vez quando o depósito enche, quando o programa termina, ou quando alguém pede.</p>
+
+<p>"Pedir para esvaziar o depósito agora" se chama <strong>flush</strong> ("dar descarga"). O <code>std::endl</code> faz um flush <strong>toda vez</strong>. O <code>\n</code> não: ele só põe a quebra de linha no depósito.</p>
+
+<div class="note">
+<strong>Por que no terminal parece igual?</strong>
+<p>Quando a saída vai direto para a janela do terminal, o sistema esvazia o depósito a cada <code>\n</code>, para você ver cada linha assim que ela fica pronta. A diferença aparece quando a saída vai para um <strong>arquivo</strong> ou para outro programa (com <code>&gt;</code> ou <code>|</code>): aí o depósito só é esvaziado quando enche. Os dois testes a seguir mostram isso.</p>
+</div>
+
+<h3>Teste 1: velocidade</h3>
+<p>Dois programas que escrevem 200 mil linhas num arquivo; um com <code>\n</code>, outro com <code>std::endl</code> (o <code>for</code> repete a linha; ele é da aula <a href="for.html">for</a>):</p>
+
+<pre class="file" data-file="muitas-n.cpp">#include &lt;iostream&gt;
+
+int main() {
+    for (int i = 1; i &lt;= 200000; i++) {
+        std::cout &lt;&lt; "Linha " &lt;&lt; i &lt;&lt; "\n";
+    }
+}
+</pre>
+
+<p>O <code>muitas-endl.cpp</code> é igual, com <code>&lt;&lt; std::endl</code> no lugar do <code>&lt;&lt; "\n"</code>. O <code>time</code> do terminal mede quanto cada um leva:</p>
+
+<pre class="term" data-cwd="~/cpp">$ time ./muitas-n &gt; linhas.txt
+
+real	0m0,030s                « 3 centésimos de segundo
+user	0m0,029s
+sys	0m0,002s
+$ time ./muitas-endl &gt; linhas.txt
+
+real	0m0,260s                « quase 9 vezes mais lento
+user	0m0,117s
+sys	0m0,143s                « o "sys" é o tempo gasto pelo sistema: 200 mil viagens do caminhão
+$ tail -n 1 linhas.txt
+Linha 200000</pre>
+
+<p>O arquivo final é o mesmo. Mas o <code>std::endl</code> chamou o caminhão 200 mil vezes. Em programas que escrevem muito, isso pesa.</p>
+
+<h3>Teste 2: o programa que quebra no meio</h3>
+<p>O outro lado da moeda: se o programa <strong>quebrar</strong> antes de esvaziar o depósito, o que estava lá dentro se perde. Para simular uma quebra, este programa chama <code>std::abort()</code> (de <code>&lt;cstdlib&gt;</code>), que encerra o programa na hora, sem arrumar nada:</p>
+
+<pre class="file" data-file="quebra-n.cpp">#include &lt;iostream&gt;
+#include &lt;cstdlib&gt;
+
+int main() {
+    std::cout &lt;&lt; "Passo 1: arroz comprado\n";
+    std::cout &lt;&lt; "Passo 2: feijão comprado\n";
+    std::abort();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ ./quebra-n
+Passo 1: arroz comprado
+Passo 2: feijão comprado
+Abortado                   (imagem do núcleo gravada) ./quebra-n
+$ echo $?
+134
+$ ./quebra-n &gt; registro.txt
+Abortado                   (imagem do núcleo gravada) ./quebra-n &gt; registro.txt
+$ cat registro.txt
+$                        « o arquivo ficou VAZIO: as duas linhas morreram no depósito</pre>
+
+<p>No terminal, as duas linhas apareceram (lá o depósito esvazia a cada <code>\n</code>). Indo para o arquivo, elas ficaram no depósito e se perderam quando o programa abortou. A mensagem <code>Abortado (imagem do núcleo gravada)</code> é do terminal, avisando que o programa foi encerrado à força. Agora a mesma coisa com <code>std::endl</code>:</p>
+
+<pre class="file" data-file="quebra-endl.cpp">#include &lt;iostream&gt;
+#include &lt;cstdlib&gt;
+
+int main() {
+    std::cout &lt;&lt; "Passo 1: arroz comprado" &lt;&lt; std::endl;
+    std::cout &lt;&lt; "Passo 2: feijão comprado" &lt;&lt; std::endl;
+    std::abort();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ ./quebra-endl &gt; registro.txt
+Abortado                   (imagem do núcleo gravada) ./quebra-endl &gt; registro.txt
+$ cat registro.txt
+Passo 1: arroz comprado
+Passo 2: feijão comprado          « com endl, cada linha foi gravada na hora</pre>
+
+<p>Com o flush a cada linha, o arquivo guardou tudo o que aconteceu até a quebra. É para isso que o <code>std::endl</code> serve.</p>
+
+<h3>Então, qual usar?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Quebra a linha</th><th>Flush</th><th>Quando usar</th></tr>
+<tr><td><code>"\n"</code></td><td>Sim</td><td>Não</td><td><strong>No dia a dia.</strong> É o que o guia usa.</td></tr>
+<tr><td><code>std::endl</code></td><td>Sim</td><td>Sim, sempre</td><td>Quando cada linha precisa sair <strong>na hora</strong>: registros de um programa que pode quebrar, progresso de uma tarefa demorada.</td></tr>
+<tr><td><code>std::flush</code></td><td>Não</td><td>Sim</td><td>Esvaziar o depósito sem pular linha (por exemplo, <code>std::cout &lt;&lt; "Carregando..." &lt;&lt; std::flush;</code>).</td></tr>
+<tr><td><code>std::cerr &lt;&lt; …</code></td><td>Só com <code>\n</code></td><td>Sim, sempre</td><td>Mensagens de erro: o <code>std::cerr</code> não usa depósito, cada mensagem sai na hora (aula <a href="saida-cout.html">Saída com cout</a>).</td></tr>
+</table>
+</div>
+
+<p>Em programas pequenos de exercício, usar <code>std::endl</code> não faz mal nenhum, e você vai vê-lo em muito material. Só não o use por hábito em programas que escrevem muitas linhas.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>O prompt grudou no fim da saída</strong>
+<pre class="term" data-cwd="~/cpp">$ ./grudado
+Olá, mundo!ana@notebook:~/cpp$</pre>
+<p><strong>O que significa:</strong> a última coisa que o programa mostrou não terminava com <code>\n</code>.</p>
+<p><strong>Como consertar:</strong> acrescente <code>\n</code> no fim do último texto (<code>"Olá, mundo!\n"</code>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>/n</code> aparece na tela</strong>
+<pre class="file" data-file="barra.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Arroz/nFeijão/n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra barra.cpp -o barra &amp;&amp; ./barra
+Arroz/nFeijão/nana@notebook:~/cpp$</pre>
+<p><strong>O que significa:</strong> a barra está virada. <code>/</code> (barra normal, a da divisão) é um caractere comum, que aparece na tela. A quebra de linha usa a barra <strong>invertida</strong>, <code>\</code>. Nenhum erro e nenhum aviso: o compilador não tem como saber que você não queria mostrar "/n".</p>
+<p><strong>Como consertar:</strong> <code>"Arroz\nFeijão\n"</code>. Para lembrar: a barra invertida "cai para trás", como quem volta para o começo da linha.</p>
+</div>
+
+<div class="cenario">
+<strong><code>‘endl’ was not declared in this scope</code></strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra endlsem.cpp -o endlsem   « std::cout &lt;&lt; "Olá" &lt;&lt; endl;
+endlsem.cpp: In function ‘int main()’:
+endlsem.cpp:4:27: error: ‘endl’ was not declared in this scope; did you mean ‘std::endl’?
+    4 |     std::cout &lt;&lt; "Olá" &lt;&lt; endl;
+      |                           ^~~~
+      |                           std::endl
+In file included from /usr/include/c++/15/iostream:43,
+                 from endlsem.cpp:1:
+/usr/include/c++/15/ostream:66:5: note: ‘std::endl’ declared here
+   66 |     endl(basic_ostream&lt;_CharT, _Traits&gt;&amp; __os)
+      |     ^~~~</pre>
+<p><strong>O que significa:</strong> o <code>endl</code> mora no <code>std</code>, como o <code>cout</code>. Em código copiado de sites que usam <code>using namespace std;</code>, ele aparece sem o sobrenome (aula <a href="sintaxe.html">Sintaxe</a>).</p>
+<p><strong>Como consertar:</strong> <code>std::endl</code>, como o próprio g++ sugere.</p>
+</div>
+
+<div class="cenario">
+<strong><code>missing terminating " character</code> com <code>\</code> no fim do texto</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra barrainv.cpp -o barrainv   « std::cout &lt;&lt; "Olá\";
+barrainv.cpp:4:18: warning: missing terminating " character
+    4 |     std::cout &lt;&lt; "Olá\";
+      |                  ^
+barrainv.cpp:4:18: error: missing terminating " character
+    4 |     std::cout &lt;&lt; "Olá\";
+      |                  ^~~~~~~
+barrainv.cpp: In function ‘int main()’:
+barrainv.cpp:5:1: error: expected primary-expression before ‘}’ token
+    5 | }
+      | ^</pre>
+<p><strong>O que significa:</strong> a Ana digitou só a barra e esqueceu o <code>n</code>. Dentro de um texto, <code>\"</code> significa "aspas que fazem parte do texto", então as aspas de fechamento sumiram: "falta o caractere <code>"</code> de fechamento".</p>
+<p><strong>Como consertar:</strong> <code>"Olá\n"</code>. Toda barra invertida dentro de aspas precisa de uma letra (ou símbolo) logo depois; veja a lista em <a href="escapes.html">Caracteres Especiais</a>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>\N</code> maiúsculo: <code>‘\N’ not followed by ‘{’</code></strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra N.cpp -o N                « std::cout &lt;&lt; "Olá\N";
+N.cpp: In function ‘int main()’:
+N.cpp:4:18: error: ‘\N’ not followed by ‘{’
+    4 |     std::cout &lt;&lt; "Olá\N";
+      |                  ^~~~~~~
+N.cpp:4:18: error: incomplete universal character name \N</pre>
+<p><strong>O que significa:</strong> maiúsculas importam também aqui. <code>\N</code> é outra coisa (no C++23, <code>\N{…}</code> escreve um caractere pelo nome em inglês), e o compilador esperava uma chave depois dele.</p>
+<p><strong>Como consertar:</strong> <code>\n</code>, com <code>n</code> minúsculo.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>"texto\n"</code></td><td>Mostra o texto e quebra a linha</td></tr>
+<tr><td><code>"\n"</code> ou <code>'\n'</code></td><td>Só quebra a linha</td></tr>
+<tr><td><code>"\n\n"</code></td><td>Quebra a linha e deixa uma linha em branco</td></tr>
+<tr><td><code>"a\tb"</code></td><td>Tabulação: pula até a próxima coluna múltipla de 8</td></tr>
+<tr><td><code>&lt;&lt; std::endl</code></td><td>Quebra a linha <strong>e</strong> faz flush (esvazia o buffer)</td></tr>
+<tr><td><code>&lt;&lt; std::flush</code></td><td>Só faz flush, sem quebrar a linha</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A quebra</h3>
+<p>Complete para o prompt não grudar:</p>
+<div class="ex-code">std::cout &lt;&lt; "Tchau!<input data-answer="\n" aria-label="quebra" size="3">";</div>
+</div>
+
+<div class="exercise">
+<h3>2. Com flush</h3>
+<p>Complete para quebrar a linha e esvaziar o buffer na hora:</p>
+<div class="ex-code">std::cout &lt;&lt; "Salvando..." &lt;&lt; <input data-answer="std::endl" aria-label="manipulador" size="10">;</div>
+</div>
+
+<div class="exercise">
+<h3>3. Quantas linhas?</h3>
+<p>Quantas linhas (contando as em branco) mostra <code>std::cout &lt;&lt; "A\n\nB\nC\n";</code>?</p>
+<div class="ex-code">Linhas: <input data-answer="4" aria-label="número" size="3"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Qual a diferença entre <code>"\n"</code> e <code>std::endl</code>?</p>
+<label><input type="radio" name="q4"> <code>std::endl</code> deixa uma linha em branco; <code>"\n"</code> não</label>
+<label><input type="radio" name="q4"> <code>"\n"</code> só funciona no Linux</label>
+<label><input type="radio" name="q4"> Os dois quebram a linha, mas o <code>std::endl</code> também faz flush, o que é mais lento</label>
+<label><input type="radio" name="q4"> Nenhuma</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. O programa mostrou <code>Total/n</code> na tela. Qual o problema?</p>
+<label><input type="radio" name="q5"> Foi usada a barra normal <code>/</code> em vez da invertida <code>\</code></label>
+<label><input type="radio" name="q5"> Faltou o <code>std::endl</code></label>
+<label><input type="radio" name="q5"> Faltou o <code>#include &lt;iostream&gt;</code></label>
+<label><input type="radio" name="q5"> O terminal não aceita quebras de linha</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">6. Um programa que escreve num arquivo quebrou no meio, e o arquivo ficou vazio, embora o programa tivesse escrito várias linhas com <code>"\n"</code>. Por quê?</p>
+<label><input type="radio" name="q6"> O <code>"\n"</code> apaga o que foi escrito</label>
+<label><input type="radio" name="q6"> As linhas ainda estavam no buffer e se perderam quando o programa quebrou</label>
+<label><input type="radio" name="q6"> Arquivos não aceitam <code>"\n"</code></label>
+<label><input type="radio" name="q6"> O <code>std::cout</code> não escreve em arquivos</label>
+</div>
+
+<h3>Missão final: o boletim</h3>
+
+<div class="trycpp" data-goal="outre:^Boletim da Ana\n\nMatéria\tNota\nMatemática\t9\nHistória\t8\n\nFim do boletim\n$">
+<p class="try-task"><strong>Missão:</strong> monte o boletim abaixo. Use <code>\t</code> entre a matéria e a nota, deixe as duas linhas em branco onde aparecem e termine a última linha com quebra de linha. Pode usar quantos <code>std::cout</code> quiser.</p>
+<pre class="out">Boletim da Ana
+
+Matéria	Nota
+Matemática	9
+História	8
+
+Fim do boletim</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Boletim da Ana\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Boletim da Ana\n\n";
+    std::cout &lt;&lt; "Matéria\tNota\n";
+    std::cout &lt;&lt; "Matemática\t9\n";
+    std::cout &lt;&lt; "História\t8\n";
+    std::cout &lt;&lt; "\nFim do boletim\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>O <code>std::cout</code> não pula linha sozinho; sem <code>\n</code>, tudo gruda, inclusive o prompt.</li>
+  <li><code>\n</code> (barra invertida + n) é a quebra de linha. Pode ficar em qualquer lugar do texto e se repetir: <code>"\n\n"</code> deixa uma linha em branco.</li>
+  <li><code>\t</code> é a tabulação: alinha colunas curtas.</li>
+  <li><code>std::endl</code> = <code>\n</code> + flush. O flush esvazia o buffer na hora: mais seguro se o programa quebrar, mais lento (quase 9 vezes no teste com 200 mil linhas).</li>
+  <li>No dia a dia, use <code>"\n"</code>. Use <code>std::endl</code> (ou <code>std::flush</code>) quando a linha precisa sair imediatamente, e <code>std::cerr</code> para erros.</li>
+  <li>Cuidado com <code>/n</code> (barra errada), <code>\N</code> (maiúsculo) e <code>endl</code> sem <code>std::</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
