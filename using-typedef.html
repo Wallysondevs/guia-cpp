@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ using e typedef — apelidos para tipos | Guia C++</title>
+<meta name="description" content="using e typedef em C++ para quem nunca programou: dar um apelido a um tipo (using Nota = double;), a forma antiga typedef, apelidos para tipos compridos como std::map, por que o apelido não cria um tipo novo e o alias de template, com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">using e typedef</span></h1>
+
+<p class="intro">Alguns tipos do C++ têm nomes enormes: <code>std::map&lt;std::string, std::string&gt;</code>, <code>std::vector&lt;Aluno&gt;</code>. Outros têm nomes curtos demais para dizer o que guardam: um <code>double</code> pode ser uma nota, um preço, uma altura. Com <code>using</code> você dá um <strong>apelido</strong> a um tipo, e o código fica mais curto e mais fácil de ler. Nesta aula você vai criar apelidos com <code>using</code>, reconhecer a forma antiga <code>typedef</code> e entender o que um apelido <strong>não</strong> faz.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como criar um apelido: <code>using Nota = double;</code>.</li>
+  <li>Que o apelido é só outro nome: <code>Nota</code> e <code>double</code> continuam sendo o mesmo tipo.</li>
+  <li>A forma antiga, <code>typedef double Nota;</code>, e por que a nova é mais fácil de ler.</li>
+  <li>Como encurtar tipos compridos: <code>using Agenda = std::map&lt;std::string, std::string&gt;;</code>.</li>
+  <li>Que existem apelidos "com buraco" (alias de template), só para reconhecê-los.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Você pode repetir cada um no editor do guia.</p>
+
+<hr>
+
+<h2>A ideia: um apelido, não uma pessoa nova</h2>
+<p>A Ana se chama Ana Beatriz, mas a família a chama de "Bia". Quando a mãe diz "a Bia chegou", ninguém pensa que entrou uma pessoa nova na casa: é a mesma Ana Beatriz, com outro nome.</p>
+
+<p>Um apelido de tipo é isso. <code>using Nota = double;</code> diz ao compilador: "quando eu escrever <code>Nota</code>, entenda <code>double</code>". O tipo é exatamente o mesmo. O ganho é para quem <strong>lê</strong> o código: <code>Nota media(Nota a, Nota b)</code> conta mais que <code>double media(double a, double b)</code>.</p>
+
+<p>Compare com as aulas anteriores: <a href="structs.html">struct</a> e <a href="enums.html">enum class</a> criam tipos <strong>novos</strong>, diferentes de todos os outros. <code>using</code> e <code>typedef</code> só dão outro nome a um tipo que já existe.</p>
+
+<hr>
+
+<h2>1. <code>using</code>: o jeito moderno</h2>
+
+<pre class="file" data-file="nota.cpp">#include &lt;iostream&gt;
+
+using Nota = double;
+
+Nota media(Nota a, Nota b) {
+    return (a + b) / 2;
+}
+
+int main() {
+    Nota prova = 8.0;
+    Nota trabalho = 6.5;
+    std::cout &lt;&lt; "Média: " &lt;&lt; media(prova, trabalho) &lt;&lt; '\n';
+
+    double comum = prova;
+    Nota outra = 10;
+    std::cout &lt;&lt; comum &lt;&lt; ' ' &lt;&lt; outra &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>using</dt><dd>Palavra-chave (em inglês, "usando"). Aqui ela começa um apelido. A mesma palavra tem outros usos em C++, como <code>using enum</code> (veja <a href="enums.html">Enums</a>) e <code>using namespace</code> (veja <a href="namespaces.html">Namespaces</a>); o que decide é o que vem depois.</dd>
+  <dt>Nota</dt><dd>O apelido novo. Como nos tipos próprios, começa com maiúscula.</dd>
+  <dt>= double;</dt><dd>O tipo verdadeiro. Leia a linha inteira como "<code>Nota</code> é igual a <code>double</code>".</dd>
+  <dt>Nota media(Nota a, Nota b)</dt><dd>A partir daí, <code>Nota</code> serve em qualquer lugar onde serviria um <code>double</code>: variáveis, parâmetros, retorno.</dd>
+  <dt>double comum = prova;</dt><dd>Como é o mesmo tipo, <code>Nota</code> e <code>double</code> se misturam à vontade, sem conversão.</dd>
+</dl>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra nota.cpp -o nota
+$ ./nota
+Média: 7.25
+8 10</pre>
+
+<p>Outra vantagem: se um dia a Ana decidir que as notas devem ser <code>float</code>, ela muda <strong>uma linha</strong> (<code>using Nota = float;</code>) em vez de caçar todos os <code>double</code> do programa, que também podem ser preços, alturas…</p>
+
+<div class="trycpp" data-goal="src:using\s+Preco\s*=\s*double,src:Preco\s+total,out:Total: R$ 37.5">
+<p class="try-task"><strong>Missão:</strong> crie o apelido <code>Preco</code> para <code>double</code> e use-o no retorno e no primeiro parâmetro da função <code>total</code> (e, se quiser, na variável <code>caderno</code>). A saída não muda: <code>Total: R$ 37.5</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+// crie aqui o apelido Preco para double
+
+double total(double unitario, int quantidade) {
+    return unitario * quantidade;
+}
+
+int main() {
+    double caderno = 12.5;
+    std::cout &lt;&lt; "Total: R$ " &lt;&lt; total(caderno, 3) &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+using Preco = double;
+
+Preco total(Preco unitario, int quantidade) {
+    return unitario * quantidade;
+}
+
+int main() {
+    Preco caderno = 12.5;
+    std::cout &lt;&lt; "Total: R$ " &lt;&lt; total(caderno, 3) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. O apelido não é um tipo novo</h2>
+<p>Isso tem uma consequência que surpreende: para o compilador, <code>Nota</code> e <code>double</code> são indistinguíveis. Ele não protege você de misturar uma nota com um preço, como o <code>enum class</code> faria. E duas funções que só diferem por um apelido são, na verdade, a mesma função:</p>
+
+<pre class="file" data-file="mesmotipo.cpp">#include &lt;iostream&gt;
+
+using Nota = double;
+
+void mostrar(double x) {
+    std::cout &lt;&lt; "double: " &lt;&lt; x &lt;&lt; '\n';
+}
+
+void mostrar(Nota n) {
+    std::cout &lt;&lt; "nota: " &lt;&lt; n &lt;&lt; '\n';
+}
+
+int main() {
+    mostrar(8.5);
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra mesmotipo.cpp -o mesmotipo
+mesmotipo.cpp:9:6: error: redefinition of ‘void mostrar(Nota)’
+    9 | void mostrar(Nota n) {
+      |      ^~~~~~~
+mesmotipo.cpp:5:6: note: ‘void mostrar(double)’ previously defined here
+    5 | void mostrar(double x) {
+      |      ^~~~~~~</pre>
+<p><em>redefinition of ‘void mostrar(Nota)’</em> = "redefinição de <code>mostrar(Nota)</code>". A nota de baixo explica: ela já tinha sido definida como <code>mostrar(double)</code>, que é a mesma coisa. Na <a href="sobrecarga.html">sobrecarga de funções</a>, os parâmetros precisam ter tipos <strong>de verdade</strong> diferentes; um apelido não conta. Se você precisa que <code>Nota</code> e <code>Preco</code> sejam tipos diferentes, crie uma <code>struct</code> para cada um.</p>
+
+<hr>
+
+<h2>3. <code>typedef</code>: o jeito antigo</h2>
+<p>Antes do C++11, os apelidos eram feitos com <code>typedef</code> (de <em>type definition</em>, "definição de tipo"), que vem da linguagem C. Ele faz exatamente a mesma coisa, mas na ordem inversa: <strong>primeiro o tipo verdadeiro, depois o apelido</strong>, como se você declarasse uma variável.</p>
+
+<pre class="file" data-file="typedef.cpp">#include &lt;iostream&gt;
+
+typedef double Nota;
+typedef unsigned int Contador;
+
+int main() {
+    Nota n = 7.5;
+    Contador alunos = 30;
+    std::cout &lt;&lt; n &lt;&lt; ' ' &lt;&lt; alunos &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra typedef.cpp -o typedef
+$ ./typedef
+7.5 30</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th><code>using</code> (C++11)</th><th><code>typedef</code> (antigo)</th></tr>
+<tr><td><code>using Nota = double;</code></td><td><code>typedef double Nota;</code></td></tr>
+<tr><td><code>using Contador = unsigned int;</code></td><td><code>typedef unsigned int Contador;</code></td></tr>
+<tr><td><code>using Turma = std::vector&lt;Aluno&gt;;</code></td><td><code>typedef std::vector&lt;Aluno&gt; Turma;</code></td></tr>
+</table>
+</div>
+
+<p>Com <code>using</code>, o nome novo fica sempre à esquerda do <code>=</code>, como numa variável (<code>int x = 5;</code>). Com <code>typedef</code>, você precisa achar o apelido no fim da linha. A diferença fica gritante com tipos complicados, como um ponteiro para função:</p>
+
+<pre class="file" data-file="ponteirofuncao.cpp">#include &lt;iostream&gt;
+
+typedef void (*AcaoAntiga)(int);
+using Acao = void (*)(int);
+
+void dizer(int n) {
+    std::cout &lt;&lt; "Número " &lt;&lt; n &lt;&lt; '\n';
+}
+
+int main() {
+    AcaoAntiga a = dizer;
+    Acao b = dizer;
+    a(1);
+    b(2);
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra ponteirofuncao.cpp -o ponteirofuncao
+$ ./ponteirofuncao
+Número 1
+Número 2</pre>
+<p>Não se preocupe com o que é um ponteiro para função; repare só onde está o nome. No <code>typedef</code>, o apelido <code>AcaoAntiga</code> fica escondido no meio, entre parênteses. No <code>using</code>, <code>Acao</code> está na frente, e o tipo inteiro do outro lado do <code>=</code>.</p>
+
+<p><strong>Qual usar:</strong> <code>using</code> no código novo. Conheça o <code>typedef</code> porque ele está em todo lugar, inclusive dentro da própria biblioteca padrão. Dois exemplos reais, dos cabeçalhos do g++ 15 na máquina da Ana:</p>
+
+<pre class="term">$ grep -n 'size_t;' /usr/include/x86_64-linux-gnu/c++/15/bits/c++config.h | head -1
+338:  typedef __SIZE_TYPE__ 	size_t;
+$ grep -n 'typedef basic_string&lt;char&gt; *string;' /usr/include/c++/15/bits/stringfwd.h
+79:  typedef basic_string&lt;char&gt;    string;</pre>
+
+<p>Isso mesmo: o <code>std::string</code> que você usa desde o Nível 1 é um <strong>apelido</strong> para <code>std::basic_string&lt;char&gt;</code>, e o <code>std::size_t</code> (o tipo de <code>v.size()</code>) é um apelido para um inteiro sem sinal. É por isso que algumas mensagens de erro falam em <code>basic_string&lt;char&gt;</code>: o compilador às vezes mostra o nome verdadeiro, não o apelido.</p>
+
+<hr>
+
+<h2>4. Apelidos para tipos compridos</h2>
+<p>O uso mais comum de <code>using</code> no dia a dia é encurtar tipos que se repetem pelo programa. Um vetor de alunos, por exemplo:</p>
+
+<pre class="file" data-file="turma.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Aluno {
+    std::string nome;
+    double nota = 0.0;
+};
+
+using Turma = std::vector&lt;Aluno&gt;;
+
+double media(const Turma&amp; turma) {
+    double soma = 0.0;
+    for (const auto&amp; a : turma) {
+        soma += a.nota;
+    }
+    return soma / turma.size();
+}
+
+int main() {
+    Turma manha = {{"Ana", 8.5}, {"Bruno", 6.0}};
+    Turma tarde = {{"Carla", 9.5}, {"Davi", 7.0}, {"Eva", 8.0}};
+    std::cout &lt;&lt; "Manhã: " &lt;&lt; media(manha) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Tarde: " &lt;&lt; media(tarde) &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra turma.cpp -o turma
+$ ./turma
+Manhã: 7.25
+Tarde: 8.16667</pre>
+
+<p>O ganho cresce com o tamanho do tipo. A agenda de telefones da Ana usa um <code>std::map</code>: uma tabela que liga uma <strong>chave</strong> (o nome) a um <strong>valor</strong> (o telefone). Você vai estudá-lo em <a href="map.html">std::map</a>; aqui, basta saber que <code>std::map&lt;std::string, std::string&gt;</code> é "uma tabela de texto para texto". Sem apelido, esse nome aparece em todo lugar:</p>
+
+<pre class="file" data-file="semalias.cpp">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+void mostrar(const std::map&lt;std::string, std::string&gt;&amp; agenda) {
+    for (const auto&amp; contato : agenda) {
+        std::cout &lt;&lt; contato.first &lt;&lt; ": " &lt;&lt; contato.second &lt;&lt; '\n';
+    }
+}
+
+int main() {
+    std::map&lt;std::string, std::string&gt; amigos;
+    amigos["Bruno"] = "(11) 98765-4321";
+    mostrar(amigos);
+}
+</pre>
+
+<p>Com apelido:</p>
+
+<pre class="file" data-file="agenda.cpp">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+using Agenda = std::map&lt;std::string, std::string&gt;;
+
+void mostrar(const Agenda&amp; agenda) {
+    for (const auto&amp; contato : agenda) {
+        std::cout &lt;&lt; contato.first &lt;&lt; ": " &lt;&lt; contato.second &lt;&lt; '\n';
+    }
+}
+
+int main() {
+    Agenda amigos;
+    amigos["Bruno"] = "(11) 98765-4321";
+    amigos["Carla"] = "(21) 91234-5678";
+    amigos["Ana"] = "(31) 99999-0000";
+    mostrar(amigos);
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra agenda.cpp -o agenda
+$ ./agenda
+Ana: (31) 99999-0000
+Bruno: (11) 98765-4321
+Carla: (21) 91234-5678</pre>
+
+<dl class="anatomy">
+  <dt>using Agenda = std::map&lt;std::string, std::string&gt;;</dt><dd>Um nome curto, que diz <strong>para que</strong> o tipo serve, no lugar de um nome longo, que diz <strong>como</strong> ele é feito.</dd>
+  <dt>amigos["Bruno"] = "(11) 98765-4321";</dt><dd>Guarda o telefone do Bruno na tabela.</dd>
+  <dt>contato.first / contato.second</dt><dd>Cada item da tabela tem a chave (<code>first</code>, "primeiro") e o valor (<code>second</code>, "segundo"). O <code>map</code> mostra os nomes em ordem alfabética.</dd>
+</dl>
+
+<div class="tip">
+<strong>Onde colocar os apelidos</strong>
+<p>Lá em cima no arquivo, depois dos <code>#include</code> e das structs que eles usam, como no <code>turma.cpp</code>: o apelido <code>Turma</code> só pode vir depois da <code>struct Aluno</code>. Também é possível criar um apelido dentro de uma função; aí ele só vale ali dentro (veja <a href="escopo.html">Escopo</a>).</p>
+</div>
+
+<div class="warning">
+<strong>Não exagere</strong>
+<p>Apelido bom diz algo que o tipo original não diz (<code>Nota</code>, <code>Agenda</code>, <code>Turma</code>). Apelidos como <code>using Inteiro = int;</code> ou <code>using Texto = std::string;</code> só obrigam quem lê a procurar o que eles significam. E nunca esconda que algo é um ponteiro ou uma referência atrás de um apelido.</p>
+</div>
+
+<hr>
+
+<h2>5. Apelidos com "buraco": alias de template</h2>
+<p>Só para você reconhecer quando encontrar: um apelido pode deixar uma parte do tipo em aberto, para ser preenchida depois, entre <code>&lt; &gt;</code>. Isso se chama <strong>alias de template</strong>, e só funciona com <code>using</code> (o <code>typedef</code> não consegue).</p>
+
+<pre class="file" data-file="template.cpp">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+template &lt;typename T&gt;
+using Lista = std::vector&lt;T&gt;;
+
+template &lt;typename V&gt;
+using Tabela = std::map&lt;std::string, V&gt;;
+
+int main() {
+    Lista&lt;int&gt; idades = {20, 19, 22};
+    Lista&lt;std::string&gt; nomes = {"Ana", "Bruno"};
+    Tabela&lt;double&gt; notas = {{"Ana", 8.5}};
+    std::cout &lt;&lt; idades.size() &lt;&lt; ' ' &lt;&lt; nomes[1] &lt;&lt; ' ' &lt;&lt; notas["Ana"] &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra template.cpp -o template
+$ ./template
+3 Bruno 8.5</pre>
+
+<p><code>Lista&lt;int&gt;</code> vira <code>std::vector&lt;int&gt;</code>; <code>Tabela&lt;double&gt;</code> vira <code>std::map&lt;std::string, double&gt;</code>. O <code>T</code> e o <code>V</code> são os "buracos". Como isso funciona por dentro é assunto de <a href="templates-classe.html">Templates de Classe</a>, no Nível 3.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"‘Nota’ does not name a type": usou o apelido antes de criá-lo</strong>
+<pre class="file" data-file="antes.cpp">#include &lt;iostream&gt;
+
+Nota dobro(Nota n) {
+    return n * 2;
+}
+
+using Nota = double;
+
+int main() {
+    std::cout &lt;&lt; dobro(4.5) &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra antes.cpp -o antes
+antes.cpp:3:1: error: ‘Nota’ does not name a type
+    3 | Nota dobro(Nota n) {
+      | ^~~~
+antes.cpp: In function ‘int main()’:
+antes.cpp:10:18: error: ‘dobro’ was not declared in this scope
+   10 |     std::cout &lt;&lt; dobro(4.5) &lt;&lt; '\n';
+      |                  ^~~~~</pre>
+<p><strong>O que aconteceu:</strong> o compilador lê o arquivo de cima para baixo. Na linha 3, ele ainda não conhecia <code>Nota</code>: <em>does not name a type</em> = "não é nome de nenhum tipo". Como a função <code>dobro</code> não pôde ser criada, o segundo erro é consequência do primeiro (por isso, <strong>conserte sempre o primeiro erro</strong>; veja <a href="erros-compilacao.html">Lendo Erros do Compilador</a>). No editor do guia, o Clang diz <code>unknown type name 'Nota'</code> ("nome de tipo desconhecido").</p>
+<p><strong>Como resolver:</strong> coloque o <code>using</code> antes de qualquer uso, lá no começo do arquivo.</p>
+</div>
+
+<div class="cenario">
+<strong>"does not name a type" no próprio <code>typedef</code>: ordem invertida</strong>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra typedefinvertido.cpp -o typedefinvertido
+typedefinvertido.cpp:1:9: error: ‘Nota’ does not name a type
+    1 | typedef Nota double;
+      |         ^~~~
+typedefinvertido.cpp: In function ‘int main()’:
+typedefinvertido.cpp:4:5: error: ‘Nota’ was not declared in this scope
+    4 |     Nota n = 7.5;
+      |     ^~~~</pre>
+<p><strong>O que aconteceu:</strong> no <code>typedef</code>, o tipo verdadeiro vem primeiro. <code>typedef Nota double;</code> está ao contrário: o compilador tentou ler <code>Nota</code> como o tipo verdadeiro e não achou.</p>
+<p><strong>Como resolver:</strong> <code>typedef double Nota;</code>, ou melhor, <code>using Nota = double;</code>, que não deixa dúvida sobre a ordem.</p>
+</div>
+
+<div class="cenario">
+<strong>"redefinition of" com um apelido</strong>
+<p><strong>O que aconteceu:</strong> você escreveu duas funções com o mesmo nome cujos parâmetros só diferem por um apelido (<code>mostrar(double)</code> e <code>mostrar(Nota)</code>). Para o compilador, são a mesma função (seção 2).</p>
+<p><strong>Como resolver:</strong> dê nomes diferentes às funções, ou use tipos realmente diferentes (uma <code>struct</code>).</p>
+</div>
+
+<div class="trycpp" data-goal="erro:/does not name a type|unknown type name/">
+<p class="try-task"><strong>Missão (provoque o erro):</strong> este programa compila. Mova a linha <code>using Nota = double;</code> para <strong>depois</strong> da função <code>dobro</code> e rode. Leia a mensagem do compilador e compare com a do g++ acima.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+using Nota = double;
+
+Nota dobro(Nota n) {
+    return n * 2;
+}
+
+int main() {
+    std::cout &lt;&lt; dobro(4.5) &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+Nota dobro(Nota n) {
+    return n * 2;
+}
+
+using Nota = double;
+
+int main() {
+    std::cout &lt;&lt; dobro(4.5) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Significado</th></tr>
+<tr><td><code>using Nota = double;</code></td><td>Cria o apelido <code>Nota</code> para <code>double</code> (C++11).</td></tr>
+<tr><td><code>typedef double Nota;</code></td><td>O mesmo, na forma antiga: tipo verdadeiro primeiro, apelido depois.</td></tr>
+<tr><td><code>using Agenda = std::map&lt;std::string, std::string&gt;;</code></td><td>Encurta um tipo comprido.</td></tr>
+<tr><td><code>template &lt;typename T&gt; using Lista = std::vector&lt;T&gt;;</code></td><td>Alias de template: <code>Lista&lt;int&gt;</code> = <code>std::vector&lt;int&gt;</code>. Só com <code>using</code>.</td></tr>
+<tr><td><code>using enum Cor;</code></td><td>Outra coisa: libera as opções de um enum sem prefixo (veja <a href="enums.html">Enums</a>).</td></tr>
+<tr><td><code>using namespace std;</code></td><td>Outra coisa: libera os nomes de um namespace (veja <a href="namespaces.html">Namespaces</a>).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Criar um apelido</h3>
+<p>Complete para criar o apelido <code>Idade</code> para <code>int</code>, do jeito moderno:</p>
+<div class="ex-code"><input data-answer="using Idade = int;" aria-label="apelido"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Do typedef para o using</h3>
+<p>Reescreva <code>typedef std::vector&lt;double&gt; Notas;</code> com <code>using</code>:</p>
+<div class="ex-code"><input data-answer="using Notas = std::vector&lt;double&gt;;" aria-label="using equivalente"></div>
+</div>
+
+<div class="exercise">
+<h3>3. Encurtar a agenda</h3>
+<p>Com <code>using Agenda = std::map&lt;std::string, std::string&gt;;</code>, complete o parâmetro da função que só lê a agenda, sem copiar:</p>
+<div class="ex-code">void mostrar(<input data-answer="const Agenda&amp; a|const Agenda &amp;a|const Agenda &amp; a|Agenda const&amp; a" aria-label="parâmetro">) { … }</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Depois de <code>using Nota = double;</code>, o que acontece com <code>double x = 5.0; Nota n = x;</code>?</p>
+<label><input type="radio" name="q4"> Erro: <code>Nota</code> e <code>double</code> são tipos diferentes.</label>
+<label><input type="radio" name="q4"> Funciona: <code>Nota</code> é só outro nome para <code>double</code>.</label>
+<label><input type="radio" name="q4"> Funciona, mas precisa de <code>static_cast&lt;Nota&gt;</code>.</label>
+<label><input type="radio" name="q4"> Funciona, mas o g++ dá um aviso.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Qual destas linhas está <strong>errada</strong>?</p>
+<label><input type="radio" name="q5"> <code>using Preco = double;</code></label>
+<label><input type="radio" name="q5"> <code>typedef double Preco;</code></label>
+<label><input type="radio" name="q5"> <code>using Lista = std::vector&lt;int&gt;;</code></label>
+<label><input type="radio" name="q5"> <code>typedef Preco double;</code></label>
+</div>
+
+<h3>Missão final: a turma com apelido</h3>
+<div class="trycpp" data-goal="src:using\s+Turma\s*=,src:const\s+Turma\s*&amp;,out:Média da turma: 7.75">
+<p class="try-task"><strong>Missão:</strong> crie o apelido <code>Turma</code> para <code>std::vector&lt;Aluno&gt;</code> (depois da struct!) e use-o no parâmetro da função <code>media</code> (<code>const Turma&amp;</code>) e na variável do <code>main</code>. A saída continua <code>Média da turma: 7.75</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Aluno {
+    std::string nome;
+    double nota = 0.0;
+};
+
+// crie aqui o apelido Turma
+
+double media(const std::vector&lt;Aluno&gt;&amp; turma) {
+    double soma = 0.0;
+    for (const auto&amp; a : turma) {
+        soma += a.nota;
+    }
+    return soma / turma.size();
+}
+
+int main() {
+    std::vector&lt;Aluno&gt; turma = {{"Ana", 8.5}, {"Bruno", 6.0}, {"Carla", 9.5}, {"Davi", 7.0}};
+    std::cout &lt;&lt; "Média da turma: " &lt;&lt; media(turma) &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Aluno {
+    std::string nome;
+    double nota = 0.0;
+};
+
+using Turma = std::vector&lt;Aluno&gt;;
+
+double media(const Turma&amp; turma) {
+    double soma = 0.0;
+    for (const auto&amp; a : turma) {
+        soma += a.nota;
+    }
+    return soma / turma.size();
+}
+
+int main() {
+    Turma turma = {{"Ana", 8.5}, {"Bruno", 6.0}, {"Carla", 9.5}, {"Davi", 7.0}};
+    std::cout &lt;&lt; "Média da turma: " &lt;&lt; media(turma) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>using Nota = double;</code> cria um <strong>apelido</strong>: um nome a mais para um tipo que já existe.</li>
+  <li>O apelido não cria um tipo novo: <code>Nota</code> e <code>double</code> se misturam e não servem para sobrecarga. Para um tipo novo, use <code>struct</code> ou <code>enum class</code>.</li>
+  <li><code>typedef double Nota;</code> é a forma antiga, com o apelido no fim. Prefira <code>using</code>.</li>
+  <li>Use apelidos para tipos compridos (<code>using Agenda = std::map&lt;std::string, std::string&gt;;</code>) e para dar significado (<code>Nota</code>, <code>Turma</code>).</li>
+  <li>O apelido precisa vir antes do primeiro uso, senão: <code>does not name a type</code>.</li>
+  <li><code>std::string</code> e <code>std::size_t</code> são apelidos da própria biblioteca padrão.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
