@@ -1,0 +1,1523 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Projeto Calculadora — cin, switch, laço e funções passo a passo | Guia C++</title>
+<meta name="description" content="Projeto passo a passo: uma calculadora de terminal em C++ que lê dois números e uma operação, escolhe a conta com switch, recusa a divisão por zero, repete até você sair, não quebra quando alguém digita texto (cin falhando) e termina organizada em funções. Seis etapas com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>Projeto <span class="hl">Calculadora</span></h1>
+
+<p class="intro">O primeiro projeto do guia: uma calculadora que roda no terminal. Ela pede um número, a operação e outro número, mostra o resultado e pergunta se você quer fazer outra conta. Parece simples, e é de propósito: a conta é a parte fácil. O desafio é fazer o programa <strong>não quebrar</strong> quando alguém divide por zero, escolhe uma operação que não existe ou digita "abc" no lugar de um número.</p>
+
+<div class="note">
+<strong>Você vai praticar</strong>
+<ul>
+  <li>Ler números e caracteres do teclado com <a href="entrada-cin.html">cin</a>.</li>
+  <li>Escolher a conta com <a href="switch.html">switch</a> (e o que acontece quando falta um <code>break</code>).</li>
+  <li>Tratar a divisão por zero de um <a href="ponto-flutuante.html">double</a>.</li>
+  <li>Repetir tudo com <a href="do-while.html">do-while</a>.</li>
+  <li><a href="validar-entrada.html">Validar a entrada</a>: o que fazer quando o <code>cin</code> falha.</li>
+  <li>Organizar o programa em <a href="funcoes.html">funções</a>.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>O que vamos construir</h2>
+<p>Esta é a calculadora pronta, rodando na máquina da Ana. Tudo o que aparece depois dos dois-pontos nas perguntas foi digitado por ela:</p>
+
+<pre class="term" data-cwd="~/cpp/calculadora">$ ./calculadora
+=== Calculadora da Ana ===
+Primeiro número: 10
+Operação (+ - * /): +
+Segundo número: 5
+10 + 5 = 15
+Outra conta? (s/n): s
+Primeiro número: seis
+"seis" não é um número. Tente de novo.      « texto no lugar de número
+Primeiro número: 6
+Operação (+ - * /): %
+Operação desconhecida: %                    « operação que não existe
+Operação (+ - * /): *
+Segundo número: 1.5
+6 * 1.5 = 9
+Outra conta? (s/n): s
+Primeiro número: 1
+Operação (+ - * /): /
+Segundo número: 0
+Não dá para dividir por zero.               « divisão por zero
+Outra conta? (s/n): n
+Até logo!</pre>
+
+<p>Vamos chegar lá em seis etapas. No fim de cada uma, o programa compila e roda:</p>
+
+<ol class="passo">
+  <li><a href="#etapa1">Ler dois números e somar</a> (<code>std::cin</code>, <code>double</code>).</li>
+  <li><a href="#etapa2">Escolher a operação</a> (<code>char</code> e <code>switch</code>).</li>
+  <li><a href="#etapa3">Não dividir por zero</a> (<code>if</code>).</li>
+  <li><a href="#etapa4">Repetir até a pessoa sair</a> (<code>do-while</code>).</li>
+  <li><a href="#etapa5">Validar o que foi digitado</a> (<code>cin</code> falhando, <code>clear</code>, <code>getline</code>).</li>
+  <li><a href="#etapa6">Organizar em funções</a>.</li>
+</ol>
+
+<h3>Antes de começar</h3>
+<p>Você precisa saber criar, compilar e rodar um programa (<a href="primeiro-programa.html">Olá, Mundo</a> e <a href="compilar.html">Compilar com g++</a>), usar variáveis <code>double</code> e <code>char</code> e ter visto o básico do <a href="entrada-cin.html">cin</a>. No seu computador, crie a pasta do projeto; o arquivo vai se chamar <code>calculadora.cpp</code>. Como fazer cada etapa no editor ou no terminal está em <a href="projetos.html">Como Usar os Projetos</a>.</p>
+
+<pre class="term">$ mkdir -p cpp/calculadora
+$ cd cpp/calculadora</pre>
+
+<hr>
+
+<h2 id="etapa1">Etapa 1 · Ler dois números e somar</h2>
+<p>O começo de toda calculadora: pedir dois números e mostrar a soma. Os números são <code>double</code> (com casas decimais), porque a Ana quer fazer contas como <code>2.5 + 1.25</code>.</p>
+
+<pre class="file" data-file="calculadora.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    double a = 0.0;
+    double b = 0.0;
+
+    std::cout &lt;&lt; "Primeiro número: ";
+    std::cin &gt;&gt; a;
+    std::cout &lt;&lt; "Segundo número: ";
+    std::cin &gt;&gt; b;
+
+    std::cout &lt;&lt; a &lt;&lt; " + " &lt;&lt; b &lt;&lt; " = " &lt;&lt; a + b &lt;&lt; '\n';
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>#include &lt;iostream&gt;</code></td><td>Traz o <code>std::cout</code> (saída) e o <code>std::cin</code> (entrada).</td></tr>
+<tr><td><code>double a = 0.0;</code></td><td>Cria a variável do primeiro número, já com zero. Toda variável começa com um valor (veja <a href="boas-praticas.html">Boas Práticas</a>).</td></tr>
+<tr><td><code>std::cout &lt;&lt; "Primeiro número: ";</code></td><td>Mostra a pergunta <strong>sem</strong> <code>\n</code>: o cursor fica na mesma linha, e o que a pessoa digitar aparece logo depois dos dois-pontos.</td></tr>
+<tr><td><code>std::cin &gt;&gt; a;</code></td><td>Espera a pessoa digitar e apertar <kbd>Enter</kbd>, converte o texto num <code>double</code> e guarda em <code>a</code>. O <code>cin</code> (de <em>character input</em>, entrada de caracteres) é o teclado.</td></tr>
+<tr><td><code>a &lt;&lt; " + " &lt;&lt; b &lt;&lt; " = " &lt;&lt; a + b</code></td><td>Monta a frase pedaço por pedaço: número, texto, número, texto e a soma.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp/calculadora">$ g++ -std=c++23 -Wall -Wextra calculadora.cpp -o calculadora
+$ ./calculadora
+=== Calculadora da Ana ===
+Primeiro número: 10
+Segundo número: 5
+10 + 5 = 15
+$ ./calculadora
+=== Calculadora da Ana ===
+Primeiro número: 2.5
+Segundo número: 1.25
+2.5 + 1.25 = 3.75</pre>
+
+<p>Repare: a Ana digitou <code>10</code>, a variável é <code>double</code>, e o <code>cout</code> mostrou <code>10</code>, sem <code>.0</code>. O <code>cout</code> só mostra as casas decimais que existem.</p>
+
+<div class="warning">
+<strong>No C++, o decimal é com ponto, mesmo em português</strong>
+<p>O <code>cin</code> lê números no formato do C++, com <strong>ponto</strong>: <code>2.5</code>. Se a Ana digitar <code>2,5</code>, veja o que acontece:</p>
+<pre class="term" data-cwd="~/cpp/calculadora">$ ./calculadora
+=== Calculadora da Ana ===
+Primeiro número: 2,5
+Segundo número: 2 + 0 = 2</pre>
+<p>O <code>cin &gt;&gt; a</code> leu o <code>2</code> e parou na vírgula, que não faz parte de um número. A vírgula e o <code>5</code> ficaram esperando na entrada. O <code>cin &gt;&gt; b</code> tentou ler um número começando pela vírgula, <strong>falhou</strong>, e colocou <code>0</code> em <code>b</code>, sem nem esperar a Ana digitar. Na etapa 5 você vai aprender a perceber essa falha.</p>
+</div>
+
+<div class="trycpp" data-stdin="10\n5\n" data-goal="out:10 + 5 = 15,src:cin\s*&gt;&gt;\s*b">
+<p class="try-task"><strong>Missão (etapa 1):</strong> o programa já lê o primeiro número. Peça e leia o segundo número na variável <code>b</code> e mostre a soma no formato <code>10 + 5 = 15</code>. A entrada <code>10</code> e <code>5</code> já vem preenchida (no editor, o que a entrada "digita" não aparece na tela, só as perguntas e a resposta).</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    double a = 0.0;
+    double b = 0.0;
+
+    std::cout &lt;&lt; "Primeiro número: ";
+    std::cin &gt;&gt; a;
+    // peça e leia o segundo número
+
+    // mostre a soma no formato 10 + 5 = 15
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    double a = 0.0;
+    double b = 0.0;
+
+    std::cout &lt;&lt; "Primeiro número: ";
+    std::cin &gt;&gt; a;
+    std::cout &lt;&lt; "Segundo número: ";
+    std::cin &gt;&gt; b;
+
+    std::cout &lt;&lt; a &lt;&lt; " + " &lt;&lt; b &lt;&lt; " = " &lt;&lt; a + b &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa2">Etapa 2 · Escolher a operação</h2>
+<p>Agora a calculadora pergunta qual conta fazer. A operação é um único caractere (<code>+</code>, <code>-</code>, <code>*</code> ou <code>/</code>), então cabe num <code>char</code> (veja <a href="char.html">Caracteres</a>). Para escolher a conta, um <a href="switch.html">switch</a>: ele compara o <code>op</code> com cada <code>case</code> e pula para o que combina.</p>
+
+<pre class="file" data-file="calculadora.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    double a = 0.0;
+    double b = 0.0;
+    char op = ' ';
+
+    std::cout &lt;&lt; "Primeiro número: ";
+    std::cin &gt;&gt; a;
+    std::cout &lt;&lt; "Operação (+ - * /): ";
+    std::cin &gt;&gt; op;
+    std::cout &lt;&lt; "Segundo número: ";
+    std::cin &gt;&gt; b;
+
+    double resultado = 0.0;
+    switch (op) {
+        case '+':
+            resultado = a + b;
+            break;
+        case '-':
+            resultado = a - b;
+            break;
+        case '*':
+            resultado = a * b;
+            break;
+        case '/':
+            resultado = a / b;
+            break;
+        default:
+            std::cout &lt;&lt; "Operação desconhecida: " &lt;&lt; op &lt;&lt; '\n';
+            return 1;
+    }
+    std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; op &lt;&lt; ' ' &lt;&lt; b &lt;&lt; " = " &lt;&lt; resultado &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>char op = ' ';</dt><dd>Um caractere, começando com um espaço. Caracteres vão entre aspas <strong>simples</strong>: <code>'+'</code>. Aspas duplas (<code>"+"</code>) seriam um texto, e o <code>switch</code> não aceita texto.</dd>
+  <dt>switch (op)</dt><dd>"Conforme o valor de <code>op</code>…".</dd>
+  <dt>case '+':</dt><dd>"…se for <code>'+'</code>, comece aqui."</dd>
+  <dt>break;</dt><dd>"Terminei, saia do <code>switch</code>." Sem ele, o programa continua no <code>case</code> seguinte (veja o cenário abaixo).</dd>
+  <dt>default:</dt><dd>"Se não for nenhum dos anteriores." Aqui mostramos o erro e saímos com <code>return 1;</code>: o código de saída 1 avisa ao sistema que algo deu errado (0 quer dizer "tudo certo").</dd>
+  <dt>a &lt;&lt; ' ' &lt;&lt; op &lt;&lt; ' ' &lt;&lt; b</dt><dd>Mostra a conta com a operação escolhida, com espaços (<code>' '</code>, um <code>char</code>) entre as partes.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/calculadora">$ g++ -std=c++23 -Wall -Wextra calculadora.cpp -o calculadora
+$ ./calculadora
+=== Calculadora da Ana ===
+Primeiro número: 10
+Operação (+ - * /): /
+Segundo número: 4
+10 / 4 = 2.5
+$ ./calculadora
+=== Calculadora da Ana ===
+Primeiro número: 7
+Operação (+ - * /): %
+Segundo número: 2
+Operação desconhecida: %
+$ printf "7\n%%\n2\n" | ./calculadora &gt; /dev/null; echo $?
+1                                            « o código de saída do return 1</pre>
+
+<p>A última linha usa um truque do terminal: o <code>printf</code> "digita" as três respostas, a saída do programa é jogada fora (<code>&gt; /dev/null</code>) e o <code>echo $?</code> mostra o código de saída. Não se preocupe com ele; é só para você ver o <code>1</code>.</p>
+
+<div class="tip">
+<strong>Dá para digitar tudo numa linha</strong>
+<p>O <code>cin &gt;&gt;</code> separa os valores por espaços, não por linhas. Se a Ana digitar <code>10 * 3</code> na primeira pergunta, os três valores ficam esperando na entrada, e as perguntas seguintes nem param:</p>
+<pre class="term" data-cwd="~/cpp/calculadora">$ ./calculadora
+=== Calculadora da Ana ===
+Primeiro número: 10 * 3
+Operação (+ - * /): Segundo número: 10 * 3 = 30</pre>
+</div>
+
+<div class="cenario">
+<strong>Esqueceu o <code>break</code>: a conta "escorrega" para o próximo <code>case</code></strong>
+<p class="warning" style="margin:6px 0">Este código tem um erro de propósito: o <code>break</code> depois da soma foi apagado.</p>
+<pre class="file" data-file="calculadora.cpp">        case '+':
+            resultado = a + b;
+        case '-':
+            resultado = a - b;
+            break;</pre>
+<pre class="term" data-cwd="~/cpp/calculadora">$ g++ -std=c++23 -Wall -Wextra calculadora.cpp -o calculadora
+calculadora.cpp: In function ‘int main()’:
+calculadora.cpp:19:23: warning: this statement may fall through [-Wimplicit-fallthrough=]
+   19 |             resultado = a + b;
+      |             ~~~~~~~~~~^~~~~~~
+calculadora.cpp:20:9: note: here
+   20 |         case '-':
+      |         ^~~~
+$ ./calculadora
+=== Calculadora da Ana ===
+Primeiro número: 10
+Operação (+ - * /): +
+Segundo número: 5
+10 + 5 = 5</pre>
+<p><strong>O que significa:</strong> "esta instrução pode cair para o próximo" (<em>fall through</em>, "cair através"). Sem o <code>break</code>, depois de somar o programa continuou no <code>case '-'</code> e trocou o resultado por <code>10 - 5</code>. A conta "10 + 5 = 5" está errada, mas o programa rodou sem reclamar. Só o aviso do <code>-Wextra</code> denunciou o problema.</p>
+<p><strong>Como consertar:</strong> um <code>break;</code> no fim de cada <code>case</code>. Veja mais em <a href="switch.html">switch</a>.</p>
+</div>
+
+<div class="trycpp" data-stdin="10\n/\n4\n" data-goal="out:10 / 4 = 2.5,src:case\s*'\*',src:case\s*'/'">
+<p class="try-task"><strong>Missão (etapa 2):</strong> esta versão só sabe somar e subtrair. Acrescente os <code>case</code> da multiplicação (<code>'*'</code>) e da divisão (<code>'/'</code>), cada um com o seu <code>break</code>. A entrada da missão é <code>10</code>, <code>/</code>, <code>4</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    double a = 0.0;
+    double b = 0.0;
+    char op = ' ';
+
+    std::cout &lt;&lt; "Primeiro número: ";
+    std::cin &gt;&gt; a;
+    std::cout &lt;&lt; "Operação (+ - * /): ";
+    std::cin &gt;&gt; op;
+    std::cout &lt;&lt; "Segundo número: ";
+    std::cin &gt;&gt; b;
+
+    double resultado = 0.0;
+    switch (op) {
+        case '+':
+            resultado = a + b;
+            break;
+        case '-':
+            resultado = a - b;
+            break;
+        // acrescente aqui a multiplicação e a divisão
+        default:
+            std::cout &lt;&lt; "Operação desconhecida: " &lt;&lt; op &lt;&lt; '\n';
+            return 1;
+    }
+    std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; op &lt;&lt; ' ' &lt;&lt; b &lt;&lt; " = " &lt;&lt; resultado &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    double a = 0.0;
+    double b = 0.0;
+    char op = ' ';
+
+    std::cout &lt;&lt; "Primeiro número: ";
+    std::cin &gt;&gt; a;
+    std::cout &lt;&lt; "Operação (+ - * /): ";
+    std::cin &gt;&gt; op;
+    std::cout &lt;&lt; "Segundo número: ";
+    std::cin &gt;&gt; b;
+
+    double resultado = 0.0;
+    switch (op) {
+        case '+':
+            resultado = a + b;
+            break;
+        case '-':
+            resultado = a - b;
+            break;
+        case '*':
+            resultado = a * b;
+            break;
+        case '/':
+            resultado = a / b;
+            break;
+        default:
+            std::cout &lt;&lt; "Operação desconhecida: " &lt;&lt; op &lt;&lt; '\n';
+            return 1;
+    }
+    std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; op &lt;&lt; ' ' &lt;&lt; b &lt;&lt; " = " &lt;&lt; resultado &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa3">Etapa 3 · Não dividir por zero</h2>
+<p>O que acontece se a Ana dividir por zero? Na matemática, não existe resposta. No C++, com <code>double</code>, existe uma resposta estranha:</p>
+
+<pre class="term" data-cwd="~/cpp/calculadora">$ ./calculadora
+=== Calculadora da Ana ===
+Primeiro número: 10
+Operação (+ - * /): /
+Segundo número: 0
+10 / 0 = inf
+$ ./calculadora
+=== Calculadora da Ana ===
+Primeiro número: -10
+Operação (+ - * /): /
+Segundo número: 0
+-10 / 0 = -inf
+$ ./calculadora
+=== Calculadora da Ana ===
+Primeiro número: 0
+Operação (+ - * /): /
+Segundo número: 0
+0 / 0 = -nan</pre>
+
+<p><code>inf</code> é "infinito" (<em>infinity</em>) e <code>nan</code> é "não é um número" (<em>not a number</em>). São valores especiais do <code>double</code>, explicados em <a href="ponto-flutuante.html">float e double</a>. O programa não quebrou, mas uma calculadora que responde "infinito" não ajuda ninguém. Com <code>int</code> seria pior: dividir um inteiro por zero é <a href="comportamento-indefinido.html">comportamento indefinido</a> e costuma derrubar o programa.</p>
+
+<p>A solução é conferir <strong>antes</strong> de dividir. Só o <code>case '/'</code> muda:</p>
+
+<pre class="file" data-file="calculadora.cpp">        case '/':
+            if (b == 0) {
+                std::cout &lt;&lt; "Não dá para dividir por zero.\n";
+                return 1;
+            }
+            resultado = a / b;
+            break;</pre>
+
+<pre class="term" data-cwd="~/cpp/calculadora">$ g++ -std=c++23 -Wall -Wextra calculadora.cpp -o calculadora
+$ ./calculadora
+=== Calculadora da Ana ===
+Primeiro número: 10
+Operação (+ - * /): /
+Segundo número: 0
+Não dá para dividir por zero.
+$ ./calculadora
+=== Calculadora da Ana ===
+Primeiro número: 10
+Operação (+ - * /): /
+Segundo número: 4
+10 / 4 = 2.5</pre>
+
+<p>O <code>return 1;</code> dentro do <code>case</code> encerra o <code>main</code> na hora: a linha que mostra o resultado nem chega a rodar.</p>
+
+<div class="trycpp" data-stdin="10\n/\n0\n" data-goal="out:Não dá para dividir por zero.,src:b\s*==\s*0">
+<p class="try-task"><strong>Missão (etapa 3):</strong> rode como está: com a entrada <code>10</code>, <code>/</code>, <code>0</code>, a calculadora responde <code>inf</code>. Acrescente no <code>case '/'</code> o <code>if</code> que mostra <code>Não dá para dividir por zero.</code> e encerra com <code>return 1;</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    double a = 0.0;
+    double b = 0.0;
+    char op = ' ';
+
+    std::cout &lt;&lt; "Primeiro número: ";
+    std::cin &gt;&gt; a;
+    std::cout &lt;&lt; "Operação (+ - * /): ";
+    std::cin &gt;&gt; op;
+    std::cout &lt;&lt; "Segundo número: ";
+    std::cin &gt;&gt; b;
+
+    double resultado = 0.0;
+    switch (op) {
+        case '+':
+            resultado = a + b;
+            break;
+        case '-':
+            resultado = a - b;
+            break;
+        case '*':
+            resultado = a * b;
+            break;
+        case '/':
+            resultado = a / b;
+            break;
+        default:
+            std::cout &lt;&lt; "Operação desconhecida: " &lt;&lt; op &lt;&lt; '\n';
+            return 1;
+    }
+    std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; op &lt;&lt; ' ' &lt;&lt; b &lt;&lt; " = " &lt;&lt; resultado &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    double a = 0.0;
+    double b = 0.0;
+    char op = ' ';
+
+    std::cout &lt;&lt; "Primeiro número: ";
+    std::cin &gt;&gt; a;
+    std::cout &lt;&lt; "Operação (+ - * /): ";
+    std::cin &gt;&gt; op;
+    std::cout &lt;&lt; "Segundo número: ";
+    std::cin &gt;&gt; b;
+
+    double resultado = 0.0;
+    switch (op) {
+        case '+':
+            resultado = a + b;
+            break;
+        case '-':
+            resultado = a - b;
+            break;
+        case '*':
+            resultado = a * b;
+            break;
+        case '/':
+            if (b == 0) {
+                std::cout &lt;&lt; "Não dá para dividir por zero.\n";
+                return 1;
+            }
+            resultado = a / b;
+            break;
+        default:
+            std::cout &lt;&lt; "Operação desconhecida: " &lt;&lt; op &lt;&lt; '\n';
+            return 1;
+    }
+    std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; op &lt;&lt; ' ' &lt;&lt; b &lt;&lt; " = " &lt;&lt; resultado &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa4">Etapa 4 · Repetir até a pessoa sair</h2>
+<p>Até agora, a calculadora faz uma conta e termina. Para fazer outra, a Ana precisa rodar o programa de novo. Vamos colocar tudo dentro de um laço que, no fim de cada conta, pergunta "Outra conta? (s/n)".</p>
+
+<p>Qual laço? A conta precisa acontecer <strong>pelo menos uma vez</strong>, e a pergunta "continuar?" vem <strong>no fim</strong>. É exatamente o caso do <a href="do-while.html">do-while</a>: "faça isto, e repita enquanto a resposta for <code>s</code>".</p>
+
+<p>Há um detalhe: os <code>return 1;</code> das etapas anteriores encerravam o programa inteiro. Agora, um erro (operação desconhecida, divisão por zero) deve só pular a conta, não fechar a calculadora. Por isso entra uma variável <code>deu_certo</code>, que começa <code>true</code> e vira <code>false</code> quando algo dá errado.</p>
+
+<pre class="file" data-file="calculadora.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    char resposta = 'n';
+
+    do {
+        double a = 0.0;
+        double b = 0.0;
+        char op = ' ';
+
+        std::cout &lt;&lt; "Primeiro número: ";
+        std::cin &gt;&gt; a;
+        std::cout &lt;&lt; "Operação (+ - * /): ";
+        std::cin &gt;&gt; op;
+        std::cout &lt;&lt; "Segundo número: ";
+        std::cin &gt;&gt; b;
+
+        double resultado = 0.0;
+        bool deu_certo = true;
+        switch (op) {
+            case '+':
+                resultado = a + b;
+                break;
+            case '-':
+                resultado = a - b;
+                break;
+            case '*':
+                resultado = a * b;
+                break;
+            case '/':
+                if (b == 0) {
+                    std::cout &lt;&lt; "Não dá para dividir por zero.\n";
+                    deu_certo = false;
+                } else {
+                    resultado = a / b;
+                }
+                break;
+            default:
+                std::cout &lt;&lt; "Operação desconhecida: " &lt;&lt; op &lt;&lt; '\n';
+                deu_certo = false;
+        }
+        if (deu_certo) {
+            std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; op &lt;&lt; ' ' &lt;&lt; b &lt;&lt; " = " &lt;&lt; resultado &lt;&lt; '\n';
+        }
+
+        std::cout &lt;&lt; "Outra conta? (s/n): ";
+        std::cin &gt;&gt; resposta;
+    } while (resposta == 's' || resposta == 'S');
+
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha nova</th><th>O que faz</th></tr>
+<tr><td><code>char resposta = 'n';</code></td><td>Guarda o <code>s</code> ou <code>n</code>. Fica <strong>fora</strong> do laço, porque o <code>while</code> lá no fim precisa enxergá-la (veja <a href="escopo.html">Escopo</a>).</td></tr>
+<tr><td><code>do {</code></td><td>Começa o bloco que se repete. As variáveis <code>a</code>, <code>b</code> e <code>op</code> agora nascem dentro dele: a cada conta, começam do zero.</td></tr>
+<tr><td><code>bool deu_certo = true;</code></td><td>"Até agora, tudo certo." Os casos de erro mudam para <code>false</code> em vez de <code>return 1</code>.</td></tr>
+<tr><td><code>if (deu_certo) { … }</code></td><td>Só mostra o resultado quando a conta foi feita.</td></tr>
+<tr><td><code>} while (resposta == 's' || resposta == 'S');</code></td><td>Volta para o <code>do</code> se a resposta for <code>s</code> ou <code>S</code>. Qualquer outra coisa encerra o laço. O <code>;</code> no fim é obrigatório no <code>do-while</code>.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp/calculadora">$ g++ -std=c++23 -Wall -Wextra calculadora.cpp -o calculadora
+$ ./calculadora
+=== Calculadora da Ana ===
+Primeiro número: 10
+Operação (+ - * /): +
+Segundo número: 5
+10 + 5 = 15
+Outra conta? (s/n): s
+Primeiro número: 7
+Operação (+ - * /): /
+Segundo número: 0
+Não dá para dividir por zero.               « o erro não fechou a calculadora
+Outra conta? (s/n): s
+Primeiro número: 3
+Operação (+ - * /): x
+Segundo número: 3
+Operação desconhecida: x
+Outra conta? (s/n): n
+Até logo!</pre>
+
+<div class="trycpp" data-stdin="10\n+\n5\ns\n3\n*\n4\nn\n" data-goal="out:10 + 5 = 15,out:3 * 4 = 12,out:Até logo!,src:do\s*\{,src:while\s*\(">
+<p class="try-task"><strong>Missão (etapa 4):</strong> o código já tem o <code>deu_certo</code> e a pergunta "Outra conta?", mas ainda faz uma conta só. Coloque tudo, da criação de <code>a</code> até a leitura da <code>resposta</code>, dentro de um <code>do { … } while (resposta == 's' || resposta == 'S');</code>. A entrada da missão faz duas contas (<code>10 + 5</code> e <code>3 * 4</code>) e responde <code>n</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    char resposta = 'n';
+    // repita tudo daqui até o "Outra conta?" enquanto a resposta for s
+
+    double a = 0.0;
+    double b = 0.0;
+    char op = ' ';
+
+    std::cout &lt;&lt; "Primeiro número: ";
+    std::cin &gt;&gt; a;
+    std::cout &lt;&lt; "Operação (+ - * /): ";
+    std::cin &gt;&gt; op;
+    std::cout &lt;&lt; "Segundo número: ";
+    std::cin &gt;&gt; b;
+
+    double resultado = 0.0;
+    bool deu_certo = true;
+    switch (op) {
+        case '+':
+            resultado = a + b;
+            break;
+        case '-':
+            resultado = a - b;
+            break;
+        case '*':
+            resultado = a * b;
+            break;
+        case '/':
+            if (b == 0) {
+                std::cout &lt;&lt; "Não dá para dividir por zero.\n";
+                deu_certo = false;
+            } else {
+                resultado = a / b;
+            }
+            break;
+        default:
+            std::cout &lt;&lt; "Operação desconhecida: " &lt;&lt; op &lt;&lt; '\n';
+            deu_certo = false;
+    }
+    if (deu_certo) {
+        std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; op &lt;&lt; ' ' &lt;&lt; b &lt;&lt; " = " &lt;&lt; resultado &lt;&lt; '\n';
+    }
+
+    std::cout &lt;&lt; "Outra conta? (s/n): ";
+    std::cin &gt;&gt; resposta;
+
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    char resposta = 'n';
+
+    do {
+        double a = 0.0;
+        double b = 0.0;
+        char op = ' ';
+
+        std::cout &lt;&lt; "Primeiro número: ";
+        std::cin &gt;&gt; a;
+        std::cout &lt;&lt; "Operação (+ - * /): ";
+        std::cin &gt;&gt; op;
+        std::cout &lt;&lt; "Segundo número: ";
+        std::cin &gt;&gt; b;
+
+        double resultado = 0.0;
+        bool deu_certo = true;
+        switch (op) {
+            case '+':
+                resultado = a + b;
+                break;
+            case '-':
+                resultado = a - b;
+                break;
+            case '*':
+                resultado = a * b;
+                break;
+            case '/':
+                if (b == 0) {
+                    std::cout &lt;&lt; "Não dá para dividir por zero.\n";
+                    deu_certo = false;
+                } else {
+                    resultado = a / b;
+                }
+                break;
+            default:
+                std::cout &lt;&lt; "Operação desconhecida: " &lt;&lt; op &lt;&lt; '\n';
+                deu_certo = false;
+        }
+        if (deu_certo) {
+            std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; op &lt;&lt; ' ' &lt;&lt; b &lt;&lt; " = " &lt;&lt; resultado &lt;&lt; '\n';
+        }
+
+        std::cout &lt;&lt; "Outra conta? (s/n): ";
+        std::cin &gt;&gt; resposta;
+    } while (resposta == 's' || resposta == 'S');
+
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa5">Etapa 5 · Validar o que foi digitado</h2>
+<p>A calculadora já se defende de operações erradas e da divisão por zero. Falta o pior caso: a pessoa digitar um <strong>texto</strong> onde se espera um número. Veja o que a versão da etapa 4 faz com <code>abc</code>:</p>
+
+<pre class="term" data-cwd="~/cpp/calculadora">$ ./calculadora
+=== Calculadora da Ana ===
+Primeiro número: abc
+Operação (+ - * /): Segundo número: Operação desconhecida:
+Outra conta? (s/n): Até logo!</pre>
+
+<p>A Ana digitou <code>abc</code> uma vez, e o programa disparou todas as perguntas sem esperar e terminou. O que aconteceu:</p>
+
+<ol class="passo">
+  <li>O <code>std::cin &gt;&gt; a</code> tentou ler um número, encontrou <code>abc</code> e <strong>falhou</strong>. Ele coloca <code>0</code> em <code>a</code> e deixa o <code>abc</code> na entrada.</li>
+  <li>Mais importante: o <code>cin</code> entra em <strong>estado de falha</strong>. Enquanto estiver assim, <strong>toda</strong> leitura seguinte falha na hora, sem esperar o teclado. Por isso o <code>op</code> ficou com o espaço do começo (<code>Operação desconhecida:  </code>) e a <code>resposta</code> ficou <code>'n'</code>.</li>
+</ol>
+
+<p>Para se defender, o programa precisa de três coisas (a aula <a href="validar-entrada.html">Validar a Entrada</a> explica cada uma com calma):</p>
+
+<dl class="anatomy">
+  <dt>while (!(std::cin &gt;&gt; a))</dt><dd>O próprio <code>std::cin &gt;&gt; a</code> responde se deu certo: vale <code>true</code> se leu um número e <code>false</code> se falhou. O <code>!</code> inverte: "enquanto a leitura <strong>falhar</strong>, repita".</dd>
+  <dt>std::cin.clear();</dt><dd>Tira o <code>cin</code> do estado de falha ("limpa" o erro), para ele voltar a ler.</dd>
+  <dt>std::getline(std::cin, lixo);</dt><dd>Lê o resto da linha (o <code>abc</code>) e guarda em <code>lixo</code>. Sem isso, o <code>abc</code> continuaria lá, e a próxima tentativa falharia de novo. De quebra, podemos mostrar o que a pessoa digitou.</dd>
+  <dt>if (std::cin.eof()) return 0;</dt><dd><code>eof</code> = <em>end of file</em>, "fim do arquivo": a entrada <strong>acabou</strong> (a pessoa apertou <kbd>Ctrl</kbd>+<kbd>D</kbd>, ou a entrada veio de um arquivo que terminou). Aí não adianta pedir de novo: encerramos.</dd>
+</dl>
+
+<p>O código da etapa 5, com a validação nos dois números:</p>
+
+<pre class="file" data-file="calculadora.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    char resposta = 'n';
+
+    do {
+        double a = 0.0;
+        double b = 0.0;
+        char op = ' ';
+
+        std::cout &lt;&lt; "Primeiro número: ";
+        while (!(std::cin &gt;&gt; a)) {
+            if (std::cin.eof()) {
+                return 0;
+            }
+            std::cin.clear();
+            std::string lixo;
+            std::getline(std::cin, lixo);
+            std::cout &lt;&lt; '"' &lt;&lt; lixo &lt;&lt; "\" não é um número. Tente de novo.\n";
+            std::cout &lt;&lt; "Primeiro número: ";
+        }
+        std::cout &lt;&lt; "Operação (+ - * /): ";
+        std::cin &gt;&gt; op;
+        std::cout &lt;&lt; "Segundo número: ";
+        while (!(std::cin &gt;&gt; b)) {
+            if (std::cin.eof()) {
+                return 0;
+            }
+            std::cin.clear();
+            std::string lixo;
+            std::getline(std::cin, lixo);
+            std::cout &lt;&lt; '"' &lt;&lt; lixo &lt;&lt; "\" não é um número. Tente de novo.\n";
+            std::cout &lt;&lt; "Segundo número: ";
+        }
+
+        double resultado = 0.0;
+        bool deu_certo = true;
+        switch (op) {
+            case '+':
+                resultado = a + b;
+                break;
+            case '-':
+                resultado = a - b;
+                break;
+            case '*':
+                resultado = a * b;
+                break;
+            case '/':
+                if (b == 0) {
+                    std::cout &lt;&lt; "Não dá para dividir por zero.\n";
+                    deu_certo = false;
+                } else {
+                    resultado = a / b;
+                }
+                break;
+            default:
+                std::cout &lt;&lt; "Operação desconhecida: " &lt;&lt; op &lt;&lt; '\n';
+                deu_certo = false;
+        }
+        if (deu_certo) {
+            std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; op &lt;&lt; ' ' &lt;&lt; b &lt;&lt; " = " &lt;&lt; resultado &lt;&lt; '\n';
+        }
+
+        std::cout &lt;&lt; "Outra conta? (s/n): ";
+        std::cin &gt;&gt; resposta;
+    } while (resposta == 's' || resposta == 'S');
+
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/calculadora">$ g++ -std=c++23 -Wall -Wextra calculadora.cpp -o calculadora
+$ ./calculadora
+=== Calculadora da Ana ===
+Primeiro número: abc
+"abc" não é um número. Tente de novo.
+Primeiro número: 10
+Operação (+ - * /): +
+Segundo número: dez
+"dez" não é um número. Tente de novo.
+Segundo número: 10
+10 + 10 = 20
+Outra conta? (s/n): n
+Até logo!</pre>
+
+<p>Funciona, mas repare: o bloco de validação aparece <strong>duas vezes</strong>, quase igual, uma para o <code>a</code> e outra para o <code>b</code>. Se a Ana quiser mudar a mensagem, vai ter de mudar nos dois lugares (e um dia vai esquecer um). Código repetido é o sinal clássico de que falta uma <strong>função</strong>, e é isso que a etapa 6 resolve.</p>
+
+<div class="cenario">
+<strong>Esqueceu o <code>clear()</code>: laço infinito</strong>
+<p>Sem o <code>std::cin.clear();</code>, o <code>cin</code> nunca sai do estado de falha. O <code>getline</code> também falha (não lê nada, por isso o <code>""</code> vazio), a leitura do número falha de novo, e o laço gira para sempre. Para não travar o terminal, a Ana rodou com <code>timeout 3</code> (para depois de 3 segundos) e <code>head -6</code> (mostra só as 6 primeiras linhas):</p>
+<pre class="term" data-cwd="~/cpp/calculadora">$ printf "abc\n10\n" | timeout 3 ./calculadora | head -6
+=== Calculadora da Ana ===
+Primeiro número: "" não é um número. Tente de novo.
+Primeiro número: "" não é um número. Tente de novo.
+Primeiro número: "" não é um número. Tente de novo.
+Primeiro número: "" não é um número. Tente de novo.
+Primeiro número: "" não é um número. Tente de novo.</pre>
+<p><strong>Como consertar:</strong> a ordem é sempre <code>clear()</code> primeiro, depois descartar a linha. Se o seu programa travar assim no terminal, aperte <kbd>Ctrl</kbd>+<kbd>C</kbd>.</p>
+</div>
+
+<div class="trycpp" data-stdin="abc\n10\n+\n5\nn\n" data-goal="out:&quot;abc&quot; não é um número. Tente de novo.,out:10 + 5 = 15,src:clear\s*\(\s*\)">
+<p class="try-task"><strong>Missão (etapa 5):</strong> esta é a versão da etapa 4. A entrada da missão começa com <code>abc</code>. Rode e veja o programa disparar as perguntas. Depois troque o <code>std::cin &gt;&gt; a;</code> por um laço de validação que mostre <code>"abc" não é um número. Tente de novo.</code> e pergunte de novo. Lembre do <code>clear()</code> e do <code>getline</code> (e do <code>#include &lt;string&gt;</code>).</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    char resposta = 'n';
+
+    do {
+        double a = 0.0;
+        double b = 0.0;
+        char op = ' ';
+
+        std::cout &lt;&lt; "Primeiro número: ";
+        std::cin &gt;&gt; a;
+        std::cout &lt;&lt; "Operação (+ - * /): ";
+        std::cin &gt;&gt; op;
+        std::cout &lt;&lt; "Segundo número: ";
+        std::cin &gt;&gt; b;
+
+        double resultado = 0.0;
+        bool deu_certo = true;
+        switch (op) {
+            case '+':
+                resultado = a + b;
+                break;
+            case '-':
+                resultado = a - b;
+                break;
+            case '*':
+                resultado = a * b;
+                break;
+            case '/':
+                if (b == 0) {
+                    std::cout &lt;&lt; "Não dá para dividir por zero.\n";
+                    deu_certo = false;
+                } else {
+                    resultado = a / b;
+                }
+                break;
+            default:
+                std::cout &lt;&lt; "Operação desconhecida: " &lt;&lt; op &lt;&lt; '\n';
+                deu_certo = false;
+        }
+        if (deu_certo) {
+            std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; op &lt;&lt; ' ' &lt;&lt; b &lt;&lt; " = " &lt;&lt; resultado &lt;&lt; '\n';
+        }
+
+        std::cout &lt;&lt; "Outra conta? (s/n): ";
+        std::cin &gt;&gt; resposta;
+    } while (resposta == 's' || resposta == 'S');
+
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    char resposta = 'n';
+
+    do {
+        double a = 0.0;
+        double b = 0.0;
+        char op = ' ';
+
+        std::cout &lt;&lt; "Primeiro número: ";
+        while (!(std::cin &gt;&gt; a)) {
+            if (std::cin.eof()) {
+                return 0;
+            }
+            std::cin.clear();
+            std::string lixo;
+            std::getline(std::cin, lixo);
+            std::cout &lt;&lt; '"' &lt;&lt; lixo &lt;&lt; "\" não é um número. Tente de novo.\n";
+            std::cout &lt;&lt; "Primeiro número: ";
+        }
+        std::cout &lt;&lt; "Operação (+ - * /): ";
+        std::cin &gt;&gt; op;
+        std::cout &lt;&lt; "Segundo número: ";
+        while (!(std::cin &gt;&gt; b)) {
+            if (std::cin.eof()) {
+                return 0;
+            }
+            std::cin.clear();
+            std::string lixo;
+            std::getline(std::cin, lixo);
+            std::cout &lt;&lt; '"' &lt;&lt; lixo &lt;&lt; "\" não é um número. Tente de novo.\n";
+            std::cout &lt;&lt; "Segundo número: ";
+        }
+
+        double resultado = 0.0;
+        bool deu_certo = true;
+        switch (op) {
+            case '+':
+                resultado = a + b;
+                break;
+            case '-':
+                resultado = a - b;
+                break;
+            case '*':
+                resultado = a * b;
+                break;
+            case '/':
+                if (b == 0) {
+                    std::cout &lt;&lt; "Não dá para dividir por zero.\n";
+                    deu_certo = false;
+                } else {
+                    resultado = a / b;
+                }
+                break;
+            default:
+                std::cout &lt;&lt; "Operação desconhecida: " &lt;&lt; op &lt;&lt; '\n';
+                deu_certo = false;
+        }
+        if (deu_certo) {
+            std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; op &lt;&lt; ' ' &lt;&lt; b &lt;&lt; " = " &lt;&lt; resultado &lt;&lt; '\n';
+        }
+
+        std::cout &lt;&lt; "Outra conta? (s/n): ";
+        std::cin &gt;&gt; resposta;
+    } while (resposta == 's' || resposta == 'S');
+
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa6">Etapa 6 · Organizar em funções</h2>
+<p>O <code>main</code> ficou comprido e tem código repetido. Vamos dividi-lo em <a href="funcoes.html">funções</a>, cada uma com <strong>uma</strong> tarefa e um nome que diz qual é:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Tarefa</th><th>Recebe → devolve</th></tr>
+<tr><td><code>ler_numero</code></td><td>Mostrar uma pergunta e ler um número, repetindo até ser válido.</td><td>a pergunta (<code>const std::string&amp;</code>) → o número (<code>double</code>)</td></tr>
+<tr><td><code>ler_operacao</code></td><td>Ler a operação, repetindo até ser <code>+ - * /</code>.</td><td>nada → a operação (<code>char</code>)</td></tr>
+<tr><td><code>calcular</code></td><td>Fazer a conta.</td><td>dois números e a operação → o resultado (<code>double</code>)</td></tr>
+<tr><td><code>quer_continuar</code></td><td>Perguntar "Outra conta?".</td><td>nada → <code>true</code> ou <code>false</code></td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="calculadora.cpp">#include &lt;cstdlib&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+// Mostra a pergunta e lê um número. Repete até a pessoa digitar um número válido.
+double ler_numero(const std::string&amp; pergunta) {
+    double numero = 0.0;
+    std::cout &lt;&lt; pergunta;
+    while (!(std::cin &gt;&gt; numero)) {
+        if (std::cin.eof()) {
+            std::exit(0);  // a entrada acabou (Ctrl+D): encerra o programa
+        }
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        std::cout &lt;&lt; '"' &lt;&lt; lixo &lt;&lt; "\" não é um número. Tente de novo.\n";
+        std::cout &lt;&lt; pergunta;
+    }
+    return numero;
+}
+
+// Lê a operação. Repete até ser + - * ou /.
+char ler_operacao() {
+    char op = ' ';
+    while (true) {
+        std::cout &lt;&lt; "Operação (+ - * /): ";
+        if (!(std::cin &gt;&gt; op)) {
+            std::exit(0);  // a entrada acabou
+        }
+        if (op == '+' || op == '-' || op == '*' || op == '/') {
+            return op;
+        }
+        std::cout &lt;&lt; "Operação desconhecida: " &lt;&lt; op &lt;&lt; '\n';
+    }
+}
+
+// Faz a conta. Só recebe operações válidas (quem garante é ler_operacao).
+double calcular(double a, char op, double b) {
+    switch (op) {
+        case '+': return a + b;
+        case '-': return a - b;
+        case '*': return a * b;
+        case '/': return a / b;
+    }
+    return 0.0;
+}
+
+bool quer_continuar() {
+    char resposta = 'n';
+    std::cout &lt;&lt; "Outra conta? (s/n): ";
+    std::cin &gt;&gt; resposta;
+    return resposta == 's' || resposta == 'S';
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    do {
+        double a = ler_numero("Primeiro número: ");
+        char op = ler_operacao();
+        double b = ler_numero("Segundo número: ");
+
+        if (op == '/' &amp;&amp; b == 0) {
+            std::cout &lt;&lt; "Não dá para dividir por zero.\n";
+        } else {
+            std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; op &lt;&lt; ' ' &lt;&lt; b &lt;&lt; " = " &lt;&lt; calcular(a, op, b) &lt;&lt; '\n';
+        }
+    } while (quer_continuar());
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+
+<p>Leia o <code>main</code> agora: ele cabe em poucas linhas e se lê quase como português. "Leia um número, leia a operação, leia outro número; se for divisão por zero, avise; senão, mostre a conta; repita enquanto a pessoa quiser continuar." Os detalhes de <strong>como</strong> cada coisa é feita estão escondidos nas funções.</p>
+
+<dl class="anatomy">
+  <dt>const std::string&amp; pergunta</dt><dd>A pergunta é passada por <strong>referência constante</strong>: a função usa o texto original, sem copiar e sem poder mudá-lo (aula <a href="passagem-referencia.html">Por Valor × Por Referência</a>). Assim a mesma função serve para "Primeiro número: " e "Segundo número: ".</dd>
+  <dt>std::exit(0);</dt><dd>Encerra o programa inteiro, de dentro de qualquer função, com o código 0. Vem do <code>&lt;cstdlib&gt;</code>. Usamos só quando a entrada acabou e não há mais o que fazer.</dd>
+  <dt>while (true) { … return op; }</dt><dd>Em <code>ler_operacao</code>, o laço "infinito" termina pelo <code>return</code>, quando a operação é válida (veja <a href="break-continue.html">break e continue</a>).</dd>
+  <dt>case '+': return a + b;</dt><dd>Em <code>calcular</code>, cada <code>case</code> devolve o resultado direto: o <code>return</code> sai da função, então não precisa de <code>break</code>.</dd>
+  <dt>return 0.0;</dt><dd>Depois do <code>switch</code>. Na prática nunca chega aqui (o <code>ler_operacao</code> só deixa passar as quatro operações), mas toda função <code>double</code> precisa devolver algo em todos os caminhos. Sem essa linha, o g++ avisa: <code>control reaches end of non-void function</code>.</dd>
+  <dt>} while (quer_continuar());</dt><dd>A condição do laço é a própria chamada da função: ela pergunta, lê e devolve <code>true</code> ou <code>false</code>.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/calculadora">$ g++ -std=c++23 -Wall -Wextra calculadora.cpp -o calculadora
+$ ./calculadora
+=== Calculadora da Ana ===
+Primeiro número: 10
+Operação (+ - * /): +
+Segundo número: 5
+10 + 5 = 15
+Outra conta? (s/n): s
+Primeiro número: seis
+"seis" não é um número. Tente de novo.
+Primeiro número: 6
+Operação (+ - * /): %
+Operação desconhecida: %
+Operação (+ - * /): *
+Segundo número: 1.5
+6 * 1.5 = 9
+Outra conta? (s/n): s
+Primeiro número: 1
+Operação (+ - * /): /
+Segundo número: 0
+Não dá para dividir por zero.
+Outra conta? (s/n): n
+Até logo!</pre>
+
+<p>Uma diferença de comportamento: agora uma operação errada é pedida <strong>de novo</strong> na hora (<code>%</code> foi recusado e a pergunta voltou), em vez de pedir o segundo número e só depois reclamar.</p>
+
+<div class="trycpp" data-stdin="seis\n6\n*\n1.5\nn\n" data-goal="out:&quot;seis&quot; não é um número. Tente de novo.,out:6 * 1.5 = 9,src:double\s+ler_numero\s*\(">
+<p class="try-task"><strong>Missão (etapa 6):</strong> o <code>main</code> já chama <code>ler_numero("Primeiro número: ")</code>, mas a função não existe. Rode e veja o erro (<code>‘ler_numero’ was not declared in this scope</code> no g++; <code>use of undeclared identifier 'ler_numero'</code> no Clang). Depois escreva a função <code>double ler_numero(const std::string&amp; pergunta)</code> com a validação da etapa 5. A entrada começa com <code>seis</code>.</p>
+<pre class="script">#include &lt;cstdlib&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+// Escreva aqui a função ler_numero(pergunta):
+// mostra a pergunta, lê um double e repete se não for número.
+
+// Lê a operação. Repete até ser + - * ou /.
+char ler_operacao() {
+    char op = ' ';
+    while (true) {
+        std::cout &lt;&lt; "Operação (+ - * /): ";
+        if (!(std::cin &gt;&gt; op)) {
+            std::exit(0);  // a entrada acabou
+        }
+        if (op == '+' || op == '-' || op == '*' || op == '/') {
+            return op;
+        }
+        std::cout &lt;&lt; "Operação desconhecida: " &lt;&lt; op &lt;&lt; '\n';
+    }
+}
+
+// Faz a conta. Só recebe operações válidas (quem garante é ler_operacao).
+double calcular(double a, char op, double b) {
+    switch (op) {
+        case '+': return a + b;
+        case '-': return a - b;
+        case '*': return a * b;
+        case '/': return a / b;
+    }
+    return 0.0;
+}
+
+bool quer_continuar() {
+    char resposta = 'n';
+    std::cout &lt;&lt; "Outra conta? (s/n): ";
+    std::cin &gt;&gt; resposta;
+    return resposta == 's' || resposta == 'S';
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    do {
+        double a = ler_numero("Primeiro número: ");
+        char op = ler_operacao();
+        double b = ler_numero("Segundo número: ");
+
+        if (op == '/' &amp;&amp; b == 0) {
+            std::cout &lt;&lt; "Não dá para dividir por zero.\n";
+        } else {
+            std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; op &lt;&lt; ' ' &lt;&lt; b &lt;&lt; " = " &lt;&lt; calcular(a, op, b) &lt;&lt; '\n';
+        }
+    } while (quer_continuar());
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;cstdlib&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+// Mostra a pergunta e lê um número. Repete até a pessoa digitar um número válido.
+double ler_numero(const std::string&amp; pergunta) {
+    double numero = 0.0;
+    std::cout &lt;&lt; pergunta;
+    while (!(std::cin &gt;&gt; numero)) {
+        if (std::cin.eof()) {
+            std::exit(0);  // a entrada acabou (Ctrl+D): encerra o programa
+        }
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        std::cout &lt;&lt; '"' &lt;&lt; lixo &lt;&lt; "\" não é um número. Tente de novo.\n";
+        std::cout &lt;&lt; pergunta;
+    }
+    return numero;
+}
+
+// Lê a operação. Repete até ser + - * ou /.
+char ler_operacao() {
+    char op = ' ';
+    while (true) {
+        std::cout &lt;&lt; "Operação (+ - * /): ";
+        if (!(std::cin &gt;&gt; op)) {
+            std::exit(0);  // a entrada acabou
+        }
+        if (op == '+' || op == '-' || op == '*' || op == '/') {
+            return op;
+        }
+        std::cout &lt;&lt; "Operação desconhecida: " &lt;&lt; op &lt;&lt; '\n';
+    }
+}
+
+// Faz a conta. Só recebe operações válidas (quem garante é ler_operacao).
+double calcular(double a, char op, double b) {
+    switch (op) {
+        case '+': return a + b;
+        case '-': return a - b;
+        case '*': return a * b;
+        case '/': return a / b;
+    }
+    return 0.0;
+}
+
+bool quer_continuar() {
+    char resposta = 'n';
+    std::cout &lt;&lt; "Outra conta? (s/n): ";
+    std::cin &gt;&gt; resposta;
+    return resposta == 's' || resposta == 'S';
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    do {
+        double a = ler_numero("Primeiro número: ");
+        char op = ler_operacao();
+        double b = ler_numero("Segundo número: ");
+
+        if (op == '/' &amp;&amp; b == 0) {
+            std::cout &lt;&lt; "Não dá para dividir por zero.\n";
+        } else {
+            std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; op &lt;&lt; ' ' &lt;&lt; b &lt;&lt; " = " &lt;&lt; calcular(a, op, b) &lt;&lt; '\n';
+        }
+    } while (quer_continuar());
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>O código completo</h2>
+<p>Esta é a calculadora final, a mesma da etapa 6. Copie, compile com <code>g++ -std=c++23 -Wall -Wextra calculadora.cpp -o calculadora</code> e use à vontade:</p>
+
+<pre class="file" data-file="calculadora.cpp">#include &lt;cstdlib&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+// Mostra a pergunta e lê um número. Repete até a pessoa digitar um número válido.
+double ler_numero(const std::string&amp; pergunta) {
+    double numero = 0.0;
+    std::cout &lt;&lt; pergunta;
+    while (!(std::cin &gt;&gt; numero)) {
+        if (std::cin.eof()) {
+            std::exit(0);  // a entrada acabou (Ctrl+D): encerra o programa
+        }
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        std::cout &lt;&lt; '"' &lt;&lt; lixo &lt;&lt; "\" não é um número. Tente de novo.\n";
+        std::cout &lt;&lt; pergunta;
+    }
+    return numero;
+}
+
+// Lê a operação. Repete até ser + - * ou /.
+char ler_operacao() {
+    char op = ' ';
+    while (true) {
+        std::cout &lt;&lt; "Operação (+ - * /): ";
+        if (!(std::cin &gt;&gt; op)) {
+            std::exit(0);  // a entrada acabou
+        }
+        if (op == '+' || op == '-' || op == '*' || op == '/') {
+            return op;
+        }
+        std::cout &lt;&lt; "Operação desconhecida: " &lt;&lt; op &lt;&lt; '\n';
+    }
+}
+
+// Faz a conta. Só recebe operações válidas (quem garante é ler_operacao).
+double calcular(double a, char op, double b) {
+    switch (op) {
+        case '+': return a + b;
+        case '-': return a - b;
+        case '*': return a * b;
+        case '/': return a / b;
+    }
+    return 0.0;
+}
+
+bool quer_continuar() {
+    char resposta = 'n';
+    std::cout &lt;&lt; "Outra conta? (s/n): ";
+    std::cin &gt;&gt; resposta;
+    return resposta == 's' || resposta == 'S';
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    do {
+        double a = ler_numero("Primeiro número: ");
+        char op = ler_operacao();
+        double b = ler_numero("Segundo número: ");
+
+        if (op == '/' &amp;&amp; b == 0) {
+            std::cout &lt;&lt; "Não dá para dividir por zero.\n";
+        } else {
+            std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; op &lt;&lt; ' ' &lt;&lt; b &lt;&lt; " = " &lt;&lt; calcular(a, op, b) &lt;&lt; '\n';
+        }
+    } while (quer_continuar());
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+
+<p>Repare no que o projeto juntou: <a href="entrada-cin.html">cin</a>, <a href="switch.html">switch</a>, <a href="if-else.html">if</a>, <a href="do-while.html">do-while</a>, <a href="while.html">while</a>, <a href="validar-entrada.html">validação</a>, <a href="funcoes.html">funções</a> com <a href="parametros.html">parâmetros</a> e <a href="retorno.html">retorno</a>. Nenhum desses assuntos é difícil sozinho; o projeto mostra como eles se encaixam.</p>
+
+<hr>
+
+<h2>Desafios extras</h2>
+<ol>
+  <li><strong>Resto da divisão.</strong> Acrescente a operação <code>%</code>. Cuidado: o <code>%</code> do C++ só funciona com inteiros. Para <code>double</code>, use <code>std::fmod(a, b)</code>, do <code>&lt;cmath&gt;</code> (veja <a href="matematica.html">Matemática</a>). E resto da divisão por zero também não existe.</li>
+  <li><strong>Potência.</strong> Acrescente <code>^</code> com <code>std::pow(a, b)</code>.</li>
+  <li><strong>Histórico.</strong> Guarde cada conta feita num <code>std::vector&lt;std::string&gt;</code> e mostre todas antes do "Até logo!" (veja <a href="vector.html">std::vector</a>).</li>
+  <li><strong>Resultado bonito.</strong> Mostre o resultado com duas casas decimais, usando <code>std::format</code> ou <code>std::println</code> com <code>{:.2f}</code> (veja <a href="format-print.html">std::format e std::print</a>).</li>
+  <li><strong>Lixo depois do número.</strong> Digite <code>12abc</code> no primeiro número e descubra o que acontece (dica: o <code>cin</code> lê o <code>12</code> e deixa o <code>abc</code>). Como você faria a calculadora recusar essa entrada?</li>
+</ol>
+
+<div class="cenario">
+<strong>O erro que quase todo mundo encontra no desafio 1</strong>
+<pre class="term" data-cwd="~/cpp/calculadora">$ g++ -std=c++23 -Wall -Wextra calculadora.cpp -o calculadora
+calculadora.cpp: In function ‘double calcular(double, char, double)’:
+calculadora.cpp:45:28: error: invalid operands of types ‘double’ and ‘double’ to binary ‘operator%’
+   45 |         case '%': return a % b;
+      |                          ~ ^ ~
+      |                          |   |
+      |                          |   double
+      |                          double</pre>
+<p><strong>O que significa:</strong> "operandos inválidos dos tipos <code>double</code> e <code>double</code> para o operador binário <code>%</code>". O desenho embaixo da linha mostra o tipo de cada lado. O <code>%</code> só aceita inteiros (veja <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>).</p>
+<p><strong>Como consertar:</strong> <code>return std::fmod(a, b);</code> com <code>#include &lt;cmath&gt;</code>.</p>
+</div>
+
+<div class="trycpp" data-stdin="10\n%\n3\ns\n7.5\n%\n2\nn\n" data-goal="out:10 % 3 = 1,out:7.5 % 2 = 1.5,src:fmod">
+<p class="try-task"><strong>Desafio 1 no editor:</strong> acrescente a operação <code>%</code> com <code>std::fmod</code>. Mude três lugares: a condição de <code>ler_operacao</code>, o <code>switch</code> de <code>calcular</code> e o <code>if</code> da divisão por zero no <code>main</code>. Com a entrada da missão, a calculadora deve mostrar <code>10 % 3 = 1</code> e <code>7.5 % 2 = 1.5</code>.</p>
+<pre class="script">#include &lt;cstdlib&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+// Mostra a pergunta e lê um número. Repete até a pessoa digitar um número válido.
+double ler_numero(const std::string&amp; pergunta) {
+    double numero = 0.0;
+    std::cout &lt;&lt; pergunta;
+    while (!(std::cin &gt;&gt; numero)) {
+        if (std::cin.eof()) {
+            std::exit(0);  // a entrada acabou (Ctrl+D): encerra o programa
+        }
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        std::cout &lt;&lt; '"' &lt;&lt; lixo &lt;&lt; "\" não é um número. Tente de novo.\n";
+        std::cout &lt;&lt; pergunta;
+    }
+    return numero;
+}
+
+// Lê a operação. Repete até ser + - * ou /.
+char ler_operacao() {
+    char op = ' ';
+    while (true) {
+        std::cout &lt;&lt; "Operação (+ - * /): ";
+        if (!(std::cin &gt;&gt; op)) {
+            std::exit(0);  // a entrada acabou
+        }
+        if (op == '+' || op == '-' || op == '*' || op == '/') {
+            return op;
+        }
+        std::cout &lt;&lt; "Operação desconhecida: " &lt;&lt; op &lt;&lt; '\n';
+    }
+}
+
+// Faz a conta. Só recebe operações válidas (quem garante é ler_operacao).
+double calcular(double a, char op, double b) {
+    switch (op) {
+        case '+': return a + b;
+        case '-': return a - b;
+        case '*': return a * b;
+        case '/': return a / b;
+    }
+    return 0.0;
+}
+
+bool quer_continuar() {
+    char resposta = 'n';
+    std::cout &lt;&lt; "Outra conta? (s/n): ";
+    std::cin &gt;&gt; resposta;
+    return resposta == 's' || resposta == 'S';
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    do {
+        double a = ler_numero("Primeiro número: ");
+        char op = ler_operacao();
+        double b = ler_numero("Segundo número: ");
+
+        if (op == '/' &amp;&amp; b == 0) {
+            std::cout &lt;&lt; "Não dá para dividir por zero.\n";
+        } else {
+            std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; op &lt;&lt; ' ' &lt;&lt; b &lt;&lt; " = " &lt;&lt; calcular(a, op, b) &lt;&lt; '\n';
+        }
+    } while (quer_continuar());
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;cmath&gt;
+#include &lt;cstdlib&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+// Mostra a pergunta e lê um número. Repete até a pessoa digitar um número válido.
+double ler_numero(const std::string&amp; pergunta) {
+    double numero = 0.0;
+    std::cout &lt;&lt; pergunta;
+    while (!(std::cin &gt;&gt; numero)) {
+        if (std::cin.eof()) {
+            std::exit(0);  // a entrada acabou (Ctrl+D): encerra o programa
+        }
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        std::cout &lt;&lt; '"' &lt;&lt; lixo &lt;&lt; "\" não é um número. Tente de novo.\n";
+        std::cout &lt;&lt; pergunta;
+    }
+    return numero;
+}
+
+// Lê a operação. Repete até ser + - * / ou %.
+char ler_operacao() {
+    char op = ' ';
+    while (true) {
+        std::cout &lt;&lt; "Operação (+ - * / %): ";
+        if (!(std::cin &gt;&gt; op)) {
+            std::exit(0);  // a entrada acabou
+        }
+        if (op == '+' || op == '-' || op == '*' || op == '/' || op == '%') {
+            return op;
+        }
+        std::cout &lt;&lt; "Operação desconhecida: " &lt;&lt; op &lt;&lt; '\n';
+    }
+}
+
+// Faz a conta. Só recebe operações válidas (quem garante é ler_operacao).
+double calcular(double a, char op, double b) {
+    switch (op) {
+        case '+': return a + b;
+        case '-': return a - b;
+        case '*': return a * b;
+        case '/': return a / b;
+        case '%': return std::fmod(a, b);
+    }
+    return 0.0;
+}
+
+bool quer_continuar() {
+    char resposta = 'n';
+    std::cout &lt;&lt; "Outra conta? (s/n): ";
+    std::cin &gt;&gt; resposta;
+    return resposta == 's' || resposta == 'S';
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Calculadora da Ana ===\n";
+    do {
+        double a = ler_numero("Primeiro número: ");
+        char op = ler_operacao();
+        double b = ler_numero("Segundo número: ");
+
+        if ((op == '/' || op == '%') &amp;&amp; b == 0) {
+            std::cout &lt;&lt; "Não dá para dividir por zero.\n";
+        } else {
+            std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; op &lt;&lt; ' ' &lt;&lt; b &lt;&lt; " = " &lt;&lt; calcular(a, op, b) &lt;&lt; '\n';
+        }
+    } while (quer_continuar());
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+</div>
+
+<p>Na máquina da Ana, a solução roda assim:</p>
+
+<pre class="term" data-cwd="~/cpp/calculadora">$ ./calculadora
+=== Calculadora da Ana ===
+Primeiro número: 10
+Operação (+ - * / %): %
+Segundo número: 3
+10 % 3 = 1
+Outra conta? (s/n): s
+Primeiro número: 7.5
+Operação (+ - * / %): %
+Segundo número: 2
+7.5 % 2 = 1.5
+Outra conta? (s/n): n
+Até logo!</pre>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">1. A Ana digitou <code>2,5</code> num <code>std::cin &gt;&gt; a</code> com <code>a</code> do tipo <code>double</code>. O que fica em <code>a</code>?</p>
+<label><input type="radio" name="q1"> <code>2.5</code></label>
+<label><input type="radio" name="q1"> <code>2</code>, e a <code>,5</code> fica esperando na entrada.</label>
+<label><input type="radio" name="q1"> <code>0</code></label>
+<label><input type="radio" name="q1"> O programa não compila.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">2. Num laço de validação, o que acontece se você esquecer o <code>std::cin.clear()</code>?</p>
+<label><input type="radio" name="q2"> Nada muda.</label>
+<label><input type="radio" name="q2"> O g++ recusa o código.</label>
+<label><input type="radio" name="q2"> Laço infinito: o <code>cin</code> continua em estado de falha e toda leitura falha de novo.</label>
+<label><input type="radio" name="q2"> O programa lê o número certo na segunda vez.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">3. Por que a calculadora usa <code>do-while</code> e não <code>while</code>?</p>
+<label><input type="radio" name="q3"> Porque a conta tem de acontecer pelo menos uma vez, e a pergunta "continuar?" vem no fim.</label>
+<label><input type="radio" name="q3"> Porque o <code>while</code> não aceita <code>char</code>.</label>
+<label><input type="radio" name="q3"> Porque o <code>do-while</code> é mais rápido.</label>
+<label><input type="radio" name="q3"> Não tem motivo; os dois fazem exatamente a mesma coisa.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Quanto vale <code>10.0 / 0</code> com <code>double</code>, no g++?</p>
+<label><input type="radio" name="q4"> <code>0</code></label>
+<label><input type="radio" name="q4"> O programa sempre trava.</label>
+<label><input type="radio" name="q4"> <code>nan</code></label>
+<label><input type="radio" name="q4"> <code>inf</code> (infinito)</label>
+</div>
+
+<div class="exercise">
+<p>5. Complete o laço que repete enquanto a leitura de <code>a</code> falhar:</p>
+<div class="ex-code">while (<input data-answer="!(std::cin &gt;&gt; a)|!(cin &gt;&gt; a)" aria-label="condição">) {</div>
+</div>
+
+<div class="exercise">
+<p>6. Qual instrução tira o <code>cin</code> do estado de falha?</p>
+<div class="ex-code">std::cin.<input data-answer="clear()|clear();" aria-label="método">;</div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>std::cin &gt;&gt; x</code> lê números com <strong>ponto</strong> decimal; ele separa os valores por espaços, não por linhas.</li>
+  <li>O <code>switch</code> escolhe a conta; cada <code>case</code> precisa do seu <code>break</code> (o <code>-Wextra</code> avisa quando falta).</li>
+  <li>Divisão de <code>double</code> por zero dá <code>inf</code> ou <code>nan</code>; confira o divisor <strong>antes</strong>.</li>
+  <li><code>do { … } while (continuar);</code> faz o "menu que repete"; um <code>bool deu_certo</code> pula a conta sem fechar o programa.</li>
+  <li>Quando o <code>cin</code> falha: teste a leitura, <code>clear()</code>, descarte a linha com <code>getline</code> e pergunte de novo. Trate o fim da entrada (<code>eof()</code>).</li>
+  <li>Código repetido pede uma função. Funções pequenas com nomes claros deixam o <code>main</code> legível.</li>
+</ul>
+<p>Próximo projeto: <a href="projeto-adivinhacao.html">Jogo de Adivinhação</a>, com números aleatórios, contagem de tentativas e recorde.</p>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
