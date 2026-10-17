@@ -1,0 +1,801 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Novidades — do C++11 ao C++26, versão por versão | Guia C++</title>
+<meta name="description" content="As novidades de cada versão do C++, do C++11 ao C++26, numa tabela com exemplo mínimo, a aula do guia e o que já funciona no g++ 15 e no clang 21: auto, lambdas, smart pointers, optional, concepts, ranges, std::format, std::print, std::expected, import std, reflexão e contratos. Tudo conferido no laboratório.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Novidades do C++11 ao C++26</span></h1>
+
+<p class="intro">Desde 2011, o C++ ganha uma versão nova a cada três anos. Cada uma traz recursos que deixam o código mais curto e mais seguro: o <code>auto</code>, as lambdas, os ponteiros inteligentes, o <code>std::optional</code>, o <code>std::print</code>… Esta página é um <strong>mapa</strong>: para cada versão, uma tabela com o que mudou, um exemplo mínimo, a aula do guia que ensina o assunto e se o recurso já funciona no <strong>g++ 15</strong> e no <strong>clang 21</strong>. Cada item foi compilado e executado no laboratório.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como escolher a versão do C++ na hora de compilar (<code>-std=c++23</code>) e como o programa descobre a versão (<code>__cplusplus</code>).</li>
+  <li>O que cada versão trouxe de mais importante: C++11, C++14, C++17, C++20, C++23 e C++26.</li>
+  <li>Como o mesmo programa fica em C++98 e em C++23.</li>
+  <li>O que do C++26 já funciona no g++ 15 e o que ainda não chegou (reflexão, contratos, <code>std::inplace_vector</code>).</li>
+  <li>Os erros que aparecem quando você usa um recurso novo com a versão errada.</li>
+</ul>
+</div>
+
+<p>A história completa das versões (quem decide, por que demorou de 1998 a 2011) está em <a href="versoes.html">Versões do C++</a>. Aqui o foco é prático: <strong>o que você pode usar hoje</strong>. Todos os programas foram compilados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp/novidades</code>, com o <strong>g++ 15.2</strong> e o <strong>clang++ 21.1</strong> do Ubuntu 26.04.</p>
+
+<hr>
+
+<h2>A ideia: atualizações de um celular</h2>
+<p>Pense no celular da Ana. De tempos em tempos chega uma atualização com recursos novos: um jeito mais fácil de tirar foto, um modo escuro. Os aplicativos antigos continuam funcionando; a atualização só <strong>acrescenta</strong> coisas.</p>
+
+<p>O C++ é igual. Um programa escrito em 1998 ainda compila hoje, quase sempre sem mudar nada. Cada versão nova acrescenta ferramentas. Mas existe uma diferença importante: no celular, a atualização é instalada uma vez e pronto. No C++, <strong>você escolhe a versão toda vez que compila</strong>. Se você não escolher, o compilador usa uma versão padrão, que pode ser mais antiga do que você imagina.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Versão</th><th>Ano</th><th>Em uma frase</th></tr>
+<tr><td>C++98 / C++03</td><td>1998 / 2003</td><td>O C++ "clássico". O C++03 só corrigiu detalhes.</td></tr>
+<tr><td><strong>C++11</strong></td><td>2011</td><td>A grande virada: <code>auto</code>, lambdas, <code>nullptr</code>, ponteiros inteligentes, movimento. Chamado de "C++ moderno".</td></tr>
+<tr><td>C++14</td><td>2014</td><td>Pequenos acertos no C++11: <code>std::make_unique</code>, lambdas genéricas.</td></tr>
+<tr><td>C++17</td><td>2017</td><td>Ferramentas do dia a dia: <code>optional</code>, <code>variant</code>, <code>string_view</code>, desestruturação, <code>filesystem</code>.</td></tr>
+<tr><td><strong>C++20</strong></td><td>2020</td><td>A segunda grande virada: concepts, ranges, <code>std::format</code>, módulos, <code>&lt;=&gt;</code>.</td></tr>
+<tr><td>C++23</td><td>2023</td><td><code>std::print</code>, <code>std::expected</code>, <code>import std</code>. <strong>A versão que este guia ensina.</strong></td></tr>
+<tr><td>C++26</td><td>2026</td><td>Reflexão e contratos. Os compiladores ainda estão implementando.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. Escolher a versão: <code>-std=</code></h2>
+<p>Quem decide a versão é a opção <code>-std=</code> (de <em>standard</em>, "padrão") do compilador. Você já viu isso em <a href="compilar.html">Compilar com g++</a>: o comando padrão do guia é <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<p>Dentro do programa, a versão aparece num número especial chamado <code>__cplusplus</code> (com dois sublinhados na frente). O compilador o preenche sozinho com o ano e o mês da versão. Este programa só mostra esse número:</p>
+
+<pre class="file" data-file="versao.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; __cplusplus &lt;&lt; '\n';
+}
+</pre>
+
+<p>A Ana compilou o mesmo arquivo com cada versão, de uma vez só, com um laço <code>for</code> do terminal (Bash). Não se preocupe com o laço: o que importa é a saída.</p>
+
+<pre class="term" data-cwd="~/cpp/novidades">$ for s in 98 11 14 17 20 23 26; do g++ -std=c++$s versao.cpp -o versao &amp;&amp; echo "c++$s: $(./versao)"; done
+c++98: 199711
+c++11: 201103
+c++14: 201402
+c++17: 201703
+c++20: 202002
+c++23: 202302
+c++26: 202400          « o C++26 ainda não tem número final no g++ 15
+$ g++ versao.cpp -o versao &amp;&amp; ./versao
+201703                 « sem -std: o g++ 15 usa o C++17</pre>
+
+<p>Repare na última linha. <strong>Sem <code>-std=</code>, o g++ 15 compila em C++17.</strong> Tudo o que veio no C++20 e no C++23 (<code>std::format</code>, <code>std::print</code>, ranges, <code>contains</code>) fica de fora. É por isso que o guia sempre escreve <code>-std=c++23</code>. No editor do guia, o Rodar já usa <code>-std=c++23</code>.</p>
+
+<div class="tip">
+<strong><code>c++2c</code>, <code>c++2b</code>, <code>gnu++23</code>: outros nomes</strong>
+<p>Antes de uma versão ter número oficial, os compiladores usam um apelido: <code>c++2b</code> era o C++23 e <code>c++2c</code> é o C++26. O g++ 15 aceita <code>-std=c++26</code> e <code>-std=c++2c</code> (os dois são a mesma coisa). Já <code>gnu++23</code> é "C++23 mais as extensões do GNU"; o guia usa sempre o <code>c++23</code> puro, para o código funcionar em qualquer compilador.</p>
+</div>
+
+<hr>
+
+<h2>2. C++11: a grande virada <span class="versao">C++11</span></h2>
+<p>Depois de 13 anos sem novidades grandes, o C++11 mudou o jeito de escrever C++. Quase todo o "C++ moderno" que este guia ensina começa aqui.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Recurso</th><th>Exemplo mínimo</th><th>Para que serve</th><th>Aula</th><th>g++ 15</th></tr>
+<tr><td><code>auto</code></td><td><code>auto preco = 4.5;</code></td><td>O compilador descobre o tipo sozinho.</td><td><a href="auto.html">auto</a></td><td>sim</td></tr>
+<tr><td>range-for</td><td><code>for (int n : notas)</code></td><td>Percorrer uma coleção sem contar posições.</td><td><a href="for-range.html">range-for</a></td><td>sim</td></tr>
+<tr><td>Lambdas</td><td><code>[](int x) { return x * 2; }</code></td><td>Uma função pequena, sem nome, escrita no meio do código.</td><td><a href="lambdas.html">Lambdas</a></td><td>sim</td></tr>
+<tr><td><code>nullptr</code></td><td><code>int* p = nullptr;</code></td><td>"Ponteiro que não aponta para nada", no lugar do antigo <code>NULL</code>.</td><td><a href="nullptr.html">nullptr</a></td><td>sim</td></tr>
+<tr><td>Ponteiros inteligentes</td><td><code>std::unique_ptr</code>, <code>std::shared_ptr</code></td><td>Memória que se libera sozinha: adeus ao <code>delete</code>.</td><td><a href="smart-pointers.html">Ponteiros Inteligentes</a></td><td>sim</td></tr>
+<tr><td>Movimento</td><td><code>b = std::move(a);</code></td><td>"Mudar" os dados de lugar em vez de copiar.</td><td><a href="move.html">Semântica de Movimento</a></td><td>sim</td></tr>
+<tr><td><code>constexpr</code></td><td><code>constexpr int q = quadrado(5);</code></td><td>Calcular durante a compilação.</td><td><a href="constexpr.html">constexpr</a></td><td>sim</td></tr>
+<tr><td><code>enum class</code></td><td><code>enum class Cor { vermelho, verde };</code></td><td>Enumerações que não se misturam com <code>int</code>.</td><td><a href="enums.html">Enums</a></td><td>sim</td></tr>
+<tr><td>Inicialização com chaves</td><td><code>std::vector&lt;int&gt; notas{7, 9, 10};</code></td><td>Criar uma coleção já com os valores.</td><td><a href="vector.html">std::vector</a></td><td>sim</td></tr>
+</table>
+</div>
+
+<p>Este programa usa todos esses recursos de uma vez. Não se preocupe em entender cada linha agora: cada uma tem a sua aula. A ideia é ver que tudo compila e roda.</p>
+
+<pre class="file" data-file="cpp11.cpp">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+enum class Cor { vermelho, verde };
+
+constexpr int quadrado(int x) { return x * x; }
+
+int main() {
+    auto preco = 4.5;                           // auto
+    std::vector&lt;int&gt; notas{7, 9, 10};           // lista entre chaves
+    for (int n : notas) std::cout &lt;&lt; n &lt;&lt; ' ';  // range-for
+    std::cout &lt;&lt; '\n';
+    auto dobro = [](int x) { return x * 2; };   // lambda
+    int* p = nullptr;                           // nullptr
+    std::unique_ptr&lt;int&gt; u(new int(42));        // smart pointer (C++11)
+    std::shared_ptr&lt;int&gt; s = std::make_shared&lt;int&gt;(7);
+    std::string a = "lista de compras";
+    std::string b = std::move(a);               // move
+    constexpr int q = quadrado(5);              // constexpr
+    Cor c = Cor::verde;                         // enum class
+    std::cout &lt;&lt; preco &lt;&lt; ' ' &lt;&lt; dobro(21) &lt;&lt; ' ' &lt;&lt; (p == nullptr) &lt;&lt; ' '
+              &lt;&lt; *u &lt;&lt; ' ' &lt;&lt; *s &lt;&lt; ' ' &lt;&lt; b &lt;&lt; ' ' &lt;&lt; q &lt;&lt; ' '
+              &lt;&lt; (c == Cor::verde) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/novidades">$ g++ -std=c++23 -Wall -Wextra cpp11.cpp -o cpp11
+$ ./cpp11
+7 9 10
+4.5 42 1 42 7 lista de compras 25 1</pre>
+
+<p>O <code>1</code> depois do <code>42</code> é o <code>true</code> de <code>p == nullptr</code>: o <code>cout</code> mostra os booleanos como <code>1</code> e <code>0</code> (veja <a href="bool.html">Booleanos</a>). O <code>new int(42)</code> da linha do <code>unique_ptr</code> é o jeito do C++11; o C++14 trouxe uma forma melhor, logo abaixo.</p>
+
+<h3>O mesmo programa, antes e depois</h3>
+<p>Para sentir a diferença, veja um programa da lista de compras da Ana escrito como se escrevia em 1998: um mapa de preços, uma lista e o total.</p>
+
+<pre class="file" data-file="compras98.cpp">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::map&lt;std::string, double&gt; precos;
+    precos["pão"] = 7.5;
+    precos["leite"] = 5.25;
+    precos["café"] = 18.9;
+
+    std::vector&lt;std::string&gt; lista;
+    lista.push_back("café");
+    lista.push_back("pão");
+
+    double total = 0;
+    for (std::vector&lt;std::string&gt;::const_iterator it = lista.begin(); it != lista.end(); ++it) {
+        std::map&lt;std::string, double&gt;::const_iterator p = precos.find(*it);
+        if (p != precos.end()) {
+            std::cout &lt;&lt; p-&gt;first &lt;&lt; ": " &lt;&lt; p-&gt;second &lt;&lt; "\n";
+            total += p-&gt;second;
+        }
+    }
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+
+<p>E agora o mesmo programa em C++23:</p>
+
+<pre class="file" data-file="compras23.cpp">#include &lt;map&gt;
+#include &lt;print&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    const std::map&lt;std::string, double&gt; precos{
+        {"pão", 7.5}, {"leite", 5.25}, {"café", 18.9}};
+    const std::vector&lt;std::string&gt; lista{"café", "pão"};
+
+    double total = 0;
+    for (const auto&amp; item : lista) {
+        if (auto p = precos.find(item); p != precos.end()) {
+            const auto&amp; [nome, preco] = *p;
+            std::println("{}: {}", nome, preco);
+            total += preco;
+        }
+    }
+    std::println("Total: {}", total);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/novidades">$ g++ -std=c++98 -Wall -Wextra compras98.cpp -o compras98 &amp;&amp; ./compras98
+café: 18.9
+pão: 7.5
+Total: 26.4
+$ g++ -std=c++23 -Wall -Wextra compras23.cpp -o compras23 &amp;&amp; ./compras23
+café: 18.9
+pão: 7.5
+Total: 26.4</pre>
+
+<p>A saída é idêntica. O que mudou foi o código:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>C++98</th><th>C++ moderno</th><th>Versão</th></tr>
+<tr><td>Três linhas <code>precos["pão"] = 7.5;</code></td><td><code>precos{{"pão", 7.5}, …}</code>, e o mapa pode ser <code>const</code></td><td>C++11</td></tr>
+<tr><td><code>std::vector&lt;std::string&gt;::const_iterator it = …</code></td><td><code>for (const auto&amp; item : lista)</code></td><td>C++11</td></tr>
+<tr><td><code>find</code> numa linha, <code>if</code> na outra</td><td><code>if (auto p = …; p != precos.end())</code>: a variável só existe dentro do <code>if</code></td><td>C++17</td></tr>
+<tr><td><code>p-&gt;first</code> e <code>p-&gt;second</code></td><td><code>auto&amp; [nome, preco] = *p;</code>: nomes que dizem o que são</td><td>C++17</td></tr>
+<tr><td><code>std::cout &lt;&lt; … &lt;&lt; "\n"</code></td><td><code>std::println("{}: {}", nome, preco)</code></td><td>C++23</td></tr>
+</table>
+</div>
+
+<div class="trycpp" data-goal="out:Total: 26.4,src:for\s*\(\s*(const\s+)?auto">
+<p class="try-task"><strong>Missão:</strong> este é o programa de 1998. Troque o laço com <code>const_iterator</code> por um <strong>range-for com <code>auto</code></strong>: <code>for (const auto&amp; item : lista)</code>. Dentro dele, use <code>item</code> no lugar de <code>*it</code>. O total deve continuar <code>26.4</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::map&lt;std::string, double&gt; precos;
+    precos["pão"] = 7.5;
+    precos["leite"] = 5.25;
+    precos["café"] = 18.9;
+
+    std::vector&lt;std::string&gt; lista;
+    lista.push_back("café");
+    lista.push_back("pão");
+
+    double total = 0;
+    for (std::vector&lt;std::string&gt;::const_iterator it = lista.begin(); it != lista.end(); ++it) {
+        std::map&lt;std::string, double&gt;::const_iterator p = precos.find(*it);
+        if (p != precos.end()) {
+            std::cout &lt;&lt; p-&gt;first &lt;&lt; ": " &lt;&lt; p-&gt;second &lt;&lt; "\n";
+            total += p-&gt;second;
+        }
+    }
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::map&lt;std::string, double&gt; precos;
+    precos["pão"] = 7.5;
+    precos["leite"] = 5.25;
+    precos["café"] = 18.9;
+
+    std::vector&lt;std::string&gt; lista;
+    lista.push_back("café");
+    lista.push_back("pão");
+
+    double total = 0;
+    for (const auto&amp; item : lista) {
+        auto p = precos.find(item);
+        if (p != precos.end()) {
+            std::cout &lt;&lt; p-&gt;first &lt;&lt; ": " &lt;&lt; p-&gt;second &lt;&lt; "\n";
+            total += p-&gt;second;
+        }
+    }
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. C++14: acabamento <span class="versao">C++14</span></h2>
+<p>O C++14 foi uma versão pequena, que arredondou o C++11. O item mais importante para você é o <code>std::make_unique</code>: com ele, o <code>new</code> some de vez do código do dia a dia.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Recurso</th><th>Exemplo mínimo</th><th>Para que serve</th><th>Aula</th><th>g++ 15</th></tr>
+<tr><td><code>std::make_unique</code></td><td><code>auto u = std::make_unique&lt;int&gt;(42);</code></td><td>Criar um <code>unique_ptr</code> sem escrever <code>new</code>.</td><td><a href="smart-pointers.html">Ponteiros Inteligentes</a></td><td>sim</td></tr>
+<tr><td>Lambdas genéricas</td><td><code>[](auto x) { … }</code></td><td>Uma lambda que aceita qualquer tipo.</td><td><a href="lambdas.html">Lambdas</a></td><td>sim</td></tr>
+<tr><td>Retorno deduzido</td><td><code>auto soma(int a, int b) { return a + b; }</code></td><td>A função descobre o próprio tipo de retorno.</td><td><a href="retorno.html">Retorno</a></td><td>sim</td></tr>
+<tr><td>Separador de dígitos</td><td><code>1'000'000</code></td><td>Números grandes fáceis de ler.</td><td><a href="inteiros.html">Inteiros</a></td><td>sim</td></tr>
+<tr><td>Literal binário</td><td><code>0b1010</code></td><td>Escrever um número em base 2.</td><td><a href="inteiros.html">Inteiros</a></td><td>sim</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="cpp14.cpp">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+
+auto soma(int a, int b) { return a + b; }       // retorno deduzido
+
+int main() {
+    auto u = std::make_unique&lt;int&gt;(42);         // make_unique
+    auto mostra = [](auto x) { std::cout &lt;&lt; x &lt;&lt; '\n'; };  // lambda genérica
+    mostra(*u);
+    mostra("texto");
+    mostra(3.5);
+    int milhao = 1'000'000;                     // separador de dígitos
+    int bin = 0b1010;                           // literal binário
+    std::cout &lt;&lt; milhao &lt;&lt; ' ' &lt;&lt; bin &lt;&lt; ' ' &lt;&lt; soma(2, 3) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/novidades">$ g++ -std=c++23 -Wall -Wextra cpp14.cpp -o cpp14 &amp;&amp; ./cpp14
+42
+texto                « a mesma lambda recebeu um int, um texto e um double
+3.5
+1000000 10 5         « 0b1010 é 10 em decimal</pre>
+
+<hr>
+
+<h2>4. C++17: ferramentas do dia a dia <span class="versao">C++17</span></h2>
+<p>O C++17 trouxe "caixinhas" que resolvem problemas comuns: um valor que pode não existir (<code>optional</code>), um valor que pode ser de dois tipos (<code>variant</code>), um texto que você só quer ler (<code>string_view</code>) e um jeito de mexer em pastas e arquivos (<code>filesystem</code>).</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Recurso</th><th>Exemplo mínimo</th><th>Para que serve</th><th>Aula</th><th>g++ 15</th></tr>
+<tr><td>Desestruturação (<em>structured bindings</em>)</td><td><code>auto [fruta, qtd] = par;</code></td><td>Dar nome às partes de um par, tupla ou struct.</td><td><a href="pair-tuple.html">pair, tuple e Desestruturação</a></td><td>sim</td></tr>
+<tr><td><code>std::optional</code></td><td><code>std::optional&lt;int&gt; idade;</code></td><td>"Talvez tenha um valor, talvez não."</td><td><a href="optional-variant.html">optional e variant</a></td><td>sim</td></tr>
+<tr><td><code>std::variant</code></td><td><code>std::variant&lt;int, std::string&gt; v;</code></td><td>Um valor que pode ser de um tipo ou de outro.</td><td><a href="optional-variant.html">optional e variant</a></td><td>sim</td></tr>
+<tr><td><code>std::string_view</code></td><td><code>void saudar(std::string_view nome)</code></td><td>Olhar um texto sem copiá-lo.</td><td><a href="string-view.html">string_view</a></td><td>sim</td></tr>
+<tr><td><code>if</code> com inicializador</td><td><code>if (auto it = m.find(k); it != m.end())</code></td><td>Criar uma variável que só existe dentro do <code>if</code>.</td><td><a href="if-else.html">if e else</a></td><td>sim</td></tr>
+<tr><td><code>std::filesystem</code></td><td><code>std::filesystem::current_path()</code></td><td>Pastas, arquivos, caminhos.</td><td><a href="arquivos.html">Arquivos</a></td><td>sim</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="cpp17.cpp">#include &lt;filesystem&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;optional&gt;
+#include &lt;string&gt;
+#include &lt;string_view&gt;
+#include &lt;variant&gt;
+
+std::optional&lt;int&gt; buscar(const std::map&lt;std::string, int&gt;&amp; m, const std::string&amp; k) {
+    if (auto it = m.find(k); it != m.end()) return it-&gt;second;  // if com inicializador
+    return std::nullopt;
+}
+
+void saudar(std::string_view nome) { std::cout &lt;&lt; "Oi, " &lt;&lt; nome &lt;&lt; '\n'; }
+
+int main() {
+    std::map&lt;std::string, int&gt; estoque{{"maçã", 12}, {"pera", 0}};
+    for (const auto&amp; [fruta, qtd] : estoque)              // structured bindings
+        std::cout &lt;&lt; fruta &lt;&lt; ": " &lt;&lt; qtd &lt;&lt; '\n';
+    std::cout &lt;&lt; buscar(estoque, "maçã").value_or(-1) &lt;&lt; ' '
+              &lt;&lt; buscar(estoque, "uva").value_or(-1) &lt;&lt; '\n';
+    std::variant&lt;int, std::string&gt; v = std::string("dez");
+    std::cout &lt;&lt; std::get&lt;std::string&gt;(v) &lt;&lt; '\n';
+    saudar("Ana");
+    std::cout &lt;&lt; std::filesystem::current_path() &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/novidades">$ g++ -std=c++23 -Wall -Wextra cpp17.cpp -o cpp17 &amp;&amp; ./cpp17
+maçã: 12
+pera: 0
+12 -1                      « "uva" não existe: value_or devolveu o -1 de reserva
+dez
+Oi, Ana
+"/home/ana/cpp/novidades"  « o caminho sai entre aspas quando vai direto para o cout</pre>
+
+<div class="trycpp" data-goal="out:maçã tem 12,out:pera tem 0,src:auto\s*&amp;?\s*\[">
+<p class="try-task"><strong>Missão:</strong> o laço usa <code>par.first</code> e <code>par.second</code>, que não dizem nada. Troque por uma <strong>desestruturação</strong>: <code>for (const auto&amp; [fruta, qtd] : estoque)</code>, e mostre <code>maçã tem 12</code> e <code>pera tem 0</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::map&lt;std::string, int&gt; estoque{{"maçã", 12}, {"pera", 0}};
+    for (const auto&amp; par : estoque) {
+        std::cout &lt;&lt; par.first &lt;&lt; ": " &lt;&lt; par.second &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::map&lt;std::string, int&gt; estoque{{"maçã", 12}, {"pera", 0}};
+    for (const auto&amp; [fruta, qtd] : estoque) {
+        std::cout &lt;&lt; fruta &lt;&lt; " tem " &lt;&lt; qtd &lt;&lt; '\n';
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>5. C++20: a segunda grande virada <span class="versao">C++20</span></h2>
+<p>O C++20 é tão grande quanto o C++11. Ele mudou como se escrevem templates (concepts), como se percorrem coleções (ranges), como se formata texto (<code>std::format</code>) e até como se organizam os arquivos (módulos).</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Recurso</th><th>Exemplo mínimo</th><th>Para que serve</th><th>Aula</th><th>g++ 15</th></tr>
+<tr><td>Concepts</td><td><code>template &lt;std::integral T&gt;</code></td><td>Dizer que tipo um template aceita, com erros legíveis.</td><td><a href="concepts.html">Concepts</a></td><td>sim</td></tr>
+<tr><td>Ranges</td><td><code>notas | std::views::filter(…)</code></td><td>Encadear filtros e transformações numa coleção.</td><td><a href="ranges.html">Ranges</a></td><td>sim</td></tr>
+<tr><td><code>std::format</code></td><td><code>std::format("{} + {}", a, b)</code></td><td>Montar texto com marcadores <code>{}</code>.</td><td><a href="format-print.html">format e print</a></td><td>sim</td></tr>
+<tr><td><code>&lt;=&gt;</code> ("nave espacial")</td><td><code>auto operator&lt;=&gt;(const V&amp;) const = default;</code></td><td>Ganhar <code>&lt;</code>, <code>&gt;</code>, <code>==</code>… de uma vez.</td><td><a href="sobrecarga-operadores.html">Sobrecarga de Operadores</a></td><td>sim</td></tr>
+<tr><td>Módulos</td><td><code>export module loja;</code> / <code>import loja;</code></td><td>Substituir os <code>#include</code>.</td><td><a href="modulos.html">Módulos</a></td><td>sim, com <code>-fmodules</code></td></tr>
+<tr><td><code>std::span</code></td><td><code>int soma(std::span&lt;const int&gt; v)</code></td><td>"Uma janela" para um pedaço de vector ou array.</td><td><a href="vector.html">std::vector</a></td><td>sim</td></tr>
+<tr><td><code>contains</code> em <code>map</code>/<code>set</code></td><td><code>m.contains("ana")</code></td><td>Perguntar se uma chave existe.</td><td><a href="map.html">std::map</a></td><td>sim</td></tr>
+<tr><td>Inicializadores designados</td><td><code>Ponto p{.x = 1, .y = 2};</code></td><td>Preencher uma struct dizendo o nome de cada campo.</td><td><a href="structs.html">Structs</a></td><td>sim</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="cpp20.cpp">#include &lt;algorithm&gt;
+#include &lt;compare&gt;
+#include &lt;concepts&gt;
+#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;ranges&gt;
+#include &lt;span&gt;
+#include &lt;vector&gt;
+
+template &lt;std::integral T&gt;
+T dobro(T x) { return x * 2; }
+
+struct Versao {
+    int maior, menor;
+    auto operator&lt;=&gt;(const Versao&amp;) const = default;
+};
+
+int soma(std::span&lt;const int&gt; v) { int t = 0; for (int x : v) t += x; return t; }
+
+int main() {
+    std::vector&lt;int&gt; notas{3, 8, 5, 10, 7};
+    auto aprovadas = notas | std::views::filter([](int n) { return n &gt;= 6; });
+    for (int n : aprovadas) std::cout &lt;&lt; n &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+    std::ranges::sort(notas);
+    std::cout &lt;&lt; std::format("menor={} maior={} soma={}\n", notas.front(), notas.back(), soma(notas));
+    std::cout &lt;&lt; dobro(21) &lt;&lt; '\n';
+    std::cout &lt;&lt; (Versao{1, 2} &lt; Versao{1, 10}) &lt;&lt; '\n';
+    std::map&lt;std::string, int&gt; m{{"ana", 1}};
+    std::cout &lt;&lt; m.contains("ana") &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/novidades">$ g++ -std=c++23 -Wall -Wextra cpp20.cpp -o cpp20 &amp;&amp; ./cpp20
+8 10 7                       « só as notas maiores ou iguais a 6
+menor=3 maior=10 soma=33
+42
+1                            « a versão 1.2 vem antes da 1.10: o &lt;=&gt; comparou campo por campo
+1</pre>
+
+<div class="note">
+<strong>Módulos ainda pedem uma opção extra</strong>
+<p>No g++ 15, módulos só funcionam com a opção <code>-fmodules</code>, além do <code>-std=c++20</code> ou mais novo. O CMake e as IDEs ainda estão se acostumando com eles. A aula <a href="modulos.html">Módulos</a> mostra o passo a passo; no dia a dia, os <code>#include</code> continuam sendo a forma mais comum.</p>
+</div>
+
+<hr>
+
+<h2>6. C++23: a versão deste guia <span class="versao">C++23</span></h2>
+<p>O C++23 completou o que o C++20 começou. O recurso que você mais vai ver no guia é o <code>std::println</code>: escrever na tela com marcadores <code>{}</code>, sem a fila de <code>&lt;&lt;</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Recurso</th><th>Exemplo mínimo</th><th>Para que serve</th><th>Aula</th><th>g++ 15</th></tr>
+<tr><td><code>std::print</code> / <code>std::println</code></td><td><code>std::println("Olá, {}!", nome);</code></td><td>Mostrar texto formatado. O <code>println</code> já pula a linha.</td><td><a href="format-print.html">format e print</a></td><td>sim</td></tr>
+<tr><td><code>std::expected</code></td><td><code>std::expected&lt;int, std::string&gt;</code></td><td>"Um resultado <strong>ou</strong> o motivo do erro", sem exceções.</td><td><a href="optional-variant.html">optional e variant</a></td><td>sim</td></tr>
+<tr><td><code>std::ranges::to</code></td><td><code>… | std::ranges::to&lt;std::vector&gt;()</code></td><td>Transformar o resultado de um range num <code>vector</code> de verdade.</td><td><a href="ranges.html">Ranges</a></td><td>sim</td></tr>
+<tr><td><code>import std;</code></td><td><code>import std;</code></td><td>A biblioteca padrão inteira numa linha, como módulo.</td><td><a href="modulos.html">Módulos</a></td><td>sim, com <code>-fmodules</code> (veja abaixo)</td></tr>
+<tr><td><code>contains</code> em <code>string</code></td><td><code>frase.contains("compras")</code></td><td>Perguntar se um texto contém outro.</td><td><a href="funcoes-string.html">Funções de String</a></td><td>sim</td></tr>
+<tr><td><code>std::views::enumerate</code></td><td><code>for (auto [i, nome] : std::views::enumerate(nomes))</code></td><td>Percorrer com a posição junto.</td><td><a href="ranges.html">Ranges</a></td><td>sim</td></tr>
+<tr><td><code>std::flat_map</code></td><td><code>std::flat_map&lt;std::string, int&gt;</code></td><td>Um mapa guardado num vetor: mais rápido para ler.</td><td><a href="map.html">std::map</a></td><td>sim</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="cpp23.cpp">#include &lt;expected&gt;
+#include &lt;print&gt;
+#include &lt;ranges&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+std::expected&lt;int, std::string&gt; dividir(int a, int b) {
+    if (b == 0) return std::unexpected("divisão por zero");
+    return a / b;
+}
+
+int main() {
+    std::println("Olá, {}!", "Ana");
+    auto r = dividir(10, 0);
+    if (!r) std::println("erro: {}", r.error());
+    std::println("{}", dividir(10, 2).value());
+    auto pares = std::views::iota(1, 11)
+               | std::views::filter([](int x) { return x % 2 == 0; })
+               | std::ranges::to&lt;std::vector&gt;();
+    std::println("{}", pares);
+    std::string frase = "lista de compras";
+    std::println("{}", frase.contains("compras"));
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/novidades">$ g++ -std=c++23 -Wall -Wextra cpp23.cpp -o cpp23 &amp;&amp; ./cpp23
+Olá, Ana!
+erro: divisão por zero         « dividir(10, 0) devolveu o erro, não um número
+5
+[2, 4, 6, 8, 10]               « o println sabe mostrar um vector inteiro
+true                           « e mostra bool como true/false, não 1/0</pre>
+
+<p>Repare nas duas últimas linhas. O <code>std::println</code> mostra um <code>vector</code> inteiro com colchetes e vírgulas, e mostra booleanos como <code>true</code>/<code>false</code>. Com o <code>cout</code>, você teria de escrever um laço para o vetor e usar <code>std::boolalpha</code> para o booleano.</p>
+
+<h3><code>import std;</code> no g++ 15</h3>
+<p>O <code>import std;</code> troca todos os <code>#include</code> da biblioteca padrão por uma linha. No g++ 15 ele funciona, mas a biblioteca precisa ser compilada como módulo na primeira vez. Isso se faz acrescentando o arquivo <code>bits/std.cc</code> (que vem com o g++) ao comando:</p>
+
+<pre class="file" data-file="importstd.cpp">import std;
+
+int main() {
+    std::println("Olá do import std!");
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/novidades">$ g++ -std=c++23 -fmodules -fsearch-include-path bits/std.cc importstd.cpp -o importstd
+$ ./importstd
+Olá do import std!
+$ ls gcm.cache
+std.gcm                « a biblioteca padrão já compilada como módulo</pre>
+
+<dl class="anatomy">
+  <dt>-fmodules</dt><dd>Liga os módulos no g++.</dd>
+  <dt>-fsearch-include-path bits/std.cc</dt><dd>Procura o arquivo <code>bits/std.cc</code> nas pastas de cabeçalhos do g++ e o compila junto. É ele que diz "o módulo <code>std</code> é feito destas partes".</dd>
+  <dt>gcm.cache/std.gcm</dt><dd>O resultado: a biblioteca padrão "pré-digerida". Nas próximas compilações na mesma pasta, o g++ reaproveita esse arquivo.</dd>
+</dl>
+
+<p>É um recurso promissor, mas ainda pouco usado: o guia continua com os <code>#include</code>, que funcionam em todo lugar. No editor do guia (Clang), use também os <code>#include</code>.</p>
+
+<div class="trycpp" data-goal="out:[7.5\, 5.25],src:ranges::to">
+<p class="try-task"><strong>Missão:</strong> a Ana quer só os produtos que custam <strong>menos de 10 reais</strong>. Complete a condição do <code>filter</code> e termine o encadeamento com <code>| std::ranges::to&lt;std::vector&gt;()</code>. O <code>println</code> deve mostrar <code>[7.5, 5.25]</code>.</p>
+<pre class="script">#include &lt;print&gt;
+#include &lt;ranges&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;double&gt; precos{7.5, 18.9, 5.25, 32.0};
+    std::vector&lt;double&gt; baratos = precos
+        | std::views::filter([](double p) { return true; /* troque */ });
+    std::println("{}", baratos);
+}
+</pre>
+<pre class="solucao">#include &lt;print&gt;
+#include &lt;ranges&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;double&gt; precos{7.5, 18.9, 5.25, 32.0};
+    std::vector&lt;double&gt; baratos = precos
+        | std::views::filter([](double p) { return p &lt; 10; })
+        | std::ranges::to&lt;std::vector&gt;();
+    std::println("{}", baratos);
+}
+</pre>
+</div>
+
+<p>Se você rodar a missão sem mexer, o compilador recusa. No g++, a linha principal do erro é esta:</p>
+
+<pre class="term" data-cwd="~/cpp/novidades">$ g++ -std=c++23 -Wall -Wextra baratos.cpp -o baratos
+baratos.cpp: In lambda function:
+baratos.cpp:8:40: warning: unused parameter ‘p’ [-Wunused-parameter]
+    8 |         | std::views::filter([](double p) { return true; /* troque */ });
+      |                                 ~~~~~~~^
+baratos.cpp: In function ‘int main()’:
+baratos.cpp:8:9: error: conversion from ‘std::ranges::filter_view&lt;std::ranges::ref_view&lt;std::vector&lt;double&gt; &gt;, main()::&lt;lambda(double)&gt; &gt;’ to non-scalar type ‘std::vector&lt;double&gt;’ requested
+    7 |     std::vector&lt;double&gt; baratos = precos
+      |                                   ~~~~~~
+    8 |         | std::views::filter([](double p) { return true; /* troque */ });
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~</pre>
+
+<p>O aviso é só porque o <code>p</code> ainda não é usado. O erro, traduzido: "pediram uma conversão de <code>filter_view</code> para <code>std::vector&lt;double&gt;</code>". Um <code>filter</code> é só uma "vista" que escolhe elementos na hora em que você percorre; ele não é um <code>vector</code>. O <code>ranges::to</code> existe exatamente para fazer essa conversão. (O Clang do editor diz a mesma coisa com outras palavras: <code>no viable conversion</code>.)</p>
+
+<hr>
+
+<h2>7. C++26: o que já chegou e o que ainda não <span class="versao">C++26</span></h2>
+<p>O C++26 é a versão mais nova. O comitê fechou o texto, mas os compiladores ainda estão implementando as partes. As duas novidades mais esperadas são a <strong>reflexão</strong> (o programa poder "olhar para si mesmo": listar os campos de uma struct, os nomes de um <code>enum</code>) e os <strong>contratos</strong> (escrever na própria função as condições que os argumentos devem cumprir). A Ana testou cada item com <code>g++ -std=c++26</code> e <code>clang++ -std=c++2c</code>:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Recurso</th><th>Exemplo mínimo</th><th>Para que serve</th><th>g++ 15</th><th>clang 21</th></tr>
+<tr><td>Reflexão</td><td><code>std::meta::identifier_of(^^Cor)</code></td><td>Ler, durante a compilação, os nomes e campos dos seus tipos.</td><td><strong>não</strong></td><td><strong>não</strong></td></tr>
+<tr><td>Contratos</td><td><code>int dividir(int a, int b) pre(b != 0)</code></td><td>Condições de entrada (<code>pre</code>) e saída (<code>post</code>) de uma função.</td><td><strong>não</strong></td><td><strong>não</strong></td></tr>
+<tr><td><code>std::inplace_vector</code></td><td><code>std::inplace_vector&lt;int, 3&gt; v;</code></td><td>Um vector com capacidade máxima fixa, sem alocar memória.</td><td><strong>não</strong></td><td><strong>não</strong></td></tr>
+<tr><td>Variável "não me interessa" <code>_</code></td><td><code>auto [_, idade] = pessoa;</code></td><td>Ignorar uma parte sem inventar um nome.</td><td>sim</td><td>sim</td></tr>
+<tr><td><code>= delete("motivo")</code></td><td><code>void pagar(int) = delete("use double");</code></td><td>Proibir uma chamada explicando por quê.</td><td>sim</td><td>sim</td></tr>
+<tr><td>Indexar pacotes</td><td><code>args...[0]</code></td><td>Pegar o primeiro argumento de um template variádico.</td><td>sim</td><td>sim</td></tr>
+<tr><td><code>#embed</code></td><td><code>#embed "lista.txt"</code></td><td>Colocar o conteúdo de um arquivo dentro do programa.</td><td>sim</td><td>sim, com aviso</td></tr>
+<tr><td>Aritmética saturada</td><td><code>std::add_sat(a, b)</code></td><td>Somar sem "dar a volta": o resultado para no máximo do tipo.</td><td>sim</td><td>sim</td></tr>
+<tr><td><code>std::println()</code> vazio</td><td><code>std::println();</code></td><td>Só pular uma linha.</td><td>sim</td><td>sim</td></tr>
+</table>
+</div>
+
+<p>As três primeiras linhas são as mais faladas, e ainda <strong>não</strong> estão no g++ 15. Veja o que ele responde a cada uma:</p>
+
+<pre class="term" data-cwd="~/cpp/novidades">$ g++ -std=c++26 -Wall -Wextra c26_reflect.cpp -o c26_reflect
+c26_reflect.cpp:1:10: fatal error: meta: Arquivo ou diretório inexistente
+    1 | #include &lt;meta&gt;
+      |          ^~~~~~
+compilation terminated.
+$ g++ -std=c++26 -Wall -Wextra c26_inplace.cpp -o c26_inplace
+c26_inplace.cpp:1:10: fatal error: inplace_vector: Arquivo ou diretório inexistente
+    1 | #include &lt;inplace_vector&gt;
+      |          ^~~~~~~~~~~~~~~~
+compilation terminated.
+$ g++ -std=c++26 -Wall -Wextra c26_contracts.cpp -o c26_contracts
+c26_contracts.cpp:3:27: error: expected initializer before ‘pre’
+    3 | int dividir(int a, int b) pre(b != 0) { return a / b; }
+      |                           ^~~
+c26_contracts.cpp: In function ‘int main()’:
+c26_contracts.cpp:6:24: error: ‘dividir’ was not declared in this scope
+    6 |     std::println("{}", dividir(10, 2));
+      |                        ^~~~~~~</pre>
+
+<p>Os dois primeiros erros dizem a mesma coisa: o <strong>cabeçalho</strong> (<code>&lt;meta&gt;</code> da reflexão, <code>&lt;inplace_vector&gt;</code>) não existe na biblioteca do g++ 15. A parte "Arquivo ou diretório inexistente" sai em português porque vem do sistema, não do g++. No terceiro, o g++ não conhece a palavra <code>pre</code> naquele lugar e se perde: o segundo erro (<code>‘dividir’ was not declared</code>) é só consequência do primeiro. Enquanto os contratos não chegam, o jeito é conferir o argumento com um <code>if</code> ou um <code>assert</code> (veja <a href="excecoes.html">Exceções</a>).</p>
+
+<p>Já os recursos menores funcionam. Este é o <code>= delete("motivo")</code>, que dá um erro com a explicação escrita por você:</p>
+
+<pre class="file" data-file="c26_delete.cpp">void pagar(double valor);
+void pagar(int) = delete("use double para dinheiro");   // C++26
+
+int main() {
+    pagar(10);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/novidades">$ g++ -std=c++26 -Wall -Wextra c26_delete.cpp -o c26_delete
+c26_delete.cpp: In function ‘int main()’:
+c26_delete.cpp:5:10: error: use of deleted function ‘void pagar(int)’: use double para dinheiro
+    5 |     pagar(10);
+      |     ~~~~~^~~~
+c26_delete.cpp:2:6: note: declared here
+    2 | void pagar(int) = delete("use double para dinheiro");   // C++26
+      |      ^~~~~
+c26_delete.cpp:5:10: note: use ‘-fdiagnostics-all-candidates’ to display considered candidates</pre>
+
+<p>O <code>10</code> é um <code>int</code>, e a versão <code>int</code> foi apagada de propósito: o erro aparece com a frase "use double para dinheiro". E o <code>_</code>, que deixa você ignorar uma parte de uma desestruturação:</p>
+
+<pre class="file" data-file="c26_placeholder.cpp">#include &lt;print&gt;
+#include &lt;utility&gt;
+
+int main() {
+    auto [_, idade] = std::pair{"Ana", 30};   // _ = "não me interessa" (C++26)
+    std::println("{}", idade);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/novidades">$ g++ -std=c++26 -Wall -Wextra c26_placeholder.cpp -o c26_placeholder &amp;&amp; ./c26_placeholder
+30</pre>
+
+<div class="tip">
+<strong>Use C++26 só quando precisar</strong>
+<p>Como o C++26 ainda está chegando aos compiladores, código com <code>-std=c++26</code> pode não compilar no computador de outra pessoa. Para projetos, o C++23 (ou até o C++20) é a escolha segura em 2026. O editor do guia também usa <code>-std=c++23</code>.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"has no member named ‘contains’": esqueceu o <code>-std=</code></strong>
+<pre class="file" data-file="contem.cpp">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::map&lt;std::string, int&gt; estoque{{"maçã", 12}};
+    if (estoque.contains("maçã"))
+        std::cout &lt;&lt; "tem maçã\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/novidades">$ g++ -Wall -Wextra contem.cpp -o contem
+contem.cpp: In function ‘int main()’:
+contem.cpp:7:17: error: ‘class std::map&lt;std::__cxx11::basic_string&lt;char&gt;, int&gt;’ has no member named ‘contains’
+    7 |     if (estoque.contains("maçã"))
+      |                 ^~~~~~~~</pre>
+<p><strong>O que significa:</strong> "a classe <code>std::map</code> não tem nenhum membro chamado <code>contains</code>". Sem <code>-std=</code>, o g++ 15 compilou em C++17, e o <code>contains</code> só veio no C++20. O tipo comprido (<code>std::__cxx11::basic_string&lt;char&gt;</code>) é só o nome completo de <code>std::string</code>.</p>
+<p><strong>Como consertar:</strong> acrescente <code>-std=c++23</code>. Sempre que um recurso novo "não existe", desconfie primeiro da versão.</p>
+</div>
+
+<div class="cenario">
+<strong>"‘println’ is not a member of ‘std’": versão antiga demais</strong>
+<pre class="term" data-cwd="~/cpp/novidades">$ g++ -std=c++20 -Wall -Wextra imprime.cpp -o imprime
+imprime.cpp: In function ‘int main()’:
+imprime.cpp:4:10: error: ‘println’ is not a member of ‘std’
+    4 |     std::println("Olá, {}!", "Ana");
+      |          ^~~~~~~
+imprime.cpp:4:10: note: ‘std::println’ is only available from C++23 onwards
+$ g++ -std=c++23 -Wall -Wextra imprime.cpp -o imprime &amp;&amp; ./imprime
+Olá, Ana!</pre>
+<p><strong>O que significa:</strong> "<code>println</code> não é membro de <code>std</code>". Aqui o g++ ajuda: a nota da última linha diz que <code>std::println</code> só existe "do C++23 em diante". O <code>#include &lt;print&gt;</code> não deu erro, mas, em C++20, o arquivo existe vazio.</p>
+<p><strong>Como consertar:</strong> <code>-std=c++23</code>, como na segunda tentativa.</p>
+</div>
+
+<div class="cenario">
+<strong>Código moderno num compilador configurado para C++98</strong>
+<pre class="term" data-cwd="~/cpp/novidades">$ g++ -std=c++98 -Wall -Wextra compras23.cpp -o x
+compras23.cpp: In function ‘int main()’:
+compras23.cpp:7:47: warning: extended initializer lists only available with ‘-std=c++11’ or ‘-std=gnu++11’ [-Wc++11-extensions]
+    7 |     const std::map&lt;std::string, double&gt; precos{
+      |                                               ^
+compras23.cpp:7:41: error: in C++98 ‘precos’ must be initialized by constructor, not by ‘{...}’</pre>
+<p><strong>O que significa:</strong> o aviso diz que "listas de inicialização estendidas" (as chaves <code>{…}</code>) só existem a partir do C++11, e o erro diz que, em C++98, o mapa teria de ser preenchido de outro jeito. Essa saída continua por dezenas de linhas, uma para cada recurso moderno do arquivo; só as primeiras aparecem aqui.</p>
+<p><strong>Como consertar:</strong> isso acontece com projetos antigos (um <code>Makefile</code> com <code>-std=c++98</code>) ou IDEs mal configuradas. Troque a opção para <code>-std=c++23</code>. Veja onde ela fica em <a href="make.html">Make</a> e <a href="cmake.html">CMake</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>"fatal error: …: Arquivo ou diretório inexistente" com um cabeçalho novo</strong>
+<p>Você viu esse erro na seção do C++26, com <code>&lt;meta&gt;</code> e <code>&lt;inplace_vector&gt;</code>. Ele quer dizer que o cabeçalho <strong>não existe</strong> na biblioteca do seu compilador: ou o recurso é novo demais, ou o nome está errado (<code>&lt;vetor&gt;</code>, <code>&lt;strings&gt;</code>). Confira o nome; se estiver certo, o seu compilador ainda não tem o recurso.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Opção</th><th><code>__cplusplus</code></th><th>Recursos-chave</th></tr>
+<tr><td><code>-std=c++98</code></td><td><code>199711</code></td><td>classes, templates, STL (<code>vector</code>, <code>map</code>, <code>string</code>)</td></tr>
+<tr><td><code>-std=c++11</code></td><td><code>201103</code></td><td><code>auto</code>, range-for, lambdas, <code>nullptr</code>, <code>unique_ptr</code>/<code>shared_ptr</code>, <code>std::move</code>, <code>constexpr</code>, <code>enum class</code>, <code>{}</code></td></tr>
+<tr><td><code>-std=c++14</code></td><td><code>201402</code></td><td><code>make_unique</code>, lambdas genéricas, <code>1'000'000</code>, <code>0b1010</code></td></tr>
+<tr><td><code>-std=c++17</code> (padrão do g++ 15)</td><td><code>201703</code></td><td>desestruturação, <code>optional</code>, <code>variant</code>, <code>string_view</code>, <code>if (init; cond)</code>, <code>filesystem</code></td></tr>
+<tr><td><code>-std=c++20</code></td><td><code>202002</code></td><td>concepts, ranges, <code>format</code>, <code>&lt;=&gt;</code>, módulos, <code>span</code>, <code>contains</code></td></tr>
+<tr><td><code>-std=c++23</code> (o guia)</td><td><code>202302</code></td><td><code>print</code>/<code>println</code>, <code>expected</code>, <code>ranges::to</code>, <code>import std</code>, <code>string::contains</code></td></tr>
+<tr><td><code>-std=c++26</code></td><td><code>202400</code> no g++ 15</td><td>reflexão e contratos (ainda não no g++ 15), <code>_</code>, <code>delete("motivo")</code>, <code>#embed</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">1. A Ana compilou com <code>g++ programa.cpp -o programa</code>, sem <code>-std=</code>. Em que versão o g++ 15 compilou?</p>
+<label><input type="radio" name="q1"> C++98</label>
+<label><input type="radio" name="q1"> C++17</label>
+<label><input type="radio" name="q1"> C++23</label>
+<label><input type="radio" name="q1"> C++26</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">2. Qual destes recursos <strong>não</strong> funciona no g++ 15?</p>
+<label><input type="radio" name="q2"> <code>std::println</code></label>
+<label><input type="radio" name="q2"> <code>std::expected</code></label>
+<label><input type="radio" name="q2"> Reflexão (<code>#include &lt;meta&gt;</code>)</label>
+<label><input type="radio" name="q2"> <code>std::ranges::to</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">3. Qual versão trouxe <code>auto</code>, lambdas, <code>nullptr</code> e os ponteiros inteligentes?</p>
+<label><input type="radio" name="q3"> C++11</label>
+<label><input type="radio" name="q3"> C++14</label>
+<label><input type="radio" name="q3"> C++17</label>
+<label><input type="radio" name="q3"> C++20</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. A mensagem <code>‘class std::map&lt;…&gt;’ has no member named ‘contains’</code> apareceu. Qual a causa mais provável?</p>
+<label><input type="radio" name="q4"> Faltou <code>#include &lt;string&gt;</code>.</label>
+<label><input type="radio" name="q4"> O mapa está vazio.</label>
+<label><input type="radio" name="q4"> <code>contains</code> só funciona em <code>std::set</code>.</label>
+<label><input type="radio" name="q4"> O programa foi compilado sem <code>-std=c++20</code> ou mais novo.</label>
+</div>
+
+<div class="exercise">
+<p>5. Complete o comando para compilar em C++23 com os avisos ligados:</p>
+<div class="ex-code">g++ <input data-answer="-std=c++23" aria-label="opção de versão"> -Wall -Wextra loja.cpp -o loja</div>
+</div>
+
+<div class="exercise">
+<p>6. Qual valor de <code>__cplusplus</code> o g++ 15 mostra com <code>-std=c++20</code>?</p>
+<div class="ex-code"><input data-answer="202002|202002L" aria-label="valor"></div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma versão nova a cada três anos: C++11, 14, 17, 20, 23 e 26. O código antigo continua compilando.</li>
+  <li><strong>Você escolhe a versão com <code>-std=</code></strong>. Sem ela, o g++ 15 usa o C++17. O guia usa sempre <code>-std=c++23</code>.</li>
+  <li>C++11 e C++20 foram as grandes viradas; C++14 e C++23 completaram o que elas começaram; C++17 trouxe <code>optional</code>, <code>variant</code> e companhia.</li>
+  <li>Tudo do C++23 que o guia ensina funciona no g++ 15 e no clang 21. <code>import std;</code> funciona no g++ 15 com <code>-fmodules</code> e <code>bits/std.cc</code>.</li>
+  <li>Do C++26, os recursos menores já funcionam; reflexão, contratos e <code>std::inplace_vector</code> ainda não estão no g++ 15 nem no clang 21.</li>
+  <li>"Não é membro", "não existe" ou "fatal error: … inexistente" com um recurso novo: confira primeiro o <code>-std=</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
