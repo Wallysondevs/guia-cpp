@@ -1,0 +1,801 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Testes Automatizados — assert, doctest, CHECK e REQUIRE | Guia C++</title>
+<meta name="description" content="Testes automatizados em C++ para quem nunca programou: por que testar, assert do &lt;cassert&gt; (Assertion failed e código 134), um mini-framework de testes, a biblioteca doctest (TEST_CASE, CHECK, REQUIRE, Approx), testar o calcularDesconto da lojinha, ctest no CMake e o que são GoogleTest e Catch2, com saídas reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Testes Automatizados</span></h1>
+
+<p class="intro">Toda vez que a Ana muda o programa da lojinha, ela roda, digita alguns valores e confere a resposta de olho. Funciona no começo. Mas o programa cresceu, e um dia ela mudou o cálculo do frete e quebrou, sem perceber, o cálculo do desconto, que ninguém tinha tocado. Um <strong>teste automatizado</strong> é um pequeno programa que confere o seu programa por você: em um segundo, ele roda dezenas de verificações e avisa exatamente qual falhou. Nesta aula você vai escrever testes de três jeitos, do mais simples (<code>assert</code>) ao usado em projetos de verdade (uma biblioteca de testes).</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um teste automatizado e por que vale a pena.</li>
+  <li>Como usar o <code>assert</code> do <code>&lt;cassert&gt;</code>, e o que significam <code>Assertion … failed</code> e o código 134.</li>
+  <li>Como montar um mini-framework de testes com poucas linhas.</li>
+  <li>Como usar a biblioteca <strong>doctest</strong>: <code>TEST_CASE</code>, <code>CHECK</code>, <code>REQUIRE</code> e <code>doctest::Approx</code>.</li>
+  <li>Por que comparar <code>double</code> com <code>==</code> engana até os testes.</li>
+  <li>Como rodar os testes pelo CMake (<code>ctest</code>), e o que são GoogleTest e Catch2.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp/testes</code>, com o comando padrão do guia (<code>-std=c++23 -Wall -Wextra</code>). A doctest usada é a versão <strong>2.4.12</strong>.</p>
+
+<hr>
+
+<h2>A ideia: a lista de conferência</h2>
+<p>Um piloto de avião não decola confiando na memória: ele segue uma <strong>lista de verificação</strong> (<em>checklist</em>), item por item, todas as vezes. Leva um minuto e pega o esquecimento que a pessoa mais experiente comete.</p>
+
+<p>Um teste é um item dessa lista, escrito em C++: "o desconto de uma compra de R$ 100 tem que ser R$ 10". Você escreve uma vez e o computador confere sempre que quiser.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Testar de olho</th><th>Teste automatizado</th></tr>
+<tr><td>você digita valores e lê a saída</td><td>o programa de teste confere sozinho</td></tr>
+<tr><td>confere o que lembrou de conferir</td><td>confere tudo o que está na lista, sempre</td></tr>
+<tr><td>demora minutos</td><td>leva frações de segundo</td></tr>
+<tr><td>uma mudança aqui quebra algo ali, e você só descobre depois</td><td>o teste que falha aponta o que quebrou, na hora</td></tr>
+</table>
+</div>
+
+<p>A função que a Ana vai testar a aula inteira é a do desconto da lojinha. A regra é: compras <strong>a partir de</strong> R$ 100 ganham 10% de desconto; <strong>a partir de</strong> R$ 200, 15%. A função devolve o valor do desconto, em reais. Esta é a primeira versão dela; repare se você acha o defeito:</p>
+
+<pre class="file" data-file="trecho">double calcularDesconto(double total) {
+    if (total &gt; 200) {
+        return total * 0.15;
+    }
+    if (total &gt; 100) {
+        return total * 0.10;
+    }
+    return 0;
+}</pre>
+
+<hr>
+
+<h2>1. O primeiro teste: <code>assert</code></h2>
+<p>A biblioteca padrão tem uma ferramenta pronta: <code>assert</code> ("afirmar"), do cabeçalho <code>&lt;cassert&gt;</code>. Você afirma algo que <strong>tem</strong> que ser verdade; se não for, o programa para na hora e diz onde.</p>
+
+<pre class="file" data-file="assert1.cpp">#include &lt;cassert&gt;
+#include &lt;iostream&gt;
+
+// Desconto da lojinha: 10% a partir de R$ 100, 15% a partir de R$ 200
+double calcularDesconto(double total) {
+    if (total &gt; 200) {
+        return total * 0.15;
+    }
+    if (total &gt; 100) {
+        return total * 0.10;
+    }
+    return 0;
+}
+
+int main() {
+    assert(calcularDesconto(50) == 0);
+    assert(calcularDesconto(300) == 45);
+    assert(calcularDesconto(100) == 10);
+    std::cout &lt;&lt; "Todos os testes passaram!\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;cassert&gt;</dt><dd>O cabeçalho do <code>assert</code> (o <code>c</code> do começo indica que ele veio da linguagem C).</dd>
+  <dt>assert(calcularDesconto(50) == 0);</dt><dd>"Afirmo que o desconto de R$ 50 é zero." Se for verdade, nada acontece e o programa segue. Se for falso, o programa é interrompido.</dd>
+  <dt>calcularDesconto(100) == 10</dt><dd>O caso que mais interessa: o valor <strong>exato</strong> da fronteira, R$ 100. A regra diz "a partir de", então R$ 100 já tem desconto.</dd>
+</dl>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra assert1.cpp -o assert1
+$ ./assert1
+assert1: assert1.cpp:18: int main(): Assertion `calcularDesconto(100) == 10' failed.
+Abortado                   (imagem do núcleo gravada) ./assert1
+$ echo $?
+134</pre>
+
+<p>O teste achou o defeito. Leia a mensagem por partes:</p>
+<dl class="anatomy">
+  <dt>assert1:</dt><dd>O nome do programa.</dd>
+  <dt>assert1.cpp:18:</dt><dd>O arquivo e a linha do <code>assert</code> que falhou.</dd>
+  <dt>int main():</dt><dd>A função onde ele está.</dd>
+  <dt>Assertion `calcularDesconto(100) == 10' failed.</dt><dd>"A afirmação … falhou", com o texto exato que você escreveu.</dd>
+  <dt>Abortado (imagem do núcleo gravada)</dt><dd>Isso é o Bash avisando que o programa foi <strong>abortado</strong>, interrompido à força pela função <code>abort()</code>, que o <code>assert</code> chama. A "imagem do núcleo" (<em>core dump</em>) é uma fotografia da memória do programa para depuração; você pode ignorá-la.</dd>
+  <dt>134</dt><dd>O código de saída de um programa abortado: 128 + 6, onde 6 é o número do sinal <code>SIGABRT</code> ("sinal de abortar"). Qualquer código diferente de 0 quer dizer "deu errado".</dd>
+</dl>
+
+<p>O defeito: o código usa <code>&gt;</code> ("maior que"), mas a regra diz "a partir de", que é <code>&gt;=</code> ("maior ou igual"). Com R$ 100, <code>100 &gt; 100</code> é falso, e o desconto ficou zero. É o tipo de erro que se esconde nas <strong>fronteiras</strong>, e por isso os bons testes sempre conferem o valor exato onde a regra muda. Trocando os dois <code>&gt;</code> por <code>&gt;=</code>:</p>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra assert1.cpp -o assert1
+$ ./assert1
+Todos os testes passaram!
+$ echo $?
+0</pre>
+
+<h3>Os limites do <code>assert</code></h3>
+<ul>
+  <li><strong>Para no primeiro erro.</strong> Se três testes estão errados, você descobre um por vez.</li>
+  <li><strong>Não mostra os valores.</strong> Diz que <code>calcularDesconto(100) == 10</code> falhou, mas não quanto a função devolveu.</li>
+  <li><strong>Pode ser desligado.</strong> Compilando com <code>-DNDEBUG</code> (de <em>no debug</em>, "sem depuração"), todos os <code>assert</code> somem. Com a versão defeituosa da função:</li>
+</ul>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra -DNDEBUG assert1.cpp -o assert1
+$ ./assert1
+Todos os testes passaram!         « mentira: os assert foram apagados
+$ echo $?
+0</pre>
+
+<p>O <code>assert</code> é uma macro (veja <a href="preprocessador.html">O Pré-processador</a>) que vira nada quando <code>NDEBUG</code> está definido. Muitos projetos compilam a versão final com <code>-DNDEBUG</code>, para não pagar o custo das verificações. Por isso, use o <code>assert</code> para conferir coisas "impossíveis" <strong>dentro</strong> do programa, e uma biblioteca de testes para testar.</p>
+
+<div class="warning">
+<strong>Nunca ponha algo que o programa precisa dentro de um <code>assert</code></strong>
+<p><code>assert(abrirArquivo());</code> funciona até o dia em que alguém compila com <code>-DNDEBUG</code>: a chamada some junto, e o arquivo nunca é aberto.</p>
+</div>
+
+<hr>
+
+<h2>2. Um mini-framework de testes</h2>
+<p>Um <strong>framework de testes</strong> (em português, "arcabouço") é o código que roda os testes, conta quantos passaram e mostra os que falharam. Dá para fazer um, bem simples, em 15 linhas, e isso ajuda a entender o que as bibliotecas fazem por dentro:</p>
+
+<pre class="file" data-file="mini.cpp">#include &lt;cmath&gt;
+#include &lt;iostream&gt;
+
+// ---------- mini-framework de testes ----------
+int testes = 0;
+int falhas = 0;
+
+void verificar(bool ok, const char* expressao, int linha) {
+    ++testes;
+    if (!ok) {
+        ++falhas;
+        std::cout &lt;&lt; "linha " &lt;&lt; linha &lt;&lt; ": FALHOU: " &lt;&lt; expressao &lt;&lt; '\n';
+    }
+}
+
+#define VERIFICAR(cond) verificar((cond), #cond, __LINE__)
+
+bool quase(double a, double b) {
+    return std::abs(a - b) &lt; 0.005;   // diferença menor que meio centavo
+}
+// -----------------------------------------------
+
+double calcularDesconto(double total) {
+    if (total &gt; 200) {
+        return total * 0.15;
+    }
+    if (total &gt; 100) {
+        return total * 0.10;
+    }
+    return 0;
+}
+
+int main() {
+    VERIFICAR(calcularDesconto(50) == 0);
+    VERIFICAR(calcularDesconto(99.99) == 0);
+    VERIFICAR(quase(calcularDesconto(100), 10));
+    VERIFICAR(quase(calcularDesconto(150), 15));
+    VERIFICAR(quase(calcularDesconto(200), 30));
+    VERIFICAR(quase(calcularDesconto(300), 45));
+
+    std::cout &lt;&lt; testes - falhas &lt;&lt; " de " &lt;&lt; testes &lt;&lt; " testes passaram\n";
+    return falhas == 0 ? 0 : 1;
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>testes, falhas</dt><dd>Dois contadores: quantas verificações rodaram e quantas falharam.</dd>
+  <dt>verificar(ok, expressao, linha)</dt><dd>Conta a verificação e, se ela falhou, mostra a linha e o texto. Diferente do <code>assert</code>, <strong>não para</strong>: segue para a próxima.</dd>
+  <dt>#define VERIFICAR(cond) …</dt><dd>Uma macro, para não ter de escrever o texto e a linha à mão. O <code>#cond</code> (um <code>#</code> antes do parâmetro) transforma o que você escreveu em texto entre aspas; o <code>__LINE__</code> vira o número da linha. É assim que o <code>assert</code> e as bibliotecas de teste conseguem mostrar a expressão.</dd>
+  <dt>quase(a, b)</dt><dd>Compara dois <code>double</code> com tolerância de meio centavo. O motivo aparece na seção 4.</dd>
+  <dt>return falhas == 0 ? 0 : 1;</dt><dd>O código de saída diz se tudo passou (0) ou não (1). Ferramentas como o <code>make</code> e o <code>ctest</code> olham esse código.</dd>
+</dl>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra mini.cpp -o mini
+$ ./mini
+linha 36: FALHOU: quase(calcularDesconto(100), 10)
+linha 38: FALHOU: quase(calcularDesconto(200), 30)
+4 de 6 testes passaram
+$ echo $?
+1</pre>
+
+<p>Agora as <strong>duas</strong> fronteiras aparecem de uma vez: R$ 100 e R$ 200.</p>
+
+<div class="trycpp" data-goal="out:6 de 6 testes passaram,exit:0">
+<p class="try-task"><strong>Missão:</strong> rode e veja as duas falhas. Conserte <strong>só a função <code>calcularDesconto</code></strong> para que a saída seja <code>6 de 6 testes passaram</code>. Depois, acrescente um teste seu: por exemplo, que uma compra de R$ 250 tem R$ 37,50 de desconto.</p>
+<pre class="script">#include &lt;cmath&gt;
+#include &lt;iostream&gt;
+
+// ---------- mini-framework de testes ----------
+int testes = 0;
+int falhas = 0;
+
+void verificar(bool ok, const char* expressao, int linha) {
+    ++testes;
+    if (!ok) {
+        ++falhas;
+        std::cout &lt;&lt; "linha " &lt;&lt; linha &lt;&lt; ": FALHOU: " &lt;&lt; expressao &lt;&lt; '\n';
+    }
+}
+
+#define VERIFICAR(cond) verificar((cond), #cond, __LINE__)
+
+bool quase(double a, double b) {
+    return std::abs(a - b) &lt; 0.005;   // diferença menor que meio centavo
+}
+// -----------------------------------------------
+
+double calcularDesconto(double total) {
+    if (total &gt; 200) {
+        return total * 0.15;
+    }
+    if (total &gt; 100) {
+        return total * 0.10;
+    }
+    return 0;
+}
+
+int main() {
+    VERIFICAR(calcularDesconto(50) == 0);
+    VERIFICAR(calcularDesconto(99.99) == 0);
+    VERIFICAR(quase(calcularDesconto(100), 10));
+    VERIFICAR(quase(calcularDesconto(150), 15));
+    VERIFICAR(quase(calcularDesconto(200), 30));
+    VERIFICAR(quase(calcularDesconto(300), 45));
+
+    std::cout &lt;&lt; testes - falhas &lt;&lt; " de " &lt;&lt; testes &lt;&lt; " testes passaram\n";
+    return falhas == 0 ? 0 : 1;
+}
+</pre>
+<pre class="solucao">#include &lt;cmath&gt;
+#include &lt;iostream&gt;
+
+// ---------- mini-framework de testes ----------
+int testes = 0;
+int falhas = 0;
+
+void verificar(bool ok, const char* expressao, int linha) {
+    ++testes;
+    if (!ok) {
+        ++falhas;
+        std::cout &lt;&lt; "linha " &lt;&lt; linha &lt;&lt; ": FALHOU: " &lt;&lt; expressao &lt;&lt; '\n';
+    }
+}
+
+#define VERIFICAR(cond) verificar((cond), #cond, __LINE__)
+
+bool quase(double a, double b) {
+    return std::abs(a - b) &lt; 0.005;   // diferença menor que meio centavo
+}
+// -----------------------------------------------
+
+double calcularDesconto(double total) {
+    if (total &gt;= 200) {
+        return total * 0.15;
+    }
+    if (total &gt;= 100) {
+        return total * 0.10;
+    }
+    return 0;
+}
+
+int main() {
+    VERIFICAR(calcularDesconto(50) == 0);
+    VERIFICAR(calcularDesconto(99.99) == 0);
+    VERIFICAR(quase(calcularDesconto(100), 10));
+    VERIFICAR(quase(calcularDesconto(150), 15));
+    VERIFICAR(quase(calcularDesconto(200), 30));
+    VERIFICAR(quase(calcularDesconto(300), 45));
+
+    std::cout &lt;&lt; testes - falhas &lt;&lt; " de " &lt;&lt; testes &lt;&lt; " testes passaram\n";
+    return falhas == 0 ? 0 : 1;
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Uma biblioteca de testes: doctest</h2>
+<p>O mini-framework funciona, mas falta muita coisa: agrupar testes por assunto, mostrar os valores que deram errado, escolher quais testes rodar… As <strong>bibliotecas de testes</strong> trazem tudo isso pronto. A <strong>doctest</strong> é uma das mais simples de começar, porque é <strong>header-only</strong> ("só cabeçalho"): a biblioteca inteira é <strong>um arquivo</strong>, <code>doctest.h</code>, que você põe na pasta do projeto e inclui. Não há nada para instalar nem para ligar (veja <a href="bibliotecas.html">Usar Bibliotecas Externas</a>).</p>
+
+<h3>Baixar o <code>doctest.h</code></h3>
+<p>O arquivo fica no repositório oficial do projeto, no GitHub. A Ana baixou a versão 2.4.12 para a pasta do projeto com o <code>wget</code> (<code>-q</code> = sem mensagens):</p>
+
+<pre class="term">$ cd ~/cpp/testes
+$ wget -q https://raw.githubusercontent.com/doctest/doctest/v2.4.12/doctest/doctest.h
+$ ls -l doctest.h
+-rw-rw-r-- 1 ana ana 323200 out 16 22:02 doctest.h</pre>
+
+<p>São 316 KB de código C++, com a licença MIT (livre para usar, inclusive em projetos comerciais) escrita no começo do arquivo. Fixar a versão no endereço (<code>v2.4.12</code>) garante que todo mundo do projeto use a mesma.</p>
+
+<h3>Separar o código dos testes</h3>
+<p>Em projetos de verdade, os testes ficam num programa <strong>separado</strong>, que usa as mesmas funções do programa principal. Por isso a Ana tirou a função do <code>main.cpp</code> e criou um par <code>.h</code>/<code>.cpp</code> (como em <a href="headers.html">Arquivos .h e .cpp</a>):</p>
+
+<pre class="file" data-file="desconto.h">#pragma once
+
+// Desconto da lojinha: 10% a partir de R$ 100, 15% a partir de R$ 200.
+// Devolve o valor do desconto, em reais.
+double calcularDesconto(double total);
+</pre>
+
+<pre class="file" data-file="desconto.cpp">#include "desconto.h"
+
+double calcularDesconto(double total) {
+    if (total &gt; 200) {
+        return total * 0.15;
+    }
+    if (total &gt; 100) {
+        return total * 0.10;
+    }
+    return 0;
+}
+</pre>
+
+<p>(Ela deixou o defeito de propósito, para ver a doctest pegá-lo.) E o arquivo de testes:</p>
+
+<pre class="file" data-file="testes.cpp">#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "doctest.h"
+#include "desconto.h"
+
+TEST_CASE("compras abaixo de R$ 100 não têm desconto") {
+    CHECK(calcularDesconto(0) == 0);
+    CHECK(calcularDesconto(50) == 0);
+    CHECK(calcularDesconto(99.99) == 0);
+}
+
+TEST_CASE("10% a partir de R$ 100") {
+    CHECK(calcularDesconto(100) == 10);
+    CHECK(calcularDesconto(150) == 15);
+}
+
+TEST_CASE("15% a partir de R$ 200") {
+    CHECK(calcularDesconto(200) == 30);
+    CHECK(calcularDesconto(300) == 45);
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN</dt><dd>"Doctest, crie o <code>main</code> por mim." O programa de testes não tem <code>main</code> seu: a doctest escreve um que roda todos os testes. Esta linha vem <strong>antes</strong> do <code>#include</code> e aparece em <strong>um só</strong> <code>.cpp</code> do programa de testes.</dd>
+  <dt>#include "doctest.h"</dt><dd>Com aspas, porque o arquivo está na pasta do projeto.</dd>
+  <dt>TEST_CASE("…") { … }</dt><dd>Um <strong>caso de teste</strong>: um grupo de verificações sobre um assunto, com um nome que aparece no relatório. Escreva o nome como uma frase que diz o que deveria acontecer.</dd>
+  <dt>CHECK(expressão)</dt><dd>"Confira": se a expressão for falsa, registra a falha, com os valores, e <strong>continua</strong>.</dd>
+</dl>
+
+<p>Para compilar, junte o arquivo de testes com o <code>.cpp</code> da função testada:</p>
+
+<pre class="term">$ time g++ -std=c++23 -Wall -Wextra testes.cpp desconto.cpp -o testes
+
+real	0m4,105s
+user	0m3,823s
+sys	0m0,280s
+$ ./testes
+[doctest] doctest version is "2.4.12"
+[doctest] run with "--help" for options
+===============================================================================
+testes.cpp:11:
+TEST CASE:  10% a partir de R$ 100
+
+testes.cpp:12: ERROR: CHECK( calcularDesconto(100) == 10 ) is NOT correct!
+  values: CHECK( 0 == 10 )
+
+===============================================================================
+testes.cpp:16:
+TEST CASE:  15% a partir de R$ 200
+
+testes.cpp:17: ERROR: CHECK( calcularDesconto(200) == 30 ) is NOT correct!
+  values: CHECK( 20 == 30 )
+
+===============================================================================
+[doctest] test cases: 3 | 1 passed | 2 failed | 0 skipped
+[doctest] assertions: 7 | 5 passed | 2 failed |
+[doctest] Status: FAILURE!
+$ echo $?
+1</pre>
+
+<dl class="anatomy">
+  <dt>testes.cpp:11: / TEST CASE:  10% a partir de R$ 100</dt><dd>Em qual caso de teste (e em que linha ele começa) houve falha.</dd>
+  <dt>testes.cpp:12: ERROR: CHECK( … ) is NOT correct!</dt><dd>A verificação da linha 12 "NÃO está correta".</dd>
+  <dt>values: CHECK( 0 == 10 )</dt><dd>A melhor parte: os <strong>valores</strong> dos dois lados. A função devolveu <code>0</code>, e o teste esperava <code>10</code>. No caso de R$ 200, devolveu <code>20</code> (10%), e o esperado era <code>30</code> (15%).</dd>
+  <dt>test cases: 3 | 1 passed | 2 failed</dt><dd>O placar: 3 casos de teste, 1 passou, 2 falharam. Na linha de baixo, o placar das verificações (<em>assertions</em>): 7, com 5 certas.</dd>
+  <dt>Status: FAILURE! e o código 1</dt><dd>Resultado geral e código de saída diferente de zero.</dd>
+</dl>
+
+<p>Os 4 segundos de compilação são quase todos da doctest, que é grande. Em projetos maiores, o <code>DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN</code> fica num <code>.cpp</code> só dele, compilado uma vez, e os arquivos de teste (que só fazem <code>#include "doctest.h"</code>) ficam leves; o <a href="make.html">Make</a> ou o <a href="cmake.html">CMake</a> cuidam de não recompilá-lo. Com o <code>&gt;=</code> no lugar do <code>&gt;</code> no <code>desconto.cpp</code>:</p>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra testes.cpp desconto.cpp -o testes
+$ ./testes
+[doctest] doctest version is "2.4.12"
+[doctest] run with "--help" for options
+===============================================================================
+[doctest] test cases: 3 | 3 passed | 0 failed | 0 skipped
+[doctest] assertions: 7 | 7 passed | 0 failed |
+[doctest] Status: SUCCESS!
+$ echo $?
+0</pre>
+
+<p>Quando tudo passa, a doctest fica quieta e só mostra o placar. Para ver cada verificação, mesmo as que passaram, use <code>-s</code> (de <em>success</em>):</p>
+
+<pre class="term">$ ./testes -s | head -20
+[doctest] doctest version is "2.4.12"
+[doctest] run with "--help" for options
+===============================================================================
+testes.cpp:5:
+TEST CASE:  compras abaixo de R$ 100 não têm desconto
+
+testes.cpp:6: SUCCESS: CHECK( calcularDesconto(0) == 0 ) is correct!
+  values: CHECK( 0 == 0 )
+
+testes.cpp:7: SUCCESS: CHECK( calcularDesconto(50) == 0 ) is correct!
+  values: CHECK( 0 == 0 )
+
+testes.cpp:8: SUCCESS: CHECK( calcularDesconto(99.99) == 0 ) is correct!
+  values: CHECK( 0 == 0 )
+
+===============================================================================
+testes.cpp:11:
+TEST CASE:  10% a partir de R$ 100
+
+testes.cpp:12: SUCCESS: CHECK( calcularDesconto(100) == 10 ) is correct!</pre>
+
+<hr>
+
+<h2>4. <code>double</code> e <code>==</code>: o teste que mente</h2>
+<p>A Ana acrescentou um teste com centavos: uma compra de R$ 199,90 deve ter R$ 19,99 de desconto (10%). Num arquivo <code>testes2.cpp</code>, com o mesmo começo do <code>testes.cpp</code>:</p>
+
+<pre class="file" data-file="testes2.cpp">#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "doctest.h"
+#include "desconto.h"
+
+#include &lt;vector&gt;
+
+TEST_CASE("centavos") {
+    CHECK(calcularDesconto(199.90) == 19.99);
+    CHECK(calcularDesconto(199.90) == doctest::Approx(19.99));
+}
+
+TEST_CASE("carrinho com três itens") {
+    std::vector&lt;double&gt; carrinho = {59.90, 45.00};
+    REQUIRE(carrinho.size() == 3);
+    CHECK(carrinho[2] == 12.50);
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra testes2.cpp desconto.cpp -o testes2
+$ ./testes2
+[doctest] doctest version is "2.4.12"
+[doctest] run with "--help" for options
+===============================================================================
+testes2.cpp:7:
+TEST CASE:  centavos
+
+testes2.cpp:8: ERROR: CHECK( calcularDesconto(199.90) == 19.99 ) is NOT correct!
+  values: CHECK( 19.99 == 19.99 )
+
+===============================================================================
+testes2.cpp:12:
+TEST CASE:  carrinho com três itens
+
+testes2.cpp:14: FATAL ERROR: REQUIRE( carrinho.size() == 3 ) is NOT correct!
+  values: REQUIRE( 2 == 3 )
+
+===============================================================================
+[doctest] test cases: 2 | 0 passed | 2 failed | 0 skipped
+[doctest] assertions: 3 | 1 passed | 2 failed |
+[doctest] Status: FAILURE!
+$ echo $?
+1</pre>
+
+<p>Olhe a linha 8: <code>values: CHECK( 19.99 == 19.99 )</code> e, mesmo assim, <code>NOT correct</code>. Não é defeito da doctest. Como você viu em <a href="ponto-flutuante.html">float e double</a>, o <code>double</code> guarda números em binário, e a maioria das frações decimais não cabe exatamente: <code>199.90 * 0.10</code> dá <code>19.990000000000002</code>, e o literal <code>19.99</code> é outro número muito próximo. A doctest mostra os valores arredondados, e eles parecem iguais.</p>
+
+<p>A linha 9 passou: <code>doctest::Approx(19.99)</code> quer dizer "aproximadamente 19,99", com uma pequena tolerância, como a função <code>quase</code> do mini-framework. <strong>Regra:</strong> nunca compare <code>double</code> com <code>==</code> num teste (nem fora dele); use <code>doctest::Approx</code>. (Em sistemas de verdade, dinheiro costuma ser guardado em <strong>centavos</strong>, num inteiro, justamente para evitar isso.)</p>
+
+<h3><code>CHECK</code> × <code>REQUIRE</code></h3>
+<p>No segundo caso, a Ana esqueceu um item do carrinho, que tem 2 itens em vez de 3. Repare que a falha diz <code>FATAL ERROR</code> e que o placar mostra 3 verificações, não 4: a linha 15 nem rodou.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>CHECK(…)</code></th><th><code>REQUIRE(…)</code></th></tr>
+<tr><td>Se falhar</td><td>registra <code>ERROR</code> e <strong>continua</strong> o caso de teste</td><td>registra <code>FATAL ERROR</code> e <strong>encerra</strong> o caso de teste (os outros casos continuam)</td></tr>
+<tr><td>Use quando</td><td>as verificações são independentes</td><td>o resto do teste não faz sentido (ou é perigoso) se esta falhar</td></tr>
+<tr><td>Exemplo</td><td><code>CHECK(calcularDesconto(100) == 10);</code></td><td><code>REQUIRE(carrinho.size() == 3);</code> antes de usar <code>carrinho[2]</code></td></tr>
+</table>
+</div>
+
+<p>Aqui, o <code>REQUIRE</code> evitou um desastre: sem ele, a linha 15 leria <code>carrinho[2]</code>, uma posição que não existe, e isso é <a href="comportamento-indefinido.html">comportamento indefinido</a>.</p>
+
+<h3>Rodar só alguns testes</h3>
+<p>Com muitos testes, dá para escolher pelo nome:</p>
+<pre class="term">$ ./testes2 --test-case="centavos"
+[doctest] doctest version is "2.4.12"
+[doctest] run with "--help" for options
+===============================================================================
+testes2.cpp:7:
+TEST CASE:  centavos
+
+testes2.cpp:8: ERROR: CHECK( calcularDesconto(199.90) == 19.99 ) is NOT correct!
+  values: CHECK( 19.99 == 19.99 )
+
+===============================================================================
+[doctest] test cases: 1 | 0 passed | 1 failed | 1 skipped
+[doctest] assertions: 2 | 1 passed | 1 failed |
+[doctest] Status: FAILURE!</pre>
+
+<hr>
+
+<h2>5. Os testes no CMake: <code>ctest</code></h2>
+<p>O CMake tem um comando para rodar todos os programas de teste do projeto, o <code>ctest</code>. A Ana pôs o desconto numa biblioteca interna (como na aula <a href="cmake.html">CMake</a>) e registrou o teste:</p>
+
+<pre class="file" data-file="CMakeLists.txt">cmake_minimum_required(VERSION 3.25)
+project(Lojinha LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+add_library(desconto desconto.cpp)
+
+enable_testing()
+add_executable(testes testes.cpp)
+target_link_libraries(testes PRIVATE desconto)
+add_test(NAME testes COMMAND testes)
+</pre>
+
+<dl class="anatomy">
+  <dt>enable_testing()</dt><dd>Liga o suporte a testes do CMake.</dd>
+  <dt>add_test(NAME testes COMMAND testes)</dt><dd>Registra um teste chamado <code>testes</code>, que consiste em rodar o programa <code>testes</code>. Se ele sair com código 0, passou.</dd>
+</dl>
+
+<pre class="term">$ cmake -B build -G Ninja &gt; /dev/null
+$ cmake --build build
+[1/4] Building CXX object CMakeFiles/desconto.dir/desconto.cpp.o
+[2/4] Linking CXX static library libdesconto.a
+[3/4] Building CXX object CMakeFiles/testes.dir/testes.cpp.o
+[4/4] Linking CXX executable testes
+$ ctest --test-dir build
+Test project /home/ana/cpp/testes/build
+    Start 1: testes
+1/1 Test #1: testes ...........................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Total Test time (real) =   0.01 sec</pre>
+
+<p>E se alguém quebrar a fronteira de novo (voltando o <code>&gt;=</code> para <code>&gt;</code>)? Só o <code>desconto.cpp</code> é recompilado, e o <code>ctest</code> avisa:</p>
+
+<pre class="term">$ cmake --build build
+[1/3] Building CXX object CMakeFiles/desconto.dir/desconto.cpp.o
+[2/3] Linking CXX static library libdesconto.a
+[3/3] Linking CXX executable testes
+$ ctest --test-dir build
+Test project /home/ana/cpp/testes/build
+    Start 1: testes
+1/1 Test #1: testes ...........................***Failed    0.00 sec
+
+0% tests passed, 1 tests failed out of 1
+
+Total Test time (real) =   0.00 sec
+
+The following tests FAILED:
+	  1 - testes (Failed)
+Errors while running CTest
+Output from these tests are in: /home/ana/cpp/testes/build/Testing/Temporary/LastTest.log
+Use "--rerun-failed --output-on-failure" to re-run the failed cases verbosely.
+$ echo $?
+8</pre>
+
+<p>O <code>ctest</code> só diz qual programa falhou. Para ver o relatório da doctest, siga a sugestão da última linha: <code>ctest --test-dir build --rerun-failed --output-on-failure</code>. Num Makefile, o equivalente é um alvo <code>test</code> (no <code>.PHONY</code>) cuja receita compila e roda o <code>./testes</code>.</p>
+
+<hr>
+
+<h2>6. Outras bibliotecas de testes</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Biblioteca</th><th>Como é</th><th>Exemplo de verificação</th></tr>
+<tr><td><strong>doctest</strong></td><td>um arquivo só, compila rápido para o que oferece; a usada nesta aula</td><td><code>CHECK(a == b)</code></td></tr>
+<tr><td><strong>Catch2</strong></td><td>a "inspiração" da doctest, com o mesmo estilo de <code>TEST_CASE</code>; a versão 3 é uma biblioteca compilada (não mais um arquivo só)</td><td><code>CHECK(a == b)</code>, <code>REQUIRE(…)</code></td></tr>
+<tr><td><strong>GoogleTest</strong> (gtest)</td><td>do Google, muito usada em empresas; biblioteca compilada, vem com o GoogleMock para "dublês" de objetos</td><td><code>TEST(Desconto, Fronteira) { EXPECT_EQ(a, b); ASSERT_EQ(…); }</code></td></tr>
+</table>
+</div>
+
+<p>As ideias são as mesmas em todas: casos de teste com nome, verificações que continuam (<code>CHECK</code>, <code>EXPECT_…</code>) e que encerram (<code>REQUIRE</code>, <code>ASSERT_…</code>), relatório com os valores e código de saída para as ferramentas. Aprendeu uma, aprendeu todas. Como instalar bibliotecas compiladas é o assunto da próxima aula, <a href="bibliotecas.html">Usar Bibliotecas Externas</a>.</p>
+
+<div class="tip">
+<strong>O que testar</strong>
+<ul>
+  <li><strong>As fronteiras:</strong> exatamente R$ 100 e R$ 200, e logo antes (R$ 99,99).</li>
+  <li><strong>Os casos comuns:</strong> uma compra típica de cada faixa.</li>
+  <li><strong>Os casos estranhos:</strong> zero, valores negativos, uma lista vazia, um texto vazio.</li>
+  <li><strong>Cada defeito que você consertar:</strong> escreva um teste que o pegaria, para ele nunca voltar.</li>
+</ul>
+<p>Há quem escreva o teste <strong>antes</strong> da função: primeiro o teste falha (porque a função não existe ou está errada), depois você escreve o código até ele passar. Isso se chama TDD (<em>Test-Driven Development</em>, "desenvolvimento guiado por testes"), e é o que você vai fazer na missão final.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>#include &lt;cassert&gt;</code> + <code>assert(cond);</code></td><td>aborta o programa (código 134) se <code>cond</code> for falsa</td></tr>
+<tr><td><code>-DNDEBUG</code></td><td>desliga todos os <code>assert</code></td></tr>
+<tr><td><code>#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN</code></td><td>a doctest cria o <code>main</code> (em um só <code>.cpp</code>, antes do <code>#include</code>)</td></tr>
+<tr><td><code>TEST_CASE("nome") { … }</code></td><td>um caso de teste</td></tr>
+<tr><td><code>CHECK(cond)</code></td><td>verifica e continua</td></tr>
+<tr><td><code>REQUIRE(cond)</code></td><td>verifica e encerra o caso de teste se falhar</td></tr>
+<tr><td><code>doctest::Approx(x)</code></td><td>"aproximadamente x", para <code>double</code></td></tr>
+<tr><td><code>./testes -s</code></td><td>mostra também as verificações que passaram</td></tr>
+<tr><td><code>./testes --test-case="nome"</code></td><td>roda só os casos com esse nome</td></tr>
+<tr><td><code>enable_testing()</code> + <code>add_test(…)</code></td><td>registra testes no CMake</td></tr>
+<tr><td><code>ctest --test-dir build</code></td><td>roda os testes registrados</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O cabeçalho do assert</h3>
+<p>Complete o <code>#include</code> necessário para usar <code>assert</code>:</p>
+<div class="ex-code">#include &lt;<input data-answer="cassert" aria-label="cabeçalho" size="8">&gt;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Comparar com tolerância</h3>
+<p>Complete o teste para aceitar o <code>19.990000000000002</code> que a conta devolve:</p>
+<div class="ex-code">CHECK(calcularDesconto(199.90) == <input data-answer="doctest::Approx(19.99)" aria-label="valor esperado">);</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Um programa terminou com <code>Assertion `total &gt; 0' failed.</code> e <code>echo $?</code> mostrou 134. O que aconteceu?</p>
+<label><input type="radio" name="q3"> Erro de compilação.</label>
+<label><input type="radio" name="q3"> O programa terminou normalmente com o valor 134.</label>
+<label><input type="radio" name="q3"> Um <code>assert</code> encontrou <code>total</code> menor ou igual a zero, e o programa foi abortado.</label>
+<label><input type="radio" name="q3"> Falta o <code>-DNDEBUG</code>.</label>
+</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Qual é a diferença entre <code>CHECK</code> e <code>REQUIRE</code> na doctest?</p>
+<label><input type="radio" name="q4"> <code>CHECK</code> só funciona com números.</label>
+<label><input type="radio" name="q4"> Se falhar, <code>CHECK</code> continua o caso de teste; <code>REQUIRE</code> o encerra.</label>
+<label><input type="radio" name="q4"> <code>REQUIRE</code> encerra o programa inteiro.</label>
+<label><input type="radio" name="q4"> Nenhuma, são sinônimos.</label>
+</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="4">
+<p class="mc-q">5. A regra é "frete grátis a partir de R$ 150". Qual teste tem mais chance de achar um <code>&gt;</code> no lugar de <code>&gt;=</code>?</p>
+<label><input type="radio" name="q5"> Frete de uma compra de R$ 10.</label>
+<label><input type="radio" name="q5"> Frete de uma compra de R$ 1.000.</label>
+<label><input type="radio" name="q5"> Frete de uma compra de R$ 300.</label>
+<label><input type="radio" name="q5"> Frete de uma compra de exatamente R$ 150.</label>
+</div>
+</div>
+
+<h3>Missão final: escreva a função a partir dos testes</h3>
+
+<div class="trycpp" data-goal="out:7 de 7 testes passaram,exit:0">
+<p class="try-task"><strong>Missão:</strong> desta vez os testes vieram primeiro (TDD). A regra do frete da lojinha é: compras <strong>a partir de</strong> R$ 150 têm frete grátis; abaixo disso, o frete é R$ 12,90, e para o bairro <code>"Centro"</code> é R$ 5,00. Escreva o corpo de <code>calcularFrete</code> até a saída ser <code>7 de 7 testes passaram</code>. Leia os testes: eles são a especificação.</p>
+<pre class="script">#include &lt;cmath&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+// ---------- mini-framework de testes ----------
+int testes = 0;
+int falhas = 0;
+
+void verificar(bool ok, const char* expressao, int linha) {
+    ++testes;
+    if (!ok) {
+        ++falhas;
+        std::cout &lt;&lt; "linha " &lt;&lt; linha &lt;&lt; ": FALHOU: " &lt;&lt; expressao &lt;&lt; '\n';
+    }
+}
+
+#define VERIFICAR(cond) verificar((cond), #cond, __LINE__)
+
+bool quase(double a, double b) {
+    return std::abs(a - b) &lt; 0.005;
+}
+// -----------------------------------------------
+
+double calcularFrete(double total, const std::string&amp; bairro) {
+    // escreva aqui
+    (void)total;
+    (void)bairro;
+    return -1;
+}
+
+int main() {
+    VERIFICAR(quase(calcularFrete(50, "Jardim"), 12.90));
+    VERIFICAR(quase(calcularFrete(149.99, "Jardim"), 12.90));
+    VERIFICAR(quase(calcularFrete(150, "Jardim"), 0));
+    VERIFICAR(quase(calcularFrete(400, "Jardim"), 0));
+    VERIFICAR(quase(calcularFrete(50, "Centro"), 5));
+    VERIFICAR(quase(calcularFrete(149.99, "Centro"), 5));
+    VERIFICAR(quase(calcularFrete(150, "Centro"), 0));
+
+    std::cout &lt;&lt; testes - falhas &lt;&lt; " de " &lt;&lt; testes &lt;&lt; " testes passaram\n";
+    return falhas == 0 ? 0 : 1;
+}
+</pre>
+<pre class="solucao">#include &lt;cmath&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+// ---------- mini-framework de testes ----------
+int testes = 0;
+int falhas = 0;
+
+void verificar(bool ok, const char* expressao, int linha) {
+    ++testes;
+    if (!ok) {
+        ++falhas;
+        std::cout &lt;&lt; "linha " &lt;&lt; linha &lt;&lt; ": FALHOU: " &lt;&lt; expressao &lt;&lt; '\n';
+    }
+}
+
+#define VERIFICAR(cond) verificar((cond), #cond, __LINE__)
+
+bool quase(double a, double b) {
+    return std::abs(a - b) &lt; 0.005;
+}
+// -----------------------------------------------
+
+double calcularFrete(double total, const std::string&amp; bairro) {
+    if (total &gt;= 150) {
+        return 0;
+    }
+    if (bairro == "Centro") {
+        return 5;
+    }
+    return 12.90;
+}
+
+int main() {
+    VERIFICAR(quase(calcularFrete(50, "Jardim"), 12.90));
+    VERIFICAR(quase(calcularFrete(149.99, "Jardim"), 12.90));
+    VERIFICAR(quase(calcularFrete(150, "Jardim"), 0));
+    VERIFICAR(quase(calcularFrete(400, "Jardim"), 0));
+    VERIFICAR(quase(calcularFrete(50, "Centro"), 5));
+    VERIFICAR(quase(calcularFrete(149.99, "Centro"), 5));
+    VERIFICAR(quase(calcularFrete(150, "Centro"), 0));
+
+    std::cout &lt;&lt; testes - falhas &lt;&lt; " de " &lt;&lt; testes &lt;&lt; " testes passaram\n";
+    return falhas == 0 ? 0 : 1;
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um teste automatizado é um programa que confere o seu: roda sempre igual, em frações de segundo, e aponta o que quebrou.</li>
+  <li><code>assert(cond)</code> (de <code>&lt;cassert&gt;</code>) aborta o programa com <code>Assertion `…' failed.</code> e código 134. Para no primeiro erro, não mostra valores e some com <code>-DNDEBUG</code>: bom para conferências internas, fraco para testar.</li>
+  <li>Bibliotecas de teste organizam tudo: na doctest, <code>TEST_CASE("nome")</code>, <code>CHECK</code> (continua) e <code>REQUIRE</code> (encerra o caso), com os valores na falha e o placar no fim. Ela é um arquivo só, o <code>doctest.h</code>.</li>
+  <li>Nunca compare <code>double</code> com <code>==</code>: use <code>doctest::Approx</code> (ou uma função como <code>quase</code>). <code>19.99 == 19.99</code> pode ser falso.</li>
+  <li>Teste as fronteiras: a maioria dos defeitos mora no <code>&gt;</code> que devia ser <code>&gt;=</code>.</li>
+  <li>No CMake: <code>enable_testing()</code>, <code>add_test(…)</code> e <code>ctest --test-dir build</code>. Catch2 e GoogleTest funcionam com as mesmas ideias.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
