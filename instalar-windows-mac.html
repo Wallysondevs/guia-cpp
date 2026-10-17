@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Instalar no Windows e macOS — MSYS2, Visual Studio, WSL e Xcode | Guia C++</title>
+<meta name="description" content="Como instalar um compilador C++ no Windows (MSYS2 com o g++ do MinGW-w64, Visual Studio Community com Desenvolvimento para desktop com C++, ou WSL) e no macOS (Command Line Tools do Xcode com o clang da Apple, ou o GCC do Homebrew), seguindo os passos oficiais, e compilar o primeiro programa em cada sistema.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Instalar no Windows e macOS</span></h1>
+
+<p class="intro">O Windows e o macOS não trazem um compilador C++ pronto para usar, mas instalar um é questão de alguns cliques e um comando. No Windows há três bons caminhos: o <strong>MSYS2</strong> (com o mesmo <code>g++</code> do Linux), o <strong>Visual Studio</strong> da Microsoft e o <strong>WSL</strong> (um Linux dentro do Windows). No macOS, as <strong>Command Line Tools</strong> da Apple trazem o <code>clang++</code>, e o <strong>Homebrew</strong> traz o GCC. Nesta aula você vai ver cada caminho, passo a passo, e compilar o primeiro programa.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Qual caminho escolher no Windows: MSYS2, Visual Studio ou WSL.</li>
+  <li>Instalar o g++ com o MSYS2 (<code>pacman -S mingw-w64-ucrt-x86_64-gcc</code>) e usá-lo fora do terminal do MSYS2.</li>
+  <li>Instalar o Visual Studio Community com a carga de trabalho "Desenvolvimento para desktop com C++" e escolher a versão do C++.</li>
+  <li>Instalar o WSL e seguir a aula do Linux.</li>
+  <li>No macOS: <code>xcode-select --install</code> (o clang da Apple) e <code>brew install gcc</code>.</li>
+  <li>Compilar e rodar o mesmo programa nos três sistemas.</li>
+</ul>
+</div>
+
+<div class="warning">
+<strong>Esta aula é ilustrativa</strong>
+<p>A máquina do guia é um Linux, então as telas e saídas desta página <strong>não</strong> foram produzidas nela: elas seguem os passos oficiais do MSYS2, da Microsoft, da Apple e do Homebrew (conferidos em outubro de 2026), mas números de versão, nomes de botões e mensagens podem variar um pouco no seu computador. Por isso as saídas aparecem em caixas de arquivo, e não no terminal da Ana. Os comandos de compilação, esses sim, são os mesmos de todo o guia.</p>
+</div>
+
+<hr>
+
+<h2>Antes de tudo: o terminal</h2>
+<p>O guia compila os programas pelo <strong>terminal</strong> (a janela de texto onde você digita comandos), porque assim você vê exatamente o que acontece. Cada sistema tem o seu:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sistema</th><th>Terminal</th><th>Como abrir</th></tr>
+<tr><td>Windows</td><td><strong>Terminal do Windows</strong> (com PowerShell) ou o terminal do MSYS2</td><td>Menu Iniciar → digite "Terminal" (ou "MSYS2 UCRT64")</td></tr>
+<tr><td>macOS</td><td><strong>Terminal</strong></td><td><kbd>Cmd</kbd>+<kbd>Espaço</kbd> → digite "Terminal"</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Windows</h2>
+
+<h3>Qual caminho escolher?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Caminho</th><th>O que você ganha</th><th>Tamanho</th><th>Bom para</th></tr>
+<tr><td><strong>1. MSYS2</strong> (g++ do MinGW-w64)</td><td>O mesmo <code>g++</code> do Linux e do guia, com as mesmas opções e mensagens. Gera programas <code>.exe</code> normais do Windows.</td><td>Algumas centenas de MB</td><td><strong>Seguir o guia</strong> com o VS Code ou outro editor. É o caminho recomendado.</td></tr>
+<tr><td><strong>2. Visual Studio Community</strong></td><td>O compilador da Microsoft (MSVC) e um ambiente completo, com depurador visual. Gratuito para estudantes, uso pessoal e equipes pequenas.</td><td>Vários GB</td><td>Quem quer um "tudo em um" ou vai trabalhar com programas e jogos para Windows (a Unreal Engine usa o Visual Studio).</td></tr>
+<tr><td><strong>3. WSL</strong></td><td>Um Ubuntu de verdade dentro do Windows: os comandos do guia funcionam igualzinho, inclusive <code>make</code> e <code>gdb</code>.</td><td>Alguns GB</td><td>Quem quer o ambiente exatamente igual ao do guia, ou vai programar para servidores Linux.</td></tr>
+</table>
+</div>
+
+<p>Não precisa escolher um só: muita gente tem o Visual Studio e o MSYS2 (ou o WSL) no mesmo computador.</p>
+
+<h3>Caminho 1: MSYS2, passo a passo</h3>
+<p>O <strong>MSYS2</strong> é um pequeno "mundo Linux" para Windows: um terminal e um gerenciador de pacotes, o <code>pacman</code> (o mesmo do Arch Linux), de onde você instala o <strong>MinGW-w64</strong>, o GCC adaptado para gerar programas do Windows.</p>
+
+<ol class="passo">
+  <li>Entre em <a href="https://www.msys2.org/">msys2.org</a> e baixe o instalador (um arquivo como <code>msys2-x86_64-20260927.exe</code>; a data no nome muda). É preciso Windows 10 ou 11, de 64 bits.</li>
+  <li>Rode o instalador e aceite a pasta sugerida, <code>C:\msys64</code>. Clique em <strong>Avançar</strong> até o fim e depois em <strong>Concluir</strong>.</li>
+  <li>Abre-se um terminal chamado <strong>MSYS2 UCRT64</strong> (se não abrir, procure por ele no menu Iniciar). <strong>UCRT64</strong> é o "ambiente" recomendado: programas de 64 bits, usando a biblioteca moderna do Windows (a <em>Universal C Runtime</em>).</li>
+  <li>Nesse terminal, instale o g++:
+<pre class="file" data-file="terminal MSYS2 UCRT64">pacman -S mingw-w64-ucrt-x86_64-gcc</pre>
+  O <code>pacman</code> mostra a lista de pacotes e pergunta <code>:: Proceed with installation? [Y/n]</code> ("continuar com a instalação?"). Tecle Enter.</li>
+  <li>Confira:
+<pre class="file" data-file="terminal MSYS2 UCRT64 (ilustrativo)">$ g++ --version
+g++.exe (Rev6, Built by MSYS2 project) 16.2.0
+Copyright (C) 2026 Free Software Foundation, Inc.
+...</pre></li>
+</ol>
+
+<dl class="anatomy">
+  <dt>pacman</dt><dd>O gerenciador de pacotes do MSYS2.</dd>
+  <dt>-S</dt><dd><em>Sync</em>: baixar e instalar.</dd>
+  <dt>mingw-w64-ucrt-x86_64-gcc</dt><dd>O nome do pacote: o GCC (<code>gcc</code>) do MinGW-w64 (<code>mingw-w64</code>), para o ambiente UCRT64 (<code>ucrt</code>), em processadores de 64 bits (<code>x86_64</code>). Ele traz o <code>gcc</code> e o <code>g++</code>.</dd>
+</dl>
+
+<p>O MSYS2 costuma ter a versão mais nova do GCC (em outubro de 2026, a 16.2). Mais tarde, para as aulas de <a href="make.html">Make</a> e <a href="depuracao-gdb.html">GDB</a>, instale o kit completo: <code>pacman -S mingw-w64-ucrt-x86_64-toolchain</code>. Para atualizar tudo: <code>pacman -Syu</code>.</p>
+
+<h3>Usar o g++ fora do terminal do MSYS2</h3>
+<p>O <code>g++</code> funciona dentro do terminal UCRT64. Para usá-lo também no PowerShell, no Terminal do Windows e no VS Code, acrescente a pasta dele ao <strong>PATH</strong> (a lista de pastas onde o Windows procura programas):</p>
+<ol class="passo">
+  <li>Menu Iniciar → digite <strong>variáveis de ambiente</strong> → "Editar as variáveis de ambiente para sua conta".</li>
+  <li>Selecione <strong>Path</strong> → <strong>Editar</strong> → <strong>Novo</strong> → digite <code>C:\msys64\ucrt64\bin</code> → <strong>OK</strong> em todas as janelas.</li>
+  <li><strong>Feche e abra de novo</strong> o terminal (o PATH só é lido quando o terminal abre) e confira com <code>g++ --version</code>.</li>
+</ol>
+
+<h3>Compilar no Windows</h3>
+<p>O comando é o mesmo do guia. A diferença é que o executável ganha a extensão <code>.exe</code> sozinho, e, no PowerShell, você roda o programa com <code>.\</code> em vez de <code>./</code>:</p>
+
+<pre class="file" data-file="PowerShell, na pasta do ola.cpp (ilustrativo)">PS C:\Users\Ana\cpp&gt; g++ -std=c++23 -Wall -Wextra ola.cpp -o ola
+PS C:\Users\Ana\cpp&gt; .\ola.exe
+Olá, mundo!</pre>
+
+<p>Repare que o GCC 16 do MSYS2 usa o C++20 quando você não passa <code>-std</code> (o g++ 15 do guia usa o C++17). Com o <code>-std=c++23</code> do comando padrão, os dois se comportam igual (aula <a href="versoes.html">Versões do C++</a>).</p>
+
+<h3>Caminho 2: Visual Studio Community</h3>
+<p>O <strong>Visual Studio</strong> (não confunda com o <em>VS Code</em>, que é só um editor: aula <a href="editores.html">Editores e IDEs</a>) é o ambiente completo da Microsoft. A edição <strong>Community</strong> é gratuita para estudantes, uso pessoal, projetos de código aberto e equipes pequenas.</p>
+
+<ol class="passo">
+  <li>Baixe o instalador em <a href="https://visualstudio.microsoft.com/pt-br/">visualstudio.microsoft.com</a> (Visual Studio <strong>Community</strong>) e rode-o.</li>
+  <li>Na tela <strong>Cargas de trabalho</strong>, marque <strong>Desenvolvimento para desktop com C++</strong>. Ela traz o compilador MSVC, as bibliotecas do Windows, o depurador e o CMake. Não precisa marcar mais nada.</li>
+  <li>Clique em <strong>Instalar</strong>. São vários gigabytes: pode demorar.</li>
+  <li>Abra o Visual Studio → <strong>Criar um projeto</strong> → <strong>Aplicativo de Console</strong> (o de C++) → dê um nome → <strong>Criar</strong>. O projeto já vem com um "Hello World".</li>
+  <li>Para compilar e rodar: <kbd>Ctrl</kbd>+<kbd>F5</kbd> (<strong>Iniciar Sem Depuração</strong>). Uma janela de console abre com a saída e espera você teclar algo antes de fechar.</li>
+</ol>
+
+<p><strong>A versão do C++ no Visual Studio:</strong> projetos novos no Visual Studio 2026 já usam o C++20. Para o <code>std::println</code> e o resto do C++23, abra <strong>Projeto → Propriedades → C/C++ → Linguagem → Padrão de Linguagem C++</strong> e escolha a opção mais recente (a que termina em <code>/std:c++latest</code>). Sem projeto (compilando direto no terminal), o compilador <code>cl</code> da Microsoft usa o C++14 se você não pedir outro.</p>
+
+<p>O compilador da Microsoft também funciona no terminal: abra o <strong>Developer PowerShell for VS</strong> (instalado junto, no menu Iniciar) e use o comando <code>cl</code>. As opções têm outra forma:</p>
+
+<pre class="file" data-file="Developer PowerShell for VS (ilustrativo)">cl /std:c++latest /EHsc /W4 ola.cpp
+.\ola.exe</pre>
+
+<dl class="anatomy">
+  <dt>cl</dt><dd>O compilador da Microsoft (de <em>compile and link</em>, compilar e ligar).</dd>
+  <dt>/std:c++latest</dt><dd>A versão do C++: a mais nova que ele conhece. É o <code>-std=c++23</code> do g++.</dd>
+  <dt>/EHsc</dt><dd>Liga o tratamento de exceções do jeito padrão do C++. Sem ele, o <code>cl</code> dá um aviso ao usar o <code>&lt;iostream&gt;</code>.</dd>
+  <dt>/W4</dt><dd>Nível 4 de avisos: o equivalente aproximado do <code>-Wall -Wextra</code>.</dd>
+  <dt>ola.cpp</dt><dd>O arquivo. O executável sai com o mesmo nome: <code>ola.exe</code>.</dd>
+</dl>
+
+<p>As mensagens de erro do MSVC são diferentes das do g++ e do Clang (têm códigos como <code>C2143</code>), mas dizem a mesma coisa. O guia mostra as do g++; quando uma não fizer sentido, procure o código no site da Microsoft.</p>
+
+<h3>Caminho 3: WSL, um Linux dentro do Windows</h3>
+<p>O <strong>WSL</strong> (<em>Windows Subsystem for Linux</em>, "subsistema Windows para Linux") roda um Linux de verdade ao lado do Windows, sem máquina virtual para configurar. Com ele, tudo o que o guia mostra no terminal funciona igual.</p>
+
+<ol class="passo">
+  <li>Abra o <strong>Terminal</strong> (ou PowerShell) <strong>como administrador</strong>: clique com o botão direito no menu Iniciar → "Terminal (Administrador)".</li>
+  <li>Digite:
+<pre class="file" data-file="PowerShell (administrador)">wsl --install</pre>
+  Esse comando instala o WSL e o <strong>Ubuntu</strong>. Reinicie o computador quando ele pedir.</li>
+  <li>Depois de reiniciar, abra o <strong>Ubuntu</strong> no menu Iniciar. Na primeira vez, ele pede um nome de usuário e uma senha para o Linux (não precisam ser os do Windows).</li>
+  <li>Pronto: você está num terminal Ubuntu. Siga a aula <a href="instalar-linux.html">Instalar no Linux</a>: <code>sudo apt update</code> e <code>sudo apt install build-essential</code>.</li>
+</ol>
+
+<p>Os arquivos do Windows aparecem dentro do Linux em <code>/mnt/c/</code> (o disco C:). Mas, para compilar mais rápido, guarde os seus programas na pasta pessoal do Linux (<code>~/cpp</code>). O VS Code abre essa pasta direto com a extensão <strong>WSL</strong> (aula <a href="editores.html">Editores e IDEs</a>).</p>
+
+<hr>
+
+<h2>macOS</h2>
+<p>No Mac, o compilador "oficial" é o <strong>Clang da Apple</strong>, que vem nas <strong>Command Line Tools</strong> (as "ferramentas de linha de comando" do Xcode). Você não precisa instalar o Xcode inteiro, que é enorme: as ferramentas bastam.</p>
+
+<h3>1. Command Line Tools: <code>xcode-select --install</code></h3>
+<ol class="passo">
+  <li>Abra o <strong>Terminal</strong> e digite:
+<pre class="file" data-file="Terminal do macOS">xcode-select --install</pre></li>
+  <li>Uma janela pergunta se você quer instalar as ferramentas de linha de comando. Clique em <strong>Instalar</strong> e aceite a licença. O download leva alguns minutos.</li>
+  <li>Confira:
+<pre class="file" data-file="Terminal do macOS (ilustrativo)">% clang++ --version
+Apple clang version 17.0.0 (clang-1700.3.19.1)
+Target: arm64-apple-darwin25.0.0
+Thread model: posix
+InstalledDir: /Library/Developer/CommandLineTools/usr/bin</pre></li>
+</ol>
+
+<p>O <code>arm64</code> na linha <code>Target</code> indica um Mac com chip Apple (M1, M2, M3…); num Mac antigo, com Intel, aparece <code>x86_64</code>. O <code>%</code> no começo da linha é o prompt do Terminal do macOS (o shell <code>zsh</code>), no papel do <code>$</code> do Linux.</p>
+
+<div class="note">
+<strong>No Mac, o <code>g++</code> é o Clang disfarçado</strong>
+<p>As Command Line Tools também instalam um comando chamado <code>g++</code>, mas ele é só um atalho para o Clang da Apple: <code>g++ --version</code> responde <code>Apple clang version …</code>. Para o guia, isso não é problema: as opções principais são as mesmas. Só não estranhe se as mensagens de erro no seu Mac se parecerem mais com as do editor do guia (que também usa o Clang) do que com as do terminal da Ana.</p>
+</div>
+
+<p>Compile e rode exatamente como no Linux:</p>
+
+<pre class="file" data-file="Terminal do macOS (ilustrativo)">% clang++ -std=c++23 -Wall -Wextra ola.cpp -o ola
+% ./ola
+Olá, mundo!</pre>
+
+<h3>2. Opcional: o GCC pelo Homebrew</h3>
+<p>Se você quiser o <strong>mesmo compilador do guia</strong> (o GCC), instale-o pelo <strong>Homebrew</strong>, o gerenciador de pacotes mais usado no Mac:</p>
+<ol class="passo">
+  <li>Instale o Homebrew, se ainda não tiver, com o comando que está na página <a href="https://brew.sh/pt-br/">brew.sh</a> (copie de lá; ele começa com <code>/bin/bash -c "$(curl -fsSL …)"</code>). No fim, o instalador mostra dois ou três comandos para colar no Terminal: cole-os, eles colocam o <code>brew</code> no PATH.</li>
+  <li>Instale o GCC:
+<pre class="file" data-file="Terminal do macOS">brew install gcc</pre></li>
+  <li>O Homebrew não ocupa o nome <code>g++</code> (que é o Clang da Apple): o GCC vem com o número da versão no nome. Em outubro de 2026, a versão do Homebrew é a 16.2:
+<pre class="file" data-file="Terminal do macOS (ilustrativo)">% g++-16 --version
+g++-16 (Homebrew GCC 16.2.0) 16.2.0
+...
+% g++-16 -std=c++23 -Wall -Wextra ola.cpp -o ola
+% ./ola
+Olá, mundo!</pre></li>
+</ol>
+
+<p>Nos comandos do guia, troque <code>g++</code> por <code>g++-16</code> (ou pelo número que o seu Homebrew instalou). Para atualizar: <code>brew upgrade gcc</code>.</p>
+
+<hr>
+
+<h2>Testando: o mesmo programa nos três sistemas</h2>
+<p>Seja qual for o caminho, o teste é o mesmo: o <code>ola.cpp</code> da aula <a href="instalar-linux.html">Instalar no Linux</a> e, em seguida, o teste do C++23 com <code>std::println</code>. Os comandos lado a lado:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sistema e caminho</th><th>Compilar</th><th>Rodar</th></tr>
+<tr><td>Linux, WSL</td><td><code>g++ -std=c++23 -Wall -Wextra ola.cpp -o ola</code></td><td><code>./ola</code></td></tr>
+<tr><td>Windows, MSYS2 (terminal UCRT64)</td><td><code>g++ -std=c++23 -Wall -Wextra ola.cpp -o ola</code></td><td><code>./ola</code> (ou <code>./ola.exe</code>)</td></tr>
+<tr><td>Windows, MSYS2 (PowerShell)</td><td><code>g++ -std=c++23 -Wall -Wextra ola.cpp -o ola</code></td><td><code>.\ola.exe</code></td></tr>
+<tr><td>Windows, Visual Studio</td><td><kbd>Ctrl</kbd>+<kbd>F5</kbd>, ou <code>cl /std:c++latest /EHsc /W4 ola.cpp</code></td><td>(abre sozinho) ou <code>.\ola.exe</code></td></tr>
+<tr><td>macOS, Command Line Tools</td><td><code>clang++ -std=c++23 -Wall -Wextra ola.cpp -o ola</code></td><td><code>./ola</code></td></tr>
+<tr><td>macOS, Homebrew</td><td><code>g++-16 -std=c++23 -Wall -Wextra ola.cpp -o ola</code></td><td><code>./ola</code></td></tr>
+</table>
+</div>
+
+<p>Um detalhe importante: o executável de um sistema <strong>não</strong> roda no outro. O <code>ola.exe</code> do Windows não abre no Mac, e o <code>ola</code> do Linux não abre no Windows. O <strong>código-fonte</strong> é o mesmo; o programa precisa ser compilado em cada sistema (a aula <a href="como-funciona.html">Como o C++ Vira Programa</a> explica por quê).</p>
+
+<p>Enquanto a instalação não termina, rode o programa abaixo no editor do guia. Ele usa o pré-processador (aula <a href="preprocessador.html">O Pré-processador</a>) para descobrir <strong>para qual sistema</strong> foi compilado: cada compilador define um nome diferente (<code>_WIN32</code> no Windows, <code>__APPLE__</code> no Mac, <code>__linux__</code> no Linux), e o <code>#if</code> escolhe a linha certa antes mesmo da compilação. Compile o mesmo arquivo no seu computador depois e compare.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode e veja o que o editor do guia responde. Ele não é Windows, nem Mac, nem Linux: o programa roda dentro do navegador, num formato chamado WebAssembly (WASI). No terminal da Ana, com o g++, o mesmo programa mostra <code>Compilado para: Linux</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+#if defined(_WIN32)
+    std::cout &lt;&lt; "Compilado para: Windows\n";
+#elif defined(__APPLE__)
+    std::cout &lt;&lt; "Compilado para: macOS\n";
+#elif defined(__linux__)
+    std::cout &lt;&lt; "Compilado para: Linux\n";
+#elif defined(__wasi__)
+    std::cout &lt;&lt; "Compilado para: WebAssembly (o editor do guia)\n";
+#else
+    std::cout &lt;&lt; "Compilado para: outro sistema\n";
+#endif
+}
+</pre>
+</div>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sistema.cpp -o sistema
+$ ./sistema
+Compilado para: Linux</pre>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+<p>As mensagens abaixo são as que aparecem em português nos sistemas configurados em português; o texto exato pode variar com a versão (<strong>ilustrativo</strong>).</p>
+
+<div class="cenario">
+<strong>Windows: <code>O termo 'g++' não é reconhecido como nome de cmdlet, função, arquivo de script ou programa operável</code></strong>
+<p><strong>O que significa:</strong> o PowerShell não achou o <code>g++</code>. Ou ele não foi instalado, ou a pasta <code>C:\msys64\ucrt64\bin</code> não está no PATH, ou o terminal foi aberto antes de você mudar o PATH.</p>
+<p><strong>Como consertar:</strong> confira se <code>g++ --version</code> funciona no terminal <strong>MSYS2 UCRT64</strong>. Se funciona lá, o problema é o PATH: refaça os passos de "Usar o g++ fora do terminal do MSYS2" e <strong>abra um terminal novo</strong>. Atenção: se você instalou pelo terminal "MSYS2 MSYS" (e não o UCRT64), o pacote foi para outro lugar; use o UCRT64.</p>
+</div>
+
+<div class="cenario">
+<strong>Windows: o programa mostra <code>OlÃ¡, mundo!</code> em vez de <code>Olá, mundo!</code></strong>
+<p><strong>O que significa:</strong> o programa escreveu o <code>á</code> corretamente, no formato <strong>UTF-8</strong> (dois bytes), mas o console do Windows interpretou esses bytes numa codificação antiga, e cada byte virou um caractere estranho. O terminal do MSYS2 não tem esse problema; o PowerShell e o Prompt de Comando antigos, às vezes, têm.</p>
+<p><strong>Como consertar:</strong> use o Terminal do Windows (que é UTF-8), ou digite <code>chcp 65001</code> antes de rodar o programa (troca o console para UTF-8). A aula <a href="acentos-utf8.html">Acentos e UTF-8</a> explica em detalhes.</p>
+</div>
+
+<div class="cenario">
+<strong>Windows: <code>cannot open output file ola.exe: Permission denied</code></strong>
+<p><strong>O que significa:</strong> "não foi possível abrir o arquivo de saída <code>ola.exe</code>: permissão negada". No Windows, um <code>.exe</code> que está rodando fica "trancado": o ligador não consegue escrever a versão nova por cima. Também acontece quando o antivírus está examinando o arquivo recém-criado.</p>
+<p><strong>Como consertar:</strong> feche o programa que ainda está aberto (uma janela de console esquecida, por exemplo) e compile de novo. Se for o antivírus, espere alguns segundos.</p>
+</div>
+
+<div class="cenario">
+<strong>macOS: <code>xcrun: error: invalid active developer path (/Library/Developer/CommandLineTools), missing xcrun</code></strong>
+<p><strong>O que significa:</strong> as ferramentas de linha de comando não estão instaladas, ou foram desativadas por uma atualização grande do macOS (acontece com frequência depois de mudar de versão do sistema).</p>
+<p><strong>Como consertar:</strong> rode <code>xcode-select --install</code> de novo e clique em Instalar.</p>
+</div>
+
+<div class="cenario">
+<strong>macOS: instalei o GCC pelo Homebrew, mas <code>g++ --version</code> ainda diz <code>Apple clang</code></strong>
+<p><strong>O que significa:</strong> é o esperado. O Homebrew instala o GCC com o número da versão no nome, para não esconder o <code>g++</code> da Apple, de que outros programas dependem.</p>
+<p><strong>Como consertar:</strong> use <code>g++-16</code> (confira o número com <code>ls $(brew --prefix)/bin/g++-*</code>).</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Caminho</th><th>Instalar</th><th>Compilador</th><th>Conferir</th></tr>
+<tr><td>Windows, MSYS2</td><td><a href="https://www.msys2.org/">msys2.org</a> + <code>pacman -S mingw-w64-ucrt-x86_64-gcc</code></td><td><code>g++</code> (GCC)</td><td><code>g++ --version</code></td></tr>
+<tr><td>Windows, Visual Studio</td><td>Instalador + "Desenvolvimento para desktop com C++"</td><td><code>cl</code> (MSVC)</td><td><code>cl</code> (sem nada) no Developer PowerShell</td></tr>
+<tr><td>Windows, WSL</td><td><code>wsl --install</code> + <code>sudo apt install build-essential</code></td><td><code>g++</code> (GCC, no Ubuntu)</td><td><code>g++ --version</code></td></tr>
+<tr><td>macOS, Command Line Tools</td><td><code>xcode-select --install</code></td><td><code>clang++</code> (Apple Clang)</td><td><code>clang++ --version</code></td></tr>
+<tr><td>macOS, Homebrew</td><td><code>brew install gcc</code></td><td><code>g++-16</code> (GCC)</td><td><code>g++-16 --version</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O pacote do MSYS2</h3>
+<p>Complete o comando que instala o g++ no ambiente UCRT64 do MSYS2:</p>
+<div class="ex-code">pacman -S <input data-answer="mingw-w64-ucrt-x86_64-gcc" aria-label="pacote" size="26"></div>
+</div>
+
+<div class="exercise">
+<h3>2. As ferramentas da Apple</h3>
+<p>Complete o comando que instala as Command Line Tools no macOS:</p>
+<div class="ex-code">xcode-select <input data-answer="--install" aria-label="opção" size="10"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. No Visual Studio Installer, qual carga de trabalho você marca para programar em C++?</p>
+<label><input type="radio" name="q3"> Desenvolvimento para a Web</label>
+<label><input type="radio" name="q3"> Desenvolvimento para desktop com C++</label>
+<label><input type="radio" name="q3"> Desenvolvimento em Python</label>
+<label><input type="radio" name="q3"> Nenhuma: o C++ vem sempre instalado</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. No Mac, a Ana digitou <code>g++ --version</code> e apareceu <code>Apple clang version …</code>. O que isso quer dizer?</p>
+<label><input type="radio" name="q4"> A instalação falhou.</label>
+<label><input type="radio" name="q4"> O Mac não aceita C++.</label>
+<label><input type="radio" name="q4"> Ela precisa reinstalar o macOS.</label>
+<label><input type="radio" name="q4"> Nada de errado: no Mac, o <code>g++</code> é um atalho para o Clang da Apple.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. A Ana compilou o <code>ola.cpp</code> no Windows e mandou o <code>ola.exe</code> para um amigo com Mac. O que acontece?</p>
+<label><input type="radio" name="q5"> Não roda: ele precisa compilar o <code>ola.cpp</code> no Mac.</label>
+<label><input type="radio" name="q5"> Roda normalmente.</label>
+<label><input type="radio" name="q5"> Roda, mas sem os acentos.</label>
+<label><input type="radio" name="q5"> Roda, se ele instalar o Visual Studio.</label>
+</div>
+
+<h3>Missão final: pronto para o Nível 1</h3>
+
+<div class="trycpp" data-goal="out:Sistema: Windows,out:Compilador: g++ do MSYS2,src:println">
+<p class="try-task"><strong>Missão:</strong> a Ana escolheu o Windows com o MSYS2. Complete o programa para ele mostrar as duas linhas abaixo, cada uma com um <code>std::println</code> (troque os <code>???</code>):</p>
+<pre class="out">Sistema: Windows
+Compilador: g++ do MSYS2</pre>
+<pre class="script">#include &lt;print&gt;
+
+int main() {
+    std::println("Sistema: ???");
+    std::println("Compilador: ???");
+}
+</pre>
+<pre class="solucao">#include &lt;print&gt;
+
+int main() {
+    std::println("Sistema: Windows");
+    std::println("Compilador: g++ do MSYS2");
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>Windows, recomendado:</strong> MSYS2 + <code>pacman -S mingw-w64-ucrt-x86_64-gcc</code>, no terminal UCRT64; para usar no PowerShell e no VS Code, coloque <code>C:\msys64\ucrt64\bin</code> no PATH.</li>
+  <li><strong>Windows, tudo em um:</strong> Visual Studio Community com "Desenvolvimento para desktop com C++"; para o C++23, escolha <code>/std:c++latest</code> nas propriedades do projeto.</li>
+  <li><strong>Windows, igual ao guia:</strong> <code>wsl --install</code>, e depois a aula do Linux.</li>
+  <li><strong>macOS:</strong> <code>xcode-select --install</code> traz o <code>clang++</code> (e um <code>g++</code> que é o Clang); <code>brew install gcc</code> traz o GCC de verdade como <code>g++-16</code>.</li>
+  <li>O comando de compilação é o mesmo em todo lugar; o executável de um sistema não roda no outro.</li>
+  <li>Próximo passo: escolher onde escrever o código, em <a href="editores.html">Editores e IDEs</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
