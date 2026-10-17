@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Tempo e Datas — std::chrono, durações, data e hora | Guia C++</title>
+<meta name="description" content="&lt;chrono&gt; em C++ para quem está começando: medir quanto tempo um trecho leva com steady_clock, durações (seconds, milliseconds, literais 500ms), pausar com sleep_for, data e hora atual com system_clock e std::format, fuso horário com current_zone e contas com datas, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Tempo e Datas (chrono)</span></h1>
+
+<p class="intro">Quanto tempo o programa da Ana leva para ordenar a lista? Como esperar meio segundo antes de mostrar o próximo número da contagem regressiva? Que dia é hoje, e quantos dias faltam para o Natal? Tudo isso mora no cabeçalho <code>&lt;chrono&gt;</code> (de <em>chronos</em>, "tempo" em grego). Ele é famoso por ter nomes compridos, mas a ideia é simples e segura: o C++ <strong>sabe a unidade</strong> de cada tempo (segundos, milissegundos, minutos) e não deixa você misturar sem querer.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Medir quanto tempo um trecho de código leva, com <code>std::chrono::steady_clock</code>.</li>
+  <li>Trabalhar com <strong>durações</strong>: <code>std::chrono::seconds</code>, <code>milliseconds</code>, <code>minutes</code>, e os literais <code>500ms</code>, <code>2s</code>, <code>1h</code>.</li>
+  <li>Converter entre unidades com <code>duration_cast</code>, e por que algumas conversões não compilam.</li>
+  <li>Pausar o programa com <code>std::this_thread::sleep_for</code>.</li>
+  <li>Pegar a data e a hora atuais com <code>system_clock</code> e formatá-las com <code>std::format</code> <span class="versao">C++20</span>.</li>
+  <li>Usar o fuso horário (<code>current_zone</code>) e fazer contas com datas.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Atenção: nesta aula, várias saídas dependem do relógio. Os tempos medidos mudam a cada execução e de computador para computador, e as datas mostram o dia em que rodamos os exemplos (16 de outubro de 2026, à noite). No seu computador, os números serão outros.</p>
+
+<hr>
+
+<h2>A ideia: o cronômetro e o relógio de parede</h2>
+<p>O <code>&lt;chrono&gt;</code> separa três ideias que, no dia a dia, a gente mistura:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ideia</th><th>No dia a dia</th><th>Em C++</th></tr>
+<tr><td><strong>Duração</strong></td><td>"90 segundos", "meia hora"</td><td><code>std::chrono::seconds</code>, <code>minutes</code>…</td></tr>
+<tr><td><strong>Relógio</strong></td><td>O cronômetro (só mede intervalos) e o relógio de parede (diz que horas são)</td><td><code>steady_clock</code> e <code>system_clock</code></td></tr>
+<tr><td><strong>Instante</strong></td><td>"agora", "quando apertei o botão"</td><td>um <code>time_point</code>, o que <code>now()</code> devolve</td></tr>
+</table>
+</div>
+<p>A conta que liga as três é a mesma do cronômetro: <strong>instante final − instante inicial = duração</strong>.</p>
+
+<p>Todos os nomes ficam dentro de <code>std::chrono</code>. Para não escrever isso toda hora, alguns exemplos usam <code>using namespace std::chrono;</code> <strong>dentro do <code>main</code></strong> (aula <a href="namespaces.html">Namespaces</a>), o que vale só ali dentro.</p>
+
+<hr>
+
+<h2>1. Medir quanto tempo um trecho leva</h2>
+
+<pre class="file" data-file="medir.cpp">#include &lt;algorithm&gt;
+#include &lt;chrono&gt;
+#include &lt;iostream&gt;
+#include &lt;random&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; numeros(1'000'000);
+    std::mt19937 gerador(42);
+    for (int&amp; n : numeros) {
+        n = static_cast&lt;int&gt;(gerador() % 1000);
+    }
+
+    auto inicio = std::chrono::steady_clock::now();
+    std::sort(numeros.begin(), numeros.end());
+    auto fim = std::chrono::steady_clock::now();
+
+    auto ms = std::chrono::duration_cast&lt;std::chrono::milliseconds&gt;(fim - inicio);
+    std::cout &lt;&lt; "Ordenar 1 milhão de números levou " &lt;&lt; ms.count() &lt;&lt; " ms\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra medir.cpp -o medir
+$ ./medir
+Ordenar 1 milhão de números levou 240 ms
+$ ./medir
+Ordenar 1 milhão de números levou 234 ms
+$ ./medir
+Ordenar 1 milhão de números levou 243 ms       « o mesmo programa, três tempos diferentes</pre>
+
+<dl class="anatomy">
+  <dt>std::chrono::steady_clock::now()</dt><dd>"Que instante é agora, no cronômetro?" <em>Steady</em> = "firme", "constante": esse relógio só anda para a frente, no mesmo ritmo, mesmo se alguém mudar a hora do computador. É o certo para medir.</dd>
+  <dt>fim - inicio</dt><dd>Subtrair dois instantes dá uma <strong>duração</strong>, na unidade mais fina do relógio (no Linux, nanossegundos).</dd>
+  <dt>duration_cast&lt;std::chrono::milliseconds&gt;(…)</dt><dd>Converte a duração para milissegundos (milésimos de segundo), jogando fora o que sobra. <em>Cast</em> = "conversão forçada".</dd>
+  <dt>ms.count()</dt><dd>O número "puro" dentro da duração, para mostrar.</dd>
+</dl>
+
+<p>Por que os tempos variam? Porque o computador está fazendo outras coisas ao mesmo tempo (o sistema, o navegador, outros programas), e a memória e o processador nem sempre estão no mesmo estado. Por isso, ao comparar dois jeitos de fazer algo, meça várias vezes. E compile com otimização (<code>-O2</code>) para medir de verdade: o comando padrão do guia, sem <code>-O2</code>, deixa o programa bem mais lento (aula <a href="compilar.html">Compilar com g++</a>). O <code>1'000'000</code> com apóstrofos é só um jeito legível de escrever um milhão (aula <a href="inteiros.html">Inteiros</a>); o <code>std::mt19937</code> gera os números sorteados (aula <a href="aleatorios.html">Números Aleatórios</a>).</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode duas ou três vezes e compare os tempos (no navegador eles serão diferentes dos do laboratório, e mudam a cada vez). Depois troque <code>10'000'000</code> por <code>1'000'000</code>: o tempo cai mais ou menos dez vezes?</p>
+<pre class="script">#include &lt;chrono&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    auto inicio = std::chrono::steady_clock::now();
+
+    long long soma = 0;
+    for (int i = 1; i &lt;= 10'000'000; ++i) {
+        soma += i % 7;
+    }
+
+    auto fim = std::chrono::steady_clock::now();
+    auto us = std::chrono::duration_cast&lt;std::chrono::microseconds&gt;(fim - inicio);
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+    std::cout &lt;&lt; "Levou " &lt;&lt; us.count() &lt;&lt; " microssegundos\n";
+}
+</pre>
+</div>
+
+<p>No laboratório, duas execuções deste mesmo programa:</p>
+<pre class="term" data-cwd="~/cpp">$ ./tempo_editor
+Soma: 29999997
+Levou 36121 microssegundos
+$ ./tempo_editor
+Soma: 29999997
+Levou 38334 microssegundos</pre>
+
+<hr>
+
+<h2>2. Durações e suas unidades</h2>
+<p>Uma duração é "um número + uma unidade". O tipo carrega a unidade, então o C++ faz as contas certas sozinho:</p>
+
+<pre class="file" data-file="duracoes.cpp">#include &lt;chrono&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    using namespace std::chrono_literals;
+
+    std::chrono::seconds intervalo = 90s;
+    std::chrono::milliseconds espera = 500ms;
+    std::chrono::minutes aula = 50min;
+
+    std::cout &lt;&lt; "Intervalo: " &lt;&lt; intervalo.count() &lt;&lt; " segundos\n";
+    std::cout &lt;&lt; "Espera: " &lt;&lt; espera.count() &lt;&lt; " milissegundos\n";
+    std::cout &lt;&lt; "Aula: " &lt;&lt; aula &lt;&lt; '\n';
+
+    std::chrono::milliseconds total = intervalo + espera;
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; '\n';
+
+    auto em_minutos = std::chrono::duration_cast&lt;std::chrono::minutes&gt;(intervalo);
+    std::cout &lt;&lt; "90s em minutos inteiros: " &lt;&lt; em_minutos &lt;&lt; '\n';
+
+    std::chrono::duration&lt;double, std::ratio&lt;60&gt;&gt; exato = intervalo;
+    std::cout &lt;&lt; "90s em minutos com vírgula: " &lt;&lt; exato.count() &lt;&lt; '\n';
+
+    std::cout &lt;&lt; std::boolalpha &lt;&lt; "1h == 60min? " &lt;&lt; (1h == 60min) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra duracoes.cpp -o duracoes
+$ ./duracoes
+Intervalo: 90 segundos
+Espera: 500 milissegundos
+Aula: 50min                          « desde o C++20, o cout mostra a unidade sozinho
+Total: 90500ms                       « 90 s + 500 ms, convertido para ms
+90s em minutos inteiros: 1min        « o duration_cast corta: 1,5 vira 1
+90s em minutos com vírgula: 1.5
+1h == 60min? true</pre>
+
+<dl class="anatomy">
+  <dt>using namespace std::chrono_literals;</dt><dd>Libera os <strong>literais</strong> de tempo: <code>90s</code>, <code>500ms</code>, <code>50min</code>, <code>1h</code>. Sem essa linha, escrever <code>500ms</code> é erro.</dd>
+  <dt>std::chrono::seconds intervalo = 90s;</dt><dd>Uma duração em segundos. O mesmo valor também poderia ser escrito <code>std::chrono::seconds{90}</code>.</dd>
+  <dt>intervalo + espera</dt><dd>Segundos + milissegundos: o C++ converte tudo para a unidade mais fina (ms) antes de somar. Nada se perde.</dd>
+  <dt>duration_cast&lt;std::chrono::minutes&gt;(intervalo)</dt><dd>Converter para uma unidade <strong>maior</strong> pode perder informação (90 s não é um número inteiro de minutos). Por isso é preciso pedir com <code>duration_cast</code>, que corta a parte quebrada.</dd>
+  <dt>duration&lt;double, std::ratio&lt;60&gt;&gt;</dt><dd>Uma duração "em minutos com vírgula": o <code>double</code> guarda frações, e <code>ratio&lt;60&gt;</code> quer dizer "cada unidade vale 60 segundos". É raro precisar disso; fica para você reconhecer.</dd>
+</dl>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Literal</th><th>Unidade</th></tr>
+<tr><td><code>std::chrono::nanoseconds</code></td><td><code>10ns</code></td><td>bilionésimo de segundo</td></tr>
+<tr><td><code>std::chrono::microseconds</code></td><td><code>10us</code></td><td>milionésimo de segundo</td></tr>
+<tr><td><code>std::chrono::milliseconds</code></td><td><code>10ms</code></td><td>milésimo de segundo</td></tr>
+<tr><td><code>std::chrono::seconds</code></td><td><code>10s</code></td><td>segundo</td></tr>
+<tr><td><code>std::chrono::minutes</code></td><td><code>10min</code></td><td>minuto</td></tr>
+<tr><td><code>std::chrono::hours</code></td><td><code>10h</code></td><td>hora</td></tr>
+<tr><td><code>std::chrono::days</code>, <code>weeks</code>, <code>months</code>, <code>years</code></td><td>(sem literal de duração)</td><td>C++20; usados com datas</td></tr>
+</table>
+</div>
+
+<h3>A conversão que perde informação não acontece sozinha</h3>
+<p>Ir de unidade grande para pequena (segundos → milissegundos) é sempre exato, e o C++ faz sem pedir. Ir de pequena para grande, não:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat perda.cpp
+#include &lt;chrono&gt;
+
+int main() {
+    using namespace std::chrono_literals;
+    std::chrono::milliseconds espera = 1500ms;
+    std::chrono::seconds s = espera;
+    return static_cast&lt;int&gt;(s.count());
+}
+$ g++ -std=c++23 -Wall -Wextra perda.cpp -o perda
+perda.cpp: In function ‘int main()’:
+perda.cpp:6:30: error: conversion from ‘duration&lt;[...],ratio&lt;[...],1000&gt;&gt;’ to non-scalar type ‘duration&lt;[...],ratio&lt;[...],1&gt;&gt;’ requested
+    6 |     std::chrono::seconds s = espera;
+      |                              ^~~~~~</pre>
+
+<p>A mensagem é enigmática, mas dá para decifrar: <code>ratio&lt;[...],1000&gt;</code> é "1/1000 de segundo" (milissegundo) e <code>ratio&lt;[...],1&gt;</code> é "1/1 de segundo" (segundo); o <code>[...]</code> são partes iguais nos dois tipos que o g++ escondeu. Ou seja: "não converto milissegundos em segundos assim". 1500 ms não é um número inteiro de segundos, e o C++ se recusa a jogar fora meio segundo em silêncio. Se cortar é o que você quer, diga: <code>std::chrono::duration_cast&lt;std::chrono::seconds&gt;(espera)</code> (dá 1 s). Compare com a armadilha do <code>accumulate</code> da aula <a href="algoritmos.html">Algoritmos</a>, que corta sem avisar: aqui o tipo protege você.</p>
+
+<hr>
+
+<h2>3. Pausar: <code>std::this_thread::sleep_for</code></h2>
+<p>Para o programa "dormir" por um tempo, use <code>sleep_for</code> ("dormir por"), do cabeçalho <code>&lt;thread&gt;</code>, com uma duração:</p>
+
+<pre class="file" data-file="dormir.cpp">#include &lt;chrono&gt;
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+
+int main() {
+    using namespace std::chrono_literals;
+
+    for (int i = 3; i &gt;= 1; --i) {
+        std::cout &lt;&lt; i &lt;&lt; "...\n";
+        std::this_thread::sleep_for(500ms);
+    }
+    std::cout &lt;&lt; "Já!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra dormir.cpp -o dormir
+$ time ./dormir
+3...
+2...
+1...
+Já!
+
+real	0m1,503s                        « 3 × 0,5 s = 1,5 s (e uns milissegundos a mais)
+user	0m0,001s                        « dormindo, o programa quase não usa o processador
+sys	0m0,002s</pre>
+
+<p>O <code>time</code>, escrito antes do programa, é um recurso do bash que mede quanto tempo o programa inteiro levou. <code>this_thread</code> quer dizer "esta linha de execução", o próprio programa; o assunto "threads" tem aula própria, <a href="threads.html">Threads</a>. O <code>sleep_for</code> garante que dorme <strong>pelo menos</strong> o tempo pedido, nunca menos; pode dormir um pouco mais. Nesta aula ele fica só no terminal: o editor do guia roda o programa de outro jeito, e uma pausa não faria sentido ali.</p>
+
+<hr>
+
+<h2>4. Data e hora de agora <span class="versao">C++20</span></h2>
+<p>Para saber <strong>que horas são</strong>, o relógio certo é o <code>system_clock</code>, o "relógio de parede" do sistema. Desde o C++20, o <code>std::format</code> (aula <a href="format-print.html">std::format e std::print</a>) sabe formatar datas com códigos como <code>%d</code> (dia), <code>%m</code> (mês), <code>%Y</code> (ano com 4 dígitos), <code>%H</code> (hora) e <code>%M</code> (minuto):</p>
+
+<pre class="file" data-file="agora.cpp">#include &lt;chrono&gt;
+#include &lt;format&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    auto agora = std::chrono::system_clock::now();
+
+    std::cout &lt;&lt; std::format("Data (UTC): {:%d/%m/%Y}\n", agora);
+    std::cout &lt;&lt; std::format("Hora (UTC): {:%H:%M}\n", agora);
+
+    auto fuso = std::chrono::current_zone();
+    std::chrono::zoned_time local{fuso, std::chrono::floor&lt;std::chrono::seconds&gt;(agora)};
+    std::cout &lt;&lt; std::format("Data local: {:%d/%m/%Y}\n", local);
+    std::cout &lt;&lt; std::format("Hora local: {:%H:%M:%S %Z}\n", local);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra agora.cpp -o agora
+$ ./agora
+Data (UTC): 17/10/2026                         « já é dia 17 em Greenwich…
+Hora (UTC): 01:03
+Data local: 16/10/2026                         « …mas ainda é dia 16 no Brasil
+Hora local: 22:03:40 -03
+$ date
+sex 16 out 2026 22:03:40 -03</pre>
+
+<dl class="anatomy">
+  <dt>std::chrono::system_clock::now()</dt><dd>O instante atual no relógio do sistema.</dd>
+  <dt>{:%d/%m/%Y}</dt><dd>Dentro das chaves do <code>format</code>, depois dos dois-pontos, vem o "molde" da data. As barras são texto comum.</dd>
+  <dt>std::chrono::current_zone()</dt><dd>O fuso horário configurado no computador.</dd>
+  <dt>std::chrono::zoned_time local{fuso, …}</dt><dd>"Este instante, visto neste fuso." É ele que dá a hora local.</dd>
+  <dt>std::chrono::floor&lt;std::chrono::seconds&gt;(agora)</dt><dd>Arredonda o instante para baixo, para segundos inteiros. Sem isso, o <code>%S</code> mostraria os segundos com nove casas decimais.</dd>
+  <dt>%Z</dt><dd>A abreviação do fuso. Aqui saiu <code>-03</code>: três horas a menos que Greenwich, o horário de Brasília.</dd>
+</dl>
+
+<div class="warning">
+<strong>O <code>system_clock</code> conta em UTC</strong>
+<p>O <code>system_clock</code> não sabe de fuso: ele mostra o horário <strong>UTC</strong> (o "horário universal", de Greenwich, em Londres). No Brasil (UTC−3), entre 21h e meia-noite, a data UTC já é o dia seguinte, como no exemplo, rodado às 22h do dia 16. Para mostrar ao usuário, use a hora local, com <code>zoned_time</code> e <code>current_zone()</code>.</p>
+</div>
+
+<p>Sobre o fuso: o <code>current_zone()</code> funciona no g++ 15 do Linux porque ele lê o banco de fusos horários do sistema (o pacote <code>tzdata</code> do Ubuntu). No editor do guia, que roda dentro do navegador, não há esse banco; por isso a parte de fuso fica só no terminal.</p>
+
+<h3>Contas com datas</h3>
+<p>O C++20 também trouxe tipos de calendário. Com eles, "quantos dias faltam para o Natal?" vira uma subtração:</p>
+
+<pre class="file" data-file="natal.cpp">#include &lt;chrono&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    using namespace std::chrono;
+
+    zoned_time agora{current_zone(), system_clock::now()};
+    auto hoje = floor&lt;days&gt;(agora.get_local_time());
+    year_month_day data{hoje};
+    std::cout &lt;&lt; "Hoje: " &lt;&lt; data &lt;&lt; '\n';
+
+    auto natal = local_days{data.year() / December / 25};
+    auto faltam = natal - hoje;
+    std::cout &lt;&lt; "Faltam " &lt;&lt; faltam.count() &lt;&lt; " dias para o Natal\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra natal.cpp -o natal
+$ ./natal
+Hoje: 2026-10-16
+Faltam 70 dias para o Natal</pre>
+
+<dl class="anatomy">
+  <dt>agora.get_local_time()</dt><dd>O instante atual no horário local.</dd>
+  <dt>floor&lt;days&gt;(…)</dt><dd>Arredonda para baixo, para o dia inteiro (joga fora as horas).</dd>
+  <dt>year_month_day data{hoje};</dt><dd>Separa o dia em ano, mês e dia. O <code>cout</code> mostra no formato internacional <code>AAAA-MM-DD</code>.</dd>
+  <dt>data.year() / December / 25</dt><dd>Monta uma data: "deste ano, dezembro, dia 25". As barras aqui não são divisão: o <code>&lt;chrono&gt;</code> as usa para montar datas.</dd>
+  <dt>natal - hoje</dt><dd>Diferença entre dois dias: uma duração em <code>days</code>.</dd>
+</dl>
+
+<p>Se você usar a data do <code>system_clock</code> direto (<code>floor&lt;days&gt;(system_clock::now())</code>), cai na armadilha do UTC: no mesmo minuto, esse programa mostrou <code>Hoje (UTC): 2026-10-17</code>, um dia adiantado.</p>
+
+<hr>
+
+<h2>Qual relógio usar?</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Para…</th><th>Use</th><th>Por quê</th></tr>
+<tr><td>Medir quanto tempo algo levou</td><td><code>steady_clock</code></td><td>Nunca anda para trás, mesmo se a hora do sistema for ajustada.</td></tr>
+<tr><td>Saber a data e a hora</td><td><code>system_clock</code> (+ <code>zoned_time</code> para a hora local)</td><td>É o relógio do calendário.</td></tr>
+<tr><td>Esperar</td><td><code>std::this_thread::sleep_for(duração)</code></td><td>Recebe uma duração com unidade: <code>sleep_for(500ms)</code> não tem como ser confundido com 500 segundos.</td></tr>
+</table>
+</div>
+<p>Você ainda vai encontrar <code>high_resolution_clock</code> em exemplos pela internet. No g++ ele é só outro nome para o <code>system_clock</code>, que pode ser ajustado; para medir, prefira o <code>steady_clock</code>. Em código antigo do C, aparecem também <code>time()</code>, <code>clock()</code> e <code>strftime</code>; o <code>&lt;chrono&gt;</code> substitui todos eles com mais segurança.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: conversion from ‘duration&lt;[...],ratio&lt;[...],1000&gt;&gt;’ to non-scalar type ‘duration&lt;[...],ratio&lt;[...],1&gt;&gt;’ requested</code></strong>
+<p><strong>O que significa:</strong> você tentou guardar uma duração numa unidade maior (ms → s), o que poderia perder a parte quebrada.</p>
+<p><strong>Como consertar:</strong> se quer cortar, use <code>duration_cast&lt;std::chrono::seconds&gt;(…)</code>; se não quer perder nada, guarde na unidade menor (<code>milliseconds</code>) ou numa duração com <code>double</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A data sai um dia adiantada</strong>
+<p><strong>O que significa:</strong> você formatou o <code>system_clock::now()</code> direto, e ele está em UTC. À noite no Brasil, em UTC já é o dia seguinte.</p>
+<p><strong>Como consertar:</strong> converta para a hora local com <code>std::chrono::zoned_time{std::chrono::current_zone(), agora}</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O tempo medido sai 0</strong>
+<p><strong>O que significa:</strong> o trecho foi mais rápido que a unidade escolhida (levou 300 microssegundos e você converteu para <code>seconds</code> ou <code>milliseconds</code>), ou, com <code>-O2</code>, o compilador percebeu que o resultado não era usado e apagou o trecho inteiro.</p>
+<p><strong>Como consertar:</strong> use uma unidade menor (<code>microseconds</code>, <code>nanoseconds</code>) e <strong>use o resultado</strong> do trecho (mostre-o na tela, como a <code>soma</code> do exemplo).</p>
+</div>
+
+<div class="cenario">
+<strong><code>500ms</code> não compila</strong>
+<p><strong>O que significa:</strong> faltou liberar os literais.</p>
+<p><strong>Como consertar:</strong> <code>using namespace std::chrono_literals;</code> dentro da função (ou <code>using namespace std::chrono;</code>, que também os inclui).</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>std::chrono::steady_clock::now()</code></td><td>Instante no cronômetro (para medir)</td></tr>
+<tr><td><code>std::chrono::system_clock::now()</code></td><td>Instante no relógio do sistema (UTC)</td></tr>
+<tr><td><code>fim - inicio</code></td><td>Duração entre dois instantes</td></tr>
+<tr><td><code>std::chrono::duration_cast&lt;std::chrono::milliseconds&gt;(d)</code></td><td>Converte cortando a parte quebrada</td></tr>
+<tr><td><code>d.count()</code></td><td>O número dentro da duração</td></tr>
+<tr><td><code>std::cout &lt;&lt; d</code></td><td>Mostra com a unidade (<code>500ms</code>), C++20</td></tr>
+<tr><td><code>using namespace std::chrono_literals;</code></td><td>Libera <code>2h</code>, <code>30min</code>, <code>10s</code>, <code>500ms</code>, <code>10us</code>, <code>10ns</code></td></tr>
+<tr><td><code>std::this_thread::sleep_for(500ms);</code></td><td>Pausa pelo menos esse tempo (<code>&lt;thread&gt;</code>)</td></tr>
+<tr><td><code>std::format("{:%d/%m/%Y %H:%M}", t)</code></td><td>Formata data e hora (C++20, <code>&lt;format&gt;</code>)</td></tr>
+<tr><td><code>std::chrono::current_zone()</code></td><td>Fuso horário do computador</td></tr>
+<tr><td><code>std::chrono::zoned_time{fuso, t}</code></td><td>Instante visto num fuso (hora local)</td></tr>
+<tr><td><code>2026y / October / 16</code></td><td>Uma data (com <code>using namespace std::chrono;</code>)</td></tr>
+<tr><td><code>sys_days{a} - sys_days{b}</code></td><td>Dias entre duas datas</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O relógio para medir</h3>
+<p>Complete com o relógio certo para medir quanto tempo um trecho leva:</p>
+<div class="ex-code">auto inicio = std::chrono::<input data-answer="steady_clock" aria-label="relógio">::now();</div>
+</div>
+
+<div class="exercise">
+<h3>2. Meio segundo</h3>
+<p>Complete com o literal de meio segundo em milissegundos:</p>
+<div class="ex-code">std::this_thread::sleep_for(<input data-answer="500ms" aria-label="duração">);</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. O que mostra <code>std::cout &lt;&lt; std::chrono::duration_cast&lt;std::chrono::minutes&gt;(150s).count();</code>?</p>
+<label><input type="radio" name="q3"> 2.5</label>
+<label><input type="radio" name="q3"> 3</label>
+<label><input type="radio" name="q3"> 2</label>
+<label><input type="radio" name="q3"> Não compila</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. <code>std::chrono::seconds s = 2500ms;</code> compila?</p>
+<label><input type="radio" name="q4"> Não: converter ms em s poderia perder meio segundo, e precisa de <code>duration_cast</code></label>
+<label><input type="radio" name="q4"> Sim, e <code>s</code> vale 2</label>
+<label><input type="radio" name="q4"> Sim, e <code>s</code> vale 3</label>
+<label><input type="radio" name="q4"> Sim, e <code>s</code> vale 2500</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Por que a data do <code>system_clock::now()</code> pode sair com um dia a mais à noite no Brasil?</p>
+<label><input type="radio" name="q5"> Porque o relógio do computador está errado</label>
+<label><input type="radio" name="q5"> Porque o <code>format</code> arredonda para cima</label>
+<label><input type="radio" name="q5"> Porque o <code>steady_clock</code> foi usado por engano</label>
+<label><input type="radio" name="q5"> Porque ela está em UTC, e em UTC já é o dia seguinte</label>
+</div>
+
+<h3>Missão: segundos em horas, minutos e segundos</h3>
+
+<div class="trycpp" data-goal="out:1h 2min 5s,src:duration_cast">
+<p class="try-task"><strong>Missão:</strong> o vídeo da aula da Ana tem 3725 segundos. Mostre a duração como <code>1h 2min 5s</code>. Dica: <code>duration_cast&lt;hours&gt;</code> dá as horas inteiras; tire-as do total com <code>-=</code>; faça o mesmo com os minutos; o que sobra são os segundos. O <code>cout</code> já escreve a unidade de cada duração.</p>
+<pre class="script">#include &lt;chrono&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    using namespace std::chrono;
+    using namespace std::chrono_literals;
+
+    seconds total = 3725s;
+
+    // calcule h e m aqui
+
+    std::cout &lt;&lt; total &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;chrono&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    using namespace std::chrono;
+    using namespace std::chrono_literals;
+
+    seconds total = 3725s;
+
+    auto h = duration_cast&lt;hours&gt;(total);
+    total -= h;
+    auto m = duration_cast&lt;minutes&gt;(total);
+    total -= m;
+
+    std::cout &lt;&lt; h &lt;&lt; ' ' &lt;&lt; m &lt;&lt; ' ' &lt;&lt; total &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<h3>Missão final: dias até o Natal, numa data fixa</h3>
+
+<div class="trycpp" data-goal="out:Do dia 2026-10-16 ao Natal: 70 dias,src:sys_days">
+<p class="try-task"><strong>Missão:</strong> sem depender do relógio (para dar sempre o mesmo resultado), calcule quantos dias há entre 16 de outubro de 2026 e 25 de dezembro de 2026. Crie duas variáveis <code>sys_days</code> com <code>2026y / October / 16</code> e <code>2026y / December / 25</code> e subtraia. A saída deve ser <code>Do dia 2026-10-16 ao Natal: 70 dias</code>.</p>
+<pre class="script">#include &lt;chrono&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    using namespace std::chrono;
+
+    // crie inicio e natal aqui
+
+    // mostre: Do dia 2026-10-16 ao Natal: 70 dias
+}
+</pre>
+<pre class="solucao">#include &lt;chrono&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    using namespace std::chrono;
+
+    sys_days inicio = 2026y / October / 16;
+    sys_days natal = 2026y / December / 25;
+
+    auto diferenca = natal - inicio;
+    std::cout &lt;&lt; "Do dia " &lt;&lt; year_month_day{inicio} &lt;&lt; " ao Natal: "
+              &lt;&lt; diferenca.count() &lt;&lt; " dias\n";
+}
+</pre>
+</div>
+
+<p>A solução, no laboratório:</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra dias.cpp -o dias
+$ ./dias
+Do dia 2026-10-16 ao Natal: 70 dias</pre>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>&lt;chrono&gt;</code> separa <strong>durações</strong> (<code>seconds</code>, <code>milliseconds</code>…), <strong>relógios</strong> e <strong>instantes</strong> (<code>now()</code>).</li>
+  <li>Para medir: <code>steady_clock::now()</code> antes e depois, subtraia, converta com <code>duration_cast</code>. Os tempos variam a cada execução: meça mais de uma vez.</li>
+  <li>Literais (<code>500ms</code>, <code>2s</code>, <code>1h</code>) exigem <code>using namespace std::chrono_literals;</code>.</li>
+  <li>Unidade grande → pequena é automático; pequena → grande exige <code>duration_cast</code> (que corta).</li>
+  <li><code>std::this_thread::sleep_for(500ms)</code> pausa o programa.</li>
+  <li><code>system_clock</code> está em UTC; para a hora local, <code>zoned_time</code> com <code>current_zone()</code>. Formate com <code>std::format("{:%d/%m/%Y}", …)</code>.</li>
+  <li>Datas do calendário: <code>2026y / December / 25</code>, e subtrair <code>sys_days</code> dá dias.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
