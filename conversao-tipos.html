@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Conversão de Tipos — implícita, static_cast e divisão inteira | Guia C++</title>
+<meta name="description" content="Conversão de tipos em C++ para quem nunca programou: int vira double, double vira int (e corta), o aviso -Wconversion, static_cast, divisão inteira × real, casts estilo C e char ↔ int, com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Conversão de Tipos</span></h1>
+
+<p class="intro">Em C++, todo valor tem um <strong>tipo</strong>: <code>7</code> é um <code>int</code>, <code>9.99</code> é um <code>double</code>, <code>'A'</code> é um <code>char</code>. Muitas vezes você precisa usar um valor de um tipo onde se espera outro: guardar um preço com centavos numa variável de números inteiros, calcular a média de notas inteiras com vírgula, descobrir o código de uma letra. Essa passagem de um tipo para outro se chama <strong>conversão</strong>. Às vezes o C++ a faz sozinho, sem avisar nada; às vezes você precisa pedir. Nesta aula você vai ver as duas formas e as armadilhas de cada uma.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é <strong>conversão implícita</strong> (automática): <code>int</code> → <code>double</code> não perde nada; <code>double</code> → <code>int</code> <strong>corta</strong> a parte depois do ponto.</li>
+  <li>Como pedir ao g++ que avise dessas perdas com <code>-Wconversion</code>.</li>
+  <li>Como converter de propósito com <code>static_cast&lt;T&gt;(valor)</code>.</li>
+  <li>Por que <code>7 / 2</code> dá <code>3</code>, e como obter <code>3.5</code>.</li>
+  <li>O que é o cast "estilo C" <code>(int)x</code> e por que preferir <code>static_cast</code>.</li>
+  <li>Como passar de <code>char</code> para <code>int</code> e de volta.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code> (veja <a href="compilar.html">Compilar com g++</a>). Você pode repetir cada um no editor do guia, que compila C++ de verdade no navegador.</p>
+
+<hr>
+
+<h2>A ideia: passar água de um copo para outro</h2>
+<p>Imagine dois recipientes na cozinha da Ana: uma <strong>jarra grande</strong>, com marcações de meio em meio copo, e uma <strong>forminha de gelo</strong>, em que cada buraco guarda uma porção inteira, sem frações.</p>
+<ul>
+  <li>Passar da forminha para a jarra é tranquilo: 7 porções inteiras viram "7,0" na jarra. <strong>Nada se perde.</strong></li>
+  <li>Passar da jarra para a forminha é diferente: se a jarra tem "9,99", só cabem <strong>9</strong> porções inteiras. O "0,99" que sobrou <strong>vai para a pia</strong>. Ninguém arredonda para 10.</li>
+</ul>
+<p>No C++, o <code>int</code> é a forminha (só números inteiros, veja <a href="inteiros.html">Inteiros</a>) e o <code>double</code> é a jarra (números com parte fracionária, veja <a href="ponto-flutuante.html">float e double</a>). Toda conversão é uma dessas duas situações: ou o valor <strong>cabe</strong> no tipo novo, ou <strong>alguma coisa se perde</strong>.</p>
+
+<hr>
+
+<h2>1. Conversão implícita: o C++ converte sozinho</h2>
+<p>"Implícita" quer dizer "sem ninguém pedir". Sempre que você coloca um valor de um tipo numa variável de outro tipo, o C++ tenta converter automaticamente. Veja os dois sentidos no mesmo programa:</p>
+
+<pre class="file" data-file="implicita.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int caixas = 7;
+    double total = caixas;      // int vira double
+    std::cout &lt;&lt; total &lt;&lt; '\n';
+    std::cout &lt;&lt; total / 2 &lt;&lt; '\n';
+
+    double preco = 9.99;
+    int reais = preco;          // double vira int: corta
+    std::cout &lt;&lt; reais &lt;&lt; '\n';
+
+    double temperatura = -2.7;
+    int t = temperatura;
+    std::cout &lt;&lt; t &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>double total = caixas;</dt><dd>O lado direito é um <code>int</code> (7). A variável é <code>double</code>. O C++ converte o 7 em 7.0 e guarda. Isso se chama <strong>conversão de alargamento</strong>: o tipo novo é "maior", tudo cabe.</dd>
+  <dt>total / 2</dt><dd>Como <code>total</code> é <code>double</code>, a divisão é feita com vírgula: 7.0 / 2 = 3.5.</dd>
+  <dt>int reais = preco;</dt><dd>O lado direito é <code>double</code> (9.99); a variável é <code>int</code>. O C++ <strong>joga fora</strong> tudo depois do ponto. Isso é uma <strong>conversão de estreitamento</strong> (em inglês, <em>narrowing</em>): o tipo novo é "menor".</dd>
+  <dt>int t = temperatura;</dt><dd>Com números negativos, o corte também vai <strong>em direção ao zero</strong>: −2.7 vira −2 (e não −3).</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra implicita.cpp -o implicita
+$ ./implicita
+7          « o double 7.0 aparece sem o ".0": o cout esconde zeros que não mudam o valor
+3.5
+9          « 9.99 virou 9: os 99 centavos foram para a pia
+-2         « -2.7 virou -2: corta em direção ao zero</pre>
+
+<p>Repare no detalhe mais importante: o g++ compilou <strong>sem nenhum aviso</strong>, mesmo com <code>-Wall -Wextra</code>. Para ele, cortar 9.99 em 9 é uma operação legal, que você pode ter feito de propósito. Os 99 centavos sumiram em silêncio.</p>
+
+<div class="warning">
+<strong>Cortar não é arredondar</strong>
+<p>A conversão de <code>double</code> para <code>int</code> <strong>sempre corta</strong> (os matemáticos dizem "trunca"): 9.99 vira 9, 9.5 vira 9, 9.01 vira 9. Se você quer arredondar, use <code>std::round</code>, mostrado mais abaixo nesta aula.</p>
+</div>
+
+<h3>Pedindo o aviso: <code>-Wconversion</code></h3>
+<p>O g++ tem uma opção que <strong>não</strong> faz parte do <code>-Wall</code> nem do <code>-Wextra</code>: <code>-Wconversion</code> ("avisar sobre conversões"). Com ela, toda conversão que <strong>pode mudar o valor</strong> vira um aviso. É o mesmo programa, compilado de novo com a opção a mais:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -Wconversion implicita.cpp -o implicita
+implicita.cpp: In function ‘int main()’:
+implicita.cpp:10:17: warning: conversion from ‘double’ to ‘int’ may change value [-Wfloat-conversion]
+   10 |     int reais = preco;          // double vira int: corta
+      |                 ^~~~~
+implicita.cpp:14:13: warning: conversion from ‘double’ to ‘int’ may change value [-Wfloat-conversion]
+   14 |     int t = temperatura;
+      |             ^~~~~~~~~~~</pre>
+
+<p>Leia o aviso por partes (a aula <a href="erros-compilacao.html">Lendo Erros do Compilador</a> explica o formato):</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pedaço</th><th>O que quer dizer</th></tr>
+<tr><td><code>implicita.cpp:10:17</code></td><td>Arquivo, linha 10, coluna 17: onde está o problema.</td></tr>
+<tr><td><code>warning:</code></td><td>É um <strong>aviso</strong>, não um erro: o programa foi gerado mesmo assim.</td></tr>
+<tr><td><code>conversion from ‘double’ to ‘int’ may change value</code></td><td>"A conversão de double para int pode mudar o valor."</td></tr>
+<tr><td><code>[-Wfloat-conversion]</code></td><td>O nome do tipo de aviso. <code>-Wfloat-conversion</code> (conversões com números de ponto flutuante) é uma parte do <code>-Wconversion</code>.</td></tr>
+</table>
+</div>
+
+<p>Repare que a linha 5 (<code>double total = caixas;</code>) <strong>não</strong> foi avisada: de <code>int</code> para <code>double</code> o valor nunca muda. O aviso aparece só onde pode haver perda.</p>
+
+<div class="tip">
+<strong>Vale a pena ligar?</strong>
+<p>Em programas pequenos, como os deste guia, sim: <code>-Wconversion</code> pega exatamente o tipo de engano que esta aula ensina. Em projetos grandes ele pode avisar demais, e muita gente liga só em partes do código. A aula <a href="avisos.html">Avisos (-Wall -Wextra)</a> mostra outras opções úteis. O comando padrão do guia continua sendo <code>-Wall -Wextra</code>; quando usarmos <code>-Wconversion</code>, ele vai aparecer escrito.</p>
+</div>
+
+<h3>Outros estreitamentos silenciosos</h3>
+<p>Não é só a parte fracionária que se perde. Um número grande demais para o tipo novo também é "estragado" em silêncio:</p>
+
+<pre class="file" data-file="grande.cpp">#include &lt;iostream&gt;
+
+int main() {
+    long long populacao = 5000000000;
+    int p = populacao;
+    std::cout &lt;&lt; p &lt;&lt; '\n';
+    int negativo = -1;
+    unsigned int u = negativo;
+    std::cout &lt;&lt; u &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra grande.cpp -o grande
+$ ./grande
+705032704        « cinco bilhões não cabem num int: sobrou um número sem sentido
+4294967295       « -1 num unsigned (sem sinal) vira o maior unsigned int
+$ g++ -std=c++23 -Wall -Wextra -Wconversion grande.cpp -o grande
+grande.cpp: In function ‘int main()’:
+grande.cpp:5:13: warning: conversion from ‘long long int’ to ‘int’ may change value [-Wconversion]
+    5 |     int p = populacao;
+      |             ^~~~~~~~~</pre>
+
+<p>Um <code>int</code> vai só até 2.147.483.647 (veja <a href="inteiros.html">Inteiros</a>). O que passa disso "dá a volta" e vira outro número. Já o −1 dentro de um <code>unsigned int</code> (um inteiro que <strong>não tem sinal</strong>, só aceita 0 e positivos) vira 4294967295. Esse comportamento volta a aparecer, de forma bem mais traiçoeira, na aula <a href="operadores-comparacao.html">Operadores de Comparação</a>. O aviso de <code>int</code> para <code>unsigned</code> tem nome próprio, <code>-Wsign-conversion</code>, e não vem nem com o <code>-Wconversion</code>.</p>
+
+<h3>As chaves pegam o estreitamento</h3>
+<p>Na aula <a href="variaveis.html">Variáveis</a> você viu que dá para inicializar com chaves: <code>int x{5};</code>. Uma das vantagens das chaves é exatamente esta: elas <strong>não aceitam</strong> estreitamento.</p>
+
+<pre class="file" data-file="estreita.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double preco = 9.99;
+    int reais{preco};
+    std::cout &lt;&lt; reais &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra estreita.cpp -o estreita
+estreita.cpp: In function ‘int main()’:
+estreita.cpp:5:15: warning: narrowing conversion of ‘preco’ from ‘double’ to ‘int’ [-Wnarrowing]
+    5 |     int reais{preco};
+      |               ^~~~~</pre>
+
+<p>"Conversão de estreitamento de <code>preco</code>, de double para int." Aqui o g++ dá só um aviso, sem precisar de <code>-Wconversion</code>. Se o valor for escrito direto, como <code>int reais{9.99};</code>, o g++ recusa de vez:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra estreita2.cpp -o estreita2
+estreita2.cpp: In function ‘int main()’:
+estreita2.cpp:4:15: error: narrowing conversion of ‘9.9900000000000002e+0’ from ‘double’ to ‘int’ [-Wnarrowing]
+    4 |     int reais{9.99};
+      |               ^~~~</pre>
+
+<p>(O <code>9.9900000000000002e+0</code> é o 9.99 do jeito que ele fica guardado na memória: <code>double</code> quase nunca guarda o número exato. A aula <a href="ponto-flutuante.html">float e double</a> explica.) No editor do guia, que usa o Clang, os <strong>dois</strong> casos são erro: <code>type 'double' cannot be narrowed to 'int' in initializer list</code>.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode o programa e veja os cortes. Depois troque <code>8.75</code> por <code>8.999</code> e por <code>-8.999</code>. Por fim, troque <code>int a = nota;</code> por <code>int a{nota};</code> e veja o compilador recusar.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 8.75;
+    int a = nota;
+    std::cout &lt;&lt; "nota (double): " &lt;&lt; nota &lt;&lt; '\n';
+    std::cout &lt;&lt; "a (int):       " &lt;&lt; a &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Conversão explícita com <code>static_cast</code></h2>
+<p>Quando a conversão é de propósito, diga isso no código. A ferramenta do C++ para isso é o <code>static_cast</code> ("conversão estática", ou seja, decidida na hora de compilar). Uma conversão pedida por você se chama <strong>explícita</strong>, ou um <strong>cast</strong> (em inglês, "moldar": você coloca o valor num molde de outro tipo).</p>
+
+<pre class="file" data-file="cast.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double preco = 9.99;
+    int a = static_cast&lt;int&gt;(preco);   // C++: o jeito recomendado
+    int b = (int)preco;                // estilo C
+    int c = int(preco);                // estilo "função"
+    std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; b &lt;&lt; ' ' &lt;&lt; c &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>static_cast</dt><dd>A palavra que pede a conversão. É uma palavra reservada do C++, não precisa de <code>#include</code>.</dd>
+  <dt>&lt;int&gt;</dt><dd>Entre os sinais de menor e maior, o tipo de <strong>destino</strong>: "converta para <code>int</code>".</dd>
+  <dt>(preco)</dt><dd>Entre parênteses, o valor que será convertido. Pode ser uma variável, um número ou uma conta inteira: <code>static_cast&lt;int&gt;(preco * 100)</code>.</dd>
+  <dt>(int)preco e int(preco)</dt><dd>Outras duas formas de escrever a mesma conversão. Você vai entender a diferença na seção 4.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -Wconversion cast.cpp -o cast
+$ ./cast
+9 9 9</pre>
+
+<p>O resultado é o mesmo corte (9), mas agora <strong>nem com <code>-Wconversion</code></strong> aparece aviso. É como assinar embaixo: "eu sei que vou perder os centavos e é isso que eu quero". Quem lê o código também entende na hora que a perda foi de propósito.</p>
+
+<h3>E se eu quiser arredondar?</h3>
+<p>O <code>static_cast</code> só corta. Para arredondar, use <code>std::round</code> da biblioteca <code>&lt;cmath&gt;</code> (a aula <a href="matematica.html">Matemática (cmath)</a> mostra todas as funções). Ele arredonda para o inteiro mais próximo e devolve um <code>double</code>; se você precisar de um <code>int</code>, converta o resultado:</p>
+
+<pre class="file" data-file="arredondar.cpp">#include &lt;cmath&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    double preco = 9.99;
+    std::cout &lt;&lt; static_cast&lt;int&gt;(preco) &lt;&lt; '\n';
+    std::cout &lt;&lt; std::round(preco) &lt;&lt; '\n';
+    std::cout &lt;&lt; static_cast&lt;int&gt;(std::round(preco)) &lt;&lt; '\n';
+    std::cout &lt;&lt; std::lround(-2.7) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra arredondar.cpp -o arredondar
+$ ./arredondar
+9        « static_cast: corta
+10       « std::round: arredonda (resultado double)
+10       « arredonda e depois converte para int
+-3       « std::lround arredonda e já devolve um inteiro (long)</pre>
+
+<hr>
+
+<h2>3. Divisão inteira × divisão real</h2>
+<p>Esta é a conversão que mais engana quem começa. Em C++, o tipo do resultado de uma conta depende do tipo dos <strong>números da conta</strong>, e não da variável onde você vai guardar o resultado.</p>
+<ul>
+  <li>Se os dois lados da divisão são <code>int</code>, a divisão é <strong>inteira</strong>: o resultado é um <code>int</code>, e a parte fracionária é cortada.</li>
+  <li>Se pelo menos um lado é <code>double</code>, o outro é convertido para <code>double</code> automaticamente (é uma conversão implícita), e a divisão é <strong>real</strong>.</li>
+</ul>
+
+<pre class="file" data-file="divisao.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; 7 / 2 &lt;&lt; '\n';
+    std::cout &lt;&lt; 7 / 2.0 &lt;&lt; '\n';
+    std::cout &lt;&lt; 7.0 / 2 &lt;&lt; '\n';
+    std::cout &lt;&lt; static_cast&lt;double&gt;(7) / 2 &lt;&lt; '\n';
+    std::cout &lt;&lt; static_cast&lt;double&gt;(7 / 2) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra divisao.cpp -o divisao
+$ ./divisao
+3
+3.5
+3.5
+3.5
+3</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Expressão</th><th>Tipos</th><th>Resultado</th><th>Por quê</th></tr>
+<tr><td><code>7 / 2</code></td><td>int / int</td><td><code>3</code></td><td>Divisão inteira: 3,5 é cortado para 3.</td></tr>
+<tr><td><code>7 / 2.0</code></td><td>int / double</td><td><code>3.5</code></td><td>O <code>2.0</code> é double, então o 7 vira 7.0.</td></tr>
+<tr><td><code>7.0 / 2</code></td><td>double / int</td><td><code>3.5</code></td><td>Basta um dos lados ser double.</td></tr>
+<tr><td><code>static_cast&lt;double&gt;(7) / 2</code></td><td>double / int</td><td><code>3.5</code></td><td>O cast transforma o 7 em 7.0 <strong>antes</strong> da divisão.</td></tr>
+<tr><td><code>static_cast&lt;double&gt;(7 / 2)</code></td><td>double( int / int )</td><td><code>3</code></td><td><strong>Armadilha:</strong> os parênteses fazem a divisão inteira primeiro (dá 3), e só depois o 3 vira 3.0. Tarde demais.</td></tr>
+</table>
+</div>
+
+<p>Com números escritos direto no código, basta colocar <code>.0</code>. Mas com <strong>variáveis</strong> <code>int</code> não dá para "colocar .0": é aí que o <code>static_cast</code> é indispensável. O caso clássico é a média de notas:</p>
+
+<pre class="file" data-file="media.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int soma = 17;     // 8 + 9
+    int provas = 2;
+    double media_errada = soma / provas;
+    double media = static_cast&lt;double&gt;(soma) / provas;
+    std::cout &lt;&lt; "Errada: " &lt;&lt; media_errada &lt;&lt; '\n';
+    std::cout &lt;&lt; "Certa: " &lt;&lt; media &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra media.cpp -o media
+$ ./media
+Errada: 8
+Certa: 8.5</pre>
+
+<ol class="passo">
+  <li><code>soma / provas</code>: os dois são <code>int</code>, então a conta é inteira: 17 / 2 = <strong>8</strong> (o 0,5 se perde aqui).</li>
+  <li><code>double media_errada = 8;</code>: o 8 vira 8.0, mas a metade já foi embora no passo anterior. A variável ser <code>double</code> não ajuda.</li>
+  <li><code>static_cast&lt;double&gt;(soma)</code>: o 17 vira 17.0 <strong>antes</strong> da divisão.</li>
+  <li><code>17.0 / provas</code>: um lado é double, então o 2 vira 2.0 e a conta é real: <strong>8.5</strong>.</li>
+</ol>
+
+<p>O g++ não avisa nada, nem com <code>-Wconversion</code>, porque nenhuma conversão perdeu valor: quem "perdeu" foi a divisão inteira, que é uma operação legítima. A aula <a href="operadores-aritmeticos.html">Operadores Aritméticos</a> mostra a divisão inteira com mais detalhes, incluindo o resto (<code>%</code>).</p>
+
+<div class="trycpp" data-goal="out:Média: 7.5,src:static_cast\s*&lt;\s*double\s*&gt;">
+<p class="try-task"><strong>Missão:</strong> o programa calcula a média de 4 notas, mas mostra <code>Média: 7</code>. Corrija a linha da média com <code>static_cast&lt;double&gt;</code> para aparecer <code>Média: 7.5</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int n1 = 7;
+    int n2 = 8;
+    int n3 = 6;
+    int n4 = 9;
+    int soma = n1 + n2 + n3 + n4;
+    double media = soma / 4;
+    std::cout &lt;&lt; "Média: " &lt;&lt; media &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int n1 = 7;
+    int n2 = 8;
+    int n3 = 6;
+    int n4 = 9;
+    int soma = n1 + n2 + n3 + n4;
+    double media = static_cast&lt;double&gt;(soma) / 4;
+    std::cout &lt;&lt; "Média: " &lt;&lt; media &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>4. O cast estilo C: <code>(int)x</code></h2>
+<p>O C++ nasceu do C (veja <a href="introducao.html">O que é C++</a>), e o C tem uma forma curta de converter: o tipo entre parênteses antes do valor, <code>(int)preco</code>. O C++ aceita, e também aceita a forma <code>int(preco)</code>, que parece uma função. Você vai ver as duas em código antigo e na internet. No programa <code>cast.cpp</code> acima, as três formas deram 9.</p>
+
+<p>Então qual é o problema? O cast estilo C é <strong>poderoso demais</strong>. O <code>static_cast</code> só faz conversões que fazem sentido (número para número, por exemplo) e recusa as absurdas. O cast estilo C tenta todas as conversões possíveis, inclusive as perigosas, até achar uma que funcione. Compare os dois tentando transformar o texto <code>"29"</code> em número:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat texto2.cpp
+#include &lt;iostream&gt;
+
+int main() {
+    int idade = static_cast&lt;int&gt;("29");
+    std::cout &lt;&lt; idade &lt;&lt; '\n';
+}
+$ g++ -std=c++23 -Wall -Wextra texto2.cpp -o texto2
+texto2.cpp: In function ‘int main()’:
+texto2.cpp:4:17: error: invalid ‘static_cast’ from type ‘const char [3]’ to type ‘int’
+    4 |     int idade = static_cast&lt;int&gt;("29");
+      |                 ^~~~~~~~~~~~~~~~~~~~~~</pre>
+
+<p>O <code>static_cast</code> recusou: "static_cast inválido do tipo <code>const char [3]</code> (um texto de 3 caracteres: 2, 9 e o terminador) para o tipo int". Ótimo: o erro aparece na hora de compilar. Agora o mesmo pedido com o cast estilo C (usando <code>long</code>, um inteiro maior):</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat perigo.cpp
+#include &lt;iostream&gt;
+
+int main() {
+    long idade = (long)"29";
+    std::cout &lt;&lt; idade &lt;&lt; '\n';
+}
+$ g++ -std=c++23 -Wall -Wextra perigo.cpp -o perigo
+$ ./perigo
+104665125543940       « não é 29!
+$ ./perigo
+97150230274052        « e muda a cada execução</pre>
+
+<p>Compilou sem nenhum aviso e mostrou um número enorme, diferente a cada vez. Esse número é o <strong>endereço na memória</strong> onde o texto <code>"29"</code> está guardado (você vai entender endereços na aula <a href="ponteiros.html">Ponteiros</a>). O cast estilo C fez uma conversão que não tem nada a ver com "texto para número", e ficou quieto. Esse é o motivo de preferir <code>static_cast</code>: ele é mais fácil de achar no código (procure por <code>_cast</code>) e recusa o que não faz sentido.</p>
+
+<p>Se você quiser que o g++ aponte os casts estilo C no seu código, existe o aviso <code>-Wold-style-cast</code> ("cast à moda antiga"). Ele até sugere a troca:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -Wold-style-cast cast.cpp -o cast
+cast.cpp: In function ‘int main()’:
+cast.cpp:6:18: warning: use of old-style cast to ‘int’ [-Wold-style-cast]
+    6 |     int b = (int)preco;                // estilo C
+      |                  ^~~~~
+      |             ----------
+      |             static_cast&lt;int&gt; (preco)</pre>
+
+<div class="note">
+<strong>Existem outros <code>_cast</code></strong>
+<p>O C++ tem mais três: <code>const_cast</code>, <code>reinterpret_cast</code> e <code>dynamic_cast</code>. Eles servem para situações bem específicas com ponteiros e classes, que aparecem nos níveis 2 e 3 (por exemplo, <a href="polimorfismo.html">Polimorfismo</a>). No dia a dia, com números, só o <code>static_cast</code> interessa.</p>
+</div>
+
+<hr>
+
+<h2>5. <code>char</code> ↔ <code>int</code>: letras são números</h2>
+<p>Na aula <a href="char.html">Caracteres (char)</a> você viu que um <code>char</code> guarda <strong>um número</strong>: o código da letra na tabela ASCII. O <code>'A'</code> é 65, o <code>'B'</code> é 66, o <code>'a'</code> é 97, e o <strong>caractere</strong> <code>'0'</code> é 48 (não zero!). Por isso, converter entre <code>char</code> e <code>int</code> é natural:</p>
+
+<pre class="file" data-file="letras.cpp">#include &lt;iostream&gt;
+
+int main() {
+    char letra = 'A';
+    int codigo = letra;                       // char vira int
+    std::cout &lt;&lt; codigo &lt;&lt; '\n';
+    std::cout &lt;&lt; letra + 1 &lt;&lt; '\n';           // a conta é feita em int
+    std::cout &lt;&lt; static_cast&lt;char&gt;(letra + 1) &lt;&lt; '\n';
+
+    char digito = '7';
+    int valor = digito - '0';                 // '7' (55) - '0' (48)
+    std::cout &lt;&lt; valor &lt;&lt; '\n';
+    std::cout &lt;&lt; static_cast&lt;int&gt;(digito) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra letras.cpp -o letras
+$ ./letras
+65       « o código do 'A'
+66       « 'A' + 1: o char virou int para a conta, e o cout mostra o número
+B        « convertendo 66 de volta para char, o cout mostra a letra
+7        « '7' - '0' = 55 - 48 = 7: o algarismo como número
+55       « o código do caractere '7'</pre>
+
+<dl class="anatomy">
+  <dt>int codigo = letra;</dt><dd>Conversão implícita de alargamento: todo <code>char</code> cabe num <code>int</code>.</dd>
+  <dt>letra + 1</dt><dd>Em contas, o C++ converte o <code>char</code> para <code>int</code> antes de calcular (isso se chama <strong>promoção</strong>). O resultado é <code>int</code>, e o <code>cout</code> mostra <code>int</code> como número.</dd>
+  <dt>static_cast&lt;char&gt;(letra + 1)</dt><dd>Para ver a <strong>letra</strong>, converta de volta para <code>char</code>. O <code>cout</code> decide como mostrar pelo tipo: <code>char</code> aparece como letra, <code>int</code> como número.</dd>
+  <dt>digito - '0'</dt><dd>Os algarismos <code>'0'</code> a <code>'9'</code> ficam em sequência na tabela (48 a 57). Subtrair <code>'0'</code> dá o valor do algarismo. Esse truque é muito usado para ler números caractere por caractere.</dd>
+</dl>
+
+<div class="warning">
+<strong>Só funciona com um caractere</strong>
+<p><code>digito - '0'</code> converte <strong>um</strong> algarismo. Para converter um texto inteiro, como <code>"2026"</code>, para número, existem funções próprias (<code>std::stoi</code> e companhia), assunto da aula <a href="string-numero.html">Texto ↔ Número</a>. E letras com acento (<code>'é'</code>, <code>'ç'</code>) não cabem num único <code>char</code>: veja <a href="acentos-utf8.html">Acentos e UTF-8</a>.</p>
+</div>
+
+<h3><code>bool</code> ↔ <code>int</code></h3>
+<p>O <code>bool</code> (veja <a href="bool.html">Booleanos</a>) também conversa com números: <code>true</code> vira 1 e <code>false</code> vira 0; no sentido contrário, <strong>zero</strong> vira <code>false</code> e <strong>qualquer outro número</strong> vira <code>true</code>.</p>
+
+<pre class="file" data-file="booleano.cpp">#include &lt;iostream&gt;
+
+int main() {
+    bool ligado = true;
+    int n = ligado;
+    std::cout &lt;&lt; n &lt;&lt; '\n';
+
+    int pontos = 5;
+    bool tem_pontos = pontos;
+    std::cout &lt;&lt; tem_pontos &lt;&lt; '\n';
+
+    bool vazio = 0;
+    std::cout &lt;&lt; vazio &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra booleano.cpp -o booleano
+$ ./booleano
+1        « true vira 1
+1        « 5 é diferente de zero: vira true, que o cout mostra como 1
+0        « 0 vira false</pre>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> troque a letra <code>'C'</code> por outras (<code>'a'</code>, <code>'Z'</code>, <code>'!'</code>) e veja o código de cada uma. Depois mude o <code>+ 2</code> para andar mais letras.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    char letra = 'C';
+    std::cout &lt;&lt; "Letra: " &lt;&lt; letra &lt;&lt; '\n';
+    std::cout &lt;&lt; "Código: " &lt;&lt; static_cast&lt;int&gt;(letra) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Duas letras depois: " &lt;&lt; static_cast&lt;char&gt;(letra + 2) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>6. Texto não é número (e cast não resolve)</h2>
+<p>Um engano comum: achar que <code>"29"</code> (entre aspas) e <code>29</code> são a mesma coisa. Não são. <code>"29"</code> é um <strong>texto</strong> com os caracteres 2 e 9. Nenhum cast transforma texto em número:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat texto.cpp
+#include &lt;iostream&gt;
+
+int main() {
+    int idade = "29";
+    std::cout &lt;&lt; idade &lt;&lt; '\n';
+}
+$ g++ -std=c++23 -Wall -Wextra texto.cpp -o texto
+texto.cpp: In function ‘int main()’:
+texto.cpp:4:17: error: invalid conversion from ‘const char*’ to ‘int’ [-fpermissive]
+    4 |     int idade = "29";
+      |                 ^~~~
+      |                 |
+      |                 const char*</pre>
+
+<p>"Conversão inválida de <code>const char*</code> para int." Para o C++, um texto entre aspas vira um <code>const char*</code>, o endereço de memória onde o texto começa (a setinha embaixo mostra esse tipo). O <code>[-fpermissive]</code> no fim diz que existe uma opção para o g++ "deixar passar", mas não use: o resultado seria o endereço de memória, como no <code>perigo.cpp</code>. Para converter texto em número de verdade, veja <a href="string-numero.html">Texto ↔ Número</a>.</p>
+
+<hr>
+
+<h2>Formas diferentes: qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Quando usar</th></tr>
+<tr><td>Implícita, sem perda</td><td><code>double d = 7;</code></td><td>À vontade: <code>int</code> → <code>double</code>, <code>char</code> → <code>int</code> nunca perdem nada.</td></tr>
+<tr><td>Implícita, com perda</td><td><code>int r = 9.99;</code></td><td>Evite: a perda fica escondida. Ligue <code>-Wconversion</code> para achar esses lugares.</td></tr>
+<tr><td>Inicialização com chaves</td><td><code>int r{9.99};</code></td><td>Use chaves para o compilador <strong>recusar</strong> estreitamentos sem querer.</td></tr>
+<tr><td><code>static_cast</code></td><td><code>static_cast&lt;int&gt;(9.99)</code></td><td><strong>Sempre</strong> que a conversão é de propósito. É o padrão deste guia.</td></tr>
+<tr><td>Cast estilo C</td><td><code>(int)9.99</code></td><td>Só para entender código antigo. Não escreva código novo assim.</td></tr>
+<tr><td>Estilo função</td><td><code>int(9.99)</code></td><td>Igual ao estilo C em poder. Também evite.</td></tr>
+<tr><td><code>std::round</code> / <code>std::lround</code></td><td><code>std::lround(9.99)</code></td><td>Quando você quer <strong>arredondar</strong>, não cortar.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>A média deu 8, mas deveria dar 8.5</strong>
+<pre class="term" data-cwd="~/cpp">$ ./media
+Errada: 8</pre>
+<p><strong>O que aconteceu:</strong> a divisão <code>soma / provas</code> foi feita entre dois <code>int</code>, então foi inteira. Guardar o resultado num <code>double</code> não recupera o que já foi cortado. Nenhum compilador avisa, porque a divisão inteira é uma operação válida.</p>
+<p><strong>Como resolver:</strong> converta um dos lados <strong>antes</strong> da divisão: <code>static_cast&lt;double&gt;(soma) / provas</code>. Cuidado para não escrever <code>static_cast&lt;double&gt;(soma / provas)</code>, que converte depois.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: invalid conversion from ‘const char*’ to ‘int’</code></strong>
+<p><strong>O que aconteceu:</strong> você tentou guardar um texto entre aspas (<code>"29"</code>) numa variável numérica.</p>
+<p><strong>Como resolver:</strong> se o valor é fixo, tire as aspas: <code>int idade = 29;</code>. Se o texto vem de fora (do teclado, de um arquivo), use <code>std::stoi</code>, da aula <a href="string-numero.html">Texto ↔ Número</a>. Não "resolva" com <code>(int)</code> ou <code>(long)</code>: compila, mas o valor é um endereço de memória.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: narrowing conversion of … from ‘double’ to ‘int’</code></strong>
+<p><strong>O que aconteceu:</strong> você inicializou com chaves (<code>int x{9.99};</code>) um valor que não cabe no tipo sem perder parte dele. As chaves foram feitas justamente para impedir isso.</p>
+<p><strong>Como resolver:</strong> decida o que você quer. Se a variável deveria guardar a parte fracionária, troque o tipo para <code>double</code>. Se você quer mesmo cortar, diga isso: <code>int x{static_cast&lt;int&gt;(9.99)};</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Um número enorme virou outro sem sentido (<code>705032704</code>)</strong>
+<p><strong>O que aconteceu:</strong> um valor de um tipo maior (<code>long long</code>) foi colocado num tipo menor (<code>int</code>), e não coube. O g++ só avisa com <code>-Wconversion</code>.</p>
+<p><strong>Como resolver:</strong> use um tipo que comporte o valor (<code>long long</code>, veja <a href="inteiros.html">Inteiros</a>) e compile com <code>-Wconversion</code> para achar outros pontos parecidos.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>De → para</th><th>Automático?</th><th>O que acontece</th><th>Exemplo</th></tr>
+<tr><td><code>int</code> → <code>double</code></td><td>Sim</td><td>Ganha <code>.0</code>, nada se perde.</td><td><code>7</code> → <code>7.0</code></td></tr>
+<tr><td><code>double</code> → <code>int</code></td><td>Sim, em silêncio</td><td>Corta em direção ao zero.</td><td><code>9.99</code> → <code>9</code>, <code>-2.7</code> → <code>-2</code></td></tr>
+<tr><td><code>long long</code> → <code>int</code></td><td>Sim, em silêncio</td><td>Se não couber, vira outro número.</td><td><code>5000000000</code> → <code>705032704</code></td></tr>
+<tr><td><code>int</code> → <code>unsigned</code></td><td>Sim, em silêncio</td><td>Negativos viram números enormes.</td><td><code>-1</code> → <code>4294967295</code></td></tr>
+<tr><td><code>char</code> → <code>int</code></td><td>Sim</td><td>Dá o código da tabela ASCII.</td><td><code>'A'</code> → <code>65</code></td></tr>
+<tr><td><code>int</code> → <code>char</code></td><td>Sim</td><td>Dá o caractere daquele código.</td><td><code>66</code> → <code>'B'</code></td></tr>
+<tr><td><code>bool</code> → <code>int</code></td><td>Sim</td><td><code>true</code> → 1, <code>false</code> → 0.</td><td></td></tr>
+<tr><td>número → <code>bool</code></td><td>Sim</td><td>0 → <code>false</code>; qualquer outro → <code>true</code>.</td><td><code>5</code> → <code>true</code></td></tr>
+<tr><td>texto → número</td><td>Não</td><td>Erro de compilação. Use <code>std::stoi</code>.</td><td><a href="string-numero.html">Texto ↔ Número</a></td></tr>
+</table>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Opção do g++</th><th>O que avisa</th></tr>
+<tr><td><code>-Wconversion</code></td><td>Conversões implícitas que podem mudar o valor (inclui <code>-Wfloat-conversion</code>).</td></tr>
+<tr><td><code>-Wsign-conversion</code></td><td>Conversões entre tipos com e sem sinal.</td></tr>
+<tr><td><code>-Wold-style-cast</code></td><td>Casts estilo C, <code>(int)x</code>.</td></tr>
+<tr><td><code>-Wnarrowing</code></td><td>Estreitamento dentro de chaves (já vem ligado).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Converta de propósito</h3>
+<p>Complete para guardar em <code>inteiro</code> só a parte inteira de <code>altura</code>, do jeito recomendado pelo C++:</p>
+<div class="ex-code">int inteiro = <input data-answer="static_cast&lt;int&gt;(altura);|static_cast&lt;int&gt;(altura)" aria-label="conversão">
+</div>
+</div>
+
+<div class="exercise">
+<h3>2. Divisão real</h3>
+<p><code>total</code> e <code>pessoas</code> são <code>int</code>. Complete para a divisão ser real (com vírgula), convertendo o <code>total</code>:</p>
+<div class="ex-code">double cada = <input data-answer="static_cast&lt;double&gt;(total)" aria-label="conversão"> / pessoas;</div>
+</div>
+
+<div class="exercise">
+<h3>3. Do algarismo ao número</h3>
+<p>A variável <code>c</code> guarda o caractere <code>'4'</code>. Complete para <code>n</code> valer o número 4:</p>
+<div class="ex-code">int n = c - <input data-answer="'0'|48" aria-label="o que subtrair">;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O que <code>std::cout &lt;&lt; static_cast&lt;double&gt;(9 / 2);</code> mostra?</p>
+<label><input type="radio" name="q4"> <code>4.5</code></label>
+<label><input type="radio" name="q4"> <code>4</code></label>
+<label><input type="radio" name="q4"> <code>5</code></label>
+<label><input type="radio" name="q4"> Um erro de compilação</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. <code>int x = -7.9;</code> — quanto vale <code>x</code>?</p>
+<label><input type="radio" name="q5"> <code>-8</code>, porque arredonda</label>
+<label><input type="radio" name="q5"> <code>-8</code>, porque corta para baixo</label>
+<label><input type="radio" name="q5"> <code>-7</code>, porque corta em direção ao zero</label>
+<label><input type="radio" name="q5"> Não compila</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Por que preferir <code>static_cast&lt;int&gt;(x)</code> a <code>(int)x</code>?</p>
+<label><input type="radio" name="q6"> Porque o <code>static_cast</code> recusa conversões sem sentido, enquanto o estilo C aceita quase tudo em silêncio</label>
+<label><input type="radio" name="q6"> Porque o <code>static_cast</code> arredonda e o <code>(int)</code> corta</label>
+<label><input type="radio" name="q6"> Porque <code>(int)x</code> não compila em C++23</label>
+<label><input type="radio" name="q6"> Porque o <code>static_cast</code> é mais rápido</label>
+</div>
+
+<h3>Missão final: a conta do restaurante</h3>
+
+<div class="trycpp" data-goal="out:Cada um paga: 45.75,out:Em notas de 1 real: 45,src:static_cast\s*&lt;\s*double\s*&gt;,src:static_cast\s*&lt;\s*int\s*&gt;">
+<p class="try-task"><strong>Missão:</strong> a conta deu <code>183</code> reais, inteiros, para <code>4</code> pessoas. Calcule quanto cada um paga, com centavos, usando <code>static_cast&lt;double&gt;</code>. Depois mostre quantas notas de 1 real inteiras isso dá, usando <code>static_cast&lt;int&gt;</code> no valor de cada um. A saída deve ser:</p>
+<pre class="out">Cada um paga: 45.75
+Em notas de 1 real: 45</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int conta = 183;
+    int pessoas = 4;
+    // calcule "cada" (double) e "notas" (int) aqui
+
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int conta = 183;
+    int pessoas = 4;
+    double cada = static_cast&lt;double&gt;(conta) / pessoas;
+    int notas = static_cast&lt;int&gt;(cada);
+    std::cout &lt;&lt; "Cada um paga: " &lt;&lt; cada &lt;&lt; '\n';
+    std::cout &lt;&lt; "Em notas de 1 real: " &lt;&lt; notas &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>Conversão implícita</strong>: o C++ converte sozinho. <code>int</code> → <code>double</code> não perde nada; <code>double</code> → <code>int</code> <strong>corta</strong> em direção ao zero, sem aviso.</li>
+  <li><code>-Wconversion</code> faz o g++ avisar das conversões que podem mudar o valor. Inicializar com chaves (<code>int x{…}</code>) recusa o estreitamento.</li>
+  <li><strong>Conversão explícita</strong>: <code>static_cast&lt;tipo&gt;(valor)</code>. Use sempre que a conversão for de propósito.</li>
+  <li><code>int / int</code> é divisão inteira (<code>7 / 2</code> = 3). Para ter <code>3.5</code>, um dos lados precisa ser <code>double</code> <strong>antes</strong> da conta: <code>7 / 2.0</code> ou <code>static_cast&lt;double&gt;(a) / b</code>.</li>
+  <li>Cortar não é arredondar: para arredondar, <code>std::round</code> / <code>std::lround</code>.</li>
+  <li>O cast estilo C <code>(int)x</code> existe, mas aceita conversões absurdas em silêncio. Prefira <code>static_cast</code>.</li>
+  <li><code>char</code> é um número: <code>'A'</code> é 65; <code>'7' - '0'</code> é 7; <code>static_cast&lt;char&gt;(66)</code> é <code>'B'</code>.</li>
+  <li>Texto (<code>"29"</code>) não vira número com cast: veja <a href="string-numero.html">Texto ↔ Número</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
