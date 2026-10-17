@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Memória Dinâmica — new, delete, vazamentos e use-after-free | Guia C++</title>
+<meta name="description" content="Memória dinâmica em C++ para quem nunca programou: new int, new int[n], delete e delete[], vazamento de memória, usar depois de liberar e delete duas vezes, com relatórios reais do AddressSanitizer, e por que o C++ moderno quase não usa new direto.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Memória Dinâmica (new e delete)</span></h1>
+
+<p class="intro">Na aula <a href="memoria.html">Como a Memória Funciona</a>, você viu que o <strong>heap</strong> é um depósito onde o programa pede espaço durante a execução, e que o <code>std::vector</code> faz isso por você. Nesta aula você vai pedir e devolver esse espaço <strong>com as próprias mãos</strong>, usando <code>new</code> e <code>delete</code>. E vai ver, com os relatórios reais de uma ferramenta de diagnóstico, os três erros clássicos que isso permite. O objetivo é <strong>entender</strong> o que acontece por baixo; no fim, você vai ver por que o C++ moderno quase não usa <code>new</code> direto.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como pedir um valor ao heap com <code>new int</code> e devolver com <code>delete</code>.</li>
+  <li>Como pedir um array de tamanho decidido na execução, <code>new int[n]</code>, e devolver com <code>delete[]</code>.</li>
+  <li>O que é um <strong>vazamento de memória</strong>, e como o AddressSanitizer o encontra.</li>
+  <li>O que acontece ao <strong>usar memória depois de devolver</strong> (<code>heap-use-after-free</code>).</li>
+  <li>O que acontece ao <strong>devolver duas vezes</strong> (<code>double free</code>).</li>
+  <li>Por que, no C++ moderno, você vai preferir <code>std::vector</code> e ponteiros inteligentes.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Para os erros de memória, a aula usa também <code>-g -fsanitize=address</code>, o <strong>AddressSanitizer</strong> (ASan), que tem aula própria em <a href="sanitizers.html">Sanitizers</a>. Os relatórios dele são longos; aqui aparecem só os trechos importantes, e os cortes estão marcados com <code>…</code>. Os sanitizers rodam no terminal, com o g++ ou o clang++; o editor do guia não os tem.</p>
+
+<hr>
+
+<h2>A ideia: um depósito de aluguel</h2>
+<p>Pense numa empresa de boxes de aluguel. A Ana chega no balcão e diz: "preciso de um box". O atendente reserva um e entrega um papel com o <strong>número do box</strong>. Quando ela não precisar mais, devolve a chave no balcão, e o box fica livre para outra pessoa.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No depósito</th><th>Em C++</th></tr>
+<tr><td>Alugar um box</td><td><code>new int</code>: reserva espaço no heap e devolve o <strong>endereço</strong> (um ponteiro).</td></tr>
+<tr><td>O papel com o número do box</td><td>O ponteiro que guarda esse endereço: <code>int* p = new int;</code></td></tr>
+<tr><td>Devolver a chave</td><td><code>delete p;</code></td></tr>
+<tr><td>Esquecer de devolver: paga para sempre</td><td><strong>Vazamento de memória</strong> (<em>memory leak</em>).</td></tr>
+<tr><td>Entrar no box depois de devolver: pode ser de outra pessoa</td><td><strong>Usar depois de liberar</strong> (<em>use after free</em>).</td></tr>
+<tr><td>Devolver a mesma chave duas vezes: confusão no balcão</td><td><strong>Liberar duas vezes</strong> (<em>double free</em>).</td></tr>
+</table>
+</div>
+
+<p>Na pilha, o compilador aluga e devolve sozinho, a cada <code>{</code> e <code>}</code>. No heap, com <code>new</code>, <strong>quem devolve é você</strong>. Toda a dificuldade desta aula vem daí.</p>
+
+<hr>
+
+<h2>1. <code>new</code> e <code>delete</code>: um valor</h2>
+
+<pre class="file" data-file="um.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int* p = new int(42);        // pede ao heap espaço para um int, com 42 dentro
+
+    std::cout &lt;&lt; "p  = " &lt;&lt; p &lt;&lt; "\n";
+    std::cout &lt;&lt; "*p = " &lt;&lt; *p &lt;&lt; "\n";
+
+    *p = *p + 1;
+    std::cout &lt;&lt; "*p = " &lt;&lt; *p &lt;&lt; "\n";
+
+    delete p;                    // devolve o espaço ao heap
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>new int(42)</dt><dd>Pede ao heap espaço para um <code>int</code>, guarda 42 nele e devolve o <strong>endereço</strong>. Sem os parênteses (<code>new int</code>), o valor inicial seria lixo; com <code>new int()</code> ou <code>new int{}</code>, seria 0.</dd>
+  <dt>int* p = …</dt><dd>O endereço vai para um ponteiro comum. O <code>int</code> que mora no heap <strong>não tem nome</strong>: o único jeito de chegar até ele é pelo <code>p</code>.</dd>
+  <dt>*p</dt><dd>Lê e muda o valor, exatamente como na aula <a href="ponteiros.html">Ponteiros</a>.</dd>
+  <dt>delete p;</dt><dd>Devolve o espaço. Depois disso, <code>p</code> continua guardando o mesmo endereço, mas ele <strong>não vale mais</strong>: o box foi devolvido.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra um.cpp -o um
+$ ./um
+p  = 0x57b8de7fa020           « um endereço do heap (não começa com 0x7ff…)
+*p = 42
+*p = 43</pre>
+
+<figure>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Região</th><th>Nome</th><th>O que está guardado</th></tr>
+<tr><td><strong>Pilha</strong> (some no <code>}</code> do <code>main</code>)</td><td><code>p</code></td><td><code>0x57b8de7fa020</code> → aponta para o heap</td></tr>
+<tr><td><strong>Heap</strong> (fica até o <code>delete</code>)</td><td>(sem nome)</td><td>42, depois 43</td></tr>
+</table>
+</div>
+<figcaption>O ponteiro <code>p</code> mora na pilha; o <code>int</code> que ele aponta mora no heap. São duas vidas diferentes: o <code>p</code> some sozinho, o <code>int</code> só some com <code>delete</code>.</figcaption>
+</figure>
+
+<p>Esta figura é a chave de tudo. Se o <code>p</code> sumir antes do <code>delete</code>, o <code>int</code> do heap fica lá, alugado, sem ninguém que saiba o endereço dele. Isso é o vazamento, que você vai ver na seção 3.</p>
+
+<div class="trycpp" data-goal="out:Ano: 2026,src:new\s+int,src:delete\s+\w">
+<p class="try-task"><strong>Missão:</strong> peça ao heap um <code>int</code> com o valor 2026, guarde o endereço em <code>ano</code>, mostre <code>Ano: 2026</code> pelo ponteiro e devolva a memória no fim.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    // int* ano = ...
+
+    // mostre "Ano: " e o valor apontado
+
+    // devolva a memória
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int* ano = new int(2026);
+    std::cout &lt;&lt; "Ano: " &lt;&lt; *ano &lt;&lt; "\n";
+    delete ano;
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. <code>new[]</code> e <code>delete[]</code>: um array de tamanho variável</h2>
+<p>Um array comum (<code>int notas[5]</code>) precisa ter o tamanho escrito no código. Com <code>new</code>, o tamanho pode vir de uma variável, decidido durante a execução, por exemplo digitado pelo usuário:</p>
+
+<pre class="file" data-file="varios.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int quantidade = 0;
+    std::cout &lt;&lt; "Quantos alunos? ";
+    std::cin &gt;&gt; quantidade;
+
+    int* notas = new int[quantidade]{};   // tamanho decidido na execução; {} zera tudo
+
+    for (int i = 0; i &lt; quantidade; ++i) {
+        notas[i] = 10 - i;
+    }
+    for (int i = 0; i &lt; quantidade; ++i) {
+        std::cout &lt;&lt; "Aluno " &lt;&lt; i + 1 &lt;&lt; ": " &lt;&lt; notas[i] &lt;&lt; "\n";
+    }
+
+    delete[] notas;              // array: delete com colchetes
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra varios.cpp -o varios
+$ ./varios
+Quantos alunos? 3               « a Ana digitou 3
+Aluno 1: 10
+Aluno 2: 9
+Aluno 3: 8</pre>
+
+<dl class="anatomy">
+  <dt>new int[quantidade]</dt><dd>Pede espaço para <code>quantidade</code> inteiros <strong>colados</strong>, e devolve o endereço do primeiro. Daí em diante, <code>notas[i]</code> funciona como num array (aula <a href="ponteiros-arrays.html">Ponteiros e Arrays</a>).</dd>
+  <dt>{}</dt><dd>Zera todos os itens. Sem ele, cada item começaria com lixo.</dd>
+  <dt>delete[] notas;</dt><dd>Devolve o array inteiro. Os colchetes avisam: "isto foi pedido com <code>new[]</code>".</dd>
+</dl>
+
+<div class="warning">
+<strong>Par certo: <code>new</code> com <code>delete</code>, <code>new[]</code> com <code>delete[]</code></strong>
+<p>Misturar os dois é comportamento indefinido. O g++ às vezes percebe e avisa:</p>
+<pre class="file" data-file="mistura.cpp">int main() {
+    int* notas = new int[5]{};
+    delete notas;                // deveria ser delete[]
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra mistura.cpp -o mistura
+mistura.cpp: In function ‘int main()’:
+mistura.cpp:3:12: warning: ‘void operator delete(void*, long unsigned int)’ called on pointer returned from a mismatched allocation function [-Wmismatched-new-delete]
+    3 |     delete notas;                // deveria ser delete[]
+      |            ^~~~~
+mistura.cpp:2:29: note: returned from ‘void* operator new [](long unsigned int)’
+    2 |     int* notas = new int[5]{};
+      |                             ^</pre>
+<p>"<code>operator delete</code> chamado num ponteiro que veio de uma função de alocação que não combina", e a nota mostra que ele veio de <code>operator new []</code>. Com o ASan, a execução para com <code>alloc-dealloc-mismatch (operator new [] vs operator delete)</code>.</p>
+</div>
+
+<hr>
+
+<h2>3. Vazamento de memória: esqueceu o <code>delete</code></h2>
+<p>A função abaixo é chamada a cada venda da lojinha. Ela pede 400 bytes (100 <code>int</code>s) e esquece de devolver:</p>
+
+<pre class="file" data-file="vazamento.cpp">#include &lt;iostream&gt;
+
+void registrar_venda() {
+    int* itens = new int[100];   // pede 400 bytes
+    itens[0] = 1;
+    std::cout &lt;&lt; "Venda registrada\n";
+    // esqueceu o delete[] itens;
+}
+
+int main() {
+    registrar_venda();
+    registrar_venda();
+    registrar_venda();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra vazamento.cpp -o vazamento
+$ ./vazamento
+Venda registrada
+Venda registrada
+Venda registrada</pre>
+
+<p>Nenhum aviso, nenhum erro, tudo "funcionou". É isso que torna o vazamento traiçoeiro. Mas veja o que aconteceu: a cada chamada, o ponteiro <code>itens</code> (que mora na pilha) morreu no <code>}</code> da função, e os 400 bytes do heap ficaram alugados, <strong>sem ninguém que saiba o endereço</strong>. Ninguém mais consegue devolvê-los. Com três vendas, são 1200 bytes perdidos; num programa que roda o dia inteiro (um servidor, um jogo), a memória usada só cresce, até a máquina ficar lenta ou o sistema matar o programa.</p>
+
+<p>O AddressSanitizer inclui um detetive de vazamentos, o <strong>LeakSanitizer</strong>, que confere tudo quando o programa termina:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -g -fsanitize=address vazamento.cpp -o vazamento
+$ ./vazamento
+Venda registrada
+Venda registrada
+Venda registrada
+
+=================================================================
+==552745==ERROR: LeakSanitizer: detected memory leaks
+
+Direct leak of 400 byte(s) in 1 object(s) allocated from:
+    #0 0x7c855252c8cf in operator new[](unsigned long) ../../../../src/libsanitizer/asan/asan_new_delete.cpp:111
+    #1 0x55a5b194521e in registrar_venda() /home/ana/cpp/vazamento.cpp:4
+    #2 0x55a5b1945291 in main /home/ana/cpp/vazamento.cpp:12
+…                                « mais duas vezes o mesmo, para as linhas 13 e 11
+
+SUMMARY: AddressSanitizer: 1200 byte(s) leaked in 3 allocation(s).
+$ echo $?
+1</pre>
+
+<dl class="anatomy">
+  <dt>LeakSanitizer: detected memory leaks</dt><dd>"Vazamentos de memória detectados".</dd>
+  <dt>Direct leak of 400 byte(s) in 1 object(s)</dt><dd>"Vazamento direto de 400 bytes em 1 objeto": um pedido de 400 bytes que nunca foi devolvido.</dd>
+  <dt>allocated from:</dt><dd>"pedido a partir de": a lista de funções que levou até o <code>new</code>, da mais recente (#0) para a mais antiga.</dd>
+  <dt>#0 … operator new[]</dt><dd>O próprio <code>new[]</code>, dentro da biblioteca. Pule essa linha.</dd>
+  <dt>#1 … registrar_venda() /home/ana/cpp/vazamento.cpp:4</dt><dd><strong>A linha que interessa</strong>: o <code>new int[100]</code> da linha 4.</dd>
+  <dt>#2 … main … vazamento.cpp:12</dt><dd>Quem chamou: o <code>main</code>, na linha 12.</dd>
+  <dt>SUMMARY: … 1200 byte(s) leaked in 3 allocation(s)</dt><dd>O resumo: 1200 bytes perdidos em 3 pedidos.</dd>
+  <dt>$? = 1</dt><dd>O sanitizer muda o código de saída para 1, para que scripts e testes percebam o problema.</dd>
+</dl>
+
+<p><strong>Conserto:</strong> <code>delete[] itens;</code> antes do fim da função. Ou, melhor, nenhum <code>new</code>: com <code>std::vector&lt;int&gt; itens(100);</code>, a devolução é automática (seção 7).</p>
+
+<hr>
+
+<h2>4. Usar depois de liberar (<em>use after free</em>)</h2>
+<p>Depois do <code>delete</code>, o ponteiro continua guardando o endereço antigo. Nada impede o programa de seguir esse endereço, e é aí que mora o perigo:</p>
+
+<pre class="file" data-file="depois.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int* saldo = new int(500);
+    delete saldo;
+
+    std::cout &lt;&lt; "Saldo: " &lt;&lt; *saldo &lt;&lt; "\n";   // usa depois de devolver!
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra depois.cpp -o depois
+$ ./depois
+Saldo: 66794023                « nem 500, nem erro: lixo
+$ echo $?
+0</pre>
+
+<p>Compilou sem aviso, rodou sem cair e mostrou um saldo de 66 milhões. O heap já tinha reaproveitado aquelas casas para as suas anotações internas. Num programa de verdade, o box devolvido pode já ter sido alugado para outra parte do programa, e escrever nele estraga dados de outra pessoa. Esse tipo de defeito é uma das falhas de segurança mais exploradas em programas escritos em C e C++.</p>
+
+<p>Com o ASan, o erro é pego na hora, com três endereços de linha: onde foi o uso, onde foi devolvido e onde foi pedido:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -g -fsanitize=address depois.cpp -o depois
+$ ./depois
+=================================================================
+==552906==ERROR: AddressSanitizer: heap-use-after-free on address 0x6d0cf6be0010 at pc 0x65373d1da340 bp 0x7ffed72aabb0 sp 0x7ffed72aaba0
+READ of size 4 at 0x6d0cf6be0010 thread T0
+    #0 0x65373d1da33f in main /home/ana/cpp/depois.cpp:7
+…
+0x6d0cf6be0010 is located 0 bytes inside of 4-byte region [0x6d0cf6be0010,0x6d0cf6be0014)
+freed by thread T0 here:
+    #0 0x70ecf812d89f in operator delete(void*, unsigned long) ../../../../src/libsanitizer/asan/asan_new_delete.cpp:190
+    #1 0x65373d1da2eb in main /home/ana/cpp/depois.cpp:5
+…
+previously allocated by thread T0 here:
+    #0 0x70ecf812c73f in operator new(unsigned long) ../../../../src/libsanitizer/asan/asan_new_delete.cpp:109
+    #1 0x65373d1da27e in main /home/ana/cpp/depois.cpp:4
+…
+SUMMARY: AddressSanitizer: heap-use-after-free /home/ana/cpp/depois.cpp:7 in main
+…                                « um mapa da memória ("Shadow bytes"), que pode ignorar
+==552906==ABORTING</pre>
+
+<ul>
+  <li><strong>heap-use-after-free</strong>: "uso de memória do heap depois de liberada".</li>
+  <li><strong>READ of size 4 … depois.cpp:7</strong>: uma <strong>leitura</strong> de 4 bytes (um <code>int</code>) na linha 7.</li>
+  <li><strong>freed by thread T0 here: … depois.cpp:5</strong>: a memória foi devolvida na linha 5 (o <code>delete</code>).</li>
+  <li><strong>previously allocated by thread T0 here: … depois.cpp:4</strong>: e tinha sido pedida na linha 4 (o <code>new</code>).</li>
+</ul>
+
+<p><strong>Conserto:</strong> use o valor <strong>antes</strong> do <code>delete</code>. E crie o hábito da próxima seção: depois de <code>delete p;</code>, escreva <code>p = nullptr;</code>.</p>
+
+<hr>
+
+<h2>5. <code>delete</code> duas vezes (<em>double free</em>)</h2>
+
+<pre class="file" data-file="duas.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int* p = new int(7);
+    std::cout &lt;&lt; "*p = " &lt;&lt; *p &lt;&lt; "\n";
+    delete p;
+    delete p;                    // devolve de novo a mesma memória
+    std::cout &lt;&lt; "Fim\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra duas.cpp -o duas
+$ ./duas
+*p = 7
+free(): double free detected in tcache 2
+Abortado                   (imagem do núcleo gravada) ./duas
+$ echo $?
+134</pre>
+
+<dl class="anatomy">
+  <dt>free(): double free detected in tcache 2</dt><dd>Quem percebeu foi a própria biblioteca do sistema (a <em>glibc</em>), que administra o heap: "<code>free()</code>: liberação dupla detectada". O <code>free</code> é a função de baixo nível que o <code>delete</code> usa; o <em>tcache</em> é uma das listas internas onde ela anota os boxes livres.</dd>
+  <dt>Abortado</dt><dd>A biblioteca matou o programa de propósito (o sinal <code>SIGABRT</code>, "abortar"), porque o heap ficou num estado em que não dá para confiar. Em inglês: <code>Aborted (core dumped)</code>.</dd>
+  <dt>134</dt><dd>128 + 6, o número do <code>SIGABRT</code>. O <code>Fim</code> nunca apareceu.</dd>
+</dl>
+
+<p>Desta vez a glibc pegou o erro, mas ela não pega todos os casos (por exemplo, quando outro <code>new</code> acontece entre os dois <code>delete</code>). O ASan pega sempre, e diz as linhas:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -g -fsanitize=address duas.cpp -o duas
+$ ./duas
+*p = 7
+=================================================================
+==553324==ERROR: AddressSanitizer: attempting double-free on 0x7132b9fe0010 in thread T0:
+    #0 0x7512bb52d89f in operator delete(void*, unsigned long) ../../../../src/libsanitizer/asan/asan_new_delete.cpp:190
+    #1 0x5c1c0438c37a in main /home/ana/cpp/duas.cpp:7
+…
+freed by thread T0 here:
+    #0 0x7512bb52d89f in operator delete(void*, unsigned long) ../../../../src/libsanitizer/asan/asan_new_delete.cpp:190
+    #1 0x5c1c0438c364 in main /home/ana/cpp/duas.cpp:6
+…
+SUMMARY: AddressSanitizer: double-free /home/ana/cpp/duas.cpp:7 in main
+==553324==ABORTING</pre>
+
+<p>"Tentativa de liberação dupla" na linha 7; a primeira liberação foi na linha 6.</p>
+
+<h3>O hábito: zerar o ponteiro depois do <code>delete</code></h3>
+<p>Um <code>delete</code> num <code>nullptr</code> não faz nada, e um ponteiro nulo pode ser testado (aula <a href="nullptr.html">nullptr</a>). Então, logo depois de devolver, apague o endereço do papel:</p>
+
+<pre class="file" data-file="zerar.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int* p = new int(7);
+    delete p;
+    p = nullptr;                 // o papel agora diz "nenhum endereço"
+
+    if (p == nullptr) {
+        std::cout &lt;&lt; "p não aponta mais para nada\n";
+    }
+    delete p;                    // delete em nullptr não faz nada: é seguro
+    std::cout &lt;&lt; "Fim\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra zerar.cpp -o zerar
+$ ./zerar
+p não aponta mais para nada
+Fim</pre>
+
+<p>Isso ajuda, mas não resolve tudo: se existir uma <strong>cópia</strong> do ponteiro (<code>int* q = p;</code>), ela continua com o endereço velho. É por isso que a solução de verdade é não ter <code>delete</code> escrito à mão.</p>
+
+<hr>
+
+<h2>6. E se o heap não tiver espaço?</h2>
+<p>Se o pedido for grande demais, o <code>new</code> não devolve um ponteiro nulo: ele lança uma <a href="excecoes.html">exceção</a> chamada <code>std::bad_alloc</code> ("alocação ruim"). Para mostrar sem travar a máquina, a Ana limitou a memória do terminal a cerca de 500 MB com <code>ulimit -v</code> e pediu 4 GB:</p>
+
+<pre class="file" data-file="gigante.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Pedindo 4 GB...\n";
+    int* p = new int[1'000'000'000];
+    std::cout &lt;&lt; "Consegui!\n";
+    delete[] p;
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra gigante.cpp -o gigante
+$ ulimit -v 500000              « limita a memória deste terminal (em KB)
+$ ./gigante
+Pedindo 4 GB...
+terminate called after throwing an instance of 'std::bad_alloc'
+  what():  std::bad_alloc
+Abortado                   (imagem do núcleo gravada) ./gigante
+$ echo $?
+134</pre>
+
+<p>"Encerrado depois de lançar uma <code>std::bad_alloc</code>": ninguém tratou a exceção, então o programa abortou. Num programa comum, você raramente vai tratar esse caso; o importante é saber que <code>new</code> nunca devolve <code>nullptr</code> por falta de memória (salvo com a forma especial <code>new (std::nothrow)</code>). O <code>ulimit -v</code> vale até você fechar o terminal.</p>
+
+<hr>
+
+<h2>7. Por que o C++ moderno quase não usa <code>new</code></h2>
+<p>Você viu três erros graves, e nenhum deles foi pego pelo compilador. Agora imagine um programa com centenas de <code>new</code>, funções com vários <code>return</code> no meio, <a href="excecoes.html">exceções</a> que pulam o <code>delete</code>... Garantir que cada <code>new</code> tenha exatamente um <code>delete</code>, no momento certo, é muito difícil. Por isso a regra do C++ moderno é: <strong>quem pede a memória é um objeto que sabe devolvê-la sozinho</strong>.</p>
+
+<p>O <code>varios.cpp</code> da seção 2, sem nenhum <code>new</code>:</p>
+
+<pre class="file" data-file="vetor.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    int quantidade = 0;
+    std::cout &lt;&lt; "Quantos alunos? ";
+    std::cin &gt;&gt; quantidade;
+
+    std::vector&lt;int&gt; notas(quantidade);   // o vector pede e devolve sozinho
+
+    for (int i = 0; i &lt; quantidade; ++i) {
+        notas[i] = 10 - i;
+    }
+    for (int i = 0; i &lt; quantidade; ++i) {
+        std::cout &lt;&lt; "Aluno " &lt;&lt; i + 1 &lt;&lt; ": " &lt;&lt; notas[i] &lt;&lt; "\n";
+    }
+}                                         // sem delete: nada para esquecer
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra vetor.cpp -o vetor
+$ ./vetor
+Quantos alunos? 4
+Aluno 1: 10
+Aluno 2: 9
+Aluno 3: 8
+Aluno 4: 7</pre>
+
+<p>O <code>std::vector</code> faz o <code>new[]</code> por dentro e o <code>delete[]</code> no <code>}</code> em que ele morre, sempre, mesmo que a função saia por um <code>return</code> no meio ou por uma exceção. Essa técnica de "o objeto devolve no fim da vida dele" se chama <strong>RAII</strong> e tem aula própria: <a href="destrutores-raii.html">Destrutores e RAII</a>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você precisa de…</th><th>Em vez de</th><th>Use</th></tr>
+<tr><td>Uma lista de tamanho variável</td><td><code>new int[n]</code> / <code>delete[]</code></td><td><a href="vector.html"><code>std::vector&lt;int&gt;</code></a></td></tr>
+<tr><td>Um texto</td><td><code>new char[n]</code></td><td><a href="strings.html"><code>std::string</code></a></td></tr>
+<tr><td>Um objeto no heap, com um dono</td><td><code>new Produto</code> / <code>delete</code></td><td><a href="smart-pointers.html"><code>std::unique_ptr</code></a> com <code>std::make_unique</code></td></tr>
+<tr><td>Um objeto no heap, com vários donos</td><td><code>new</code> e contar "na mão"</td><td><a href="smart-pointers.html"><code>std::shared_ptr</code></a> com <code>std::make_shared</code></td></tr>
+</table>
+</div>
+
+<p>Então por que aprender <code>new</code> e <code>delete</code>? Porque eles estão por baixo de tudo isso, porque você vai encontrá-los em código antigo e porque entender os três erros desta aula é o que faz os <a href="smart-pointers.html">ponteiros inteligentes</a> (próxima aula) fazerem sentido.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>O programa usa cada vez mais memória (vazamento)</strong>
+<p><strong>O que aconteceu:</strong> algum <code>new</code> não tem o <code>delete</code> correspondente, muitas vezes porque a função saiu antes (um <code>return</code> no meio, uma exceção) ou porque o ponteiro foi sobrescrito.</p>
+<p><strong>Como resolver:</strong> compile com <code>-g -fsanitize=address</code>, rode até o fim e procure as linhas <code>Direct leak of … allocated from:</code>; a primeira linha com um arquivo seu (<code>/home/ana/…</code>) é o <code>new</code> culpado. Depois troque esse <code>new</code> por <code>std::vector</code> ou <code>std::make_unique</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Valores absurdos depois de um <code>delete</code> (<code>heap-use-after-free</code>)</strong>
+<pre class="term" data-cwd="~/cpp">$ ./depois
+Saldo: 66794023</pre>
+<p><strong>O que aconteceu:</strong> o programa leu memória que já tinha sido devolvida. Sem sanitizer, o sintoma é lixo, ou uma queda bem longe do erro de verdade.</p>
+<p><strong>Como resolver:</strong> o ASan mostra três linhas: o uso (<code>READ</code>/<code>WRITE</code>), o <code>freed by</code> e o <code>previously allocated by</code>. Mova o uso para antes do <code>delete</code> e zere o ponteiro (<code>p = nullptr;</code>). Melhor: use um ponteiro inteligente.</p>
+</div>
+
+<div class="cenario">
+<strong>"free(): double free detected" e "Abortado" (134)</strong>
+<pre class="term" data-cwd="~/cpp">$ ./duas
+*p = 7
+free(): double free detected in tcache 2
+Abortado                   (imagem do núcleo gravada) ./duas</pre>
+<p><strong>O que aconteceu:</strong> o mesmo endereço foi devolvido duas vezes, às vezes por duas cópias do mesmo ponteiro.</p>
+<p><strong>Como resolver:</strong> cada <code>new</code> tem <strong>um</strong> dono, responsável pelo único <code>delete</code>. É exatamente o que o <code>std::unique_ptr</code> garante.</p>
+</div>
+
+<div class="cenario">
+<strong>"called on pointer returned from a mismatched allocation function"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra mistura.cpp -o mistura
+mistura.cpp: In function ‘int main()’:
+mistura.cpp:3:12: warning: ‘void operator delete(void*, long unsigned int)’ called on pointer returned from a mismatched allocation function [-Wmismatched-new-delete]
+    3 |     delete notas;                // deveria ser delete[]
+      |            ^~~~~
+mistura.cpp:2:29: note: returned from ‘void* operator new [](long unsigned int)’
+    2 |     int* notas = new int[5]{};
+      |                             ^</pre>
+<p><strong>O que aconteceu:</strong> memória pedida com <code>new[]</code> foi devolvida com <code>delete</code> (sem colchetes), ou o contrário.</p>
+<p><strong>Como resolver:</strong> <code>new</code> ↔ <code>delete</code>, <code>new[]</code> ↔ <code>delete[]</code>. Ou <code>std::vector</code>, que não tem como errar.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>O que faz</th></tr>
+<tr><td><code>int* p = new int;</code></td><td>Pede um <code>int</code> ao heap (valor inicial: lixo).</td></tr>
+<tr><td><code>int* p = new int(42);</code> / <code>new int{}</code></td><td>Pede um <code>int</code> com 42 / com 0.</td></tr>
+<tr><td><code>delete p;</code></td><td>Devolve o que foi pedido com <code>new</code>.</td></tr>
+<tr><td><code>int* v = new int[n]{};</code></td><td>Pede <code>n</code> inteiros zerados (<code>n</code> pode ser uma variável).</td></tr>
+<tr><td><code>delete[] v;</code></td><td>Devolve o que foi pedido com <code>new[]</code>.</td></tr>
+<tr><td><code>p = nullptr;</code></td><td>Depois do <code>delete</code>: evita usar ou devolver de novo por engano.</td></tr>
+<tr><td><code>delete nullptr</code></td><td>Não faz nada (é seguro).</td></tr>
+<tr><td><code>std::bad_alloc</code></td><td>Exceção lançada quando o <code>new</code> não consegue memória.</td></tr>
+<tr><td><code>-g -fsanitize=address</code></td><td>Pega vazamentos, <code>heap-use-after-free</code>, <code>double-free</code> e <code>alloc-dealloc-mismatch</code>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O par certo</h3>
+<p>A memória foi pedida com <code>double* precos = new double[10];</code>. Complete a devolução:</p>
+<div class="ex-code"><input data-answer="delete[]" aria-label="comando"> precos;</div>
+</div>
+
+<div class="exercise">
+<h3>2. O hábito</h3>
+<p>Complete a linha que vem logo depois de <code>delete p;</code> para evitar usar o endereço velho:</p>
+<div class="ex-code">p = <input data-answer="nullptr" aria-label="valor">;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Uma função faz <code>int* v = new int[100];</code> e termina sem <code>delete[]</code>. O que acontece?</p>
+<label><input type="radio" name="q3"> O compilador dá erro</label>
+<label><input type="radio" name="q3"> Os 400 bytes ficam reservados sem ninguém saber o endereço: vazamento</label>
+<label><input type="radio" name="q3"> O C++ devolve a memória sozinho no <code>}</code></label>
+<label><input type="radio" name="q3"> O programa cai na hora</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. O ASan mostrou <code>heap-use-after-free</code>. O que o programa fez?</p>
+<label><input type="radio" name="q4"> Pediu memória demais</label>
+<label><input type="radio" name="q4"> Esqueceu um <code>delete</code></label>
+<label><input type="radio" name="q4"> Usou um ponteiro nulo</label>
+<label><input type="radio" name="q4"> Usou memória do heap depois de ela ter sido devolvida com <code>delete</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. No C++ moderno, o que usar no lugar de <code>new int[n]</code>?</p>
+<label><input type="radio" name="q5"> <code>std::vector&lt;int&gt; v(n);</code></label>
+<label><input type="radio" name="q5"> <code>int v[n];</code></label>
+<label><input type="radio" name="q5"> <code>malloc</code></label>
+<label><input type="radio" name="q5"> <code>new int[n]</code> sem <code>delete[]</code>, porque o sistema limpa no fim</label>
+</div>
+
+<h3>Missão final: o carrinho no heap</h3>
+
+<div class="trycpp" data-goal="out:Total: 19.5,src:new\s+double\s*\[,src:delete\s*\[\s*\]">
+<p class="try-task"><strong>Missão:</strong> usando <code>new double[quantidade]</code>, crie um array <code>precos</code> no heap, guarde 4.5, 12.0 e 3.0, some os três em <code>total</code> e, no fim, devolva o array com o <code>delete</code> certo. A saída deve ser <code>Total: 19.5</code>. (Depois, como exercício extra, reescreva com <code>std::vector&lt;double&gt;</code> e repare que o <code>delete[]</code> desaparece.)</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int quantidade = 3;
+    // peça ao heap um array de 3 double chamado precos
+
+    // guarde 4.5, 12.0 e 3.0
+
+    double total = 0;
+    // some os preços em total
+
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; "\n";
+
+    // devolva o array
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int quantidade = 3;
+    double* precos = new double[quantidade];
+
+    precos[0] = 4.5;
+    precos[1] = 12.0;
+    precos[2] = 3.0;
+
+    double total = 0;
+    for (int i = 0; i &lt; quantidade; ++i) {
+        total = total + precos[i];
+    }
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; "\n";
+
+    delete[] precos;
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>new</code> pede memória ao heap e devolve um ponteiro; <code>delete</code> devolve. Para arrays: <code>new T[n]</code> e <code>delete[]</code>.</li>
+  <li>O ponteiro mora na pilha e some sozinho; a memória do heap só some com <code>delete</code>.</li>
+  <li><strong>Vazamento</strong>: esqueceu o <code>delete</code>. Nada aparece; o LeakSanitizer acusa <code>Direct leak of … bytes</code>.</li>
+  <li><strong>Usar depois de liberar</strong>: mostra lixo ou corrompe dados; o ASan acusa <code>heap-use-after-free</code>.</li>
+  <li><strong>Liberar duas vezes</strong>: <code>free(): double free detected</code>, <code>Abortado</code>, código 134.</li>
+  <li>Depois de <code>delete p;</code>, faça <code>p = nullptr;</code>. Melhor ainda: não escreva <code>delete</code>.</li>
+  <li>No C++ moderno, use <code>std::vector</code>, <code>std::string</code> e ponteiros inteligentes. Próxima aula: <a href="smart-pointers.html">Ponteiros Inteligentes</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
