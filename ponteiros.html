@@ -402,6 +402,21 @@ caneta custa 3</pre>
 
 <p>A regra é curta: <strong>com a variável, ponto</strong> (<code>caneta.preco</code>); <strong>com um ponteiro, seta</strong> (<code>p-&gt;preco</code>). Os parênteses em <code>(*p).preco</code> são obrigatórios, porque o ponto vem antes do <code>*</code> na <a href="precedencia.html">precedência</a>. Se você usar ponto num ponteiro, o g++ até sugere a seta:</p>
 
+<pre class="file" data-file="seta-erro.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco;
+};
+
+int main() {
+    Produto caneta{"caneta", 2.50};
+    Produto* p = &amp;caneta;
+    std::cout &lt;&lt; p.preco &lt;&lt; "\n";
+}
+</pre>
+
 <pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra seta-erro.cpp -o seta-erro
 seta-erro.cpp: In function ‘int main()’:
 seta-erro.cpp:12:20: error: request for member ‘preco’ in ‘p’, which is of pointer type ‘Produto*’ (maybe you meant to use ‘-&gt;’ ?)

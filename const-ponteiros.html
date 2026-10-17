@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ const com Ponteiros e Referências — const int* × int* const | Guia C++</title>
+<meta name="description" content="const com ponteiros e referências em C++ para quem nunca programou: const int* × int* const × const int* const, a regra de ler da direita para a esquerda, ponteiro para variável const e const&amp; em parâmetros de função, com os erros reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">const com Ponteiros e Referências</span></h1>
+
+<p class="intro">Você já conhece o <code>const</code> de <a href="constantes.html">Constantes</a>: ele trava uma variável para que ninguém a mude. Com um ponteiro, existem <strong>duas coisas</strong> que podem ser travadas: o <strong>valor</strong> lá na casa apontada e o <strong>endereço</strong> anotado no próprio ponteiro. Dependendo de onde você escreve o <code>const</code>, trava uma, a outra ou as duas. Parece um quebra-cabeça, mas existe uma regra simples para ler: da direita para a esquerda.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A diferença entre <code>const int* p</code>, <code>int* const p</code> e <code>const int* const p</code>.</li>
+  <li>Os erros reais do g++ ao tentar mudar o que está travado.</li>
+  <li>A regra "leia da direita para a esquerda".</li>
+  <li>Por que o endereço de uma variável <code>const</code> só cabe num <code>const int*</code>.</li>
+  <li>Por que <code>const&amp;</code> é o jeito padrão de passar coisas grandes para funções.</li>
+</ul>
+</div>
+
+<p>Antes, leia <a href="ponteiros.html">Ponteiros</a> e <a href="referencias.html">Referências</a>. Os programas foram compilados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Nesta aula, a maior parte das saídas são <strong>erros de compilação</strong>, e é isso mesmo que queremos: o <code>const</code> serve para o compilador barrar mudanças que você não queria.</p>
+
+<hr>
+
+<h2>A ideia: dois cadeados diferentes</h2>
+<p>Volte ao ponteiro como um papel com um endereço anotado. Dá para colocar um cadeado em dois lugares:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Cadeado em…</th><th>Comparação</th><th>Em C++</th></tr>
+<tr><td><strong>A casa</strong> (o valor)</td><td>Uma <strong>vitrine</strong>: você vê o bolo, mas não pode mexer nele. Pode, porém, ir olhar outra vitrine.</td><td><code>const int* p</code></td></tr>
+<tr><td><strong>O papel</strong> (o endereço)</td><td>Um <strong>papel plastificado</strong>: o endereço anotado nunca muda, mas lá dentro da casa você mexe à vontade.</td><td><code>int* const p</code></td></tr>
+<tr><td>Os dois</td><td>Papel plastificado apontando para uma vitrine: só olhar, sempre a mesma.</td><td><code>const int* const p</code></td></tr>
+</table>
+</div>
+
+<p>O segredo é a posição do <code>const</code> em relação ao <code>*</code>: <strong>antes</strong> do <code>*</code>, ele trava o valor; <strong>depois</strong> do <code>*</code>, trava o ponteiro.</p>
+
+<hr>
+
+<h2>1. <code>const int* p</code>: ponteiro para valor constante</h2>
+<p>O <code>const</code> está antes do <code>*</code>, junto do <code>int</code>: o que é constante é o <code>int</code> lá na casa. Pelo ponteiro, você pode <strong>ler</strong> e pode <strong>trocar de alvo</strong>, mas não pode <strong>mudar o valor</strong>:</p>
+
+<pre class="file" data-file="ptr-const.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int ana = 7;
+    int bruno = 3;
+    const int* p = &amp;ana;     // ponteiro para const int
+
+    std::cout &lt;&lt; "*p = " &lt;&lt; *p &lt;&lt; "\n";   // ler pode
+    p = &amp;bruno;                           // trocar o alvo pode
+    std::cout &lt;&lt; "*p = " &lt;&lt; *p &lt;&lt; "\n";
+    *p = 100;                             // mudar o valor NÃO pode
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ptr-const.cpp -o ptr-const
+ptr-const.cpp: In function ‘int main()’:
+ptr-const.cpp:11:8: error: assignment of read-only location ‘* p’
+   11 |     *p = 100;                             // mudar o valor NÃO pode
+      |     ~~~^~~~~</pre>
+
+<p>Tradução: "atribuição numa <strong>posição</strong> somente-leitura <code>*p</code>". O g++ diz <em>location</em> (posição, lugar) porque o problema está no lugar para onde <code>p</code> aponta, o <code>*p</code>. As linhas 8, 9 e 10 (ler e trocar o alvo) passaram sem reclamação.</p>
+
+<h3>O <code>const</code> vale para o ponteiro, não para a variável</h3>
+<p>Assim como na referência para <code>const</code>, quem fica travado é o <strong>caminho</strong> pelo ponteiro. A variável original continua livre:</p>
+
+<pre class="file" data-file="dono.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int saldo = 500;
+    const int* so_ver = &amp;saldo;
+
+    saldo = 800;                 // o dono continua livre
+    std::cout &lt;&lt; "*so_ver = " &lt;&lt; *so_ver &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra dono.cpp -o dono
+$ ./dono
+*so_ver = 800</pre>
+
+<p>Pense no extrato do aplicativo do banco: a Ana não pode mudar o saldo por ali, mas o saldo muda quando cai o salário, e o extrato mostra o valor novo.</p>
+
+<div class="tip">
+<strong><code>int const*</code> é a mesma coisa</strong>
+<p>Você vai encontrar <code>int const* p</code> em alguns códigos. É idêntico a <code>const int* p</code>: o que importa é o <code>const</code> estar <strong>antes do <code>*</code></strong>. A ordem entre <code>const</code> e <code>int</code> não muda nada.</p>
+</div>
+
+<hr>
+
+<h2>2. <code>int* const p</code>: ponteiro constante</h2>
+<p>Agora o <code>const</code> está depois do <code>*</code>, colado no nome: o que é constante é o próprio <code>p</code>, o papel. O endereço não muda nunca, mas o valor da casa pode mudar:</p>
+
+<pre class="file" data-file="const-ptr.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int ana = 7;
+    int bruno = 3;
+    int* const p = &amp;ana;     // ponteiro const para int
+
+    *p = 100;                             // mudar o valor pode
+    std::cout &lt;&lt; "ana = " &lt;&lt; ana &lt;&lt; "\n";
+    p = &amp;bruno;                           // trocar o alvo NÃO pode
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra const-ptr.cpp -o const-ptr
+const-ptr.cpp: In function ‘int main()’:
+const-ptr.cpp:10:7: error: assignment of read-only variable ‘p’
+   10 |     p = &amp;bruno;                           // trocar o alvo NÃO pode
+      |     ~~^~~~~~~~</pre>
+
+<p>Compare as mensagens: antes era <em>read-only <strong>location</strong> ‘* p’</em> (a casa); agora é <em>read-only <strong>variable</strong> ‘p’</em> (a variável <code>p</code>, o papel). A mensagem diz exatamente qual dos dois cadeados você tentou abrir.</p>
+
+<p>Um <code>int* const</code> se comporta como uma <a href="referencias.html">referência</a>: sempre o mesmo alvo, e o valor pode mudar. E, como toda constante, ele precisa nascer com valor:</p>
+
+<pre class="file" data-file="sem-init.cpp">int main() {
+    int* const p;
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sem-init.cpp -o sem-init
+sem-init.cpp: In function ‘int main()’:
+sem-init.cpp:2:16: error: uninitialized ‘const p’ [-fpermissive]
+    2 |     int* const p;
+      |                ^
+sem-init.cpp:2:16: warning: unused variable ‘p’ [-Wunused-variable]</pre>
+
+<p>"<code>p</code> é <code>const</code> e não foi inicializada": se o endereço nunca pode mudar, ele precisa ser dado na criação.</p>
+
+<hr>
+
+<h2>3. <code>const int* const p</code>: tudo travado</h2>
+<p>Com <code>const</code> nos dois lados do <code>*</code>, nada muda por <code>p</code>: nem o valor, nem o alvo. As duas tentativas dão erro:</p>
+
+<pre class="file" data-file="const-const.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int ana = 7;
+    int bruno = 3;
+    const int* const p = &amp;ana;   // nada pode mudar por p
+
+    std::cout &lt;&lt; "*p = " &lt;&lt; *p &lt;&lt; "\n";
+    *p = 100;
+    p = &amp;bruno;
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra const-const.cpp -o const-const
+const-const.cpp: In function ‘int main()’:
+const-const.cpp:9:8: error: assignment of read-only location ‘*(const int*)p’
+    9 |     *p = 100;
+      |     ~~~^~~~~
+const-const.cpp:10:7: error: assignment of read-only variable ‘p’
+   10 |     p = &amp;bruno;
+      |     ~~^~~~~~~~</pre>
+
+<p>Dois erros, um para cada cadeado. Na primeira mensagem, o g++ escreve <code>*(const int*)p</code>, mostrando que olhou o <code>p</code> como "ponteiro para <code>const int</code>" e achou a casa travada.</p>
+
+<h3>As três formas lado a lado</h3>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Declaração</th><th>Ler <code>*p</code></th><th>Mudar o valor (<code>*p = 5</code>)</th><th>Mudar o alvo (<code>p = &amp;y</code>)</th><th>Erro ao tentar o proibido</th></tr>
+<tr><td><code>int* p</code></td><td>Sim</td><td>Sim</td><td>Sim</td><td>(nenhum)</td></tr>
+<tr><td><code>const int* p</code></td><td>Sim</td><td><strong>Não</strong></td><td>Sim</td><td><code>assignment of read-only location ‘* p’</code></td></tr>
+<tr><td><code>int* const p</code></td><td>Sim</td><td>Sim</td><td><strong>Não</strong></td><td><code>assignment of read-only variable ‘p’</code></td></tr>
+<tr><td><code>const int* const p</code></td><td>Sim</td><td><strong>Não</strong></td><td><strong>Não</strong></td><td>Os dois acima</td></tr>
+</table>
+</div>
+
+<p>E o que é permitido, funcionando:</p>
+
+<pre class="file" data-file="ok.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int ana = 7;
+    int bruno = 3;
+
+    const int* p1 = &amp;ana;        // valor travado, alvo livre
+    p1 = &amp;bruno;
+
+    int* const p2 = &amp;ana;        // alvo travado, valor livre
+    *p2 = 100;
+
+    std::cout &lt;&lt; "*p1 = " &lt;&lt; *p1 &lt;&lt; ", ana = " &lt;&lt; ana &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ok.cpp -o ok
+$ ./ok
+*p1 = 3, ana = 100</pre>
+
+<hr>
+
+<h2>4. A regra: leia da direita para a esquerda</h2>
+<p>Para não precisar decorar a tabela, leia a declaração <strong>de trás para a frente</strong>, começando pelo nome. Leia o <code>*</code> como "ponteiro para":</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Declaração</th><th>Lida da direita para a esquerda</th></tr>
+<tr><td><code>int* p</code></td><td><code>p</code> é um ponteiro para <code>int</code>.</td></tr>
+<tr><td><code>const int* p</code></td><td><code>p</code> é um ponteiro para <code>int</code> <strong>constante</strong>. (O <code>int</code> é que é constante.)</td></tr>
+<tr><td><code>int const* p</code></td><td><code>p</code> é um ponteiro para <strong>constante</strong> <code>int</code>. (A mesma coisa.)</td></tr>
+<tr><td><code>int* const p</code></td><td><code>p</code> é <strong>constante</strong>: um ponteiro para <code>int</code>. (O <code>p</code> é que é constante.)</td></tr>
+<tr><td><code>const int* const p</code></td><td><code>p</code> é <strong>constante</strong>: um ponteiro para <code>int</code> <strong>constante</strong>.</td></tr>
+<tr><td><code>const int&amp; r</code></td><td><code>r</code> é uma referência para <code>int</code> <strong>constante</strong>.</td></tr>
+</table>
+</div>
+
+<p>Repare que não existe <code>int&amp; const r</code>: uma referência nunca troca de alvo, então ela já é "constante" por natureza. Só o <code>const int&amp;</code> (valor travado) faz sentido.</p>
+
+<div class="trycpp" data-goal="erro:read-only">
+<p class="try-task"><strong>Missão (provoque o erro):</strong> o ponteiro <code>consulta</code> só deixa olhar o estoque. Acrescente, antes do <code>}</code> final, a linha <code>*consulta = 0;</code> e clique em Rodar. Leia o erro: ele diz que a casa apontada é somente-leitura. Depois, tente trocar o <code>const int*</code> por <code>int* const</code> e veja qual linha passa a ser aceita.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int estoque = 12;
+    const int* consulta = &amp;estoque;
+
+    std::cout &lt;&lt; "Estoque: " &lt;&lt; *consulta &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int estoque = 12;
+    const int* consulta = &amp;estoque;
+
+    std::cout &lt;&lt; "Estoque: " &lt;&lt; *consulta &lt;&lt; "\n";
+    *consulta = 0;
+}
+</pre>
+</div>
+
+<p>No editor do guia (Clang), as mensagens são outras, mas a ideia é a mesma: <code>read-only variable is not assignable</code> ("variável somente-leitura não pode receber valor") para o <code>*p = …</code> e <code>cannot assign to variable 'p' with const-qualified type 'int *const'</code> para o <code>p = …</code>.</p>
+
+<hr>
+
+<h2>5. Variável <code>const</code> pede ponteiro para <code>const</code></h2>
+<p>Se a própria variável é constante, um <code>int*</code> comum seria uma porta dos fundos para mudá-la. O compilador fecha essa porta:</p>
+
+<pre class="file" data-file="limite.cpp">#include &lt;iostream&gt;
+
+int main() {
+    const int limite = 10;
+    int* p = &amp;limite;
+    *p = 99;
+    std::cout &lt;&lt; limite &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra limite.cpp -o limite
+limite.cpp: In function ‘int main()’:
+limite.cpp:5:14: error: invalid conversion from ‘const int*’ to ‘int*’ [-fpermissive]
+    5 |     int* p = &amp;limite;
+      |              ^~~~~~~
+      |              |
+      |              const int*</pre>
+
+<p>"Conversão inválida de <code>const int*</code> para <code>int*</code>". O endereço de um <code>const int</code> é um <code>const int*</code>, e ele não pode virar um ponteiro que permite escrever. O erro aparece na linha 5, antes mesmo de alguém tentar mudar o valor. Conserto:</p>
+
+<pre class="file" data-file="limite-ok.cpp">#include &lt;iostream&gt;
+
+int main() {
+    const int limite = 10;
+    const int* p = &amp;limite;
+    std::cout &lt;&lt; *p &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra limite-ok.cpp -o limite-ok
+$ ./limite-ok
+10</pre>
+
+<p>O caminho contrário é sempre permitido: um <code>int*</code> pode virar <code>const int*</code>, porque <strong>tirar</strong> uma permissão nunca é perigoso. Foi o que aconteceu com <code>const int* p = &amp;ana;</code> nos exemplos acima.</p>
+
+<hr>
+
+<h2>6. <code>const&amp;</code> em parâmetros</h2>
+<p>Este é o uso de <code>const</code> que você vai escrever todos os dias. Quando uma função recebe algo <strong>grande</strong> (uma <code>std::string</code>, um <code>std::vector</code>) só para <strong>ler</strong>, o melhor tipo de parâmetro é a referência para <code>const</code>:</p>
+
+<pre class="file" data-file="param.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void saudar(const std::string&amp; nome) {    // não copia e não muda
+    std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "! (" &lt;&lt; nome.size() &lt;&lt; " letras)\n";
+}
+
+int main() {
+    std::string cliente = "Ana Beatriz";
+    saudar(cliente);           // uma variável
+    saudar("Bruno");           // um texto direto: const&amp; aceita
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra param.cpp -o param
+$ ./param
+Olá, Ana Beatriz! (11 letras)
+Olá, Bruno! (5 letras)</pre>
+
+<p>O <code>const std::string&amp;</code> dá três garantias de uma vez:</p>
+<ol>
+  <li><strong>Não copia</strong>: é um apelido (o <code>&amp;</code>). Para um texto de mil letras ou um vetor de um milhão de itens, isso economiza tempo e memória.</li>
+  <li><strong>Não muda</strong>: o <code>const</code> promete a quem chama que a variável dele volta intacta. Se a função tentar mudar, o compilador barra:</li>
+</ol>
+
+<pre class="file" data-file="param-muda.cpp">#include &lt;iostream&gt;
+
+void dar_bonus(const int&amp; nota) {
+    nota = nota + 1;
+}
+
+int main() {
+    int nota_ana = 8;
+    dar_bonus(nota_ana);
+    std::cout &lt;&lt; nota_ana &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra param-muda.cpp -o param-muda
+param-muda.cpp: In function ‘void dar_bonus(const int&amp;)’:
+param-muda.cpp:4:10: error: assignment of read-only reference ‘nota’
+    4 |     nota = nota + 1;
+      |     ~~~~~^~~~~~~~~~</pre>
+
+<ol start="3">
+  <li><strong>Aceita textos e valores diretos</strong>, como <code>saudar("Bruno")</code>. Sem o <code>const</code>, isso não compila:</li>
+</ol>
+
+<pre class="file" data-file="param-sem-const.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void saudar(std::string&amp; nome) {
+    std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "!\n";
+}
+
+int main() {
+    saudar("Bruno");
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra param-sem-const.cpp -o param-sem-const
+param-sem-const.cpp: In function ‘int main()’:
+param-sem-const.cpp:9:12: error: cannot bind non-const lvalue reference of type ‘std::string&amp;’ {aka ‘std::__cxx11::basic_string&lt;char&gt;&amp;’} to an rvalue of type ‘std::string’ {aka ‘std::__cxx11::basic_string&lt;char&gt;’}
+    9 |     saudar("Bruno");
+      |            ^~~~~~~
+In file included from /usr/include/c++/15/string:56,
+                 from /usr/include/c++/15/bits/locale_classes.h:42,
+                 from /usr/include/c++/15/bits/ios_base.h:43,
+                 from /usr/include/c++/15/ios:46,
+                 from /usr/include/c++/15/bits/ostream.h:43,
+                 from /usr/include/c++/15/ostream:42,
+                 from /usr/include/c++/15/iostream:43,
+                 from param-sem-const.cpp:1:
+/usr/include/c++/15/bits/basic_string.h:706:7: note:   after user-defined conversion: ‘constexpr std::__cxx11::basic_string&lt;_CharT, _Traits, _Alloc&gt;::basic_string(const _CharT*, const _Alloc&amp;) [with &lt;template-parameter-2-1&gt; = std::allocator&lt;char&gt;; _CharT = char; _Traits = std::char_traits&lt;char&gt;; _Alloc = std::allocator&lt;char&gt;]’
+  706 |       basic_string(const _CharT* __s, const _Alloc&amp; __a = _Alloc())
+      |       ^~~~~~~~~~~~
+param-sem-const.cpp:4:26: note: initializing argument 1 of ‘void saudar(std::string&amp;)’
+    4 | void saudar(std::string&amp; nome) {
+      |             ~~~~~~~~~~~~~^~~~</pre>
+
+<p>Assusta, mas só a primeira linha de erro importa. É a mesma mensagem que você viu em <a href="referencias.html">Referências</a> com <code>int&amp; r = 10;</code>: para chamar a função, o C++ precisou criar uma <code>std::string</code> temporária a partir de <code>"Bruno"</code> (um <em>rvalue</em>), e uma referência comum não pode se ligar a um temporário. O resto são notas: o <code>{aka …}</code> mostra o nome "verdadeiro" de <code>std::string</code> dentro da biblioteca, e o bloco <code>In file included from …</code> mostra onde está a conversão de texto para <code>std::string</code> que ele tentou usar. A última nota aponta o parâmetro culpado, na linha 4. Conserto: <code>const std::string&amp; nome</code>.</p>
+
+<h3>Como escolher o tipo do parâmetro</h3>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>A função vai…</th><th>Tipo pequeno (<code>int</code>, <code>double</code>, <code>char</code>, <code>bool</code>)</th><th>Tipo grande (<code>std::string</code>, <code>std::vector</code>, structs)</th></tr>
+<tr><td>Só ler</td><td>Por valor: <code>int n</code></td><td><code>const std::string&amp; s</code></td></tr>
+<tr><td>Mudar a variável de quem chamou</td><td><code>int&amp; n</code></td><td><code>std::string&amp; s</code></td></tr>
+<tr><td>Ler algo que pode não existir</td><td><code>const int* p</code> (e conferir <code>nullptr</code>)</td><td><code>const std::string* p</code> (e conferir <code>nullptr</code>)</td></tr>
+</table>
+</div>
+
+<p>Copiar um <code>int</code> custa o mesmo que copiar um endereço, então <code>const int&amp;</code> não traz vantagem para tipos pequenos. A aula <a href="passagem-referencia.html">Por Valor × Por Referência</a> discute essa escolha com mais exemplos.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"assignment of read-only location ‘* p’"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ptr-const.cpp -o ptr-const
+ptr-const.cpp: In function ‘int main()’:
+ptr-const.cpp:11:8: error: assignment of read-only location ‘* p’
+   11 |     *p = 100;                             // mudar o valor NÃO pode
+      |     ~~~^~~~~</pre>
+<p><strong>O que aconteceu:</strong> você tentou mudar o valor por um <code>const int*</code>.</p>
+<p><strong>Como resolver:</strong> se a mudança é intencional, mude pela própria variável ou use um ponteiro sem <code>const</code> antes do <code>*</code>. Se a função recebeu <code>const int*</code>, é porque prometeu não mudar: talvez a mudança deva acontecer em outro lugar.</p>
+</div>
+
+<div class="cenario">
+<strong>"assignment of read-only variable ‘p’"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra const-ptr.cpp -o const-ptr
+const-ptr.cpp: In function ‘int main()’:
+const-ptr.cpp:10:7: error: assignment of read-only variable ‘p’
+   10 |     p = &amp;bruno;                           // trocar o alvo NÃO pode
+      |     ~~^~~~~~~~</pre>
+<p><strong>O que aconteceu:</strong> você tentou trocar o alvo de um ponteiro <code>const</code> (<code>int* const</code>).</p>
+<p><strong>Como resolver:</strong> se o ponteiro precisa mudar de alvo, tire o <code>const</code> de depois do <code>*</code>. Talvez você quisesse escrever <code>*p = …</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"invalid conversion from ‘const int*’ to ‘int*’"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra limite.cpp -o limite
+limite.cpp: In function ‘int main()’:
+limite.cpp:5:14: error: invalid conversion from ‘const int*’ to ‘int*’ [-fpermissive]
+    5 |     int* p = &amp;limite;
+      |              ^~~~~~~
+      |              |
+      |              const int*</pre>
+<p><strong>O que aconteceu:</strong> um ponteiro comum tentou apontar para algo constante. O mesmo erro aparece ao passar um <code>const int*</code> para uma função que pede <code>int*</code>.</p>
+<p><strong>Como resolver:</strong> declare o ponteiro (ou o parâmetro da função) como <code>const int*</code>. Nunca "resolva" com conversões forçadas: mudar algo que nasceu <code>const</code> é <a href="comportamento-indefinido.html">comportamento indefinido</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>"uninitialized ‘const p’"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sem-init.cpp -o sem-init
+sem-init.cpp: In function ‘int main()’:
+sem-init.cpp:2:16: error: uninitialized ‘const p’ [-fpermissive]
+    2 |     int* const p;
+      |                ^
+sem-init.cpp:2:16: warning: unused variable ‘p’ [-Wunused-variable]</pre>
+<p><strong>O que aconteceu:</strong> um ponteiro <code>const</code> nasceu sem endereço e nunca poderia receber um.</p>
+<p><strong>Como resolver:</strong> dê o endereço na criação: <code>int* const p = &amp;x;</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>Leitura</th><th>Pode mudar</th></tr>
+<tr><td><code>const int* p</code> ou <code>int const* p</code></td><td>ponteiro para int constante</td><td>o alvo (<code>p = &amp;y</code>)</td></tr>
+<tr><td><code>int* const p = &amp;x</code></td><td>ponteiro constante para int</td><td>o valor (<code>*p = 5</code>)</td></tr>
+<tr><td><code>const int* const p = &amp;x</code></td><td>ponteiro constante para int constante</td><td>nada</td></tr>
+<tr><td><code>const int&amp; r = x</code></td><td>referência para int constante</td><td>nada (pelo <code>r</code>)</td></tr>
+<tr><td><code>void f(const std::string&amp; s)</code></td><td>parâmetro: lê sem copiar</td><td>nada; aceita <code>f("texto")</code></td></tr>
+<tr><td><code>void f(const int* v, std::size_t n)</code></td><td>parâmetro: lê uma sequência</td><td>nada</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Só olhar</h3>
+<p>Complete para que <code>p</code> possa trocar de alvo, mas <strong>não</strong> possa mudar o valor apontado:</p>
+<div class="ex-code"><input data-answer="const" aria-label="palavra"> int* p = &amp;x;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Endereço fixo</h3>
+<p>Complete para que <code>p</code> aponte sempre para <code>x</code>, mas possa mudar o valor dele:</p>
+<div class="ex-code">int* <input data-answer="const" aria-label="palavra"> p = &amp;x;</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Com <code>const int* p = &amp;a;</code>, qual linha compila?</p>
+<label><input type="radio" name="q3"> <code>*p = 5;</code></label>
+<label><input type="radio" name="q3"> <code>*p = *p + 1;</code></label>
+<label><input type="radio" name="q3"> <code>p = &amp;b;</code></label>
+<label><input type="radio" name="q3"> Nenhuma</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O g++ mostrou <code>error: assignment of read-only variable ‘p’</code>. O que foi travado?</p>
+<label><input type="radio" name="q4"> O valor para onde <code>p</code> aponta</label>
+<label><input type="radio" name="q4"> O próprio ponteiro <code>p</code> (o endereço guardado)</label>
+<label><input type="radio" name="q4"> A variável apontada inteira, para sempre</label>
+<label><input type="radio" name="q4"> Nada: é só um aviso</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Qual é o melhor parâmetro para uma função que só <strong>mostra</strong> um <code>std::vector&lt;int&gt;</code> enorme?</p>
+<label><input type="radio" name="q5"> <code>const std::vector&lt;int&gt;&amp; v</code></label>
+<label><input type="radio" name="q5"> <code>std::vector&lt;int&gt; v</code></label>
+<label><input type="radio" name="q5"> <code>std::vector&lt;int&gt;&amp; v</code></label>
+<label><input type="radio" name="q5"> <code>std::vector&lt;int&gt;* const v</code></label>
+</div>
+
+<h3>Missão final: o total do carrinho, sem copiar</h3>
+
+<div class="trycpp" data-goal="out:Total: 20.5,src:const\s+std::vector&lt;double&gt;\s*&amp;\s*precos">
+<p class="try-task"><strong>Missão:</strong> a função <code>total</code> recebe o carrinho <strong>por cópia</strong>, o que é desperdício, e ainda não soma nada. (1) Troque o parâmetro para uma referência para <code>const</code> (<code>const std::vector&lt;double&gt;&amp; precos</code>). (2) Some os preços. A saída deve ser <code>Total: 20.5</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+double total(std::vector&lt;double&gt; precos) {
+    double soma = 0;
+    // some os preços
+    return soma;
+}
+
+int main() {
+    std::vector&lt;double&gt; carrinho = {4.5, 3.0, 12.0, 1.0};
+    std::cout &lt;&lt; "Total: " &lt;&lt; total(carrinho) &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+double total(const std::vector&lt;double&gt;&amp; precos) {
+    double soma = 0;
+    for (double p : precos) {
+        soma = soma + p;
+    }
+    return soma;
+}
+
+int main() {
+    std::vector&lt;double&gt; carrinho = {4.5, 3.0, 12.0, 1.0};
+    std::cout &lt;&lt; "Total: " &lt;&lt; total(carrinho) &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Num ponteiro, dá para travar o <strong>valor</strong> (<code>const</code> antes do <code>*</code>) ou o <strong>endereço</strong> (<code>const</code> depois do <code>*</code>), ou os dois.</li>
+  <li><code>const int* p</code>: lê e troca de alvo, não muda o valor (<code>read-only location</code>).</li>
+  <li><code>int* const p</code>: muda o valor, não troca de alvo (<code>read-only variable</code>); precisa nascer com endereço.</li>
+  <li>Leia da direita para a esquerda: "<code>p</code> é um ponteiro para <code>int</code> constante".</li>
+  <li>O endereço de uma variável <code>const</code> só cabe num <code>const int*</code>.</li>
+  <li>Para ler coisas grandes numa função, use <code>const&amp;</code>: não copia, não muda e aceita valores diretos.</li>
+  <li>Próxima aula: <a href="new-delete.html">Memória Dinâmica (new e delete)</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
