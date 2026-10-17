@@ -250,6 +250,8 @@ $ echo $?
   <dt>Abortado … / 134</dt><dd>O sistema matou o programa (128 + 6, o sinal de "abortar"). O <code>fim</code> nunca apareceu.</dd>
 </dl>
 
+<p>No editor do guia, que usa outra biblioteca padrão (a libc++, do projeto LLVM), a mesma situação aparece como <code>libc++abi: terminating due to uncaught exception of type std::out_of_range: map::at:  key not found</code> ("encerrando por causa de uma exceção não capturada do tipo <code>std::out_of_range</code>: chave não encontrada"). As palavras mudam; o tipo da exceção é o mesmo.</p>
+
 <p>O <code>at</code> é a escolha quando a chave <strong>tem</strong> que existir: se não existe, é um erro, e é melhor parar do que seguir com um 0 inventado. Se quiser tratar o erro, use <code>try</code>/<code>catch</code>:</p>
 
 <pre class="file" data-file="at-try.cpp">#include &lt;iostream&gt;
