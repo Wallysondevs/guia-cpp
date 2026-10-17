@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ getline — ler uma linha inteira com espaços | Guia C++</title>
+<meta name="description" content="Como ler uma linha inteira do teclado em C++ para quem nunca programou: std::getline, frases com espaços, o bug clássico de cin &gt;&gt; idade seguido de getline (linha vazia) e as correções com cin.ignore e std::ws, ler até o fim da entrada e usar outro separador, com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Ler uma Linha (getline)</span></h1>
+
+<p class="intro">Na aula <a href="entrada-cin.html">Entrada com cin</a> você leu números e palavras do teclado com <code>std::cin &gt;&gt;</code>. Mas tente pedir o nome completo da Ana: o programa só fica com <code>Ana</code>. O <code>&gt;&gt;</code> para no primeiro espaço. Para ler <strong>uma linha inteira</strong>, com espaços, existe o <code>std::getline</code>. Nesta aula você vai usá-lo, vai conhecer o bug mais famoso de quem mistura <code>&gt;&gt;</code> com <code>getline</code> (e as três formas de consertar), e vai ler várias linhas, até o fim da entrada.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que <code>std::cin &gt;&gt; nome</code> lê só uma palavra.</li>
+  <li>Como ler uma frase inteira com <code>std::getline(std::cin, linha)</code>.</li>
+  <li>Por que <code>cin &gt;&gt; idade</code> seguido de <code>getline</code> lê uma <strong>linha vazia</strong>, e como consertar com <code>std::cin.ignore()</code> ou <code>std::ws</code>.</li>
+  <li>Como ler todas as linhas até o fim da entrada com <code>while (std::getline(…))</code>, e o que é o <kbd>Ctrl</kbd>+<kbd>D</kbd>.</li>
+  <li>Como usar outro separador no lugar do Enter: <code>getline(…, ',')</code>.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com o comando padrão <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Nas sessões de terminal, o que vem depois de <code>Nome completo: </code> ou <code>Idade: </code> foi <strong>digitado</strong> pela Ana, seguido de <kbd>Enter</kbd>. Nos editores do guia, a entrada já vem preenchida (ela aparece embaixo do código).</p>
+
+<hr>
+
+<h2>A ideia: o carteiro e a fila de letras</h2>
+<p>Quando você digita no terminal, as letras não vão direto para o programa. Elas entram numa <strong>fila</strong> (o <em>buffer</em> de entrada) e ficam esperando. O <kbd>Enter</kbd> também entra na fila, como um caractere invisível: o <code>'\n'</code>. Se a Ana digita <code>Ana Maria</code> e aperta <kbd>Enter</kbd>, a fila fica assim:</p>
+
+<pre class="file" data-file="a fila de entrada">A n a ␣ M a r i a \n</pre>
+
+<p>Cada forma de leitura é um "carteiro" com uma regra diferente para pegar letras dessa fila:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Leitura</th><th>Regra</th><th>Pega da fila acima</th><th>Deixa na fila</th></tr>
+<tr><td><code>std::cin &gt;&gt; nome</code></td><td>Pula espaços do começo, pega até o próximo espaço ou Enter</td><td><code>Ana</code></td><td><code>␣Maria\n</code></td></tr>
+<tr><td><code>std::getline(std::cin, nome)</code></td><td>Pega tudo até o Enter; tira o Enter da fila e joga fora</td><td><code>Ana Maria</code></td><td>nada</td></tr>
+</table>
+</div>
+
+<p>Guarde a última coluna: é ela que explica o bug da seção 3.</p>
+
+<hr>
+
+<h2>1. O problema: <code>&gt;&gt;</code> lê uma palavra</h2>
+
+<pre class="file" data-file="cinpalavra.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome;
+    std::cout &lt;&lt; "Nome completo: ";
+    std::cin &gt;&gt; nome;
+    std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra cinpalavra.cpp -o cinpalavra
+$ ./cinpalavra
+Nome completo: Ana Maria Souza
+Olá, Ana!          « o resto se perdeu</pre>
+
+<p>O <code>&gt;&gt;</code> foi feito para ler <strong>valores separados por espaço</strong>: <code>std::cin &gt;&gt; a &gt;&gt; b</code> lê dois números digitados como <code>3 4</code>. Para ele, o espaço é um separador, e <code>Maria Souza</code> ficou esperando na fila para uma próxima leitura que nunca veio.</p>
+
+<hr>
+
+<h2>2. <code>std::getline</code>: a linha inteira</h2>
+
+<pre class="file" data-file="linha.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome;
+    std::cout &lt;&lt; "Nome completo: ";
+    std::getline(std::cin, nome);
+    std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "!\n";
+    std::cout &lt;&lt; "(" &lt;&lt; nome.size() &lt;&lt; " caracteres)\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra linha.cpp -o linha
+$ ./linha
+Nome completo: Ana Maria Souza
+Olá, Ana Maria Souza!
+(15 caracteres)    « o Enter não entra na string</pre>
+
+<dl class="anatomy">
+  <dt>std::getline</dt><dd>"Pegar linha" (<em>get line</em>). Vem do cabeçalho <code>&lt;string&gt;</code>.</dd>
+  <dt>std::cin</dt><dd>De onde ler: a entrada padrão, o teclado. (O mesmo <code>getline</code> lê de arquivos, trocando o <code>std::cin</code> por um arquivo aberto; veja <a href="arquivos.html">Ler e Escrever Arquivos</a>.)</dd>
+  <dt>nome</dt><dd>Onde guardar: <strong>sempre</strong> um <code>std::string</code>. O texto antigo da variável é trocado pela linha lida.</dd>
+  <dt>O Enter</dt><dd>O <code>getline</code> lê até o <code>'\n'</code>, tira o <code>'\n'</code> da fila e <strong>não</strong> o guarda. Por isso <code>Ana Maria Souza</code> tem 15 caracteres, sem nenhum Enter no fim.</dd>
+</dl>
+
+<p>O <code>getline</code> guarda a linha <strong>exatamente</strong> como foi digitada: espaços no começo, no meio e no fim, tudo. Se a pessoa só apertar <kbd>Enter</kbd>, a string fica vazia, e você pode conferir com <code>.empty()</code> (aula <a href="strings.html">Strings</a>).</p>
+
+<div class="trycpp" data-stdin="Ana Maria Souza&#10;" data-goal="out:Olá\, Ana Maria Souza!,src:getline\s*\(">
+<p class="try-task"><strong>Missão:</strong> este programa só guarda a primeira palavra do nome. Troque a leitura por <code>std::getline</code> para ele mostrar <code>Olá, Ana Maria Souza!</code>. A entrada (o que a "Ana digitou") já está preenchida.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome;
+    std::cout &lt;&lt; "Nome completo: ";
+    std::cin &gt;&gt; nome;
+    std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome;
+    std::cout &lt;&lt; "Nome completo: ";
+    std::getline(std::cin, nome);
+    std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. O bug clássico: <code>cin &gt;&gt; idade</code> e depois <code>getline</code></h2>
+<p>Agora o programa pede a idade (um número, com <code>&gt;&gt;</code>) e depois o nome completo (com <code>getline</code>). Parece perfeito:</p>
+
+<pre class="file" data-file="bug.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    int idade = 0;
+    std::string nome;
+    std::cout &lt;&lt; "Idade: ";
+    std::cin &gt;&gt; idade;
+    std::cout &lt;&lt; "Nome completo: ";
+    std::getline(std::cin, nome);
+    std::cout &lt;&lt; "[" &lt;&lt; nome &lt;&lt; "] tem " &lt;&lt; idade &lt;&lt; " anos\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra bug.cpp -o bug
+$ ./bug
+Idade: 30
+Nome completo: [] tem 30 anos     « nem deu tempo de digitar o nome!</pre>
+
+<p>A Ana digitou <code>30</code> e <kbd>Enter</kbd>. O programa mostrou <code>Nome completo: </code> e, <strong>sem esperar</strong>, terminou com o nome vazio. Nenhum erro, nenhum aviso. O que aconteceu? Siga a fila:</p>
+
+<ol class="passo">
+  <li>A Ana digita <code>30</code> e <kbd>Enter</kbd>. A fila fica: <code>3 0 \n</code>.</li>
+  <li><code>std::cin &gt;&gt; idade</code> pega o <code>30</code> e <strong>para antes do <code>\n</code></strong>, que fica na fila: <code>\n</code>.</li>
+  <li><code>std::getline</code> lê "tudo até o Enter". O primeiro caractere da fila já é um Enter! Ele lê <strong>zero</strong> caracteres, tira o <code>\n</code> e devolve uma linha vazia, na hora.</li>
+</ol>
+
+<p>O <code>getline</code> fez exatamente o que promete: leu o resto da linha do <code>30</code>, que estava vazio. O problema é a <strong>sobra</strong> que o <code>&gt;&gt;</code> deixou na fila. A solução, portanto, é <strong>jogar a sobra fora</strong> antes do <code>getline</code>.</p>
+
+<hr>
+
+<h2>4. As correções</h2>
+
+<h3>Forma 1: <code>std::cin.ignore()</code></h3>
+<p><code>ignore</code> ("ignorar") tira <strong>um</strong> caractere da fila e joga fora. Coloque-o logo depois do <code>&gt;&gt;</code>:</p>
+
+<pre class="file" data-file="ignore.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    int idade = 0;
+    std::string nome;
+    std::cout &lt;&lt; "Idade: ";
+    std::cin &gt;&gt; idade;
+    std::cin.ignore();
+    std::cout &lt;&lt; "Nome completo: ";
+    std::getline(std::cin, nome);
+    std::cout &lt;&lt; "[" &lt;&lt; nome &lt;&lt; "] tem " &lt;&lt; idade &lt;&lt; " anos\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ignore.cpp -o ignore
+$ ./ignore
+Idade: 30
+Nome completo: Ana Maria
+[Ana Maria] tem 30 anos</pre>
+
+<p>Funciona, mas tem um ponto fraco: ele joga fora <strong>um</strong> caractere só. Se a Ana digitar <code>30</code>, uns espaços e só depois o <kbd>Enter</kbd>, a sobra é maior que um caractere:</p>
+
+<pre class="term" data-cwd="~/cpp">$ ./ignore
+Idade: 30
+Nome completo: [  ] tem 30 anos   « sobraram 2 espaços e o Enter</pre>
+
+<h3>Forma 2: <code>std::cin.ignore(…, '\n')</code>, jogar fora até o Enter</h3>
+<p>Dá para pedir: "ignore quantos caracteres for preciso, até passar por um <code>'\n'</code>". O "quantos for preciso" se escreve com o maior número possível, que vem de <code>&lt;limits&gt;</code>:</p>
+
+<pre class="file" data-file="ignoremax.cpp">#include &lt;iostream&gt;
+#include &lt;limits&gt;
+#include &lt;string&gt;
+
+int main() {
+    int idade = 0;
+    std::string nome;
+    std::cout &lt;&lt; "Idade: ";
+    std::cin &gt;&gt; idade;
+    std::cin.ignore(std::numeric_limits&lt;std::streamsize&gt;::max(), '\n');
+    std::cout &lt;&lt; "Nome completo: ";
+    std::getline(std::cin, nome);
+    std::cout &lt;&lt; "[" &lt;&lt; nome &lt;&lt; "] tem " &lt;&lt; idade &lt;&lt; " anos\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ignoremax.cpp -o ignoremax
+$ ./ignoremax
+Idade: 30
+Nome completo: Ana Maria
+[Ana Maria] tem 30 anos     « os espaços depois do 30 também foram descartados</pre>
+
+<dl class="anatomy">
+  <dt>std::numeric_limits&lt;std::streamsize&gt;::max()</dt><dd>"O maior valor possível do tipo <code>std::streamsize</code>" (o tipo que a entrada usa para contar caracteres). Para o <code>ignore</code>, esse valor quer dizer "sem limite". É comprido, mas é sempre igual: copie.</dd>
+  <dt>'\n'</dt><dd>O delimitador: "pare depois de jogar fora um Enter".</dd>
+</dl>
+
+<h3>Forma 3: <code>std::ws</code>, pular os espaços em branco</h3>
+<p>A forma mais curta: <code>std::ws</code> (<em>whitespace</em>, "espaço em branco") come todos os espaços, tabs e Enters do começo da fila. Ele vai <strong>dentro</strong> do <code>getline</code>:</p>
+
+<pre class="file" data-file="ws.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    int idade = 0;
+    std::string nome;
+    std::cout &lt;&lt; "Idade: ";
+    std::cin &gt;&gt; idade;
+    std::cout &lt;&lt; "Nome completo: ";
+    std::getline(std::cin &gt;&gt; std::ws, nome);
+    std::cout &lt;&lt; "[" &lt;&lt; nome &lt;&lt; "] tem " &lt;&lt; idade &lt;&lt; " anos\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ws.cpp -o ws
+$ ./ws
+Idade: 30
+Nome completo: Ana Maria
+[Ana Maria] tem 30 anos</pre>
+
+<dl class="anatomy">
+  <dt>std::cin &gt;&gt; std::ws</dt><dd>"Leia do <code>cin</code> todos os espaços em branco e jogue fora". O resultado continua sendo o próprio <code>std::cin</code>, que é entregue ao <code>getline</code>.</dd>
+  <dt>std::getline(…, nome)</dt><dd>Agora a fila começa no <code>A</code> de <code>Ana</code>, e o <code>getline</code> lê a linha certa.</dd>
+</dl>
+
+<h3>Qual usar?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Vantagem</th><th>Cuidado</th></tr>
+<tr><td><code>std::getline(std::cin &gt;&gt; std::ws, s)</code></td><td>Curta e resistente a espaços e linhas em branco. <strong>A recomendada</strong> para quem começa.</td><td>Também apaga espaços do <strong>começo</strong> da linha e pula linhas vazias. Não serve se uma linha vazia é uma resposta válida.</td></tr>
+<tr><td><code>std::cin.ignore(std::numeric_limits&lt;std::streamsize&gt;::max(), '\n');</code></td><td>Descarta exatamente o resto da linha do <code>&gt;&gt;</code>, e nada mais.</td><td>Comprida; precisa de <code>&lt;limits&gt;</code>.</td></tr>
+<tr><td><code>std::cin.ignore();</code></td><td>A mais curta.</td><td>Só descarta 1 caractere: falha com espaços depois do número.</td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>Uma regra que evita o problema</strong>
+<p>Muitos programadores preferem não misturar: leem <strong>tudo</strong> com <code>getline</code> (inclusive a idade, como texto) e convertem para número depois, com <code>std::stoi</code>. Assim nunca sobra nada na fila. A conversão está em <a href="string-numero.html">Texto ↔ Número</a>, e a validação completa da entrada em <a href="validar-entrada.html">Validar a Entrada</a>.</p>
+</div>
+
+<hr>
+
+<h2>5. Ler até o fim da entrada</h2>
+<p>E quando você não sabe quantas linhas virão? Uma lista de compras, um arquivo inteiro? O <code>getline</code> responde "deu certo" ou "acabou", e por isso pode ir direto num <code>while</code> ("enquanto", aula <a href="while.html">while</a>): "<strong>enquanto</strong> conseguir ler uma linha, faça isto".</p>
+
+<pre class="file" data-file="linhas.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string linha;
+    int numero = 0;
+    while (std::getline(std::cin, linha)) {
+        numero++;
+        std::cout &lt;&lt; numero &lt;&lt; ": " &lt;&lt; linha &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "Total: " &lt;&lt; numero &lt;&lt; " linhas\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra linhas.cpp -o linhas
+$ ./linhas
+arroz              « digitado
+1: arroz
+feijão             « digitado
+2: feijão
+                   « aqui a Ana apertou Ctrl+D
+Total: 2 linhas</pre>
+
+<dl class="anatomy">
+  <dt>while (std::getline(std::cin, linha))</dt><dd>Tenta ler uma linha. Se conseguiu, roda o bloco e tenta de novo. Se a entrada <strong>acabou</strong>, o <code>getline</code> "falha", e o <code>while</code> termina.</dd>
+  <dt>Ctrl+D</dt><dd>No teclado, a entrada nunca "acaba" sozinha: a pessoa avisa que terminou apertando <kbd>Ctrl</kbd>+<kbd>D</kbd> no começo de uma linha (no Linux e no macOS; no Windows, <kbd>Ctrl</kbd>+<kbd>Z</kbd> e <kbd>Enter</kbd>). Esse aviso se chama <strong>fim de arquivo</strong> (<em>EOF</em>, <em>end of file</em>). Ele não aparece na tela.</dd>
+</dl>
+
+<p>O mesmo programa lê um arquivo inteiro, sem mudar nada, se você <strong>redirecionar</strong> a entrada no terminal com <code>&lt;</code> ou mandar o texto por um <code>|</code> (o "cano" que liga a saída de um comando à entrada de outro; o Guia Bash explica os dois na aula de redirecionamento). Aí o fim de arquivo chega sozinho, quando o arquivo termina:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat compras.txt
+arroz
+feijão
+café com leite
+$ ./linhas &lt; compras.txt
+1: arroz
+2: feijão
+3: café com leite
+Total: 3 linhas
+$ cat compras.txt | ./linhas
+1: arroz
+2: feijão
+3: café com leite
+Total: 3 linhas</pre>
+
+<div class="trycpp" data-stdin="pão&#10;leite&#10;&#10;queijo minas&#10;">
+<p class="try-task"><strong>Experimente:</strong> a entrada tem quatro linhas, uma delas vazia. Rode e veja como a linha vazia aparece. Depois, mude o programa para <strong>não contar</strong> as linhas vazias: dentro do <code>while</code>, só faça algo <code>if (!linha.empty())</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string linha;
+    int numero = 0;
+    while (std::getline(std::cin, linha)) {
+        numero++;
+        std::cout &lt;&lt; numero &lt;&lt; ": [" &lt;&lt; linha &lt;&lt; "]\n";
+    }
+    std::cout &lt;&lt; "Total: " &lt;&lt; numero &lt;&lt; " linhas\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>6. Outro separador: <code>getline(…, ',')</code></h2>
+<p>O <code>getline</code> aceita um terceiro argumento: o caractere que marca o fim de cada pedaço, no lugar do Enter. Com <code>','</code>, ele lê "até a próxima vírgula":</p>
+
+<pre class="file" data-file="virgula.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string item;
+    while (std::getline(std::cin, item, ',')) {
+        std::cout &lt;&lt; "[" &lt;&lt; item &lt;&lt; "]\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra virgula.cpp -o virgula
+$ printf 'arroz,feijão,café' | ./virgula
+[arroz]
+[feijão]
+[café]
+$ printf 'arroz,feijão,café\n' | ./virgula
+[arroz]
+[feijão]
+[café              « o Enter do fim entrou no último item!
+]</pre>
+
+<dl class="anatomy">
+  <dt>std::getline(std::cin, item, ',')</dt><dd>Lê até a vírgula, joga a vírgula fora e guarda o resto em <code>item</code>. O último pedaço vai até o fim da entrada.</dd>
+  <dt>O <code>\n</code> no último item</dt><dd>Com o separador trocado, o Enter passa a ser um caractere comum, e vai parar dentro do último pedaço. É uma armadilha clássica: <code>"café\n" == "café"</code> dá <code>false</code>.</dd>
+</dl>
+
+<p>A forma segura de ler uma linha com campos separados por vírgula (um arquivo <strong>CSV</strong>, como os de planilha) é em duas etapas: primeiro a linha inteira, com o <code>getline</code> normal (que já descarta o Enter); depois, separar a linha nas vírgulas. Para isso, você transforma a linha numa "entrada de mentira" com <code>std::istringstream</code>, e o <code>getline</code> lê dela como leria do teclado:</p>
+
+<pre class="file" data-file="csv.cpp">#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string linha;
+    while (std::getline(std::cin, linha)) {
+        std::istringstream partes(linha);
+        std::string nome, nota;
+        std::getline(partes, nome, ',');
+        std::getline(partes, nota, ',');
+        std::cout &lt;&lt; nome &lt;&lt; " tirou " &lt;&lt; nota &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra csv.cpp -o csv
+$ cat notas.csv
+Ana,9.5
+Bruno,7.0
+Carla,8.25
+$ ./csv &lt; notas.csv
+Ana tirou 9.5
+Bruno tirou 7.0
+Carla tirou 8.25</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;sstream&gt;</dt><dd>Traz os <em>string streams</em>: "fluxos" que leem de (ou escrevem numa) string, em vez do teclado ou da tela.</dd>
+  <dt>std::istringstream partes(linha);</dt><dd>Cria uma entrada (<code>i</code> de <em>input</em>) cujo conteúdo é a <code>linha</code>. Para o <code>getline</code>, ela se comporta igual ao <code>std::cin</code>.</dd>
+  <dt>std::getline(partes, nome, ',')</dt><dd>Lê de <code>partes</code> até a vírgula: <code>Ana</code>. O próximo <code>getline</code> continua dali: <code>9.5</code>.</dd>
+</dl>
+
+<p>As notas chegaram como <strong>texto</strong> (<code>"9.5"</code>). Para fazer contas com elas, converta com <code>std::stod</code>, em <a href="string-numero.html">Texto ↔ Número</a>, que também fala mais do <code>std::stringstream</code>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>O <code>getline</code> não espera e a string fica vazia</strong>
+<p><strong>O que significa:</strong> antes dele houve um <code>std::cin &gt;&gt; …</code>, que deixou o Enter na fila. O <code>getline</code> leu esse Enter como uma linha vazia.</p>
+<p><strong>Como consertar:</strong> <code>std::getline(std::cin &gt;&gt; std::ws, s);</code> ou, logo depois do <code>&gt;&gt;</code>, <code>std::cin.ignore(std::numeric_limits&lt;std::streamsize&gt;::max(), '\n');</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Só a primeira palavra foi guardada</strong>
+<p><strong>O que significa:</strong> a leitura foi feita com <code>std::cin &gt;&gt; s</code>, que para no primeiro espaço. O resto ficou na fila e pode "atropelar" a próxima leitura.</p>
+<p><strong>Como consertar:</strong> use <code>std::getline(std::cin, s)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O último item tem um Enter grudado (<code>[café</code> e <code>]</code> em linhas separadas)</strong>
+<p><strong>O que significa:</strong> você usou <code>getline(…, ',')</code> direto na entrada. Com outro separador, o <code>'\n'</code> vira um caractere comum.</p>
+<p><strong>Como consertar:</strong> leia a linha com o <code>getline</code> normal e separe as vírgulas com <code>std::istringstream</code> (seção 6).</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: no matching function for call to ‘getline(std::istream&amp;, int&amp;)’</code></strong>
+<pre class="file" data-file="getint.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    int idade = 0;
+    std::getline(std::cin, idade);
+    std::cout &lt;&lt; idade &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra getint.cpp -o getint
+getint.cpp: In function ‘int main()’:
+getint.cpp:6:17: error: no matching function for call to ‘getline(std::istream&amp;, int&amp;)’
+    6 |     std::getline(std::cin, idade);
+      |     ~~~~~~~~~~~~^~~~~~~~~~~~~~~~~
+getint.cpp:6:17: note: there are 4 candidates
+In file included from /usr/include/c++/15/string:57,
+                 from /usr/include/c++/15/bits/locale_classes.h:42,
+                 from /usr/include/c++/15/bits/ios_base.h:43,
+                 from /usr/include/c++/15/ios:46,
+                 from /usr/include/c++/15/bits/ostream.h:43,
+                 from /usr/include/c++/15/ostream:42,
+                 from /usr/include/c++/15/iostream:43,
+                 from getint.cpp:1:
+/usr/include/c++/15/bits/basic_string.tcc:938:5: note: candidate 1: ‘template&lt;class _CharT, class _Traits, class _Alloc&gt; std::basic_istream&lt;_CharT, _Traits&gt;&amp; std::getline(basic_istream&lt;_CharT, _Traits&gt;&amp;, __cxx11::basic_string&lt;_CharT, _Traits, _Alloc&gt;&amp;, _CharT)’
+  938 |     getline(basic_istream&lt;_CharT, _Traits&gt;&amp; __in,
+      |     ^~~~~~~
+/usr/include/c++/15/bits/basic_string.tcc:938:5: note: candidate expects 3 arguments, 2 provided
+In file included from /usr/include/c++/15/string:56:
+/usr/include/c++/15/bits/basic_string.h:4405:5: note: candidate 2: ‘template&lt;class _CharT, class _Traits, class _Alloc&gt; std::basic_istream&lt;_CharT, _Traits&gt;&amp; std::getline(basic_istream&lt;_CharT, _Traits&gt;&amp;, __cxx11::basic_string&lt;_CharT, _Traits, _Alloc&gt;&amp;)’
+ 4405 |     getline(basic_istream&lt;_CharT, _Traits&gt;&amp; __is,
+      |     ^~~~~~~
+/usr/include/c++/15/bits/basic_string.h:4405:5: note: template argument deduction/substitution failed:
+getint.cpp:6:17: note:   mismatched types ‘std::__cxx11::basic_string&lt;_CharT, _Traits, _Alloc&gt;’ and ‘int’
+    6 |     std::getline(std::cin, idade);
+      |     ~~~~~~~~~~~~^~~~~~~~~~~~~~~~~
+/usr/include/c++/15/bits/basic_string.h:4413:5: note: candidate 3: ‘template&lt;class _CharT, class _Traits, class _Alloc&gt; std::basic_istream&lt;_CharT, _Traits&gt;&amp; std::getline(basic_istream&lt;_CharT, _Traits&gt;&amp;&amp;, __cxx11::basic_string&lt;_CharT, _Traits, _Alloc&gt;&amp;, _CharT)’
+ 4413 |     getline(basic_istream&lt;_CharT, _Traits&gt;&amp;&amp; __is,
+      |     ^~~~~~~
+/usr/include/c++/15/bits/basic_string.h:4413:5: note: candidate expects 3 arguments, 2 provided
+/usr/include/c++/15/bits/basic_string.h:4420:5: note: candidate 4: ‘template&lt;class _CharT, class _Traits, class _Alloc&gt; std::basic_istream&lt;_CharT, _Traits&gt;&amp; std::getline(basic_istream&lt;_CharT, _Traits&gt;&amp;&amp;, __cxx11::basic_string&lt;_CharT, _Traits, _Alloc&gt;&amp;)’
+ 4420 |     getline(basic_istream&lt;_CharT, _Traits&gt;&amp;&amp; __is,
+      |     ^~~~~~~
+/usr/include/c++/15/bits/basic_string.h:4420:5: note: template argument deduction/substitution failed:
+getint.cpp:6:17: note:   mismatched types ‘std::__cxx11::basic_string&lt;_CharT, _Traits, _Alloc&gt;’ and ‘int’
+    6 |     std::getline(std::cin, idade);
+      |     ~~~~~~~~~~~~^~~~~~~~~~~~~~~~~</pre>
+<p><strong>O que significa:</strong> a primeira linha já diz tudo: "nenhuma função <code>getline</code> aceita (entrada, <code>int</code>)". O resto são as 4 versões que existem (os "candidatos"), e o motivo de cada uma ter sido recusada. A pista está em <code>mismatched types ‘…basic_string…’ and ‘int’</code>: o <code>getline</code> queria uma string e recebeu um <code>int</code>.</p>
+<p><strong>Como consertar:</strong> o <code>getline</code> só lê para <code>std::string</code>. Para um número, use <code>std::cin &gt;&gt; idade</code>, ou leia uma string e converta com <code>std::stoi</code> (<a href="string-numero.html">Texto ↔ Número</a>).</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>std::getline(std::cin, s);</code></td><td>Lê uma linha inteira (com espaços) para <code>s</code>; descarta o Enter</td></tr>
+<tr><td><code>std::getline(std::cin, s, ',');</code></td><td>Lê até a vírgula (o Enter vira caractere comum)</td></tr>
+<tr><td><code>std::getline(std::cin &gt;&gt; std::ws, s);</code></td><td>Pula espaços e Enters que sobraram, depois lê a linha</td></tr>
+<tr><td><code>std::cin.ignore();</code></td><td>Descarta 1 caractere da entrada</td></tr>
+<tr><td><code>std::cin.ignore(std::numeric_limits&lt;std::streamsize&gt;::max(), '\n');</code></td><td>Descarta até o fim da linha (<code>&lt;limits&gt;</code>)</td></tr>
+<tr><td><code>while (std::getline(std::cin, s)) { … }</code></td><td>Lê todas as linhas até o fim da entrada</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd> (Linux/macOS), <kbd>Ctrl</kbd>+<kbd>Z</kbd> <kbd>Enter</kbd> (Windows)</td><td>Fim da entrada pelo teclado</td></tr>
+<tr><td><code>std::istringstream p(linha);</code></td><td>Uma entrada que lê de uma string (<code>&lt;sstream&gt;</code>)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Ler a frase</h3>
+<p>Complete para ler uma linha inteira do teclado para a string <code>frase</code>:</p>
+<div class="ex-code">std::<input data-answer="getline" aria-label="função">(std::cin, frase);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Pular a sobra</h3>
+<p>Complete para o <code>getline</code> pular os espaços e Enters que o <code>&gt;&gt;</code> deixou:</p>
+<div class="ex-code">std::getline(std::cin &gt;&gt; std::<input data-answer="ws" aria-label="manipulador">, nome);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Separador</h3>
+<p>Complete para ler um item até o próximo ponto e vírgula:</p>
+<div class="ex-code">std::getline(std::cin, item, <input data-answer="';'" aria-label="separador">);</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. A pessoa digita <code>  Bom dia  </code> (com dois espaços antes e dois depois) e <kbd>Enter</kbd>. Quanto vale <code>s.size()</code> depois de <code>std::getline(std::cin, s)</code>?</p>
+<label><input type="radio" name="q4"> 6</label>
+<label><input type="radio" name="q4"> 3</label>
+<label><input type="radio" name="q4"> 11</label>
+<label><input type="radio" name="q4"> 12, contando o Enter</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Num programa com <code>std::cin &gt;&gt; n;</code> seguido de <code>std::getline(std::cin, s);</code>, a pessoa digita <code>5</code> e <kbd>Enter</kbd>. O que acontece?</p>
+<label><input type="radio" name="q5"> <code>s</code> fica vazia na hora, sem esperar a pessoa digitar</label>
+<label><input type="radio" name="q5"> <code>s</code> fica <code>"5"</code></label>
+<label><input type="radio" name="q5"> Erro de compilação</label>
+<label><input type="radio" name="q5"> O programa espera a próxima linha normalmente</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">6. Como o <code>while (std::getline(std::cin, linha))</code> termina quando a entrada vem do teclado?</p>
+<label><input type="radio" name="q6"> Quando a pessoa digita uma linha vazia</label>
+<label><input type="radio" name="q6"> Quando a pessoa aperta <kbd>Ctrl</kbd>+<kbd>D</kbd> (fim da entrada)</label>
+<label><input type="radio" name="q6"> Depois de 100 linhas</label>
+<label><input type="radio" name="q6"> Nunca termina</label>
+</div>
+
+<h3>Missão final: o cadastro que pulava o nome</h3>
+
+<div class="trycpp" data-stdin="30&#10;Ana Maria Souza&#10;" data-goal="out:Ana Maria Souza tem 30 anos,src:getline\s*\(">
+<p class="try-task"><strong>Missão:</strong> o cadastro lê a idade e depois o nome completo, mas o nome sai vazio (é o bug da seção 3). Conserte com uma das formas da seção 4, para mostrar <code>Ana Maria Souza tem 30 anos</code>. A entrada é <code>30</code> numa linha e <code>Ana Maria Souza</code> na outra.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    int idade = 0;
+    std::string nome;
+    std::cout &lt;&lt; "Idade: ";
+    std::cin &gt;&gt; idade;
+    std::cout &lt;&lt; "Nome completo: ";
+    std::getline(std::cin, nome);
+    std::cout &lt;&lt; '\n' &lt;&lt; nome &lt;&lt; " tem " &lt;&lt; idade &lt;&lt; " anos\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    int idade = 0;
+    std::string nome;
+    std::cout &lt;&lt; "Idade: ";
+    std::cin &gt;&gt; idade;
+    std::cout &lt;&lt; "Nome completo: ";
+    std::getline(std::cin &gt;&gt; std::ws, nome);
+    std::cout &lt;&lt; '\n' &lt;&lt; nome &lt;&lt; " tem " &lt;&lt; idade &lt;&lt; " anos\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>std::cin &gt;&gt; s</code> lê <strong>uma palavra</strong>; <code>std::getline(std::cin, s)</code> lê <strong>a linha inteira</strong>, com espaços, e descarta o Enter.</li>
+  <li>Depois de um <code>&gt;&gt;</code>, o Enter fica na fila, e o <code>getline</code> seguinte lê uma linha vazia. Conserte com <code>std::getline(std::cin &gt;&gt; std::ws, s)</code> ou <code>std::cin.ignore(std::numeric_limits&lt;std::streamsize&gt;::max(), '\n')</code>.</li>
+  <li><code>while (std::getline(std::cin, linha))</code> lê até o fim da entrada: <kbd>Ctrl</kbd>+<kbd>D</kbd> no teclado, ou o fim de um arquivo redirecionado com <code>&lt;</code>.</li>
+  <li><code>getline(…, ',')</code> usa outro separador, mas o Enter vira caractere comum. Para CSV, leia a linha e separe com <code>std::istringstream</code>.</li>
+  <li><code>getline</code> só lê para <code>std::string</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
