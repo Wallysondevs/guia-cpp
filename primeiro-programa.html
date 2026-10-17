@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Olá, Mundo — o primeiro programa linha por linha | Guia C++</title>
+<meta name="description" content="O primeiro programa em C++ para quem nunca programou: o Olá, mundo explicado linha por linha (#include, int main, chaves, std::cout, <<, aspas, \n, ponto e vírgula, return 0), criar o arquivo, compilar com g++ ola.cpp -o ola, rodar com ./ola, o a.out e os erros mais comuns, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Olá, Mundo</span></h1>
+
+<p class="intro">Chegou a hora de escrever o seu primeiro programa. Ele é pequeno: só mostra a frase <code>Olá, mundo!</code> na tela. Mas, para chegar até ela, você vai passar por todo o caminho que qualquer programa em C++ percorre: <strong>escrever</strong> o código num arquivo, <strong>compilar</strong> (transformar o texto em programa) e <strong>rodar</strong>. Nesta aula você entende cada pedacinho das cinco linhas do programa, sem pular nenhum símbolo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Criar a pasta e o arquivo <code>ola.cpp</code>.</li>
+  <li>O que faz cada parte do Olá, mundo: <code>#include &lt;iostream&gt;</code>, <code>int main()</code>, <code>{ }</code>, <code>std::cout</code>, <code>&lt;&lt;</code>, as aspas, o <code>\n</code> e o <code>;</code>.</li>
+  <li>Compilar com <code>g++ ola.cpp -o ola</code> e rodar com <code>./ola</code>.</li>
+  <li>Por que precisa do <code>./</code> na frente do nome.</li>
+  <li>O que é o arquivo <code>a.out</code>, que aparece quando você esquece o <code>-o</code>.</li>
+  <li>O que o <code>return 0;</code> faz e por que ele é opcional no <code>main</code>.</li>
+  <li>Os primeiros erros que todo mundo comete, com a mensagem real.</li>
+</ul>
+</div>
+
+<p>Todos os comandos desta aula foram executados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), com o <strong>g++ 15.2</strong> do Ubuntu 26.04, numa pasta chamada <code>~/cpp</code>. As saídas foram copiadas da tela, sem mudar nada. Se você ainda não instalou o compilador, volte para <a href="instalar-linux.html">Instalar no Linux</a> (ou <a href="instalar-windows-mac.html">Windows e macOS</a>). Se ainda não tem, você também pode fazer tudo no editor do guia, que roda C++ de verdade no navegador (<a href="simulador.html">O Editor do Guia</a>).</p>
+
+<hr>
+
+<h2>A ideia: a receita e o bolo</h2>
+<p>Pense numa receita de bolo escrita num papel. O papel não é o bolo: alguém precisa ler a receita e <strong>fazer</strong> o bolo. Em C++ é igual:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na cozinha</th><th>Em C++</th><th>Nesta aula</th></tr>
+<tr><td>A receita no papel</td><td>O <strong>código-fonte</strong>: um arquivo de texto que você escreve</td><td><code>ola.cpp</code></td></tr>
+<tr><td>A cozinheira que lê a receita e faz o bolo</td><td>O <strong>compilador</strong></td><td><code>g++</code></td></tr>
+<tr><td>O bolo pronto</td><td>O <strong>programa executável</strong>, que o computador sabe rodar</td><td><code>ola</code></td></tr>
+<tr><td>Comer o bolo</td><td><strong>Rodar</strong> o programa</td><td><code>./ola</code></td></tr>
+</table>
+</div>
+
+<p>Depois que o bolo está pronto, você pode comê-lo sem a receita. E se mudar a receita, precisa fazer outro bolo. Guarde essa ideia: ela explica quase todos os tropeços do começo. O caminho completo, com pré-processador, compilador e ligador, está em <a href="como-funciona.html">Como o C++ Vira Programa</a>; aqui você só precisa dos três passos: <strong>escrever, compilar, rodar</strong>.</p>
+
+<hr>
+
+<h2>1. Criar a pasta e o arquivo</h2>
+<p>Comece criando uma pasta só para os seus programas, para eles não se misturarem com fotos e documentos. No terminal:</p>
+
+<pre class="term">$ mkdir cpp              « cria a pasta "cpp" dentro da sua pasta pessoal
+$ cd cpp                 « entra nela</pre>
+
+<p>Os dois comandos não mostram nada quando dão certo: o terminal só volta a mostrar o prompt, agora com <code>~/cpp</code> no fim. (<code>mkdir</code> e <code>cd</code> são comandos do terminal, não do C++. Eles são explicados no Guia Bash.)</p>
+
+<p>Agora abra o seu editor de código (o VS Code, o Kate, o gedit ou o nano, veja <a href="editores.html">Editores e IDEs</a>), crie um arquivo novo, digite o programa abaixo e salve com o nome <strong><code>ola.cpp</code></strong>, dentro da pasta <code>cpp</code>:</p>
+
+<pre class="file" data-file="ola.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!\n";
+}
+</pre>
+
+<p>Três cuidados ao salvar:</p>
+<ul>
+  <li><strong>A extensão é <code>.cpp</code></strong> (de "C plus plus"). Ela diz ao compilador e ao editor que o arquivo é C++. Você também vai ver <code>.cc</code> e <code>.cxx</code> em projetos de outras pessoas; o guia usa sempre <code>.cpp</code>.</li>
+  <li><strong>Sem espaços e sem acentos no nome</strong>: <code>ola.cpp</code>, e não <code>olá mundo.cpp</code>. Funciona com espaços, mas você teria de usar aspas em todo comando.</li>
+  <li><strong>Digite, não copie e cole</strong>, pelo menos desta vez. Digitar faz você reparar em cada símbolo, e os símbolos importam.</li>
+</ul>
+
+<p>Para conferir que o arquivo está na pasta certa e com o conteúdo certo, use <code>ls</code> (lista os arquivos) e <code>cat</code> (mostra o conteúdo):</p>
+
+<pre class="term" data-cwd="~/cpp">$ ls
+ola.cpp
+$ cat ola.cpp
+#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!\n";
+}</pre>
+
+<hr>
+
+<h2>2. O programa, linha por linha</h2>
+<p>São cinco linhas, e cada símbolo tem uma função. Leia com calma; não precisa decorar nada agora, porque você vai escrever essas linhas tantas vezes que elas vão grudar sozinhas.</p>
+
+<h3>Linha 1: <code>#include &lt;iostream&gt;</code></h3>
+<p>O C++ "puro" sabe muito pouco: ele nem sabe mostrar texto na tela. Essa parte fica na <strong>biblioteca padrão</strong>, um conjunto enorme de ferramentas prontas que vem junto com o compilador e está dividida em arquivos chamados <strong>cabeçalhos</strong> (<em>headers</em>). A linha 1 pede: "antes de compilar, cole aqui o cabeçalho <code>iostream</code>".</p>
+
+<dl class="anatomy">
+  <dt>#include</dt><dd>O <code>#</code> marca uma instrução para o <strong>pré-processador</strong>, um ajudante que prepara o arquivo antes do compilador. <code>include</code> = "incluir": copia o conteúdo de outro arquivo para dentro deste, naquele ponto. Linhas com <code>#</code> não terminam com <code>;</code>. (O pré-processador tem aula própria: <a href="preprocessador.html">O Pré-processador</a>.)</dd>
+  <dt>&lt;iostream&gt;</dt><dd>O nome do cabeçalho. <code>iostream</code> vem de <em>input/output stream</em>, "fluxo de entrada e saída", e traz o <code>std::cout</code> (saída na tela) e o <code>std::cin</code> (leitura do teclado, aula <a href="entrada-cin.html">Entrada com cin</a>). Os sinais <code>&lt; &gt;</code> funcionam como "parênteses pontudos": dizem "procure este arquivo nas pastas do sistema", onde fica a biblioteca padrão.</dd>
+</dl>
+
+<h3>Linha 2: a linha em branco</h3>
+<p>Não faz nada. Ela só separa o "material que eu trouxe" do "programa", para ficar mais fácil de ler. O compilador ignora linhas em branco (mais sobre isso em <a href="sintaxe.html">Sintaxe</a>).</p>
+
+<h3>Linha 3: <code>int main() {</code></h3>
+<p>Aqui começa o programa de verdade. Todo programa em C++ tem uma <strong>função</strong> chamada <code>main</code> ("principal"). Uma função é um bloco de instruções com nome. Quando você roda o programa, o sistema procura a <code>main</code> e executa o que está dentro dela, de cima para baixo. Sem <code>main</code>, não existe programa.</p>
+
+<dl class="anatomy">
+  <dt>int</dt><dd>De <em>integer</em>, "inteiro". Diz que a <code>main</code>, quando terminar, entrega um número inteiro ao sistema: o <strong>código de saída</strong>, que avisa se o programa deu certo. Você vai vê-lo na seção 6.</dd>
+  <dt>main</dt><dd>O nome da função. Tem de ser exatamente <code>main</code>, tudo em minúsculas: <code>Main</code> ou <code>MAIN</code> não servem (a aula <a href="sintaxe.html">Sintaxe</a> mostra o erro).</dd>
+  <dt>()</dt><dd>Os parênteses guardam o que a função recebe. Vazios = "esta <code>main</code> não recebe nada". Em <a href="funcoes.html">Funções</a> você vai colocar coisas aí dentro.</dd>
+  <dt>{</dt><dd>A <strong>chave de abertura</strong>: "aqui começa o corpo da <code>main</code>". Tudo até a chave de fechamento <code>}</code> correspondente pertence a ela.</dd>
+</dl>
+
+<h3>Linha 4: <code>std::cout &lt;&lt; "Olá, mundo!\n";</code></h3>
+<p>Esta é a única linha que <strong>faz</strong> alguma coisa: manda o texto para a tela. Ela tem recuo (quatro espaços no começo) porque está <em>dentro</em> da <code>main</code>. O recuo não é obrigatório, mas ajuda muito a ler.</p>
+
+<dl class="anatomy">
+  <dt>std::cout</dt><dd><code>cout</code> vem de <em>character output</em>, "saída de caracteres", e representa a tela (mais exatamente, a saída do terminal). Pronuncia-se "si-áut". <code>std</code> (de <em>standard</em>, "padrão") é o sobrenome de tudo o que vem da biblioteca padrão: os nomes dela moram num "bairro" chamado <code>std</code> (um <strong>namespace</strong>, aula <a href="namespaces.html">Namespaces</a>). Os dois-pontos duplos <code>::</code> querem dizer "o que está dentro de": <code>std::cout</code> se lê "o <code>cout</code> do <code>std</code>".</dd>
+  <dt>&lt;&lt;</dt><dd>O <strong>operador de saída</strong>. Pense numa seta mostrando o caminho: o texto vai <strong>para dentro</strong> do <code>cout</code>. Dá para encadear vários: <code>std::cout &lt;&lt; "a" &lt;&lt; "b"</code> (aula <a href="saida-cout.html">Saída com cout</a>).</dd>
+  <dt>"Olá, mundo!\n"</dt><dd>O texto, entre <strong>aspas duplas</strong>. As aspas dizem ao compilador "isto é texto para mostrar, não é código", e não aparecem na tela. Um texto entre aspas se chama <strong>string</strong> (aula <a href="strings.html">Strings</a>). No fim dele, o <code>\n</code> (barra invertida + <code>n</code>, de <em>new line</em>) é a <strong>quebra de linha</strong>: não aparece como "\n" na tela, faz o cursor pular para a linha de baixo. Sem ele, o prompt do terminal gruda no seu texto (aula <a href="novas-linhas.html">Novas Linhas</a>).</dd>
+  <dt>;</dt><dd>O <strong>ponto e vírgula</strong> termina a instrução, como o ponto final de uma frase. Esquecê-lo é o erro número um de quem começa, e você vai vê-lo no fim desta aula.</dd>
+</dl>
+
+<h3>Linha 5: <code>}</code></h3>
+<p>A <strong>chave de fechamento</strong>: "acabou a <code>main</code>". Quando o programa chega aqui, ele termina. Toda <code>{</code> precisa de uma <code>}</code>, como parênteses numa conta.</p>
+
+<div class="tip">
+<strong>Teclas difíceis no teclado brasileiro (ABNT2)</strong>
+<p><code>{</code> e <code>}</code>: <kbd>AltGr</kbd> + <kbd>7</kbd> e <kbd>AltGr</kbd> + <kbd>0</kbd>, ou a tecla ao lado do <kbd>P</kbd>/<kbd>Ç</kbd> com <kbd>Shift</kbd>. <code>&lt;</code> e <code>&gt;</code>: a tecla ao lado do <kbd>Z</kbd> (com e sem <kbd>Shift</kbd>) ou <kbd>Shift</kbd> + vírgula/ponto. <code>\</code>: a tecla ao lado do <kbd>Z</kbd> no teclado ABNT2 ou acima do <kbd>Enter</kbd> no padrão americano. <code>#</code>: <kbd>Shift</kbd> + <kbd>3</kbd>.</p>
+</div>
+
+<hr>
+
+<h2>3. Compilar: de texto para programa</h2>
+<p>O arquivo <code>ola.cpp</code> é só texto. O computador não sabe rodá-lo. Quem transforma o texto em programa é o compilador <code>g++</code> (o compilador de C++ do projeto GNU):</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ ola.cpp -o ola
+$                        « nada! no mundo dos compiladores, silêncio = deu certo</pre>
+
+<p>O <code>g++</code> não diz "pronto" nem "sucesso". Se ele não reclamou, compilou. Repare que agora há um arquivo novo na pasta:</p>
+
+<pre class="term" data-cwd="~/cpp">$ ls
+ola  ola.cpp             « "ola" é o programa (no terminal, ele aparece em verde: é executável)</pre>
+
+<dl class="anatomy">
+  <dt>g++</dt><dd>O compilador.</dd>
+  <dt>ola.cpp</dt><dd>O arquivo de código que ele vai ler (a receita).</dd>
+  <dt>-o ola</dt><dd><code>-o</code> de <em>output</em>, "saída": o nome do programa que ele vai criar (o bolo). Pode ser qualquer nome; usar o mesmo nome do arquivo, sem o <code>.cpp</code>, é o costume.</dd>
+</dl>
+
+<p>Este é o comando <strong>mínimo</strong>. Na próxima aula, <a href="compilar.html">Compilar com g++</a>, você vai acrescentar opções que ativam o C++ moderno e fazem o compilador avisar sobre erros prováveis, e a partir dela o guia usa sempre o comando completo: <code>g++ -std=c++23 -Wall -Wextra ola.cpp -o ola</code>.</p>
+
+<hr>
+
+<h2>4. Rodar o programa</h2>
+<p>Para rodar um programa que está na pasta atual, escreva <code>./</code> e o nome dele:</p>
+
+<pre class="term" data-cwd="~/cpp">$ ./ola
+Olá, mundo!</pre>
+
+<p>Pronto: esse é o seu primeiro programa em C++ funcionando. As aspas não apareceram, o <code>\n</code> virou uma quebra de linha e o prompt voltou na linha de baixo, como deveria.</p>
+
+<h3>Por que <code>./</code>?</h3>
+<p>Quando você digita um nome solto, como <code>ls</code> ou <code>g++</code>, o terminal procura o programa numa lista fixa de pastas do sistema (a variável <code>PATH</code>). A sua pasta <code>~/cpp</code> não está nessa lista, por segurança. O <code>.</code> quer dizer "a pasta onde estou agora" e a <code>/</code> separa a pasta do arquivo. Então <code>./ola</code> é "o programa <code>ola</code> que está <strong>aqui</strong>". Sem o <code>./</code>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ ola
+bash: ola: comando não encontrado</pre>
+
+<p>O terminal procurou um comando <code>ola</code> nas pastas do sistema e não achou. Não é um erro do C++: o programa está lá, só faltou dizer onde.</p>
+
+<p>Agora é a sua vez. O editor abaixo compila e roda C++ de verdade no navegador (a primeira vez demora alguns segundos, porque ele baixa o compilador). Ele faz os passos 3 e 4 de uma vez quando você clica em <strong>Rodar</strong>.</p>
+
+<div class="trycpp" data-goal="out:Olá\, Ana!">
+<p class="try-task"><strong>Missão:</strong> rode o programa como está. Depois troque <code>mundo</code> pelo nome <code>Ana</code>, de modo que a saída seja <code>Olá, Ana!</code>, e rode de novo. Mexa só no que está entre as aspas.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, Ana!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>5. Sem o <code>-o</code>: o famoso <code>a.out</code></h2>
+<p>O <code>-o ola</code> é opcional. Se você não disser o nome do programa, o <code>g++</code> escolhe um sozinho: <strong><code>a.out</code></strong>.</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ ola.cpp
+$ ls
+a.out  ola  ola.cpp      « apareceu o a.out
+$ ./a.out
+Olá, mundo!</pre>
+
+<p>O <code>a.out</code> é um programa igualzinho ao <code>ola</code>, só com outro nome. Os dois têm até o mesmo tamanho:</p>
+
+<pre class="term" data-cwd="~/cpp">$ ls -l
+total 36
+-rwxrwxr-x 1 ana ana 16120 out 16 21:40 a.out
+-rwxrwxr-x 1 ana ana 16120 out 16 21:40 ola
+-rw-rw-r-- 1 ana ana    71 out 16 21:40 ola.cpp</pre>
+
+<p>Repare nos tamanhos: as 5 linhas de texto ocupam 71 bytes; o programa pronto, 16120 bytes (cerca de 16 KB). Ele contém o código traduzido para a linguagem do processador e as informações que o sistema precisa para carregá-lo. E o <code>x</code> em <code>-rwxrwxr-x</code> quer dizer "executável": o <code>g++</code> já cria o programa com permissão para rodar.</p>
+
+<div class="note">
+<strong>Por que "a.out"?</strong>
+<p>É um nome histórico, dos primeiros sistemas Unix dos anos 1970: <em>assembler output</em>, "saída do montador". O nome ficou até hoje. O problema do <code>a.out</code> é que <strong>cada compilação sem <code>-o</code> sobrescreve o anterior</strong>: se você compilar dois programas diferentes sem <code>-o</code>, só o último sobra. Por isso, o guia sempre usa <code>-o nome</code>.</p>
+</div>
+
+<hr>
+
+<h2>6. O <code>return 0;</code> e o código de saída</h2>
+<p>Em muitos livros e sites, o Olá, mundo tem uma linha a mais:</p>
+
+<pre class="file" data-file="ola.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!\n";
+    return 0;
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>return</dt><dd>"Devolver". Termina a função e entrega um valor para quem a chamou. No caso da <code>main</code>, quem chamou foi o sistema operacional.</dd>
+  <dt>0</dt><dd>O valor entregue: o <strong>código de saída</strong>. Por convenção, <code>0</code> = "terminei sem problemas"; qualquer outro número = "algo deu errado" (cada programa escolhe o que cada número significa).</dd>
+  <dt>;</dt><dd>Como toda instrução, termina com ponto e vírgula.</dd>
+</dl>
+
+<p>No terminal, o código de saída do último programa fica guardado em <code>$?</code>. Veja com <code>echo</code>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ ./ola
+Olá, mundo!
+$ echo $?
+0</pre>
+
+<p>Deu <code>0</code>, mesmo sem o <code>return 0;</code> no nosso <code>ola.cpp</code>. Isso porque a <code>main</code> tem uma regra especial: <strong>se ela chegar ao <code>}</code> final sem <code>return</code>, o C++ age como se lá estivesse <code>return 0;</code></strong>. Só a <code>main</code> tem essa regra; nas outras funções, esquecer o <code>return</code> é um problema sério (aula <a href="retorno.html">Retorno</a>).</p>
+
+<p>Para ver que o número chega mesmo ao sistema, devolva outro valor:</p>
+
+<pre class="file" data-file="saida3.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Saindo com 3\n";
+    return 3;
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ saida3.cpp -o saida3
+$ ./saida3
+Saindo com 3
+$ echo $?
+3                        « o 3 do return chegou ao terminal</pre>
+
+<p>Para que serve isso? Scripts e outros programas usam o código de saída para saber se o seu programa deu certo. O próprio <code>g++</code> faz isso: quando a compilação falha, ele sai com o código <code>1</code>.</p>
+
+<div class="tip">
+<strong>Com ou sem <code>return 0;</code>?</strong>
+<p>Os dois estão certos. Este guia <strong>omite</strong> o <code>return 0;</code> na <code>main</code> quando o programa sempre termina bem, para os exemplos ficarem mais curtos, e usa <code>return</code> quando o valor importa. Em código de outras pessoas, você vai ver as duas formas. O editor do guia mostra o código de saída embaixo da saída do programa.</p>
+</div>
+
+<hr>
+
+<h2>7. Mostrar mais de uma linha</h2>
+<p>A <code>main</code> pode ter quantas instruções você quiser. Elas rodam uma depois da outra, de cima para baixo, cada uma terminada com <code>;</code>:</p>
+
+<pre class="file" data-file="apresentacao.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá! Eu sou a Ana.\n";
+    std::cout &lt;&lt; "Estou aprendendo C++.\n";
+    std::cout &lt;&lt; "Este é o meu primeiro programa.\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ apresentacao.cpp -o apresentacao
+$ ./apresentacao
+Olá! Eu sou a Ana.
+Estou aprendendo C++.
+Este é o meu primeiro programa.</pre>
+
+<p>Cada <code>\n</code> fecha uma linha. O que acontece se tirar um deles, e outras formas de quebrar linha, estão em <a href="novas-linhas.html">Novas Linhas</a>. Juntar texto e números numa mesma instrução (<code>&lt;&lt; "Idade: " &lt;&lt; 29</code>) está em <a href="saida-cout.html">Saída com cout</a>.</p>
+
+<h3>Outras formas de escrever o Olá, mundo</h3>
+<p>Você vai encontrar o mesmo programa escrito de jeitos diferentes. Todos funcionam:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Onde aparece</th><th>Aula</th></tr>
+<tr><td><code>std::cout &lt;&lt; "Olá, mundo!\n";</code></td><td>A forma deste guia nas primeiras aulas. Funciona em qualquer versão do C++.</td><td>Esta</td></tr>
+<tr><td><code>std::cout &lt;&lt; "Olá, mundo!" &lt;&lt; std::endl;</code></td><td>Muito comum em livros e cursos. O <code>std::endl</code> quebra a linha e "despeja" a saída na hora.</td><td><a href="novas-linhas.html">Novas Linhas</a></td></tr>
+<tr><td><code>using namespace std;</code> + <code>cout &lt;&lt; …</code></td><td>Sites de exercícios e código antigo. Evita escrever <code>std::</code>, com riscos.</td><td><a href="sintaxe.html">Sintaxe</a></td></tr>
+<tr><td><code>#include &lt;print&gt;</code> + <code>std::println("Olá, mundo!");</code> <span class="versao">C++23</span></td><td>O jeito mais novo. Precisa compilar com <code>-std=c++23</code>.</td><td><a href="compilar.html">Compilar</a> e <a href="format-print.html">std::print</a></td></tr>
+</table>
+</div>
+
+<p><strong>Qual usar?</strong> Por enquanto, a primeira. O <code>std::cout</code> aparece em praticamente todo código C++ que existe, então você precisa conhecê-lo bem. O <code>std::println</code> chega mais tarde no guia, quando você já souber formatar valores.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+<p>Errar faz parte. Um erro de compilação <strong>não estraga nada</strong>: o <code>g++</code> só se recusa a criar o programa até você consertar. Estes são os tropeços mais comuns da primeira vez.</p>
+
+<div class="cenario">
+<strong><code>bash: ola: comando não encontrado</code></strong>
+<pre class="term" data-cwd="~/cpp">$ ola
+bash: ola: comando não encontrado</pre>
+<p><strong>O que significa:</strong> faltou o <code>./</code>. O terminal procurou <code>ola</code> nas pastas do sistema.</p>
+<p><strong>Como consertar:</strong> <code>./ola</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>bash: ./ola: Arquivo ou diretório inexistente</code></strong>
+<pre class="term" data-cwd="~/cpp">$ ./ola
+bash: ./ola: Arquivo ou diretório inexistente</pre>
+<p><strong>O que significa:</strong> não existe nenhum programa <code>ola</code> nesta pasta. Ou você ainda não compilou, ou a compilação falhou (e, quando falha, o <code>g++</code> não cria o programa), ou você está em outra pasta.</p>
+<p><strong>Como consertar:</strong> rode <code>ls</code> para ver o que há na pasta. Se o <code>ola.cpp</code> está lá, compile (<code>g++ ola.cpp -o ola</code>) e leia se apareceu algum erro. Se nem o <code>ola.cpp</code> aparece, entre na pasta certa com <code>cd ~/cpp</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>fatal error: ole.cpp: Arquivo ou diretório inexistente</code></strong>
+<pre class="term" data-cwd="~/cpp">$ g++ ole.cpp -o ola
+cc1plus: fatal error: ole.cpp: Arquivo ou diretório inexistente
+compilation terminated.</pre>
+<p><strong>O que significa:</strong> o nome do arquivo de código está errado (aqui, <code>ole</code> em vez de <code>ola</code>), ou ele foi salvo em outra pasta, ou com outra extensão (<code>ola.cpp.txt</code>, <code>ola.txt</code>). <em>Fatal error</em> = "erro fatal"; <em>compilation terminated</em> = "compilação encerrada". O <code>cc1plus</code> é a parte do <code>g++</code> que compila C++ de fato.</p>
+<p><strong>Como consertar:</strong> <code>ls</code> e confira o nome exato. A tecla <kbd>Tab</kbd> completa nomes de arquivo no terminal e evita esse erro.</p>
+</div>
+
+<div class="cenario">
+<strong><code>input file ‘ola.cpp’ is the same as output file</code></strong>
+<pre class="term" data-cwd="~/cpp">$ g++ ola.cpp -o ola.cpp
+g++: fatal error: input file ‘ola.cpp’ is the same as output file
+compilation terminated.</pre>
+<p><strong>O que significa:</strong> "o arquivo de entrada é o mesmo que o de saída". Você pediu para o programa se chamar <code>ola.cpp</code>, o que apagaria o seu código. O <code>g++</code> 15 se recusa, e isso salvou o seu arquivo.</p>
+<p><strong>Como consertar:</strong> o nome depois do <code>-o</code> é o do programa, <strong>sem</strong> <code>.cpp</code>: <code>g++ ola.cpp -o ola</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: expected ‘;’ before ‘}’ token</code></strong>
+<pre class="file" data-file="semponto.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!\n"
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ semponto.cpp -o semponto
+semponto.cpp: In function ‘int main()’:
+semponto.cpp:4:33: error: expected ‘;’ before ‘}’ token
+    4 |     std::cout &lt;&lt; "Olá, mundo!\n"
+      |                                 ^
+      |                                 ;
+    5 | }
+      | ~                                </pre>
+<p><strong>O que significa:</strong> "esperava <code>;</code> antes do <code>}</code>". Faltou o ponto e vírgula no fim da linha 4. A mensagem diz o arquivo (<code>semponto.cpp</code>), a linha (<code>4</code>) e a coluna (<code>33</code>), e o <code>g++</code> até desenha o <code>;</code> no lugar onde ele deveria estar.</p>
+<p><strong>Como consertar:</strong> coloque o <code>;</code> no fim da linha 4 e compile de novo. Ler mensagens assim, com calma, é o assunto da aula <a href="erros-compilacao.html">Lendo Erros do Compilador</a>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>undefined reference to `main'</code> (ou, em português, <code>referência não definida para "main"</code>)</strong>
+<pre class="term" data-cwd="~/cpp">$ cat semmain.cpp
+#include &lt;iostream&gt;
+$ g++ semmain.cpp -o semmain
+/usr/bin/x86_64-linux-gnu-ld.bfd: /usr/lib/gcc/x86_64-linux-gnu/15/../../../x86_64-linux-gnu/Scrt1.o: na função "_start":
+(.text+0x1b): referência não definida para "main"
+collect2: error: ld returned 1 exit status</pre>
+<p><strong>O que significa:</strong> o arquivo não tem a função <code>main</code> (ou ela foi escrita com outro nome, como <code>Main</code>). Quem reclama aqui não é o compilador, é o <strong>ligador</strong> (<code>ld</code>, de <em>linker</em>), a última etapa, que monta o programa e precisa saber onde ele começa. Repare que essa parte da mensagem saiu em português: o ligador do Ubuntu tem tradução, o <code>g++</code> não. Em inglês ela diz <code>undefined reference to `main'</code>.</p>
+<p><strong>Como consertar:</strong> confira se existe <code>int main() { … }</code>, escrito exatamente assim.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>#include &lt;iostream&gt;</code></td><td>Traz o <code>std::cout</code> (e o <code>std::cin</code>) da biblioteca padrão</td></tr>
+<tr><td><code>int main() { … }</code></td><td>A função principal: o programa começa e termina nela</td></tr>
+<tr><td><code>std::cout &lt;&lt; "texto";</code></td><td>Mostra o texto na tela</td></tr>
+<tr><td><code>\n</code></td><td>Quebra de linha, dentro das aspas</td></tr>
+<tr><td><code>;</code></td><td>Termina uma instrução</td></tr>
+<tr><td><code>return 0;</code></td><td>Termina a <code>main</code> com código de saída 0 (opcional só na <code>main</code>)</td></tr>
+<tr><td><code>g++ ola.cpp -o ola</code></td><td>Compila <code>ola.cpp</code> e cria o programa <code>ola</code></td></tr>
+<tr><td><code>g++ ola.cpp</code></td><td>Compila e cria o programa com o nome <code>a.out</code></td></tr>
+<tr><td><code>./ola</code></td><td>Roda o programa <code>ola</code> da pasta atual</td></tr>
+<tr><td><code>echo $?</code></td><td>Mostra o código de saída do último programa</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O cabeçalho</h3>
+<p>Complete a primeira linha para poder usar o <code>std::cout</code>:</p>
+<div class="ex-code">#include &lt;<input data-answer="iostream" aria-label="cabeçalho">&gt;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Compilar com nome</h3>
+<p>Complete o comando para compilar <code>jogo.cpp</code> e criar o programa <code>jogo</code>:</p>
+<div class="ex-code">g++ jogo.cpp <input data-answer="-o jogo" aria-label="opção e nome"></div>
+</div>
+
+<div class="exercise">
+<h3>3. Rodar</h3>
+<p>O programa <code>jogo</code> está na pasta atual. Que comando o roda?</p>
+<div class="ex-code">$ <input data-answer="./jogo" aria-label="comando"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Você compilou com <code>g++ teste.cpp</code>, sem <code>-o</code>. Como se chama o programa criado?</p>
+<label><input type="radio" name="q4"> <code>teste</code></label>
+<label><input type="radio" name="q4"> <code>a.out</code></label>
+<label><input type="radio" name="q4"> <code>teste.exe</code></label>
+<label><input type="radio" name="q4"> Nenhum: sem <code>-o</code> dá erro</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Qual destas afirmações sobre o <code>return 0;</code> está certa?</p>
+<label><input type="radio" name="q5"> Sem ele, o programa não compila</label>
+<label><input type="radio" name="q5"> Ele mostra o número 0 na tela</label>
+<label><input type="radio" name="q5"> Na <code>main</code> ele é opcional: sem ele, o código de saída é 0 do mesmo jeito</label>
+<label><input type="radio" name="q5"> Ele apaga o programa depois de rodar</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. O que o <code>\n</code> faz em <code>"Olá, mundo!\n"</code>?</p>
+<label><input type="radio" name="q6"> Pula para a linha de baixo depois do texto</label>
+<label><input type="radio" name="q6"> Mostra as letras <code>\n</code> na tela</label>
+<label><input type="radio" name="q6"> Termina a instrução, como o <code>;</code></label>
+<label><input type="radio" name="q6"> Fecha as aspas</label>
+</div>
+
+<h3>Missão final: o cartão de visita</h3>
+
+<div class="trycpp" data-goal="out:Ana Souza,out:Programadora C++,out:Recife - PE,semaviso">
+<p class="try-task"><strong>Missão:</strong> escreva um programa completo, do <code>#include</code> à <code>}</code>, que mostre o cartão de visita da Ana em três linhas:</p>
+<pre class="out">Ana Souza
+Programadora C++
+Recife - PE</pre>
+<p class="try-task">Use um <code>std::cout</code> para cada linha. Se o compilador reclamar, leia a linha e a coluna da mensagem.</p>
+<pre class="script">// escreva o programa inteiro aqui
+
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Ana Souza\n";
+    std::cout &lt;&lt; "Programadora C++\n";
+    std::cout &lt;&lt; "Recife - PE\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Programar em C++ tem três passos: <strong>escrever</strong> o código (<code>ola.cpp</code>), <strong>compilar</strong> (<code>g++ ola.cpp -o ola</code>) e <strong>rodar</strong> (<code>./ola</code>).</li>
+  <li><code>#include &lt;iostream&gt;</code> traz o <code>std::cout</code>; <code>int main() { … }</code> é onde o programa começa; <code>std::cout &lt;&lt; "…";</code> mostra texto; <code>\n</code> quebra a linha; <code>;</code> termina a instrução.</li>
+  <li>O <code>g++</code> não diz nada quando dá certo. Silêncio = compilou.</li>
+  <li>Programas da pasta atual rodam com <code>./</code> na frente.</li>
+  <li>Sem <code>-o</code>, o programa se chama <code>a.out</code>, e cada compilação sobrescreve o anterior.</li>
+  <li><code>return 0;</code> é opcional só na <code>main</code>. O código de saída aparece com <code>echo $?</code>.</li>
+  <li>Próximo passo: <a href="compilar.html">Compilar com g++</a>, onde você aprende o comando completo que o guia usa daqui para a frente.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
