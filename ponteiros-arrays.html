@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Ponteiros e Arrays — aritmética de ponteiros e std::span | Guia C++</title>
+<meta name="description" content="Ponteiros e arrays em C++ para quem nunca programou: o nome do array vira ponteiro, aritmética de ponteiros (p + 1 anda sizeof(int) bytes), percorrer um array com ponteiro, por que o array perde o tamanho ao entrar numa função (-Wsizeof-array-argument) e std::span do C++20, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Ponteiros e Arrays</span></h1>
+
+<p class="intro">Arrays e ponteiros são parentes muito próximos, e entender esse parentesco explica várias coisas estranhas do C++: por que <code>notas[2]</code> funciona, por que um array "esquece" o tamanho quando entra numa função e por que o C++ moderno criou o <code>std::span</code>. A base de tudo você já viu em <a href="memoria.html">Como a Memória Funciona</a>: os itens de um array moram <strong>colados</strong>, um depois do outro, como casas vizinhas numa rua.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que o nome de um array, sozinho, vira o endereço do primeiro item.</li>
+  <li>A <strong>aritmética de ponteiros</strong>: <code>p + 1</code> anda um <strong>item</strong>, não um byte.</li>
+  <li>Que <code>notas[i]</code> é só um jeito curto de escrever <code>*(notas + i)</code>.</li>
+  <li>Como percorrer um array com um ponteiro.</li>
+  <li>Por que, dentro de uma função, <code>sizeof</code> de um array dá 8 (e o aviso <code>-Wsizeof-array-argument</code>).</li>
+  <li>O <code>std::span</code> <span class="versao">C++20</span>, que resolve esse problema.</li>
+</ul>
+</div>
+
+<p>Antes, leia <a href="ponteiros.html">Ponteiros</a> e <a href="arrays.html">Arrays</a>. Os programas foram compilados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>, Linux de 64 bits), na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Os endereços mudam a cada execução; o que importa é a <strong>diferença</strong> entre eles.</p>
+
+<hr>
+
+<h2>A ideia: casas numa rua, sem buracos</h2>
+<p>Imagine um conjunto de quatro casas iguais, lado a lado, numa rua. Para chegar a qualquer uma delas, basta saber onde fica a <strong>primeira</strong> e quantas casas andar: "a primeira é a 52; a terceira fica duas casas depois". Um array é isso. E um ponteiro que aponta para a primeira casa pode <strong>andar</strong> pela rua, de casa em casa.</p>
+
+<hr>
+
+<h2>1. O nome do array vira ponteiro</h2>
+<p>Quando você usa o nome de um array numa expressão, ele quase sempre se transforma, sozinho, no <strong>endereço do primeiro item</strong>. Por isso dá para criar um ponteiro sem escrever <code>&amp;</code>:</p>
+
+<pre class="file" data-file="nome.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int notas[4] = {7, 8, 6, 9};
+    int* p = notas;              // sem &amp;: o nome do array vira o endereço do 1º item
+
+    std::cout &lt;&lt; "notas     = " &lt;&lt; notas &lt;&lt; "\n";
+    std::cout &lt;&lt; "&amp;notas[0] = " &lt;&lt; &amp;notas[0] &lt;&lt; "\n";
+    std::cout &lt;&lt; "p         = " &lt;&lt; p &lt;&lt; "\n";
+    std::cout &lt;&lt; "*p        = " &lt;&lt; *p &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra nome.cpp -o nome
+$ ./nome
+notas     = 0x7ffed706ca00     « o array "virou" um endereço
+&amp;notas[0] = 0x7ffed706ca00     « que é o do primeiro item
+p         = 0x7ffed706ca00
+*p        = 7                  « seguindo o ponteiro: a primeira nota</pre>
+
+<p>Essa transformação se chama <strong>decaimento</strong> (em inglês, <em>array-to-pointer decay</em>): o array "decai" para um ponteiro. Ela é herança da linguagem C. Duas exceções importantes: <code>sizeof(notas)</code> e <code>&amp;notas</code> enxergam o array inteiro, sem decair. Guarde a palavra "decair": ela explica a armadilha da seção 4.</p>
+
+<hr>
+
+<h2>2. Aritmética de ponteiros: <code>p + 1</code> anda um item</h2>
+<p>Você pode somar um número inteiro a um ponteiro. Mas <code>p + 1</code> <strong>não</strong> é "o endereço seguinte, um byte depois". É "o <strong>próximo item</strong>", e o C++ calcula quantos bytes pular a partir do tipo do ponteiro:</p>
+
+<pre class="file" data-file="aritmetica.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int notas[4] = {7, 8, 6, 9};
+    int* p = notas;
+
+    std::cout &lt;&lt; "p     = " &lt;&lt; p     &lt;&lt; "  *p     = " &lt;&lt; *p     &lt;&lt; "\n";
+    std::cout &lt;&lt; "p + 1 = " &lt;&lt; p + 1 &lt;&lt; "  *(p+1) = " &lt;&lt; *(p + 1) &lt;&lt; "\n";
+    std::cout &lt;&lt; "p + 2 = " &lt;&lt; p + 2 &lt;&lt; "  *(p+2) = " &lt;&lt; *(p + 2) &lt;&lt; "\n";
+    std::cout &lt;&lt; "p + 3 = " &lt;&lt; p + 3 &lt;&lt; "  *(p+3) = " &lt;&lt; *(p + 3) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra aritmetica.cpp -o aritmetica
+$ ./aritmetica
+p     = 0x7ffc2d276340  *p     = 7
+p + 1 = 0x7ffc2d276344  *(p+1) = 8      « +4 bytes = sizeof(int)
+p + 2 = 0x7ffc2d276348  *(p+2) = 6      « +8 bytes
+p + 3 = 0x7ffc2d27634c  *(p+3) = 9      « +12 bytes (c = 12 em hexadecimal)</pre>
+
+<figure>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Expressão</th><th><code>p</code></th><th><code>p + 1</code></th><th><code>p + 2</code></th><th><code>p + 3</code></th></tr>
+<tr><td>Endereço</td><td><code>…340</code></td><td><code>…344</code></td><td><code>…348</code></td><td><code>…34c</code></td></tr>
+<tr><td>Bytes ocupados</td><td>340 a 343</td><td>344 a 347</td><td>348 a 34b</td><td>34c a 34f</td></tr>
+<tr><td>Valor (<code>*</code>)</td><td>7</td><td>8</td><td>6</td><td>9</td></tr>
+<tr><td>Mesmo que</td><td><code>notas[0]</code></td><td><code>notas[1]</code></td><td><code>notas[2]</code></td><td><code>notas[3]</code></td></tr>
+</table>
+</div>
+<figcaption>Cada <code>int</code> ocupa 4 casas. Somar 1 ao ponteiro pula as 4 de uma vez, caindo bem no começo do próximo item.</figcaption>
+</figure>
+
+<p>Os parênteses em <code>*(p + 1)</code> são obrigatórios: <code>*p + 1</code> seria "o valor de <code>*p</code>, mais 1", ou seja, 7 + 1 = 8. Aqui deu o mesmo número por coincidência; com <code>*(p + 2)</code> e <code>*p + 2</code> a diferença aparece (6 contra 9).</p>
+
+<h3>Com <code>double</code>, o passo é 8</h3>
+<p>Para provar que o passo depende do tipo, o mesmo teste com um array de <code>double</code> (8 bytes cada):</p>
+
+<pre class="file" data-file="double.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double precos[3] = {4.5, 3.0, 12.9};
+    double* p = precos;
+
+    std::cout &lt;&lt; "p     = " &lt;&lt; p     &lt;&lt; "\n";
+    std::cout &lt;&lt; "p + 1 = " &lt;&lt; p + 1 &lt;&lt; "\n";
+    std::cout &lt;&lt; "p + 2 = " &lt;&lt; p + 2 &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra double.cpp -o double
+$ ./double
+p     = 0x7ffc9951c0f0
+p + 1 = 0x7ffc9951c0f8     « +8 = sizeof(double)
+p + 2 = 0x7ffc9951c100     « +16 (f0 + 10 em hexadecimal = 100)</pre>
+
+<p>É por isso que o ponteiro precisa ter o tipo certo (<code>int*</code>, <code>double*</code>): o tipo diz o tamanho de cada passo.</p>
+
+<h3><code>notas[i]</code> é <code>*(notas + i)</code></h3>
+<p>Agora o colchete deixa de ser mágico. Escrever <code>notas[2]</code> é exatamente o mesmo que "pegue o endereço do primeiro item, ande 2 itens e leia o que estiver lá". E o colchete funciona em ponteiros também:</p>
+
+<pre class="file" data-file="colchete.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int notas[4] = {7, 8, 6, 9};
+    int* p = notas;
+
+    std::cout &lt;&lt; notas[2] &lt;&lt; " " &lt;&lt; *(notas + 2) &lt;&lt; " " &lt;&lt; p[2] &lt;&lt; " " &lt;&lt; *(p + 2) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra colchete.cpp -o colchete
+$ ./colchete
+6 6 6 6                  « quatro jeitos de escrever a mesma coisa</pre>
+
+<p>Isso também explica por que o primeiro item é o <code>[0]</code>: ele está a <strong>zero</strong> passos do começo.</p>
+
+<hr>
+
+<h2>3. Percorrer um array com um ponteiro</h2>
+<p>Se <code>p + 1</code> é o próximo item, então <code>++p</code> (somar 1 ao próprio <code>p</code>) faz o ponteiro <strong>andar</strong> para o próximo. Dá para percorrer o array inteiro assim:</p>
+
+<pre class="file" data-file="percorrer.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int notas[4] = {7, 8, 6, 9};
+    int* fim = notas + 4;        // uma casa DEPOIS do último item
+
+    for (int* p = notas; p != fim; ++p) {
+        std::cout &lt;&lt; *p &lt;&lt; " ";
+    }
+    std::cout &lt;&lt; "\n";
+
+    std::cout &lt;&lt; "Itens entre o começo e o fim: " &lt;&lt; fim - notas &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra percorrer.cpp -o percorrer
+$ ./percorrer
+7 8 6 9
+Itens entre o começo e o fim: 4</pre>
+
+<dl class="anatomy">
+  <dt>int* fim = notas + 4;</dt><dd>Um ponteiro para a casa logo <strong>depois</strong> da última nota. O C++ permite <strong>calcular</strong> esse endereço "um depois do fim", mas não permite <strong>ler</strong> o que está lá (<code>*fim</code> seria um erro grave).</dd>
+  <dt>int* p = notas;</dt><dd>O ponteiro começa no primeiro item.</dd>
+  <dt>p != fim</dt><dd>Continua enquanto <code>p</code> não chegou ao fim.</dd>
+  <dt>++p</dt><dd>Anda um item (4 bytes).</dd>
+  <dt>*p</dt><dd>Lê o item atual.</dd>
+  <dt>fim - notas</dt><dd>Subtrair dois ponteiros do mesmo array dá <strong>quantos itens</strong> há entre eles (não quantos bytes).</dd>
+</dl>
+
+<p>Esse par "começo e um depois do fim" é a base dos <a href="iteradores.html">iteradores</a> da biblioteca padrão (<code>v.begin()</code> e <code>v.end()</code>). No dia a dia, para só percorrer, o <a href="for-range.html">for de intervalo</a> (<code>for (int n : notas)</code>) é mais simples e não tem como errar o fim.</p>
+
+<div class="trycpp" data-goal="out:Soma: 30,src:soma\s*(=\s*soma\s*\+|\+=)\s*\*\s*p">
+<p class="try-task"><strong>Missão:</strong> o laço já anda pelas notas com o ponteiro <code>p</code>. Complete o corpo para somar em <code>soma</code> o valor apontado por <code>p</code>. A saída deve ser <code>Soma: 30</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int notas[4] = {7, 8, 6, 9};
+    int soma = 0;
+
+    for (int* p = notas; p != notas + 4; ++p) {
+        // some o valor apontado por p em soma
+    }
+
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int notas[4] = {7, 8, 6, 9};
+    int soma = 0;
+
+    for (int* p = notas; p != notas + 4; ++p) {
+        soma = soma + *p;
+    }
+
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<div class="warning">
+<strong>Ponteiro fora do array</strong>
+<p>Nada impede você de escrever <code>*(p + 10)</code> num array de 4 itens. O C++ não confere: ele calcula o endereço e lê o que estiver lá, que pode ser outra variável, lixo ou memória proibida. Isso é <a href="comportamento-indefinido.html">comportamento indefinido</a>, e os <a href="sanitizers.html">sanitizers</a> são a ferramenta para pegar esse erro. Com <code>std::vector</code> e <code>std::array</code>, o <code>.at(i)</code> confere e avisa.</p>
+</div>
+
+<hr>
+
+<h2>4. A armadilha: o array perde o tamanho na função</h2>
+<p>Lembra do decaimento? Ao passar um array para uma função, o que viaja é <strong>só o endereço do primeiro item</strong>. A função recebe um ponteiro e não tem como saber quantos itens existem. Mesmo que você escreva o parâmetro como <code>int notas[]</code>, ele é um <code>int*</code> disfarçado:</p>
+
+<pre class="file" data-file="funcao.cpp">#include &lt;iostream&gt;
+
+void mostrar(int notas[]) {
+    std::cout &lt;&lt; "Dentro da função: " &lt;&lt; sizeof(notas) &lt;&lt; " bytes\n";
+}
+
+int main() {
+    int notas[4] = {7, 8, 6, 9};
+    std::cout &lt;&lt; "No main:          " &lt;&lt; sizeof(notas) &lt;&lt; " bytes\n";
+    mostrar(notas);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra funcao.cpp -o funcao
+funcao.cpp: In function ‘void mostrar(int*)’:
+funcao.cpp:4:49: warning: ‘sizeof’ on array function parameter ‘notas’ will return size of ‘int*’ [-Wsizeof-array-argument]
+    4 |     std::cout &lt;&lt; "Dentro da função: " &lt;&lt; sizeof(notas) &lt;&lt; " bytes\n";
+      |                                                ~^~~~~~
+funcao.cpp:3:18: note: declared here
+    3 | void mostrar(int notas[]) {
+      |              ~~~~^~~~~~~
+$ ./funcao
+No main:          16 bytes     « 4 itens × 4 bytes: o array inteiro
+Dentro da função: 8 bytes      « o tamanho de um ponteiro!</pre>
+
+<dl class="anatomy">
+  <dt>In function ‘void mostrar(int*)’</dt><dd>Olhe o cabeçalho: o próprio g++ escreve a função como <code>mostrar(int*)</code>. O <code>int notas[]</code> que você digitou virou <code>int*</code>.</dd>
+  <dt>warning: ‘sizeof’ on array function parameter ‘notas’ will return size of ‘int*’</dt><dd>"<code>sizeof</code> num parâmetro array de função vai devolver o tamanho de <code>int*</code>". O compilador sabe que você provavelmente queria outra coisa.</dd>
+  <dt>[-Wsizeof-array-argument]</dt><dd>O nome do aviso. Vem ligado por padrão.</dd>
+</dl>
+
+<p>O truque <code>sizeof(notas) / sizeof(notas[0])</code> da aula <a href="memoria.html">Como a Memória Funciona</a> daria, dentro da função, 8 ÷ 4 = <strong>2</strong> itens, um número errado e sem erro nenhum na execução. É por isso que esse truque só serve onde o array foi declarado.</p>
+
+<h3>O jeito antigo: mandar o tamanho junto</h3>
+<p>No estilo C, a função recebe dois parâmetros: o ponteiro e a quantidade.</p>
+
+<pre class="file" data-file="funcao-tam.cpp">#include &lt;iostream&gt;
+#include &lt;cstddef&gt;
+
+void mostrar(const int* notas, std::size_t quantidade) {
+    for (std::size_t i = 0; i &lt; quantidade; ++i) {
+        std::cout &lt;&lt; notas[i] &lt;&lt; " ";
+    }
+    std::cout &lt;&lt; "\n";
+}
+
+int main() {
+    int notas[4] = {7, 8, 6, 9};
+    mostrar(notas, 4);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra funcao-tam.cpp -o funcao-tam
+$ ./funcao-tam
+7 8 6 9 </pre>
+
+<p>Funciona, mas nada impede alguém de chamar <code>mostrar(notas, 40)</code>. O <code>const int*</code> diz que a função só vai ler as notas (veja <a href="const-ponteiros.html">const com Ponteiros e Referências</a>), e <code>std::size_t</code> é o tipo usado para tamanhos e quantidades.</p>
+
+<h3>O jeito moderno: <code>std::span</code> <span class="versao">C++20</span></h3>
+<p>Um <code>std::span</code> ("vão", "trecho") é um <strong>ponteiro que carrega o tamanho junto</strong>. Ele não copia os itens: só olha para eles, como uma janela. E aceita, sem mudar nada na função, arrays, <code>std::array</code> e <code>std::vector</code>:</p>
+
+<pre class="file" data-file="span.cpp">#include &lt;iostream&gt;
+#include &lt;span&gt;
+#include &lt;vector&gt;
+
+void mostrar(std::span&lt;const int&gt; notas) {
+    std::cout &lt;&lt; notas.size() &lt;&lt; " notas: ";
+    for (int n : notas) {
+        std::cout &lt;&lt; n &lt;&lt; " ";
+    }
+    std::cout &lt;&lt; "\n";
+}
+
+int main() {
+    int notas[4] = {7, 8, 6, 9};
+    std::vector&lt;int&gt; outras = {10, 5};
+
+    mostrar(notas);       // array: o span descobre o tamanho sozinho
+    mostrar(outras);      // vector também serve
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra span.cpp -o span
+$ ./span
+4 notas: 7 8 6 9
+2 notas: 10 5 </pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;span&gt;</dt><dd>O cabeçalho do <code>std::span</code>.</dd>
+  <dt>std::span&lt;const int&gt;</dt><dd>"Uma janela para vários <code>int</code> que eu só vou ler". Sem o <code>const</code>, a função poderia mudar os itens.</dd>
+  <dt>notas.size()</dt><dd>O tamanho viajou junto. Funciona também o <code>for</code> de intervalo.</dd>
+</dl>
+
+<p>O <code>std::span</code> é do C++20. Com <code>-std=c++17</code>, o g++ 15 responde <code>error: ‘span’ is not a member of ‘std’</code> e explica: <code>note: ‘std::span’ is only available from C++20 onwards</code>. Antes dele, a alternativa era a dupla ponteiro + tamanho, ou receber <code>const std::vector&lt;int&gt;&amp;</code> (que só aceita vetores). Esta aula só apresenta o <code>std::span</code>; ele tem mais recursos, como pegar só um pedaço (<code>notas.first(2)</code>).</p>
+
+<hr>
+
+<h2>Formas de passar uma lista para uma função: qual usar</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parâmetro</th><th>Sabe o tamanho?</th><th>Aceita</th><th>Quando usar</th></tr>
+<tr><td><code>int notas[]</code> ou <code>int* notas</code></td><td>Não</td><td>Arrays e ponteiros</td><td>Só em código C ou antigo.</td></tr>
+<tr><td><code>const int* notas, std::size_t n</code></td><td>Se quem chama acertar o <code>n</code></td><td>Arrays, ponteiros</td><td>Bibliotecas em estilo C.</td></tr>
+<tr><td><code>const std::vector&lt;int&gt;&amp; notas</code></td><td>Sim</td><td>Só <code>std::vector</code></td><td>Quando o programa só usa vetores (o caso mais comum).</td></tr>
+<tr><td><code>std::span&lt;const int&gt; notas</code> <span class="versao">C++20</span></td><td>Sim</td><td>Arrays, <code>std::array</code>, <code>std::vector</code></td><td>Função que só lê uma sequência, venha de onde vier.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Aviso "‘sizeof’ on array function parameter … will return size of ‘int*’"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra funcao.cpp -o funcao
+funcao.cpp: In function ‘void mostrar(int*)’:
+funcao.cpp:4:49: warning: ‘sizeof’ on array function parameter ‘notas’ will return size of ‘int*’ [-Wsizeof-array-argument]
+    4 |     std::cout &lt;&lt; "Dentro da função: " &lt;&lt; sizeof(notas) &lt;&lt; " bytes\n";
+      |                                                ~^~~~~~
+funcao.cpp:3:18: note: declared here
+    3 | void mostrar(int notas[]) {
+      |              ~~~~^~~~~~~</pre>
+<p><strong>O que aconteceu:</strong> o array decaiu para ponteiro ao entrar na função, e <code>sizeof</code> mediu o ponteiro (8 bytes). No editor do guia (Clang), a mensagem é <code>sizeof on array function parameter will return size of 'int *' instead of 'int[]'</code>.</p>
+<p><strong>Como resolver:</strong> receba <code>std::span&lt;const int&gt;</code> e use <code>.size()</code>, ou passe a quantidade num segundo parâmetro, ou use <code>std::vector</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"‘span’ is not a member of ‘std’"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++17 -Wall -Wextra span.cpp -o span
+span.cpp:5:6: error: variable or field ‘mostrar’ declared void
+    5 | void mostrar(std::span&lt;const int&gt; notas) {
+      |      ^~~~~~~
+span.cpp:5:19: error: ‘span’ is not a member of ‘std’
+    5 | void mostrar(std::span&lt;const int&gt; notas) {
+      |                   ^~~~
+span.cpp:5:19: note: ‘std::span’ is only available from C++20 onwards
+…                                « mais erros, todos consequência deste</pre>
+<p><strong>O que aconteceu:</strong> o código pediu C++17, e o <code>std::span</code> só existe a partir do C++20. A nota diz isso com todas as letras: "<code>std::span</code> só está disponível do C++20 em diante". A primeira mensagem ("declarada como void") e as seguintes são consequência: sem saber o que é <code>span</code>, o g++ se perdeu. Leia sempre a primeira mensagem que faz sentido (veja <a href="erros-compilacao.html">Lendo Erros do Compilador</a>).</p>
+<p><strong>Como resolver:</strong> compile com <code>-std=c++23</code> (o padrão do guia) e inclua <code>&lt;span&gt;</code>. No g++ 15, o programa até compila sem o <code>#include &lt;span&gt;</code>, porque outro cabeçalho o traz junto, mas não conte com isso: em outro compilador, pode faltar.</p>
+</div>
+
+<div class="cenario">
+<strong>O laço mostrou números estranhos depois dos itens certos</strong>
+<p><strong>O que aconteceu:</strong> o ponteiro passou do fim do array, por exemplo com <code>p &lt;= fim</code> em vez de <code>p != fim</code>, ou com a quantidade errada. O C++ leu as casas vizinhas, sem avisar.</p>
+<p><strong>Como resolver:</strong> confira a condição de parada; prefira o <code>for</code> de intervalo, <code>std::span</code> ou <code>std::vector</code>, que sabem o tamanho. Para investigar, compile com <code>-fsanitize=address</code> (aula <a href="sanitizers.html">Sanitizers</a>).</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>O que faz</th></tr>
+<tr><td><code>int* p = notas;</code></td><td>O nome do array decai para o endereço do primeiro item (<code>&amp;notas[0]</code>).</td></tr>
+<tr><td><code>p + i</code></td><td>O endereço do item <code>i</code> passos à frente (anda <code>i × sizeof(tipo)</code> bytes).</td></tr>
+<tr><td><code>*(p + i)</code> ou <code>p[i]</code></td><td>O valor do item <code>i</code>.</td></tr>
+<tr><td><code>++p</code> / <code>--p</code></td><td>Anda um item para a frente / para trás.</td></tr>
+<tr><td><code>fim - comeco</code></td><td>Quantos itens há entre dois ponteiros do mesmo array.</td></tr>
+<tr><td><code>notas + 4</code> (num array de 4)</td><td>"Um depois do fim": pode calcular e comparar, não pode ler.</td></tr>
+<tr><td><code>void f(int v[])</code></td><td>É o mesmo que <code>void f(int* v)</code>: o tamanho se perde.</td></tr>
+<tr><td><code>std::span&lt;const int&gt; v</code></td><td><span class="versao">C++20</span> Ponteiro + tamanho; <code>v.size()</code>, <code>for (int n : v)</code>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O segundo item</h3>
+<p>Com <code>int* p = notas;</code>, complete para mostrar <code>notas[1]</code> usando aritmética de ponteiros:</p>
+<div class="ex-code">std::cout &lt;&lt; *(p + <input data-answer="1" aria-label="número">);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Quantos bytes?</h3>
+<p>Num array de <code>double</code>, <code>p</code> está em <code>0x1000</code>. Em que endereço está <code>p + 2</code>? (Escreva em hexadecimal, com <code>0x</code>.)</p>
+<div class="ex-code">p + 2 = <input data-answer="0x1010" aria-label="endereço"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Com <code>int notas[4] = {7, 8, 6, 9};</code>, quanto vale <code>*notas + 2</code>?</p>
+<label><input type="radio" name="q3"> 6, o item de índice 2</label>
+<label><input type="radio" name="q3"> 9, porque é <code>*notas</code> (7) mais 2</label>
+<label><input type="radio" name="q3"> Um endereço</label>
+<label><input type="radio" name="q3"> Erro de compilação</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Dentro de <code>void f(int v[])</code>, chamada com um array de 10 <code>int</code>, quanto dá <code>sizeof(v)</code> no Linux de 64 bits?</p>
+<label><input type="radio" name="q4"> 40</label>
+<label><input type="radio" name="q4"> 10</label>
+<label><input type="radio" name="q4"> 8, o tamanho de um ponteiro</label>
+<label><input type="radio" name="q4"> 4</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. O que o <code>std::span</code> traz que um <code>int*</code> não traz?</p>
+<label><input type="radio" name="q5"> O tamanho da sequência, junto com o endereço</label>
+<label><input type="radio" name="q5"> Uma cópia dos itens</label>
+<label><input type="radio" name="q5"> A capacidade de crescer, como um <code>std::vector</code></label>
+<label><input type="radio" name="q5"> Nada: é só outro nome para <code>int*</code></label>
+</div>
+
+<h3>Missão final: a média de qualquer turma</h3>
+
+<div class="trycpp" data-goal="out:Média A: 7.5,out:Média B: 8,src:notas\.size\(\)">
+<p class="try-task"><strong>Missão:</strong> a função <code>media</code> recebe as notas como <code>std::span</code>. Complete-a para somar as notas e dividir pela quantidade (<code>notas.size()</code>). Cuidado: divida como <code>double</code>, senão 15 ÷ 2 vira 7. A saída deve ser:</p>
+<pre class="out">Média A: 7.5
+Média B: 8</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;span&gt;
+
+double media(std::span&lt;const int&gt; notas) {
+    // some as notas e divida pela quantidade (notas.size())
+    return 0;
+}
+
+int main() {
+    int turma_a[4] = {7, 8, 6, 9};
+    int turma_b[2] = {10, 6};
+
+    std::cout &lt;&lt; "Média A: " &lt;&lt; media(turma_a) &lt;&lt; "\n";
+    std::cout &lt;&lt; "Média B: " &lt;&lt; media(turma_b) &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;span&gt;
+
+double media(std::span&lt;const int&gt; notas) {
+    int soma = 0;
+    for (int n : notas) {
+        soma = soma + n;
+    }
+    return static_cast&lt;double&gt;(soma) / notas.size();
+}
+
+int main() {
+    int turma_a[4] = {7, 8, 6, 9};
+    int turma_b[2] = {10, 6};
+
+    std::cout &lt;&lt; "Média A: " &lt;&lt; media(turma_a) &lt;&lt; "\n";
+    std::cout &lt;&lt; "Média B: " &lt;&lt; media(turma_b) &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<div class="trycpp" data-goal="aviso:array function parameter">
+<p class="try-task"><strong>Missão extra (provoque o aviso):</strong> dentro de <code>contar</code>, troque o <code>return 0;</code> por <code>return sizeof(lista) / sizeof(lista[0]);</code> e rode. Leia o aviso e veja que a função não responde 6: ela mediu um ponteiro, não o array. (No Linux de 64 bits da Ana, responde <code>Itens: 2</code>.)</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int contar(int lista[]) {
+    return 0;
+}
+
+int main() {
+    int precos[6] = {4, 3, 12, 7, 1, 5};
+    std::cout &lt;&lt; "Itens: " &lt;&lt; contar(precos) &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int contar(int lista[]) {
+    return sizeof(lista) / sizeof(lista[0]);
+}
+
+int main() {
+    int precos[6] = {4, 3, 12, 7, 1, 5};
+    std::cout &lt;&lt; "Itens: " &lt;&lt; contar(precos) &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>O nome de um array, numa expressão, <strong>decai</strong> para o endereço do primeiro item: <code>int* p = notas;</code>.</li>
+  <li><code>p + 1</code> anda <strong>um item</strong> (<code>sizeof(int)</code> = 4 bytes para <code>int</code>, 8 para <code>double</code>).</li>
+  <li><code>notas[i]</code> é o mesmo que <code>*(notas + i)</code>; o colchete funciona em ponteiros.</li>
+  <li>Dá para percorrer com <code>for (int* p = notas; p != notas + n; ++p)</code>, mas o <code>for</code> de intervalo é mais seguro.</li>
+  <li>Array passado para função vira ponteiro e perde o tamanho: <code>sizeof</code> dá 8 (<code>-Wsizeof-array-argument</code>).</li>
+  <li>Use <code>std::span</code> <span class="versao">C++20</span> (ou <code>std::vector</code>) para passar sequências com o tamanho junto.</li>
+  <li>Próxima aula: <a href="nullptr.html">nullptr</a>, o ponteiro que não aponta para nada.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
