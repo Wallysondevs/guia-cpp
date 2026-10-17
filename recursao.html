@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Recursão — a função que chama a si mesma | Guia C++</title>
+<meta name="description" content="Recursão em C++ para quem nunca programou: contagem regressiva, fatorial, o caso base e o passo recursivo, a pilha de chamadas mostrada passo a passo, Fibonacci e o custo exponencial (com as chamadas contadas e o tempo medido), o caso base esquecido que termina em Falha de segmentação (código 139) e quando preferir um laço. Com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Recursão</span></h1>
+
+<p class="intro">Na aula <a href="funcoes.html">Funções</a>, você viu que uma função pode chamar outra. Ela também pode chamar <strong>a si mesma</strong>. Isso se chama <strong>recursão</strong>, e é um jeito de resolver um problema grande resolvendo uma versão <strong>menor</strong> do mesmo problema, até chegar a uma versão tão pequena que a resposta é óbvia. Nesta aula você vai escrever funções recursivas, acompanhar a "pilha" de chamadas passo a passo, contar quantas chamadas um Fibonacci ingênuo faz, ver o programa cair quando falta o ponto de parada, e decidir quando um laço é melhor.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é recursão, com uma contagem regressiva.</li>
+  <li>As duas partes de toda função recursiva: o <strong>caso base</strong> e o <strong>passo recursivo</strong>.</li>
+  <li>O fatorial recursivo e como as chamadas se empilham e voltam.</li>
+  <li>Fibonacci e por que a versão recursiva simples fica lenta tão rápido (contando as chamadas).</li>
+  <li>O que acontece sem caso base: o aviso <code>-Winfinite-recursion</code> e a <code>Falha de segmentação</code> com código 139.</li>
+  <li>Quando usar recursão e quando usar um laço.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com o comando padrão do guia, <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: a fila do cinema</h2>
+<p>A Ana está numa fila escura de cinema e quer saber em que posição está. Ela não consegue contar todo mundo. Então pergunta para a pessoa da frente: "qual é a sua posição?". Essa pessoa também não sabe, e pergunta para a da frente dela, e assim por diante. Até que a pergunta chega à <strong>primeira</strong> pessoa da fila, que não tem ninguém na frente e responde: "sou a 1ª". A resposta volta: a segunda diz "sou a 2ª", a terceira "sou a 3ª"… até chegar na Ana.</p>
+
+<p>Repare nas duas partes do raciocínio:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parte</th><th>Na fila</th><th>Nome técnico</th></tr>
+<tr><td>Quando a resposta é óbvia e ninguém mais é perguntado</td><td>"Não tem ninguém na minha frente: sou a 1ª."</td><td><strong>Caso base</strong></td></tr>
+<tr><td>Quando a pessoa passa a pergunta adiante, para um problema menor</td><td>"Minha posição é a da pessoa da frente + 1."</td><td><strong>Passo recursivo</strong></td></tr>
+</table>
+</div>
+<p>Toda função recursiva tem essas duas partes. Sem o caso base, a pergunta nunca para de ser passada adiante.</p>
+
+<hr>
+
+<h2>1. A primeira função recursiva: contagem regressiva</h2>
+
+<pre class="file" data-file="contagem.cpp">#include &lt;iostream&gt;
+
+void contagem(int n) {
+    if (n == 0) {
+        std::cout &lt;&lt; "Já!\n";
+        return;
+    }
+    std::cout &lt;&lt; n &lt;&lt; "...\n";
+    contagem(n - 1);
+}
+
+int main() {
+    contagem(3);
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>if (n == 0) { … return; }</dt><dd>O <strong>caso base</strong>: quando chega a zero, mostra "Já!" e para. Nenhuma nova chamada.</dd>
+  <dt>std::cout &lt;&lt; n &lt;&lt; "...\n";</dt><dd>O trabalho desta chamada: mostrar o número atual.</dd>
+  <dt>contagem(n - 1);</dt><dd>O <strong>passo recursivo</strong>: a função chama a si mesma com um problema <strong>menor</strong> (um número a menos). É essa diminuição que garante que um dia o caso base chega.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra contagem.cpp -o contagem
+$ ./contagem
+3...
+2...
+1...
+Já!</pre>
+
+<ol class="passo">
+  <li><code>contagem(3)</code>: 3 não é 0. Mostra <code>3...</code> e chama <code>contagem(2)</code>.</li>
+  <li><code>contagem(2)</code>: mostra <code>2...</code> e chama <code>contagem(1)</code>.</li>
+  <li><code>contagem(1)</code>: mostra <code>1...</code> e chama <code>contagem(0)</code>.</li>
+  <li><code>contagem(0)</code>: caso base. Mostra <code>Já!</code> e volta. Cada chamada anterior também termina, uma por uma.</li>
+</ol>
+
+<p>Cada chamada é uma execução <strong>separada</strong> da função, com o seu próprio <code>n</code> (lembre da aula <a href="escopo.html">Escopo</a>: parâmetros são locais). Quando <code>contagem(1)</code> roda, o <code>n</code> de <code>contagem(3)</code> continua guardado, valendo 3, esperando a volta.</p>
+
+<hr>
+
+<h2>2. Funções recursivas que devolvem valores: o fatorial</h2>
+<p>O <strong>fatorial</strong> de um número (escrito <code>4!</code>) é a multiplicação dele por todos os inteiros menores até 1: <code>4! = 4 × 3 × 2 × 1 = 24</code>. Ele aparece em contas de combinações: de quantas formas a Ana pode arrumar 4 produtos na vitrine? 24.</p>
+
+<p>Repare que <code>4! = 4 × 3!</code>, e <code>3! = 3 × 2!</code>… O fatorial de um número é ele vezes o fatorial do anterior. É uma definição recursiva, e vira código quase palavra por palavra:</p>
+
+<pre class="file" data-file="fatorial.cpp">#include &lt;iostream&gt;
+
+long long fatorial(int n) {
+    if (n &lt;= 1) {
+        return 1;
+    }
+    return n * fatorial(n - 1);
+}
+
+int main() {
+    std::cout &lt;&lt; "4! = " &lt;&lt; fatorial(4) &lt;&lt; "\n";
+    std::cout &lt;&lt; "10! = " &lt;&lt; fatorial(10) &lt;&lt; "\n";
+    std::cout &lt;&lt; "20! = " &lt;&lt; fatorial(20) &lt;&lt; "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>long long</dt><dd>O fatorial cresce muito rápido; <code>long long</code> é um inteiro grande, que aguenta até <code>20!</code> (aula <a href="inteiros.html">Inteiros</a>). A partir de <code>21!</code>, nem ele aguenta.</dd>
+  <dt>if (n &lt;= 1) return 1;</dt><dd>Caso base: <code>1! = 1</code> (e, por definição, <code>0! = 1</code>). Usar <code>&lt;= 1</code> em vez de <code>== 1</code> também protege contra zero.</dd>
+  <dt>return n * fatorial(n - 1);</dt><dd>Passo recursivo: "o fatorial de <code>n</code> é <code>n</code> vezes o fatorial de <code>n - 1</code>". A multiplicação só acontece <strong>depois</strong> que a chamada de dentro devolver o resultado.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra fatorial.cpp -o fatorial
+$ ./fatorial
+4! = 24
+10! = 3628800
+20! = 2432902008176640000</pre>
+
+<h3>A pilha de chamadas, passo a passo</h3>
+<p>Para ver a "ida" e a "volta", a Ana colocou mensagens dentro da função, com um recuo de dois espaços para cada nível:</p>
+
+<pre class="file" data-file="rastro.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+long long fatorial(int n) {
+    std::string recuo(2 * (4 - n), ' ');
+    std::cout &lt;&lt; recuo &lt;&lt; "fatorial(" &lt;&lt; n &lt;&lt; ") começou\n";
+    if (n &lt;= 1) {
+        std::cout &lt;&lt; recuo &lt;&lt; "fatorial(" &lt;&lt; n &lt;&lt; ") devolve 1\n";
+        return 1;
+    }
+    long long resultado = n * fatorial(n - 1);
+    std::cout &lt;&lt; recuo &lt;&lt; "fatorial(" &lt;&lt; n &lt;&lt; ") devolve " &lt;&lt; resultado &lt;&lt; "\n";
+    return resultado;
+}
+
+int main() {
+    fatorial(4);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra rastro.cpp -o rastro
+$ ./rastro
+fatorial(4) começou
+  fatorial(3) começou
+    fatorial(2) começou
+      fatorial(1) começou
+      fatorial(1) devolve 1        « caso base: a descida para aqui
+    fatorial(2) devolve 2          « 2 * 1
+  fatorial(3) devolve 6            « 3 * 2
+fatorial(4) devolve 24             « 4 * 6</pre>
+
+<p>(<code>std::string recuo(2 * (4 - n), ' ')</code> cria um texto com vários espaços; é só enfeite para ver os níveis.) O desenho em forma de "V" mostra a <strong>pilha de chamadas</strong>: cada chamada fica <strong>empilhada</strong> esperando a de cima terminar, como pratos numa pilha. A última que entrou, <code>fatorial(1)</code>, é a primeira que sai. Cada prato ocupa um pedaço da memória chamado <strong>pilha</strong> (em inglês, <em>stack</em>), e essa memória é limitada, como você vai ver na seção 4. Mais sobre a pilha em <a href="memoria.html">Como a Memória Funciona</a>.</p>
+
+<div class="trycpp" data-goal="out:soma(4) = 10,out:soma(100) = 5050,src:soma\s*\(\s*n\s*-\s*1\s*\),semaviso">
+<p class="try-task"><strong>Missão:</strong> complete a função recursiva <code>soma(n)</code>, que devolve <code>1 + 2 + … + n</code>. O caso base: <code>soma(1)</code> é 1. O passo: <code>soma(n)</code> é <code>n</code> mais <code>soma(n - 1)</code>. Não use laços.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int soma(int n) {
+    // caso base
+
+    // passo recursivo
+}
+
+int main() {
+    std::cout &lt;&lt; "soma(4) = " &lt;&lt; soma(4) &lt;&lt; "\n";
+    std::cout &lt;&lt; "soma(100) = " &lt;&lt; soma(100) &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int soma(int n) {
+    if (n &lt;= 1) {
+        return 1;
+    }
+    return n + soma(n - 1);
+}
+
+int main() {
+    std::cout &lt;&lt; "soma(4) = " &lt;&lt; soma(4) &lt;&lt; "\n";
+    std::cout &lt;&lt; "soma(100) = " &lt;&lt; soma(100) &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Fibonacci e o custo escondido</h2>
+<p>A sequência de Fibonacci começa com 0 e 1, e cada número seguinte é a soma dos dois anteriores: 0, 1, 1, 2, 3, 5, 8, 13, 21… A definição é recursiva com <strong>duas</strong> chamadas: <code>fib(n) = fib(n - 1) + fib(n - 2)</code>. A versão em C++ é curta e bonita. Para ver o preço dessa beleza, a Ana passou um contador de chamadas por referência (aula <a href="passagem-referencia.html">Por Valor × Por Referência</a>):</p>
+
+<pre class="file" data-file="fib.cpp">#include &lt;iostream&gt;
+
+long long fib(int n, long long&amp; chamadas) {
+    chamadas++;
+    if (n &lt;= 1) {
+        return n;
+    }
+    return fib(n - 1, chamadas) + fib(n - 2, chamadas);
+}
+
+int main() {
+    for (int n : {5, 10, 20, 30, 35}) {
+        long long chamadas = 0;
+        long long resultado = fib(n, chamadas);
+        std::cout &lt;&lt; "fib(" &lt;&lt; n &lt;&lt; ") = " &lt;&lt; resultado
+                  &lt;&lt; "  (" &lt;&lt; chamadas &lt;&lt; " chamadas)\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra fib.cpp -o fib
+$ ./fib
+fib(5) = 5  (15 chamadas)
+fib(10) = 55  (177 chamadas)
+fib(20) = 6765  (21891 chamadas)
+fib(30) = 832040  (2692537 chamadas)
+fib(35) = 9227465  (29860703 chamadas)</pre>
+
+<p>Para calcular o 35º número, foram quase <strong>30 milhões</strong> de chamadas. E a cada 5 a mais no <code>n</code>, o número de chamadas fica mais de 10 vezes maior. Por quê? Porque a função recalcula as mesmas coisas o tempo todo:</p>
+
+<pre class="out">fib(5)
+├── fib(4)
+│   ├── fib(3)
+│   │   ├── fib(2) ...
+│   │   └── fib(1)
+│   └── fib(2) ...          « fib(2) de novo
+└── fib(3)                  « fib(3) inteiro de novo!
+    ├── fib(2) ...
+    └── fib(1)
+</pre>
+
+<p>Cada chamada se divide em duas, que se dividem em duas… Esse crescimento se chama <strong>exponencial</strong>. No relógio, com dois programas que só calculam e mostram <code>fib(35)</code> e <code>fib(40)</code> (a mesma função, sem o contador):</p>
+
+<pre class="term" data-cwd="~/cpp">$ time ./fib35
+9227465
+
+real	0m0,112s
+user	0m0,109s
+sys	0m0,003s
+$ time ./fib40          « só 5 a mais
+102334155
+
+real	0m1,240s           « mais de 10 vezes mais lento
+user	0m1,239s
+sys	0m0,001s</pre>
+
+<p>Pelo mesmo ritmo, <code>fib(50)</code> levaria mais de dois minutos, e <code>fib(60)</code>, horas. (Os tempos mudam de máquina para máquina; a proporção, não.) Agora a versão com um laço, que guarda só os dois últimos números e anda para a frente:</p>
+
+<pre class="file" data-file="fiblaco.cpp">#include &lt;iostream&gt;
+
+long long fib(int n) {
+    long long anterior = 0;
+    long long atual = 1;
+    if (n == 0) {
+        return 0;
+    }
+    for (int i = 2; i &lt;= n; i++) {
+        long long proximo = anterior + atual;
+        anterior = atual;
+        atual = proximo;
+    }
+    return atual;
+}
+
+int main() {
+    for (int n : {5, 10, 20, 30, 35, 90}) {
+        std::cout &lt;&lt; "fib(" &lt;&lt; n &lt;&lt; ") = " &lt;&lt; fib(n) &lt;&lt; "\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ time ./fiblaco
+fib(5) = 5
+fib(10) = 55
+fib(20) = 6765
+fib(30) = 832040
+fib(35) = 9227465
+fib(90) = 2880067194370816120
+
+real	0m0,002s                « inclusive o fib(90)
+user	0m0,001s
+sys	0m0,001s</pre>
+
+<p>Para <code>fib(90)</code>, o laço faz 89 voltas. A recursão simples faria mais chamadas do que um computador consegue em milhares de anos. A lição não é "recursão é lenta": é que <strong>recursão com duas chamadas que repetem o mesmo trabalho</strong> explode. (Existe uma técnica para manter a recursão e guardar os resultados já calculados, a <em>memoização</em>; ela usa um <a href="map.html">std::map</a> ou um <a href="vector.html">vetor</a> como "caderninho".)</p>
+
+<hr>
+
+<h2>4. Sem caso base: a pilha estoura</h2>
+<p>O que acontece se a Ana esquecer o caso base do fatorial?</p>
+
+<pre class="file" data-file="semfim.cpp">#include &lt;iostream&gt;
+
+long long fatorial(int n) {
+    return n * fatorial(n - 1);
+}
+
+int main() {
+    std::cout &lt;&lt; fatorial(4) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semfim.cpp -o semfim
+semfim.cpp: In function ‘long long int fatorial(int)’:
+semfim.cpp:3:11: warning: infinite recursion detected [-Winfinite-recursion]
+    3 | long long fatorial(int n) {
+      |           ^~~~~~~~
+semfim.cpp:4:24: note: recursive call
+    4 |     return n * fatorial(n - 1);
+      |                ~~~~~~~~^~~~~~~
+$ ./semfim
+Falha de segmentação     (imagem do núcleo gravada) ./semfim
+$ echo $?
+139</pre>
+
+<dl class="anatomy">
+  <dt>warning: infinite recursion detected</dt><dd>"Recursão infinita detectada". O g++ percebeu que não há nenhum caminho pela função que não chame a si mesma. O aviso <code>-Winfinite-recursion</code> vem com o <code>-Wall</code>. No editor do guia, o Clang diz <code>all paths through this function will call itself</code> ("todos os caminhos desta função chamam a si mesma").</dd>
+  <dt>note: recursive call</dt><dd>"Chamada recursiva": aponta a linha da chamada.</dd>
+  <dt>Falha de segmentação</dt><dd>O programa caiu. <code>fatorial(4)</code> chamou <code>fatorial(3)</code>, <code>2</code>, <code>1</code>, <code>0</code>, <code>-1</code>, <code>-2</code>… e cada chamada empilhou mais um prato na pilha, até a memória da pilha acabar. Isso se chama <strong>estouro de pilha</strong> (em inglês, <em>stack overflow</em>, que deu nome ao famoso site de perguntas). O sistema mata o programa ao ver um acesso fora da área permitida. Em inglês: <code>Segmentation fault (core dumped)</code>.</dd>
+  <dt>139</dt><dd>O código de saída: 128 + 11, o sinal 11 (<code>SIGSEGV</code>, violação de segmentação).</dd>
+</dl>
+
+<h3>Quão funda é a pilha?</h3>
+<p>Para ver quantas chamadas cabem, a Ana fez uma função que desce sem parar e avisa a cada 20 mil níveis:</p>
+
+<pre class="file" data-file="profundidade.cpp">#include &lt;iostream&gt;
+
+void descer(int nivel) {
+    if (nivel % 20000 == 0) {
+        std::cout &lt;&lt; "nível " &lt;&lt; nivel &lt;&lt; "\n";
+    }
+    descer(nivel + 1);
+}
+
+int main() {
+    descer(1);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ ulimit -s
+8192                     « o tamanho da pilha: 8192 KB = 8 MB (o padrão no Linux)
+$ ./profundidade
+nível 20000
+nível 40000
+nível 60000
+nível 80000
+nível 100000
+nível 120000
+nível 140000
+nível 160000
+nível 180000
+nível 200000
+nível 220000
+nível 240000
+nível 260000
+Falha de segmentação     (imagem do núcleo gravada) ./profundidade
+$ echo $?
+139
+$ ulimit -s 1024         « diminui a pilha deste terminal para 1 MB
+$ ./profundidade
+nível 20000
+Falha de segmentação     (imagem do núcleo gravada) ./profundidade
+$ echo $?
+139</pre>
+
+<p>Com a pilha padrão de 8 MB, coube um pouco mais de 260 mil chamadas desta função pequena; com 1 MB, um pouco mais de 20 mil. <code>ulimit -s</code> é um comando do terminal que mostra ou muda o tamanho máximo da pilha dos programas abertos nele (só naquele terminal, até fechá-lo). Funções com mais variáveis locais ocupam pratos maiores, e cabem menos. No Windows, a pilha padrão costuma ser de só 1 MB.</p>
+
+<h3>O caso base que nunca chega</h3>
+<p>Ter um caso base não basta: o passo recursivo precisa <strong>chegar</strong> nele. Nesta versão da contagem, a Ana pulou de 2 em 2:</p>
+
+<pre class="file" data-file="basecerta.cpp">#include &lt;iostream&gt;
+
+void contagem(int n) {
+    if (n == 0) {
+        std::cout &lt;&lt; "Já!\n";
+        return;
+    }
+    std::cout &lt;&lt; n &lt;&lt; "...\n";
+    contagem(n - 2);
+}
+
+int main() {
+    contagem(3);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra basecerta.cpp -o basecerta      « nenhum aviso desta vez
+$ ./basecerta
+3...
+1...
+-1...                    « passou direto pelo zero
+-3...
+-5...
+-7...                    « … e assim por mais de 260 mil linhas …
+Falha de segmentação     (imagem do núcleo gravada) ./basecerta
+$ echo $?
+139</pre>
+
+<p>Desta vez o g++ não avisou nada: existe um caminho que para (<code>n == 0</code>), só que, começando do 3 e descendo de 2 em 2, ele nunca é alcançado. A correção é um caso base que pegue <strong>todos</strong> os finais possíveis: <code>if (n &lt;= 0)</code>.</p>
+
+<div class="warning">
+<strong>No editor do guia, evite a recursão infinita</strong>
+<p>Os exemplos que estouram a pilha ficam só aqui, no terminal. No editor, o programa roda dentro do navegador, que tem os próprios limites, e o resultado pode ser diferente do <code>Falha de segmentação</code>. Confira sempre o caso base antes de clicar em Rodar.</p>
+</div>
+
+<hr>
+
+<h2>5. Recursão × laço</h2>
+<p>Todo problema que se resolve com recursão também se resolve com um laço (às vezes com mais trabalho), e vice-versa. O fatorial com <code>for</code>:</p>
+
+<pre class="file" data-file="fatlaco.cpp">#include &lt;iostream&gt;
+
+long long fatorial(int n) {
+    long long resultado = 1;
+    for (int i = 2; i &lt;= n; i++) {
+        resultado = resultado * i;
+    }
+    return resultado;
+}
+
+int main() {
+    std::cout &lt;&lt; "4! = " &lt;&lt; fatorial(4) &lt;&lt; "\n";
+    std::cout &lt;&lt; "20! = " &lt;&lt; fatorial(20) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra fatlaco.cpp -o fatlaco
+$ ./fatlaco
+4! = 24
+20! = 2432902008176640000</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Recursão</th><th>Laço</th></tr>
+<tr><td>Memória</td><td>Cada chamada ocupa um pedaço da pilha; muito fundo estoura</td><td>Constante: as mesmas poucas variáveis</td></tr>
+<tr><td>Velocidade</td><td>Um pouco mais lenta (cada chamada tem um custo); explode se repetir trabalho, como o Fibonacci</td><td>Geralmente mais rápida</td></tr>
+<tr><td>Clareza</td><td>Muito clara quando o problema é "naturalmente" recursivo</td><td>Mais clara para repetições simples (contar, somar, percorrer uma lista)</td></tr>
+<tr><td>Bons usos</td><td>Estruturas que contêm versões menores de si mesmas: pastas dentro de pastas, árvores genealógicas, menus com submenus; algoritmos de "dividir para conquistar" (ordenação rápida, busca binária)</td><td>Fatorial, somas, Fibonacci, percorrer vetores, ler entradas até acabar</td></tr>
+</table>
+</div>
+
+<p>Regra prática para quem está começando: <strong>se um laço simples resolve, use o laço</strong>. Guarde a recursão para quando o problema tiver a forma de "algo que contém versões menores de si mesmo", em que o laço ficaria complicado. E sempre que escrever uma função recursiva, faça duas perguntas: <em>qual é o caso base?</em> e <em>cada chamada chega mais perto dele?</em></p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>warning: infinite recursion detected [-Winfinite-recursion]</code></strong>
+<p><strong>O que significa:</strong> nenhum caminho da função termina sem chamar a si mesma: falta o caso base.</p>
+<p><strong>Como consertar:</strong> acrescente, no começo da função, um <code>if</code> que devolve a resposta sem nova chamada para o menor caso (<code>if (n &lt;= 1) return 1;</code>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>Falha de segmentação (imagem do núcleo gravada)</code>, código 139, numa função recursiva</strong>
+<p><strong>O que significa:</strong> estouro de pilha. Ou falta o caso base, ou o passo recursivo nunca o alcança (pula por cima, como no <code>n - 2</code>, ou anda na direção errada, como <code>n + 1</code>), ou a entrada é grande demais para a profundidade da pilha.</p>
+<p><strong>Como consertar:</strong> confira as duas perguntas: qual é o caso base, e cada chamada chega mais perto dele? Use <code>&lt;=</code> no caso base em vez de <code>==</code>, para pegar também valores que passaram do ponto. Se o problema é só o tamanho (centenas de milhares de níveis), reescreva com um laço. Para investigar onde caiu, use o <a href="depuracao-gdb.html">GDB</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>A função recursiva funciona, mas fica muito lenta com números maiores</strong>
+<p><strong>O que significa:</strong> provavelmente ela faz duas (ou mais) chamadas que recalculam o mesmo trabalho, como o Fibonacci. O custo cresce exponencialmente.</p>
+<p><strong>Como consertar:</strong> reescreva com um laço que guarda os resultados anteriores, ou guarde os resultados já calculados (memoização).</p>
+</div>
+
+<div class="cenario">
+<strong>O resultado do fatorial ficou negativo ou sem sentido</strong>
+<p><strong>O que significa:</strong> o número passou do limite do tipo. Um <code>int</code> aguenta só até <code>12!</code>; um <code>long long</code>, até <code>20!</code>. Acima disso, o resultado "dá a volta" (estouro de inteiro, aula <a href="inteiros.html">Inteiros</a>). Não é problema da recursão: o laço tem o mesmo limite.</p>
+<p><strong>Como consertar:</strong> use <code>long long</code> e não passe de 20.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Termo</th><th>Significado</th></tr>
+<tr><td>Recursão</td><td>Uma função que chama a si mesma</td></tr>
+<tr><td>Caso base</td><td>O caso mais simples, resolvido sem nova chamada: <code>if (n &lt;= 1) return 1;</code></td></tr>
+<tr><td>Passo recursivo</td><td>A chamada com um problema menor: <code>return n * fatorial(n - 1);</code></td></tr>
+<tr><td>Pilha de chamadas</td><td>As chamadas em andamento, empilhadas; a última a entrar é a primeira a sair</td></tr>
+<tr><td>Estouro de pilha</td><td>Chamadas demais: <code>Falha de segmentação</code>, código 139</td></tr>
+<tr><td><code>-Winfinite-recursion</code></td><td>Aviso do <code>-Wall</code> quando não há caminho sem recursão</td></tr>
+<tr><td><code>ulimit -s</code></td><td>Mostra ou muda o tamanho da pilha no terminal (em KB)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O caso base</h3>
+<p>Complete o caso base de uma função que calcula <code>base</code> elevado a <code>exp</code>, sabendo que qualquer número elevado a 0 é 1:</p>
+<div class="ex-code">if (exp == 0) { return <input data-answer="1" aria-label="valor">; }</div>
+</div>
+
+<div class="exercise">
+<h3>2. O passo recursivo</h3>
+<p>Complete o passo recursivo da mesma função (<code>base</code> elevado a <code>exp</code> é <code>base</code> vezes <code>base</code> elevado a <code>exp - 1</code>):</p>
+<div class="ex-code">return base * potencia(base, <input data-answer="exp - 1|exp-1" aria-label="argumento">);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Código de saída</h3>
+<p>Uma recursão sem fim termina com <code>Falha de segmentação</code>. Qual é o código de saída que o <code>echo $?</code> mostra?</p>
+<div class="ex-code"><input data-answer="139" aria-label="código"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. A função <code>void f(int n) { if (n == 10) return; f(n + 2); }</code> é chamada com <code>f(1)</code>. O que acontece?</p>
+<label><input type="radio" name="q4"> Para quando <code>n</code> chega a 10</label>
+<label><input type="radio" name="q4"> Erro de compilação</label>
+<label><input type="radio" name="q4"> Nunca chega a 10 (1, 3, 5, 7, 9, 11…) e a pilha estoura</label>
+<label><input type="radio" name="q4"> Para quando <code>n</code> chega a 0</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Por que o Fibonacci recursivo simples fica tão lento?</p>
+<label><input type="radio" name="q5"> Porque cada chamada faz duas outras, que recalculam os mesmos valores muitas vezes</label>
+<label><input type="radio" name="q5"> Porque usa <code>long long</code></label>
+<label><input type="radio" name="q5"> Porque recursão é sempre lenta</label>
+<label><input type="radio" name="q5"> Porque falta o caso base</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">6. Para somar os preços de um <code>std::vector</code> com 10 itens, o que é mais indicado?</p>
+<label><input type="radio" name="q6"> Recursão, porque é mais elegante</label>
+<label><input type="radio" name="q6"> Um laço, porque é uma repetição simples</label>
+<label><input type="radio" name="q6"> Tanto faz: os dois estouram a pilha</label>
+<label><input type="radio" name="q6"> Nenhum: não dá para somar um vetor</label>
+</div>
+
+<h3>Missão final: potência recursiva</h3>
+
+<div class="trycpp" data-goal="out:2^10 = 1024,out:3^4 = 81,out:5^0 = 1,src:potencia\s*\(\s*base\s*\,\s*exp\s*-\s*1\s*\),semaviso">
+<p class="try-task"><strong>Missão:</strong> complete <code>potencia(base, exp)</code> <strong>com recursão</strong>, sem laços: qualquer número elevado a 0 é 1 (caso base), e <code>base</code> elevado a <code>exp</code> é <code>base</code> vezes <code>potencia(base, exp - 1)</code> (passo recursivo). Saída esperada:</p>
+<pre class="out">2^10 = 1024
+3^4 = 81
+5^0 = 1</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+long long potencia(long long base, int exp) {
+    // caso base e passo recursivo aqui
+}
+
+int main() {
+    std::cout &lt;&lt; "2^10 = " &lt;&lt; potencia(2, 10) &lt;&lt; "\n";
+    std::cout &lt;&lt; "3^4 = " &lt;&lt; potencia(3, 4) &lt;&lt; "\n";
+    std::cout &lt;&lt; "5^0 = " &lt;&lt; potencia(5, 0) &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+long long potencia(long long base, int exp) {
+    if (exp == 0) {
+        return 1;
+    }
+    return base * potencia(base, exp - 1);
+}
+
+int main() {
+    std::cout &lt;&lt; "2^10 = " &lt;&lt; potencia(2, 10) &lt;&lt; "\n";
+    std::cout &lt;&lt; "3^4 = " &lt;&lt; potencia(3, 4) &lt;&lt; "\n";
+    std::cout &lt;&lt; "5^0 = " &lt;&lt; potencia(5, 0) &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>Recursão</strong>: uma função que chama a si mesma com um problema menor.</li>
+  <li>Toda função recursiva precisa de um <strong>caso base</strong> (resolve sem nova chamada) e de um <strong>passo recursivo</strong> que chegue mais perto dele a cada chamada.</li>
+  <li>As chamadas se empilham na <strong>pilha</strong> e voltam na ordem inversa: a última a entrar é a primeira a sair.</li>
+  <li>Duas chamadas que repetem trabalho (Fibonacci) crescem de forma exponencial: <code>fib(35)</code> fez quase 30 milhões de chamadas; o laço resolve <code>fib(90)</code> na hora.</li>
+  <li>Sem caso base (ou com um que nunca chega): estouro de pilha, <code>Falha de segmentação</code>, código 139. O <code>-Wall</code> avisa os casos óbvios com <code>-Winfinite-recursion</code>.</li>
+  <li>Se um laço simples resolve, use o laço. Recursão brilha em estruturas que contêm versões menores de si mesmas.</li>
+  <li>Próxima aula: <a href="lambdas.html">Lambdas</a>, funções sem nome escritas no meio do código.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
