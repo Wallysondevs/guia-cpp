@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Membros static — atributos e métodos da classe | Guia C++</title>
+<meta name="description" content="Membros static em C++ para iniciantes: atributo static compartilhado por todos os objetos (contador de produtos criados), definição fora da classe e o erro real de ligação undefined reference, inline static do C++17, métodos static, acesso com Classe:: e constantes static constexpr, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Membros static</span></h1>
+
+<p class="intro">Até agora, tudo o que você pôs numa classe pertencia a <strong>cada objeto</strong>: cada produto tem o seu nome, o seu preço, o seu estoque. Mas algumas informações não são de nenhum produto em particular, e sim da <strong>classe inteira</strong>: "quantos produtos já foram cadastrados?", "qual é o próximo código livre?", "qual é o estoque máximo da loja?". Para isso existem os membros <code>static</code> ("estático"): atributos e métodos que pertencem à classe, existem uma vez só e são compartilhados por todos os objetos.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que um atributo comum não serve para contar objetos.</li>
+  <li>Como declarar um atributo <code>static</code> e defini-lo fora da classe (o jeito clássico).</li>
+  <li>O erro de ligação <code>referência não definida</code> (<code>undefined reference</code>) quando falta a definição.</li>
+  <li>O atalho do C++17: <code>inline static int criados = 0;</code> dentro da classe.</li>
+  <li>Métodos <code>static</code>, que funcionam sem objeto nenhum, e por que eles não têm <code>this</code>.</li>
+  <li>Como acessar tudo isso com <code>Classe::nome</code>, e as constantes <code>static constexpr</code>.</li>
+</ul>
+</div>
+
+<p>Os programas desta aula foram compilados e executados na máquina fictícia da Ana, na pasta <code>~/cpp/static</code>, com o <strong>g++ 15.2</strong> e o comando padrão <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: o carimbo numerador da loja</h2>
+<p>Cada ficha de produto da Ana tem os seus campos. Mas, no balcão, há uma coisa que não é de ficha nenhuma: o <strong>carimbo numerador</strong>, aquele que carimba 1, depois 2, depois 3… Toda ficha nova passa por ele e ganha o próximo número. Existe <strong>um</strong> carimbo para a loja toda; se cada ficha tivesse o seu próprio carimbo, todas ganhariam o número 1.</p>
+<p>Um atributo <code>static</code> é o carimbo: uma variável só, que pertence à classe (o molde) e não a cada objeto. Todos os objetos enxergam e mexem <strong>na mesma</strong>.</p>
+
+<hr>
+
+<h2>1. O problema: contar com um atributo comum</h2>
+<p>A Ana quer saber quantos produtos foram criados. A primeira ideia é um atributo que o construtor aumenta:</p>
+
+<pre class="file" data-file="errado.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int criados = 0;
+
+    Produto(std::string n) : nome(n) {
+        criados++;
+    }
+};
+
+int main() {
+    Produto a{"caneta"};
+    Produto b{"caderno"};
+    Produto c{"régua"};
+    std::cout &lt;&lt; "a.criados = " &lt;&lt; a.criados &lt;&lt; "\n";
+    std::cout &lt;&lt; "c.criados = " &lt;&lt; c.criados &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/static">$ g++ -std=c++23 -Wall -Wextra errado.cpp -o errado
+$ ./errado
+a.criados = 1
+c.criados = 1          « deveria ser 3</pre>
+
+<p>Três produtos criados, e o contador diz 1. É o carimbo individual: cada objeto nasce com o <strong>seu próprio</strong> <code>criados</code> valendo 0, e o construtor aumenta o dele para 1. Os três contadores nunca se encontram.</p>
+
+<hr>
+
+<h2>2. O atributo <code>static</code> (jeito clássico)</h2>
+<p>Com a palavra <code>static</code>, o atributo deixa de ser de cada objeto e passa a ser da classe. No jeito clássico (que vale em qualquer versão do C++ e que você vai encontrar em muito código), ele é escrito em <strong>duas partes</strong>:</p>
+
+<pre class="file" data-file="classico.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    static int criados;          // declaração: existe um só, da classe
+
+    Produto(std::string n) : nome(n) {
+        criados++;
+    }
+};
+
+int Produto::criados = 0;        // definição: aqui ele nasce, com 0
+
+int main() {
+    std::cout &lt;&lt; "Antes: " &lt;&lt; Produto::criados &lt;&lt; "\n";
+    Produto a{"caneta"};
+    Produto b{"caderno"};
+    Produto c{"régua"};
+    std::cout &lt;&lt; "Depois: " &lt;&lt; Produto::criados &lt;&lt; "\n";
+    std::cout &lt;&lt; "Pelo objeto a: " &lt;&lt; a.criados &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/static">$ g++ -std=c++23 -Wall -Wextra classico.cpp -o classico
+$ ./classico
+Antes: 0
+Depois: 3
+Pelo objeto a: 3</pre>
+
+<dl class="anatomy">
+  <dt>static int criados;</dt><dd>A <strong>declaração</strong>, dentro da classe: "a classe <code>Produto</code> tem um contador <code>criados</code>, um só, compartilhado". Ela só anuncia; ainda não reserva memória.</dd>
+  <dt>int Produto::criados = 0;</dt><dd>A <strong>definição</strong>, fora da classe, uma única vez no programa: aqui a variável realmente nasce, com o valor 0. O <code>Produto::</code> diz de quem ela é (o mesmo <code>::</code> de <code>void Produto::mostrar()</code>, aula <a href="metodos.html">Métodos</a>). Repare: aqui <strong>não</strong> se repete a palavra <code>static</code>.</dd>
+  <dt>criados++;</dt><dd>Dentro do construtor, <code>criados</code> é o contador da classe. Cada produto novo aumenta <strong>o mesmo</strong> contador: 1, 2, 3.</dd>
+  <dt>Produto::criados</dt><dd>Fora da classe, o jeito certo de acessar: <strong>pelo nome da classe</strong>, com <code>::</code>. Funciona até antes de existir qualquer produto ("Antes: 0"), porque o contador é da classe, não de um objeto.</dd>
+  <dt>a.criados</dt><dd>Também funciona pelo objeto, e dá 3, o mesmo valor. Mas engana quem lê, que pode achar que é "o <code>criados</code> da caneta". Prefira <code>Produto::criados</code>.</dd>
+</dl>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Atributo comum (<code>int estoque;</code>)</th><th>Atributo <code>static</code> (<code>static int criados;</code>)</th></tr>
+<tr><td>Quantas cópias existem</td><td>Uma por objeto</td><td><strong>Uma só</strong>, para a classe inteira</td></tr>
+<tr><td>Quando nasce</td><td>Com o objeto</td><td>Antes do <code>main</code> começar</td></tr>
+<tr><td>Quando morre</td><td>Com o objeto</td><td>Quando o programa termina</td></tr>
+<tr><td>Como acessar de fora</td><td><code>caneta.estoque</code></td><td><code>Produto::criados</code></td></tr>
+<tr><td>Precisa de um objeto?</td><td>Sim</td><td>Não</td></tr>
+</table>
+</div>
+
+<div class="note"><strong>Por que essas duas partes?</strong> A classe costuma ficar num arquivo <code>.h</code>, incluído por vários <code>.cpp</code> (aula <a href="headers.html">Arquivos .h e .cpp</a>). Se a variável nascesse dentro da classe, ela nasceria uma vez em cada <code>.cpp</code> que incluísse o <code>.h</code>: vários contadores, de novo. Por isso, no C++ clássico, a classe só <em>declara</em>, e a <em>definição</em> fica num único <code>.cpp</code>. A seção 4 mostra a saída moderna para isso.</div>
+
+<hr>
+
+<h2>3. Esquecer a definição: o erro do ligador</h2>
+<p>O erro mais comum com <code>static</code> é escrever a declaração na classe e esquecer a linha de fora. Para deixar a mensagem curta, este exemplo usa um construtor sem parâmetros:</p>
+
+<pre class="file" data-file="semdef2.cpp">#include &lt;iostream&gt;
+
+class Produto {
+public:
+    static int criados;
+
+    Produto() {
+        criados++;
+    }
+};
+
+int main() {
+    Produto a;
+    Produto b;
+    std::cout &lt;&lt; Produto::criados &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/static">$ g++ -std=c++23 -Wall -Wextra semdef2.cpp -o semdef2
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccZjSjzl.o: aviso: relocalização contra "_ZN7Produto7criadosE" em secção só de leitura ".text._ZN7ProdutoC2Ev[_ZN7ProdutoC5Ev]"
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccZjSjzl.o: na função "main":
+semdef2.cpp:(.text+0x35): referência não definida para "Produto::criados"
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccZjSjzl.o: na função "Produto::Produto()":
+semdef2.cpp:(.text._ZN7ProdutoC2Ev[_ZN7ProdutoC5Ev]+0xe): referência não definida para "Produto::criados"
+/usr/bin/x86_64-linux-gnu-ld.bfd: semdef2.cpp:(.text._ZN7ProdutoC2Ev[_ZN7ProdutoC5Ev]+0x17): referência não definida para "Produto::criados"
+/usr/bin/x86_64-linux-gnu-ld.bfd: aviso: a criar DT_TEXTREL num PIE.
+collect2: error: ld returned 1 exit status</pre>
+
+<p>Assusta, mas a leitura é simples. Primeiro, quem reclamou: não foi o compilador (nenhuma linha diz <code>error:</code> com um número de linha do seu código), foi o <strong>ligador</strong>, o <code>ld</code>, a etapa final que junta os pedaços do programa (aula <a href="como-funciona.html">Como o C++ Vira Programa</a>). O compilador aceitou o código porque a classe <em>prometeu</em> que <code>Produto::criados</code> existe; o ligador foi procurar onde ele nasceu e não achou.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que quer dizer</th></tr>
+<tr><td><code>referência não definida para "Produto::criados"</code></td><td><strong>A linha que importa.</strong> "O código usa <code>Produto::criados</code>, mas ninguém o definiu." Aparece uma vez para cada lugar que usa o contador: no <code>main</code> e duas no construtor (ler e gravar o <code>criados++</code>).</td></tr>
+<tr><td><code>na função "main"</code> / <code>na função "Produto::Produto()"</code></td><td>Onde o uso foi encontrado.</td></tr>
+<tr><td><code>/tmp/ccZjSjzl.o</code>, <code>.text+0x35</code></td><td>Arquivo temporário e posição dentro do código de máquina. O nome muda a cada compilação; ignore.</td></tr>
+<tr><td><code>_ZN7Produto7criadosE</code></td><td>O nome "codificado" (<em>mangled</em>) de <code>Produto::criados</code>, como o ligador o enxerga.</td></tr>
+<tr><td>As linhas de <code>aviso:</code> (relocalização, <code>DT_TEXTREL</code>)</td><td>Efeitos colaterais da referência que faltou. Somem quando você conserta o erro.</td></tr>
+<tr><td><code>collect2: error: ld returned 1 exit status</code></td><td>O g++ avisando que o ligador falhou, e por isso o programa não foi gerado.</td></tr>
+</table>
+</div>
+
+<p>Essa mensagem saiu em português porque o <code>ld</code> tem tradução no Ubuntu (as mensagens do próprio g++ continuam em inglês). Num sistema em inglês, a linha principal é a famosa <code>undefined reference to `Produto::criados'</code>, que você vai encontrar em buscas na internet. No editor do guia, quem liga o programa é outro ligador (o do WebAssembly), e a mensagem fala em <code>undefined symbol</code> ("símbolo indefinido"); a causa é a mesma.</p>
+
+<p><strong>Como resolver:</strong> escreva a definição, <code>int Produto::criados = 0;</code>, fora da classe, uma vez. Ou use o atalho da próxima seção.</p>
+
+<hr>
+
+<h2>4. O atalho do C++17: <code>inline static</code></h2>
+<p>A primeira tentativa de quem aprende é inicializar o <code>static</code> na própria classe, como um atributo comum. Sem mais nada, o C++ recusa:</p>
+
+<pre class="file" data-file="dentro.cpp">class Produto {
+public:
+    std::string nome;
+    static int criados = 0;
+    …
+};
+</pre>
+
+<pre class="term" data-cwd="~/cpp/static">$ g++ -std=c++23 -Wall -Wextra dentro.cpp -o dentro
+dentro.cpp:7:16: error: ISO C++ forbids in-class initialization of non-const static member ‘Produto::criados’
+    7 |     static int criados = 0;
+      |                ^~~~~~~</pre>
+
+<p>"O C++ padrão (ISO) proíbe inicializar dentro da classe um membro <code>static</code> que não é <code>const</code>." É a regra das duas partes da seção 2. Desde o <span class="versao">C++17</span>, porém, basta acrescentar <code>inline</code>:</p>
+
+<pre class="file" data-file="inline.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    inline static int criados = 0;
+
+    Produto(std::string n) : nome(n) {
+        criados++;
+    }
+};
+
+int main() {
+    Produto a{"caneta"};
+    Produto b{"caderno"};
+    std::cout &lt;&lt; "Produtos criados: " &lt;&lt; Produto::criados &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/static">$ g++ -std=c++23 -Wall -Wextra inline.cpp -o inline
+$ ./inline
+Produtos criados: 2</pre>
+
+<dl class="anatomy">
+  <dt>inline static int criados = 0;</dt><dd>Declaração <strong>e</strong> definição numa linha só, dentro da classe. O <code>inline</code> diz ao ligador: "esta variável pode aparecer em vários arquivos <code>.cpp</code> (porque a classe está num <code>.h</code> incluído por eles), mas é <strong>uma só</strong>: junte todas as aparições numa". Acabaram a linha de fora e o risco de esquecê-la.</dd>
+  <dt>inline static ou static inline</dt><dd>A ordem das duas palavras não importa; as duas formas aparecem por aí.</dd>
+</dl>
+
+<p>O <code>inline</code> em variáveis é do C++17. Pedindo um padrão mais antigo ao g++, ele ainda compila, mas avisa:</p>
+
+<pre class="term" data-cwd="~/cpp/static">$ g++ -std=c++14 -Wall -Wextra inline.cpp -o inline14
+inline.cpp:7:5: warning: inline variables are only available with ‘-std=c++17’ or ‘-std=gnu++17’ [-Wc++17-extensions]
+    7 |     inline static int criados = 0;
+      |     ^~~~~~
+$ ./inline14
+Produtos criados: 2</pre>
+
+<p>Com o comando padrão deste guia (<code>-std=c++23</code>), não há aviso. Como o g++ 15 usa C++17 quando você não pede outro padrão, o <code>inline static</code> funciona até sem o <code>-std</code>.</p>
+
+<div class="tip"><strong>Qual usar?</strong> Em código novo, <code>inline static</code>: uma linha, dentro da classe, sem chance de esquecer a definição. O jeito clássico (declaração + <code>int Produto::criados = 0;</code> num <code>.cpp</code>) continua certo e é o que você vai ler em projetos antigos, ou em projetos presos a C++11/14.</div>
+
+<div class="trycpp" data-goal="out:Produtos criados: 3,src:(inline\s+static|static\s+inline)\s+int\s+criados">
+<p class="try-task"><strong>Missão:</strong> o contador abaixo mostra 1. Transforme <code>criados</code> num atributo da classe com <code>inline static</code> e mostre-o pelo nome da classe (<code>Produto::criados</code>). A saída deve ser <code>Produtos criados: 3</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int criados = 0;
+
+    Produto(std::string n) : nome(n) {
+        criados++;
+    }
+};
+
+int main() {
+    Produto a{"caneta"};
+    Produto b{"caderno"};
+    Produto c{"régua"};
+    std::cout &lt;&lt; "Produtos criados: " &lt;&lt; c.criados &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    inline static int criados = 0;
+
+    Produto(std::string n) : nome(n) {
+        criados++;
+    }
+};
+
+int main() {
+    Produto a{"caneta"};
+    Produto b{"caderno"};
+    Produto c{"régua"};
+    std::cout &lt;&lt; "Produtos criados: " &lt;&lt; Produto::criados &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>5. Métodos <code>static</code></h2>
+<p>Um contador público pode ser mexido por qualquer um (<code>Produto::criados = 500;</code>), o mesmo problema da aula <a href="encapsulamento.html">public e private</a>. A solução é a de sempre: deixá-lo <code>private</code> e oferecer um método para ler. Mas um método comum precisa de um objeto para ser chamado, e "quantos produtos existem?" é uma pergunta à classe, não a um produto. Para isso existem os <strong>métodos <code>static</code></strong>.</p>
+
+<p>O exemplo abaixo também usa o contador para dar a cada produto um <strong>código automático</strong>, o carimbo numerador da ideia inicial:</p>
+
+<pre class="file" data-file="metodo.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(std::string nome) : nome_(nome), codigo_(proximoCodigo_++) {
+    }
+
+    void mostrar() const {
+        std::cout &lt;&lt; "#" &lt;&lt; codigo_ &lt;&lt; " " &lt;&lt; nome_ &lt;&lt; "\n";
+    }
+
+    static int quantosCriados() {
+        return proximoCodigo_ - 1;
+    }
+
+private:
+    std::string nome_;
+    int codigo_;
+    inline static int proximoCodigo_ = 1;
+};
+
+int main() {
+    std::cout &lt;&lt; "Criados: " &lt;&lt; Produto::quantosCriados() &lt;&lt; "\n";
+
+    Produto caneta{"caneta"};
+    Produto caderno{"caderno"};
+    Produto regua{"régua"};
+
+    caneta.mostrar();
+    caderno.mostrar();
+    regua.mostrar();
+    std::cout &lt;&lt; "Criados: " &lt;&lt; Produto::quantosCriados() &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/static">$ g++ -std=c++23 -Wall -Wextra metodo.cpp -o metodo
+$ ./metodo
+Criados: 0
+#1 caneta
+#2 caderno
+#3 régua
+Criados: 3</pre>
+
+<dl class="anatomy">
+  <dt>inline static int proximoCodigo_ = 1;</dt><dd>O carimbo: privado, da classe, começa em 1. Ninguém de fora consegue mexer nele.</dd>
+  <dt>codigo_(proximoCodigo_++)</dt><dd>Na <a href="construtores.html">lista de inicialização</a>, cada produto novo pega o número atual do carimbo para o <strong>seu</strong> <code>codigo_</code> (um atributo comum, um por objeto), e o <code>++</code> deixa o carimbo pronto para o próximo (aula <a href="incremento.html">++ e --</a>: o pós-incremento entrega o valor antigo e depois soma).</dd>
+  <dt>static int quantosCriados()</dt><dd>Um método da <strong>classe</strong>. Ele pode usar os membros <code>static</code> (<code>proximoCodigo_</code>), mesmo os privados.</dd>
+  <dt>Produto::quantosCriados()</dt><dd>Chamado pelo nome da classe, sem objeto nenhum: funciona até antes de existir o primeiro produto ("Criados: 0").</dd>
+</dl>
+
+<h3>Método <code>static</code> não tem <code>this</code></h3>
+<p>Como ninguém chama um método <code>static</code> "sobre" um objeto, ele não recebe o parâmetro escondido <code>this</code> (aula <a href="this.html">this</a>). Consequência: ele <strong>não enxerga os atributos comuns</strong>. Não há "o nome" sem um produto.</p>
+
+<pre class="file" data-file="staticnome.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    inline static int criados = 0;
+
+    static void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; "\n";
+    }
+
+    static void mostrar2() {
+        std::cout &lt;&lt; this-&gt;nome &lt;&lt; "\n";
+    }
+};
+
+int main() {
+    Produto::mostrar();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/static">$ g++ -std=c++23 -Wall -Wextra staticnome.cpp -o staticnome
+staticnome.cpp: In static member function ‘static void Produto::mostrar()’:
+staticnome.cpp:10:22: error: invalid use of member ‘Produto::nome’ in static member function
+   10 |         std::cout &lt;&lt; nome &lt;&lt; "\n";
+      |                      ^~~~
+staticnome.cpp:6:17: note: declared here
+    6 |     std::string nome;
+      |                 ^~~~
+staticnome.cpp: In static member function ‘static void Produto::mostrar2()’:
+staticnome.cpp:14:22: error: ‘this’ is unavailable for static member functions
+   14 |         std::cout &lt;&lt; this-&gt;nome &lt;&lt; "\n";
+      |                      ^~~~</pre>
+
+<p>Dois erros, a mesma causa. "Uso inválido do membro <code>Produto::nome</code> em função-membro estática": o nome de qual produto? E "<code>this</code> não está disponível em funções-membro estáticas". Se o método precisa de um produto, ou ele não deveria ser <code>static</code>, ou deve receber o produto por parâmetro (<code>static void mostrar(const Produto&amp; p)</code>).</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Dentro de…</th><th>pode usar atributos comuns?</th><th>pode usar atributos <code>static</code>?</th><th>tem <code>this</code>?</th></tr>
+<tr><td>Método comum</td><td>Sim</td><td>Sim</td><td>Sim</td></tr>
+<tr><td>Método <code>static</code></td><td><strong>Não</strong> (só de um objeto recebido por parâmetro)</td><td>Sim</td><td><strong>Não</strong></td></tr>
+</table>
+</div>
+
+<p>E o contrário funciona: um método comum (como o construtor acima) pode usar membros <code>static</code> à vontade. Um método <code>static</code> também não pode ser <code>const</code> (aula <a href="metodos-const.html">Métodos const</a>): o <code>const</code> promete não mudar <em>o objeto</em>, e ele não tem objeto.</p>
+
+<hr>
+
+<h2>6. Constantes da classe: <code>static constexpr</code></h2>
+<p>Outro uso muito comum: uma constante que vale para a classe toda, como o estoque máximo que cabe na prateleira. Constantes podem ser inicializadas dentro da classe desde sempre, e o jeito moderno é <code>static constexpr</code> (aula <a href="constantes.html">Constantes</a>):</p>
+
+<pre class="file" data-file="constante.cpp">class Produto {
+public:
+    static constexpr int estoqueMaximo = 100;
+
+    Produto(std::string nome) : nome_(nome) {
+    }
+
+    bool repor(int quantidade) {
+        if (estoque_ + quantidade &gt; estoqueMaximo) {
+            std::cout &lt;&lt; "Não cabe: máximo " &lt;&lt; estoqueMaximo &lt;&lt; "\n";
+            return false;
+        }
+        estoque_ += quantidade;
+        return true;
+    }
+
+    int estoque() const { return estoque_; }
+
+private:
+    std::string nome_;
+    int estoque_ = 0;
+};
+
+int main() {
+    Produto caneta{"caneta"};
+    caneta.repor(80);
+    caneta.repor(30);
+    std::cout &lt;&lt; "Estoque: " &lt;&lt; caneta.estoque() &lt;&lt; " de " &lt;&lt; Produto::estoqueMaximo &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/static">$ g++ -std=c++23 -Wall -Wextra constante.cpp -o constante
+$ ./constante
+Não cabe: máximo 100
+Estoque: 80 de 100</pre>
+
+<p><code>static</code> porque o máximo é o mesmo para todo produto (não faz sentido guardar 100 dentro de cada objeto); <code>constexpr</code> porque nunca muda e é conhecido na compilação. Pode ser pública sem medo, já que ninguém consegue mudá-la. Membros <code>constexpr static</code> já são <code>inline</code> automaticamente, por isso não precisam da linha de fora.</p>
+
+<hr>
+
+<h2>Formas diferentes: qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Forma</th></tr>
+<tr><td>Contador, próximo código, total da loja (muda)</td><td><code>inline static int x = 0;</code>, de preferência <code>private</code>, com um método <code>static</code> para ler.</td></tr>
+<tr><td>Mesmo caso, em código C++11/14</td><td><code>static int x;</code> na classe + <code>int Classe::x = 0;</code> num <code>.cpp</code>.</td></tr>
+<tr><td>Constante da classe (não muda)</td><td><code>static constexpr int maximo = 100;</code></td></tr>
+<tr><td>Operação que não precisa de objeto</td><td>Método <code>static</code>, chamado com <code>Classe::metodo()</code>.</td></tr>
+<tr><td>Acessar um membro <code>static</code></td><td><code>Classe::membro</code> (funciona por um objeto, mas engana quem lê).</td></tr>
+</table>
+</div>
+
+<div class="warning"><strong>Contar objetos <em>vivos</em> é outra história.</strong> O contador desta aula conta quantos produtos foram <strong>criados</strong>. Para saber quantos ainda <strong>existem</strong>, é preciso diminuir o contador quando um produto morre, e isso se faz no <strong>destrutor</strong>, assunto da próxima aula, <a href="destrutores-raii.html">Destrutores e RAII</a>. (E cópias de objetos passam por outro construtor, que você verá em <a href="copia-movimento.html">Cópia e Movimento</a>.)</div>
+
+<hr>
+
+<h2 id="errado">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Declarou o <code>static</code> e esqueceu a definição</strong>
+<p>É o erro da seção 3: <code>referência não definida para "Produto::criados"</code> (em inglês, <code>undefined reference to `Produto::criados'</code>), vindo do <code>ld</code>, terminando com <code>collect2: error: ld returned 1 exit status</code>. <strong>Como resolver:</strong> acrescente <code>int Produto::criados = 0;</code> fora da classe, ou troque a declaração por <code>inline static int criados = 0;</code>. Num projeto com vários arquivos, confira também se o <code>.cpp</code> que tem a definição entrou no comando de compilação (aula <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>Inicializou dentro da classe sem <code>inline</code></strong>
+<p>É o erro da seção 4: <code>ISO C++ forbids in-class initialization of non-const static member ‘Produto::criados’</code>. No Clang, do editor do guia: <code>non-const static data member must be initialized out of line</code> ("membro estático não-const precisa ser inicializado fora da classe"). <strong>Como resolver:</strong> acrescente <code>inline</code> (<code>inline static int criados = 0;</code>) ou tire o <code>= 0</code> e escreva a definição fora.</p>
+</div>
+
+<div class="cenario">
+<strong>Repetir <code>static</code> na definição de fora</strong>
+<pre class="file" data-file="repetirstatic.cpp">#include &lt;iostream&gt;
+
+class Produto {
+public:
+    static int criados;
+};
+
+static int Produto::criados = 0;
+
+int main() {
+    std::cout &lt;&lt; Produto::criados &lt;&lt; "\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/static">$ g++ -std=c++23 -Wall -Wextra repetirstatic.cpp -o repetirstatic
+repetirstatic.cpp:8:1: error: ‘static’ may not be used when defining (as opposed to declaring) a static data member [-fpermissive]
+    8 | static int Produto::criados = 0;
+      | ^~~~~~</pre>
+<p><strong>O que aconteceu:</strong> "<code>static</code> não pode ser usado ao <em>definir</em> (em oposição a <em>declarar</em>) um membro de dados estático". A palavra <code>static</code> vai só na declaração, dentro da classe; fora, ela teria outro significado (que você vai ver em <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>). O mesmo vale para métodos <code>static</code> definidos fora da classe. No Clang: <code>'static' can only be specified inside the class definition</code>.</p>
+<p><strong>Como resolver:</strong> <code>int Produto::criados = 0;</code>, sem <code>static</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Método <code>static</code> usando um atributo comum ou <code>this</code></strong>
+<p>São os erros da seção 5: <code>invalid use of member ‘Produto::nome’ in static member function</code> e <code>‘this’ is unavailable for static member functions</code>. <strong>Como resolver:</strong> se o método trabalha sobre um produto, tire o <code>static</code> (vira um método comum); se ele é mesmo da classe, passe o produto por parâmetro ou use só membros <code>static</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>static int criados;</code> (na classe)</td><td>Declara um atributo da classe, compartilhado por todos os objetos.</td></tr>
+<tr><td><code>int Produto::criados = 0;</code> (fora, uma vez)</td><td>Define o atributo <code>static</code> (jeito clássico). Sem <code>static</code> aqui.</td></tr>
+<tr><td><code>inline static int criados = 0;</code></td><td>Declara e define dentro da classe (C++17).</td></tr>
+<tr><td><code>static constexpr int maximo = 100;</code></td><td>Constante da classe.</td></tr>
+<tr><td><code>static int quantos() { … }</code></td><td>Método da classe: sem objeto, sem <code>this</code>, só enxerga membros <code>static</code>.</td></tr>
+<tr><td><code>Produto::criados</code>, <code>Produto::quantos()</code></td><td>Acesso pelo nome da classe (forma recomendada).</td></tr>
+<tr><td><code>referência não definida</code> / <code>undefined reference</code></td><td>Erro do ligador: faltou a definição de fora.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Da classe, não do objeto</h3>
+<p>Complete a declaração para que o contador seja um só, dentro da classe, com valor inicial 0 (C++17):</p>
+<div class="ex-code"><input data-answer="inline static|static inline" aria-label="palavras"> int total = 0;</div>
+</div>
+
+<div class="exercise">
+<h3>2. A definição clássica</h3>
+<p>A classe <code>Cliente</code> declara <code>static int total;</code>. Complete a definição de fora da classe:</p>
+<div class="ex-code">int <input data-answer="Cliente::total" aria-label="nome"> = 0;</div>
+</div>
+
+<div class="exercise">
+<h3>3. Chamar sem objeto</h3>
+<p>Complete para chamar o método <code>static</code> <code>quantosCriados</code> da classe <code>Produto</code>:</p>
+<div class="ex-code">int n = <input data-answer="Produto::quantosCriados();|Produto::quantosCriados()" aria-label="chamada"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Três objetos <code>Produto</code> existem e a classe tem <code>inline static int criados</code>. Quantas variáveis <code>criados</code> existem na memória?</p>
+<label><input type="radio" name="q4"> Três, uma por objeto</label>
+<label><input type="radio" name="q4"> Nenhuma, até alguém chamar um método</label>
+<label><input type="radio" name="q4"> Uma, da classe</label>
+<label><input type="radio" name="q4"> Quatro: uma por objeto e uma da classe</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. A classe declara <code>static int criados;</code>, sem <code>inline</code> e sem definição fora. Quem reclama, e com que mensagem?</p>
+<label><input type="radio" name="q5"> O ligador (<code>ld</code>): <code>referência não definida para "Produto::criados"</code> / <code>undefined reference</code></label>
+<label><input type="radio" name="q5"> O compilador: <code>‘criados’ was not declared in this scope</code></label>
+<label><input type="radio" name="q5"> Ninguém: o contador começa com lixo</label>
+<label><input type="radio" name="q5"> O programa, ao rodar: falha de segmentação</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Por que um método <code>static</code> não pode usar o atributo comum <code>nome</code>?</p>
+<label><input type="radio" name="q6"> Porque <code>nome</code> é privado</label>
+<label><input type="radio" name="q6"> Porque métodos <code>static</code> só aceitam números</label>
+<label><input type="radio" name="q6"> Porque falta <code>const</code></label>
+<label><input type="radio" name="q6"> Porque ele não é chamado sobre um objeto: não tem <code>this</code>, então não há "o nome" de ninguém</label>
+</div>
+
+<h3>Missão final: carteirinhas numeradas</h3>
+
+<div class="trycpp" data-goal="out:#1 Bia,out:#2 Caio,out:#3 Duda,out:Clientes cadastrados: 3,src:static\s+int\s+total\s*\(">
+<p class="try-task"><strong>Missão:</strong> cada cliente da lojinha ganha uma carteirinha com número automático. Complete a classe <code>Cliente</code>: um contador <code>inline static int proximo_ = 1;</code> privado; no construtor, o <code>id_</code> recebe <code>proximo_++</code>; e um método <code>static int total()</code> que devolve quantos clientes foram cadastrados. A saída deve ser:</p>
+<pre class="out">#1 Bia
+#2 Caio
+#3 Duda
+Clientes cadastrados: 3</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Cliente {
+public:
+    Cliente(std::string nome) : nome_(nome), id_(0) {
+    }
+
+    void mostrar() const {
+        std::cout &lt;&lt; "#" &lt;&lt; id_ &lt;&lt; " " &lt;&lt; nome_ &lt;&lt; "\n";
+    }
+
+    // escreva o método static total() aqui
+
+private:
+    std::string nome_;
+    int id_;
+    // e o contador aqui
+};
+
+int main() {
+    Cliente bia{"Bia"};
+    Cliente caio{"Caio"};
+    Cliente duda{"Duda"};
+    bia.mostrar();
+    caio.mostrar();
+    duda.mostrar();
+    std::cout &lt;&lt; "Clientes cadastrados: " &lt;&lt; Cliente::total() &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Cliente {
+public:
+    Cliente(std::string nome) : nome_(nome), id_(proximo_++) {
+    }
+
+    void mostrar() const {
+        std::cout &lt;&lt; "#" &lt;&lt; id_ &lt;&lt; " " &lt;&lt; nome_ &lt;&lt; "\n";
+    }
+
+    static int total() {
+        return proximo_ - 1;
+    }
+
+private:
+    std::string nome_;
+    int id_;
+    inline static int proximo_ = 1;
+};
+
+int main() {
+    Cliente bia{"Bia"};
+    Cliente caio{"Caio"};
+    Cliente duda{"Duda"};
+    bia.mostrar();
+    caio.mostrar();
+    duda.mostrar();
+    std::cout &lt;&lt; "Clientes cadastrados: " &lt;&lt; Cliente::total() &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um membro <code>static</code> pertence à <strong>classe</strong>, não a cada objeto: existe uma vez só e é compartilhado. Serve para contadores, códigos automáticos e constantes da classe.</li>
+  <li>Jeito clássico: <code>static int criados;</code> na classe + <code>int Produto::criados = 0;</code> fora, uma vez (sem repetir <code>static</code>). Esquecer a de fora dá erro do ligador: <code>referência não definida</code> / <code>undefined reference</code>.</li>
+  <li>Desde o C++17: <code>inline static int criados = 0;</code>, tudo dentro da classe. Sem o <code>inline</code>, <code>ISO C++ forbids in-class initialization of non-const static member</code>.</li>
+  <li>Acesse com <code>Classe::membro</code>; funciona sem nenhum objeto criado.</li>
+  <li>Métodos <code>static</code> são chamados com <code>Classe::metodo()</code>, não têm <code>this</code> e só enxergam membros <code>static</code>.</li>
+  <li>Constantes da classe: <code>static constexpr int maximo = 100;</code>.</li>
+  <li>Próxima aula: o que acontece quando um objeto morre, em <a href="destrutores-raii.html">Destrutores e RAII</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
