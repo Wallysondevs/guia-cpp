@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Editores e IDEs — VS Code, CLion, Visual Studio, Code::Blocks e Vim | Guia C++</title>
+<meta name="description" content="Onde escrever código C++: editor de texto, editor de código e IDE. VS Code com as extensões C/C++ da Microsoft e clangd, configurar o C++23, compilar pelo terminal integrado e com um tasks.json, CLion, Visual Studio, Code::Blocks e Vim, e os cuidados com o arquivo (extensão, UTF-8, salvar antes de compilar).">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Editores e IDEs</span></h1>
+
+<p class="intro">Código C++ é texto puro: dá para escrever no Bloco de Notas. Mas um bom <strong>editor de código</strong> faz a diferença entre sofrer e aprender: ele pinta cada parte do código de uma cor, avisa do erro enquanto você digita, completa nomes compridos como <code>std::vector</code> e compila com uma tecla. Nesta aula você vai conhecer os editores e IDEs mais usados para C++, configurar o <strong>VS Code</strong> para o C++23, compilar por dentro dele e saber os cuidados com o arquivo que evitam dor de cabeça.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A diferença entre editor de texto, editor de código e IDE.</li>
+  <li>Configurar o VS Code: as extensões <strong>C/C++</strong> da Microsoft e <strong>clangd</strong>, e o padrão C++23.</li>
+  <li>Compilar pelo terminal integrado e com uma tarefa (<code>tasks.json</code>) ligada ao atalho <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>.</li>
+  <li>O que oferecem o CLion, o Visual Studio, o Code::Blocks e o Vim, e qual escolher.</li>
+  <li>Os cuidados com o arquivo: extensão <code>.cpp</code>, UTF-8 e salvar antes de compilar.</li>
+</ul>
+</div>
+
+<p>Esta aula não tem capturas de tela: os menus mudam a cada versão, e o guia descreve o caminho pelo nome dos botões. As saídas de terminal foram produzidas na máquina da Ana, que tem o VS Code 1.141.</p>
+
+<hr>
+
+<h2>A ideia: caneta, caderno e estojo completo</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Comparação</th><th>O que faz</th><th>Exemplos</th></tr>
+<tr><td><strong>Editor de texto</strong></td><td>Uma caneta e uma folha</td><td>Só escreve e salva texto.</td><td>Bloco de Notas, gedit, <code>nano</code></td></tr>
+<tr><td><strong>Editor de código</strong></td><td>Um caderno com régua, marca-texto e corretor</td><td>Cores por tipo de palavra, numeração de linhas, completar nomes, marcar erros; com extensões, compila e depura.</td><td><strong>VS Code</strong>, Vim, Neovim, Sublime Text, Zed</td></tr>
+<tr><td><strong>IDE</strong> (<em>Integrated Development Environment</em>, "ambiente de desenvolvimento integrado")</td><td>O estojo completo</td><td>Tudo do editor de código, mais projetos, compilação, depurador e ferramentas de análise, já configurados e integrados.</td><td><strong>CLion</strong>, <strong>Visual Studio</strong>, <strong>Code::Blocks</strong></td></tr>
+</table>
+</div>
+
+<p>Importante: <strong>nenhum deles é o compilador</strong>. O editor só ajuda a escrever; quem transforma o código em programa continua sendo o <code>g++</code>, o <code>clang++</code> ou o <code>cl</code> da Microsoft, que você instalou na aula <a href="instalar-linux.html">Instalar no Linux</a> ou <a href="instalar-windows-mac.html">Instalar no Windows e macOS</a>. A exceção são algumas IDEs (Visual Studio, Code::Blocks para Windows, CLion para Windows) que já trazem um compilador junto.</p>
+
+<hr>
+
+<h2>Por que um editor de código ajuda tanto</h2>
+<p>Veja um erro que todo iniciante comete: esquecer de fechar as aspas. A Ana escreveu <code>"Olá, mundo!\n;</code> (o <code>"</code> do fim sumiu):</p>
+
+<pre class="file" data-file="aspas.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!\n;
+    std::cout &lt;&lt; "Tchau!\n";
+}
+</pre>
+
+<p>Num editor de código, o problema salta aos olhos <strong>antes</strong> de compilar: o texto entre aspas tem uma cor própria, e a cor "vaza" até o fim da linha, ou as aspas da linha seguinte ficam com a cor trocada. O editor também sublinha o erro em vermelho. Sem essa ajuda, a Ana só descobre ao compilar, e o g++ responde com uma avalanche:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra aspas.cpp -o aspas 2&gt;&amp;1 | wc -l
+391                                                « 391 linhas de mensagens!
+$ g++ -std=c++23 -Wall -Wextra aspas.cpp -o aspas 2&gt;&amp;1 | head -6
+aspas.cpp:4:18: warning: missing terminating " character
+    4 |     std::cout &lt;&lt; "Olá, mundo!\n;
+      |                  ^
+aspas.cpp:4:18: error: missing terminating " character   « a primeira mensagem diz tudo
+    4 |     std::cout &lt;&lt; "Olá, mundo!\n;
+      |                  ^~~~~~~~~~~~~~~</pre>
+
+<p>O <code>2&gt;&amp;1 | wc -l</code> conta as linhas da mensagem (as mensagens do compilador saem por um canal separado, e o <code>2&gt;&amp;1</code> as junta à saída normal), e o <code>head -6</code> mostra só as seis primeiras. A primeira mensagem já diz o problema: <code>missing terminating " character</code>, "falta o caractere <code>"</code> de fechamento", na linha 4, coluna 18. As outras 385 linhas são <strong>consequência</strong>: sem as aspas fechadas, o g++ se perdeu e tentou entender o resto de todo jeito. Regra de ouro, que a aula <a href="erros-compilacao.html">Lendo Erros do Compilador</a> detalha: <strong>leia e conserte a primeira mensagem</strong>, e compile de novo.</p>
+
+<p>Experimente aqui. O editor do guia também pinta o código, e o compilador dele, o Clang, costuma ser mais econômico nas mensagens:</p>
+
+<div class="trycpp" data-goal="out:Olá\, mundo!,out:Tchau!">
+<p class="try-task"><strong>Missão:</strong> rode e leia o erro. Repare nas cores da linha 4: o texto "vaza". Feche as aspas no lugar certo (antes do <code>;</code>, depois do <code>\n</code>) e rode de novo: devem aparecer as duas linhas.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!\n;
+    std::cout &lt;&lt; "Tchau!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!\n";
+    std::cout &lt;&lt; "Tchau!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>VS Code</h2>
+<p>O <strong>Visual Studio Code</strong> (VS Code) é um editor de código gratuito da Microsoft, para Windows, Linux e macOS. Sozinho, ele só pinta o código; com as <strong>extensões</strong> certas, vira um ambiente completo para C++. É o editor mais usado do mundo e o recomendado para seguir o guia. Não confunda com o <strong>Visual Studio</strong> (sem "Code"), a IDE pesada só para Windows.</p>
+
+<h3>Instalando</h3>
+<p>Baixe em <a href="https://code.visualstudio.com/">code.visualstudio.com</a> (no Ubuntu e no Debian, o arquivo <code>.deb</code>; no Fedora, o <code>.rpm</code>; no Windows e no macOS, o instalador). Depois de instalado, o comando <code>code</code> funciona no terminal:</p>
+
+<pre class="term" data-cwd="~/cpp">$ code --version
+1.141.0                                            « a versão do VS Code
+2a59476c9bfcb90b3ddc372c36762471b7dfad1c           « o código da compilação (pode ignorar)
+x64                                                « a arquitetura: PC de 64 bits</pre>
+
+<p>Para abrir a pasta dos seus programas no VS Code: <code>code ~/cpp</code> (ou, no VS Code, <strong>Arquivo → Abrir Pasta</strong>). Trabalhe sempre com a <strong>pasta</strong> aberta, não com arquivos soltos: as configurações e as tarefas ficam na pasta.</p>
+
+<h3>As extensões: C/C++ ou clangd</h3>
+<p>Abra a aba <strong>Extensões</strong> (o ícone de quadradinhos na barra da esquerda, ou <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>) e procure pelo nome. Há duas boas opções, e você deve usar <strong>uma</strong> delas para entender o código:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><strong>C/C++</strong> (da Microsoft)</th><th><strong>clangd</strong> (do projeto LLVM)</th></tr>
+<tr><td>Identificador</td><td><code>ms-vscode.cpptools</code></td><td><code>llvm-vs-code-extensions.vscode-clangd</code></td></tr>
+<tr><td>O que faz</td><td>IntelliSense (completar, marcar erros, ir para a definição) e <strong>depuração</strong> com o GDB, o LLDB ou o depurador da Microsoft</td><td>Completar e marcar erros usando o próprio Clang: os erros sublinhados são exatamente os do compilador</td></tr>
+<tr><td>Precisa instalar algo mais?</td><td>Não (só o compilador)</td><td>O programa <code>clangd</code>: <code>sudo apt install clangd</code> no Ubuntu; a extensão também oferece baixá-lo</td></tr>
+<tr><td>Configurar o C++23</td><td>Configuração <code>C_Cpp.default.cppStandard</code> = <code>c++23</code></td><td>Um arquivo <code>compile_flags.txt</code> na pasta (veja abaixo)</td></tr>
+<tr><td>Bom para</td><td>Começar: funciona sem configurar quase nada, e traz o depurador</td><td>Quem quer avisos mais precisos e rápidos</td></tr>
+</table>
+</div>
+
+<p>Pelo terminal, a instalação é um comando: <code>code --install-extension ms-vscode.cpptools</code> (ou o identificador do clangd). Se instalar as duas, a do clangd pergunta se pode desligar o IntelliSense da Microsoft: aceite, senão cada erro aparece duas vezes. Dá para manter a da Microsoft só para depurar.</p>
+
+<h3>Configurando o C++23</h3>
+<p>Os dois "corretores" precisam saber que você usa C++23; senão, sublinham o <code>std::println</code> como erro, mesmo ele compilando. Na extensão <strong>C/C++</strong>: abra as configurações (<kbd>Ctrl</kbd>+<kbd>,</kbd>), procure <strong>Cpp Standard</strong> e escolha <code>c++23</code> no item <strong>C_Cpp › Default: Cpp Standard</strong>. Com o <strong>clangd</strong>: crie na pasta do projeto um arquivo chamado <code>compile_flags.txt</code> com as opções de compilação, uma por linha:</p>
+
+<pre class="file" data-file="compile_flags.txt">-std=c++23
+-Wall
+-Wextra
+</pre>
+
+<p>O clangd lê esse arquivo e passa a analisar o código com as mesmas opções do comando padrão do guia. Em projetos com CMake, ele usa outro arquivo, gerado automaticamente (aula <a href="cmake.html">CMake</a>).</p>
+
+<h3>Compilar pelo terminal integrado</h3>
+<p>O VS Code tem um terminal dentro dele: menu <strong>Terminal → Novo Terminal</strong>. Ele abre já na pasta do projeto. É o jeito mais simples e o que o guia recomenda no começo, porque você vê o comando e a saída completos, igual às aulas:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ola.cpp -o ola
+$ ./ola
+Olá, mundo!</pre>
+
+<p>Quando há erro, segure <kbd>Ctrl</kbd> e clique no <code>ola.cpp:4:18</code> da mensagem: o VS Code abre o arquivo exatamente na linha e na coluna do problema.</p>
+
+<h3>Compilar com uma tecla: o <code>tasks.json</code></h3>
+<p>Digitar o comando toda vez cansa. O VS Code permite gravar um comando como uma <strong>tarefa</strong> (<em>task</em>), num arquivo chamado <code>tasks.json</code>, dentro de uma pasta <code>.vscode</code> no projeto. Crie <code>.vscode/tasks.json</code> com este conteúdo:</p>
+
+<pre class="file" data-file=".vscode/tasks.json">{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Compilar C++23",
+      "type": "shell",
+      "command": "g++",
+      "args": [
+        "-std=c++23", "-Wall", "-Wextra", "-g",
+        "${file}",
+        "-o", "${fileDirname}/${fileBasenameNoExtension}"
+      ],
+      "problemMatcher": ["$gcc"],
+      "group": { "kind": "build", "isDefault": true }
+    }
+  ]
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>"version": "2.0.0"</code></td><td>A versão do formato do arquivo. Sempre <code>2.0.0</code>.</td></tr>
+<tr><td><code>"label"</code></td><td>O nome da tarefa, que aparece nos menus. Escolha o que quiser.</td></tr>
+<tr><td><code>"type": "shell"</code></td><td>Roda o comando num terminal, como se você o digitasse.</td></tr>
+<tr><td><code>"command": "g++"</code></td><td>O programa. Troque por <code>clang++</code>, <code>g++-14</code> ou <code>g++-16</code> se for o seu caso.</td></tr>
+<tr><td><code>"args"</code></td><td>As opções, uma por item, entre aspas e separadas por vírgula. O <code>-g</code> guarda informações para o depurador (aula <a href="depuracao-gdb.html">Depurar com o GDB</a>).</td></tr>
+<tr><td><code>${file}</code></td><td>Uma variável do VS Code: o arquivo aberto na aba ativa, com o caminho completo.</td></tr>
+<tr><td><code>${fileDirname}/${fileBasenameNoExtension}</code></td><td>A pasta desse arquivo + o nome dele sem a extensão. Para <code>ola.cpp</code>, o executável vira <code>ola</code>, na mesma pasta.</td></tr>
+<tr><td><code>"problemMatcher": ["$gcc"]</code></td><td>Ensina o VS Code a ler as mensagens do g++: os erros aparecem na aba <strong>Problemas</strong> e sublinhados no código.</td></tr>
+<tr><td><code>"group": { "kind": "build", "isDefault": true }</code></td><td>Marca esta como a tarefa de compilação padrão, a do atalho <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>.</td></tr>
+</table>
+</div>
+
+<p>Agora, com o <code>ola.cpp</code> aberto, tecle <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>. O VS Code abre o terminal e executa o comando montado com as variáveis. Na máquina da Ana, ele fica assim (rodado à mão, o resultado é o mesmo):</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -g /home/ana/cpp/ola.cpp -o /home/ana/cpp/ola
+$ ./ola
+Olá, mundo!</pre>
+
+<p>A tarefa compila; para rodar, use o terminal (<code>./ola</code>). A extensão C/C++ também tem um botão ▷ no canto da aba, que cria uma configuração própria na primeira vez (ela pergunta qual compilador usar). Ele funciona, mas a configuração que ele gera não tem <code>-std=c++23</code> nem <code>-Wall -Wextra</code>: se for usá-lo, acrescente essas opções na lista <code>args</code> do <code>tasks.json</code> que ele criar.</p>
+
+<div class="warning">
+<strong>Cuidado com extensões que "rodam qualquer coisa"</strong>
+<p>Extensões como a <em>Code Runner</em> rodam o arquivo com um clique, mas usam um comando próprio, sem <code>-std=c++23</code> e sem avisos. Resultado: o <code>std::println</code> "não existe" e os avisos que o guia ensina a ler nunca aparecem. Prefira o terminal ou o <code>tasks.json</code>, em que você vê e controla o comando.</p>
+</div>
+
+<hr>
+
+<h2>Outras opções</h2>
+
+<h3>CLion</h3>
+<p>O <strong>CLion</strong>, da JetBrains, é uma IDE feita só para C e C++, para Windows, Linux e macOS. Desde 2025, é <strong>gratuito para uso não comercial</strong> (estudar, projetos pessoais). Ele organiza tudo com o <a href="cmake.html">CMake</a>: ao criar um projeto, escolha o padrão <strong>C++23</strong>, e ele grava <code>set(CMAKE_CXX_STANDARD 23)</code> no arquivo <code>CMakeLists.txt</code>. Tem análise de código muito boa (baseada no clangd), refatoração (renomear uma variável em todo o projeto) e depurador visual. No Windows, já vem com um compilador MinGW. É a melhor escolha para quem quer uma IDE completa sem ser preso ao Windows. No Linux: <code>sudo snap install clion --classic</code>, ou pelo site da JetBrains.</p>
+
+<h3>Visual Studio</h3>
+<p>O <strong>Visual Studio</strong> (Community é a edição gratuita) é a IDE da Microsoft, <strong>só para Windows</strong>. Vem com o compilador MSVC, o melhor depurador visual que existe para C++ e ferramentas para programas e jogos de Windows. A instalação e a escolha do C++23 estão em <a href="instalar-windows-mac.html">Instalar no Windows e macOS</a>. Ponto de atenção: as mensagens de erro do MSVC são diferentes das do g++ mostradas no guia.</p>
+
+<h3>Code::Blocks</h3>
+<p>O <strong>Code::Blocks</strong> é uma IDE gratuita, leve e simples, muito usada em escolas e faculdades. No Windows, baixe a versão do instalador com <strong>mingw</strong> no nome, que já traz o g++. No Linux: <code>sudo apt install codeblocks</code>. Para o C++23: <strong>Settings → Compiler → Compiler settings</strong> e, na aba <strong>Other compiler options</strong>, escreva <code>-std=c++23 -Wall -Wextra</code>. Crie um projeto com <strong>File → New → Project → Console application</strong> e compile e rode com <kbd>F9</kbd>. A interface é mais antiga e o autocompletar é mais fraco, mas roda bem em computadores modestos.</p>
+
+<h3>Vim e Neovim</h3>
+<p>O <strong>Vim</strong> e o <strong>Neovim</strong> são editores de terminal, rapidíssimos, que se usam só com o teclado. A curva de aprendizado é íngreme (o famoso "como eu saio do Vim?": tecle <kbd>Esc</kbd> e digite <code>:q</code>), mas quem aprende não larga. Dentro do Vim, dá para compilar e rodar sem sair do editor:</p>
+
+<pre class="file" data-file="dentro do Vim (modo normal)">:w
+:!g++ -std=c++23 -Wall -Wextra % -o %:r
+:!./%:r</pre>
+
+<dl class="anatomy">
+  <dt>:w</dt><dd>Salva o arquivo (<em>write</em>). Sem isso, o g++ compila a versão antiga, a que está no disco.</dd>
+  <dt>:!</dt><dd>Roda um comando do terminal sem sair do Vim.</dd>
+  <dt>%</dt><dd>O Vim troca pelo nome do arquivo aberto: <code>ola.cpp</code>.</dd>
+  <dt>%:r</dt><dd>O nome sem a extensão (<em>root</em>): <code>ola</code>.</dd>
+</dl>
+
+<p>O Neovim (e o Vim, com um plugin) conversa com o <strong>clangd</strong> e ganha autocompletar e erros sublinhados, como o VS Code. Para escrever rápido no terminal sem aprender o Vim, o <code>nano</code> também serve: ele mostra os atalhos no rodapé (<kbd>Ctrl</kbd>+<kbd>O</kbd> salva, <kbd>Ctrl</kbd>+<kbd>X</kbd> sai).</p>
+
+<h3>Qual escolher?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Se você…</th><th>Use</th></tr>
+<tr><td>está começando e quer seguir o guia</td><td><strong>VS Code</strong> + extensão C/C++ (ou clangd) + terminal integrado</td></tr>
+<tr><td>quer uma IDE completa, em qualquer sistema</td><td><strong>CLion</strong></td></tr>
+<tr><td>programa para Windows, jogos com Unreal ou usa o compilador da Microsoft</td><td><strong>Visual Studio</strong></td></tr>
+<tr><td>tem um computador modesto ou a escola pede</td><td><strong>Code::Blocks</strong></td></tr>
+<tr><td>vive no terminal ou edita em servidores</td><td><strong>Vim</strong>/<strong>Neovim</strong> (ou <code>nano</code>, para o básico)</td></tr>
+<tr><td>ainda não instalou nada</td><td>As caixas <strong>Experimente</strong> do guia (aula <a href="simulador.html">O Editor do Guia</a>)</td></tr>
+</table>
+</div>
+
+<p>A escolha do editor não é para sempre, e não muda nada no código: um <code>ola.cpp</code> escrito no Vim compila igual a um escrito no CLion.</p>
+
+<hr>
+
+<h2>Os cuidados com o arquivo</h2>
+
+<h3>A extensão <code>.cpp</code></h3>
+<p>Salve com a extensão <code>.cpp</code>. É ela que faz o editor ligar as cores e as ferramentas do C++ (e o <code>gcc</code>/<code>g++</code> tratar o arquivo como C++). No Windows, cuidado com o Bloco de Notas, que gosta de acrescentar <code>.txt</code>: <code>ola.cpp.txt</code>. Ative "Extensões de nomes de arquivos" no menu <strong>Exibir</strong> do Explorador de Arquivos para ver o nome completo.</p>
+
+<h3>Codificação: UTF-8</h3>
+<p>Os acentos do guia (<code>"Olá"</code>) só funcionam direito se o arquivo for salvo em <strong>UTF-8</strong>, a codificação usada pelo Linux, pelo macOS e pela web. O VS Code, o CLion e o Vim usam UTF-8 por padrão; a codificação aparece na barra de status, no canto de baixo do VS Code. A aula <a href="acentos-utf8.html">Acentos e UTF-8</a> explica o que acontece quando não é.</p>
+
+<h3>Salve antes de compilar</h3>
+<p>O compilador lê o arquivo <strong>do disco</strong>, não o que está na tela do editor. Se você mudou o código e não salvou, o g++ compila a versão anterior, e parece que "a mudança não funcionou". No VS Code, uma bolinha branca na aba indica arquivo não salvo. Dica: ative <strong>Arquivo → Salvamento Automático</strong>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>VS Code: <code>#include errors detected. Please update your includePath.</code></strong>
+<p><strong>O que significa:</strong> "erros de <code>#include</code> detectados; atualize o caminho de inclusão". A extensão C/C++ não achou o <code>&lt;iostream&gt;</code>, quase sempre porque não achou o <strong>compilador</strong>, que é quem traz esses arquivos. O código provavelmente compila no terminal; é só o IntelliSense que está perdido (<strong>ilustrativo</strong>: a mensagem exata muda com a versão da extensão).</p>
+<p><strong>Como consertar:</strong> confira se <code>g++ --version</code> funciona no terminal integrado do VS Code. No Windows com MSYS2, o problema costuma ser o PATH (veja <a href="instalar-windows-mac.html">Instalar no Windows e macOS</a>); feche e abra o VS Code depois de mudá-lo. Depois, use o comando <strong>C/C++: Select IntelliSense Configuration</strong> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>) e escolha o seu <code>g++</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O editor sublinha o <code>std::println</code> em vermelho, mas o programa compila</strong>
+<p><strong>O que significa:</strong> o corretor do editor está usando uma versão mais antiga do C++ que a do seu comando de compilação (o compilador, sem <code>-std</code>, usa C++17). Quem manda é o compilador: se compilou, o código está certo.</p>
+<p><strong>Como consertar:</strong> configure o C++23 no editor: <code>C_Cpp.default.cppStandard</code> = <code>c++23</code> na extensão C/C++, ou o <code>compile_flags.txt</code> no clangd.</p>
+</div>
+
+<div class="cenario">
+<strong>Teclei <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> com o <code>tasks.json</code> aberto</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -g .vscode/tasks.json -o .vscode/tasks
+/usr/bin/x86_64-linux-gnu-ld.bfd:.vscode/tasks.json: file format not recognized; treating as linker script
+/usr/bin/x86_64-linux-gnu-ld.bfd:.vscode/tasks.json:1: syntax error
+collect2: error: ld returned 1 exit status</pre>
+<p><strong>O que significa:</strong> o <code>${file}</code> é o arquivo da <strong>aba ativa</strong>. Com o <code>tasks.json</code> na frente, a tarefa mandou o g++ compilar o próprio <code>tasks.json</code>. Como a extensão <code>.json</code> não é de código, o g++ o entregou ao ligador, que disse: "formato de arquivo não reconhecido; tratando como script do ligador" e, em seguida, "erro de sintaxe" na linha 1.</p>
+<p><strong>Como consertar:</strong> clique na aba do <code>.cpp</code> antes de teclar o atalho.</p>
+</div>
+
+<div class="cenario">
+<strong>"Mudei o código e o programa continua igual"</strong>
+<p><strong>O que significa:</strong> uma de duas coisas. Ou o arquivo não foi <strong>salvo</strong> (o compilador leu a versão antiga do disco), ou ele não foi <strong>compilado de novo</strong> (você rodou o executável antigo; veja <a href="como-funciona.html">Como o C++ Vira Programa</a>).</p>
+<p><strong>Como consertar:</strong> salvar (<kbd>Ctrl</kbd>+<kbd>S</kbd>), compilar, rodar, sempre nessa ordem.</p>
+</div>
+
+<hr>
+
+<h2>Referência: atalhos do VS Code</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Atalho (Windows/Linux)</th><th>No macOS</th><th>O que faz</th></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td><kbd>Cmd</kbd>+<kbd>S</kbd></td><td>Salvar</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td><kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Rodar a tarefa de compilação padrão</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd></td><td><kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd></td><td>Paleta de comandos: procurar qualquer comando pelo nome</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd></td><td><kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd></td><td>Extensões</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>,</kbd></td><td><kbd>Cmd</kbd>+<kbd>,</kbd></td><td>Configurações</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Espaço</kbd></td><td><kbd>Ctrl</kbd>+<kbd>Espaço</kbd></td><td>Sugestões de autocompletar</td></tr>
+<tr><td><kbd>F12</kbd></td><td><kbd>F12</kbd></td><td>Ir para a definição do nome sob o cursor</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>/</kbd></td><td><kbd>Cmd</kbd>+<kbd>/</kbd></td><td>Comentar ou descomentar a linha (aula <a href="comentarios.html">Comentários</a>)</td></tr>
+<tr><td><kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>F</kbd></td><td><kbd>Shift</kbd>+<kbd>Option</kbd>+<kbd>F</kbd></td><td>Formatar o documento (arrumar os espaços e o recuo)</td></tr>
+<tr><td><kbd>F5</kbd></td><td><kbd>F5</kbd></td><td>Iniciar a depuração</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">1. Qual destas afirmações é verdadeira?</p>
+<label><input type="radio" name="q1"> O VS Code compila C++ sozinho, sem nenhum compilador instalado.</label>
+<label><input type="radio" name="q1"> VS Code e Visual Studio são o mesmo programa.</label>
+<label><input type="radio" name="q1"> O editor ajuda a escrever; quem gera o programa é o compilador (g++, clang++ ou cl).</label>
+<label><input type="radio" name="q1"> Só é possível programar em C++ numa IDE.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">2. Num <code>tasks.json</code>, o que o VS Code coloca no lugar de <code>${file}</code>?</p>
+<label><input type="radio" name="q2"> O nome do projeto.</label>
+<label><input type="radio" name="q2"> O arquivo aberto na aba ativa, com o caminho completo.</label>
+<label><input type="radio" name="q2"> Todos os arquivos <code>.cpp</code> da pasta.</label>
+<label><input type="radio" name="q2"> O nome do executável.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">3. A g++ mostrou 391 linhas de erro depois que a Ana esqueceu de fechar umas aspas. O que ela deve fazer?</p>
+<label><input type="radio" name="q3"> Ler as 391 linhas antes de mexer em qualquer coisa.</label>
+<label><input type="radio" name="q3"> Reinstalar o compilador.</label>
+<label><input type="radio" name="q3"> Começar pela última mensagem.</label>
+<label><input type="radio" name="q3"> Ler e consertar a primeira mensagem, e compilar de novo.</label>
+</div>
+
+<div class="exercise">
+<h3>4. O arquivo do clangd</h3>
+<p>Qual é o nome do arquivo em que o clangd lê as opções de compilação, uma por linha?</p>
+<div class="ex-code"><input data-answer="compile_flags.txt" aria-label="nome do arquivo" size="18"></div>
+</div>
+
+<div class="exercise">
+<h3>5. Compilar dentro do Vim</h3>
+<p>Complete o comando do Vim que compila o arquivo aberto (<code>%</code>) gerando um executável com o nome sem extensão:</p>
+<div class="ex-code">:!g++ -std=c++23 -Wall -Wextra % -o <input data-answer="%:r|%&lt;" aria-label="nome do executável" size="4"></div>
+</div>
+
+<h3>Missão final: o recuo que ajuda a ler</h3>
+
+<div class="trycpp" data-goal="out:Lista de compras:,out:- arroz,out:- feijão,out:- café,src:\n    std::cout">
+<p class="try-task"><strong>Missão:</strong> o programa abaixo funciona, mas foi escrito todo "colado" na margem, e fica difícil ver o que está dentro do <code>main</code>. Os editores de código fazem o <strong>recuo</strong> (os espaços no começo da linha) sozinhos. Arrume à mão: coloque 4 espaços antes de cada linha com <code>std::cout</code>. Depois rode: a saída não muda, mas o código fica muito mais fácil de ler.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+std::cout &lt;&lt; "Lista de compras:\n";
+std::cout &lt;&lt; "- arroz\n";
+std::cout &lt;&lt; "- feijão\n";
+std::cout &lt;&lt; "- café\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Lista de compras:\n";
+    std::cout &lt;&lt; "- arroz\n";
+    std::cout &lt;&lt; "- feijão\n";
+    std::cout &lt;&lt; "- café\n";
+}
+</pre>
+</div>
+
+<p>Para o compilador, os espaços no começo da linha não fazem diferença nenhuma; para quem lê, fazem toda. A aula <a href="sintaxe.html">Sintaxe</a> mostra as convenções de recuo, e o atalho <kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>F</kbd> do VS Code faz isso automaticamente.</p>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Editor de texto escreve; editor de código ajuda (cores, autocompletar, erros); IDE integra tudo. Nenhum deles é o compilador.</li>
+  <li><strong>VS Code</strong> (recomendado): extensão <strong>C/C++</strong> (<code>ms-vscode.cpptools</code>) ou <strong>clangd</strong>; configure o C++23 (<code>C_Cpp.default.cppStandard</code> ou <code>compile_flags.txt</code>).</li>
+  <li>Compile pelo terminal integrado ou com um <code>.vscode/tasks.json</code> e <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>, sempre com <code>-std=c++23 -Wall -Wextra</code>.</li>
+  <li><strong>CLion</strong> (IDE completa, grátis para uso não comercial), <strong>Visual Studio</strong> (Windows), <strong>Code::Blocks</strong> (leve), <strong>Vim/Neovim</strong> (terminal).</li>
+  <li>Arquivo com extensão <code>.cpp</code>, em UTF-8, e <strong>salvo</strong> antes de compilar.</li>
+  <li>Diante de muitas mensagens de erro, leia a primeira.</li>
+  <li>Próximo passo: conhecer a fundo as caixas Experimente, em <a href="simulador.html">O Editor do Guia</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
