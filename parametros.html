@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Parâmetros e Argumentos — mandar valores para a função | Guia C++</title>
+<meta name="description" content="Parâmetros e argumentos em C++ para quem nunca programou: a diferença entre os dois, funções com vários parâmetros, o tipo de cada um, a ordem, os erros reais too few arguments e too many arguments do g++ e a conversão implícita (2.9 vira 2). Com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Parâmetros e Argumentos</span></h1>
+
+<p class="intro">Na aula <a href="funcoes.html">Funções</a>, a função <code>saudar()</code> sempre dizia a mesma frase. Mas a Ana quer cumprimentar cada cliente <strong>pelo nome</strong>: "Olá, Bruno!", "Olá, Carla!". Para isso, a função precisa <strong>receber</strong> uma informação de quem a chama. Essa informação entra pelos parênteses: do lado da função, ela se chama <strong>parâmetro</strong>; do lado da chamada, <strong>argumento</strong>. Nesta aula você vai criar funções que recebem um, dois, três valores, ver o que o compilador diz quando você manda valores de menos ou de mais, e descobrir o que acontece quando o valor enviado é de outro tipo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A diferença entre <strong>parâmetro</strong> (na definição) e <strong>argumento</strong> (na chamada).</li>
+  <li>Como criar funções com vários parâmetros, cada um com seu tipo.</li>
+  <li>Por que a <strong>ordem</strong> dos argumentos importa.</li>
+  <li>Os erros <code>too few arguments to function</code> e <code>too many arguments to function</code>.</li>
+  <li>O que acontece quando o argumento é de outro tipo: a <strong>conversão implícita</strong> (e por que <code>2.9</code> pode virar <code>2</code> sem aviso).</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com o comando padrão do guia, <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: o formulário e o que você preenche</h2>
+<p>Pense num formulário de cadastro. Ele tem <strong>campos</strong> com rótulo: "Nome: ____", "Idade: ____". O formulário em branco é sempre o mesmo; o que muda é o que cada pessoa <strong>escreve</strong> nos campos.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No formulário</th><th>Em C++</th><th>Exemplo</th></tr>
+<tr><td>O campo em branco, com rótulo</td><td><strong>Parâmetro</strong>: escrito na definição da função</td><td><code>void saudar(std::string nome)</code></td></tr>
+<tr><td>O que alguém escreveu no campo</td><td><strong>Argumento</strong>: o valor enviado na chamada</td><td><code>saudar("Bruno");</code></td></tr>
+</table>
+</div>
+
+<p>Um jeito de lembrar: o <strong>p</strong>arâmetro fica no <strong>p</strong>rojeto da função; o <strong>a</strong>rgumento chega na hora da <strong>a</strong>ção, a chamada. Muita gente usa as duas palavras como sinônimos no dia a dia, e tudo bem; mas as mensagens do compilador usam <em>argument</em> para o valor da chamada, então vale saber a diferença.</p>
+
+<hr>
+
+<h2>1. Uma função com um parâmetro</h2>
+
+<pre class="file" data-file="saudar.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void saudar(std::string nome) {
+    std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "! Bem-vinda à lojinha.\n";
+}
+
+int main() {
+    saudar("Ana");
+    saudar("Bruno");
+    std::string cliente = "Carla";
+    saudar(cliente);
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;string&gt;</dt><dd>Traz o tipo <code>std::string</code> (texto), que o parâmetro usa (aula <a href="strings.html">Strings</a>).</dd>
+  <dt>(std::string nome)</dt><dd>O <strong>parâmetro</strong>: um <strong>tipo</strong> (<code>std::string</code>) e um <strong>nome</strong> (<code>nome</code>), como na criação de uma variável. É exatamente isso: <code>nome</code> é uma variável que existe só dentro da função e nasce com o valor que veio na chamada.</dd>
+  <dt>&lt;&lt; nome &lt;&lt;</dt><dd>Dentro do corpo, o parâmetro é usado como qualquer variável.</dd>
+  <dt>saudar("Ana");</dt><dd>Chamada com o <strong>argumento</strong> <code>"Ana"</code>. Nesta execução da função, <code>nome</code> vale <code>"Ana"</code>.</dd>
+  <dt>saudar(cliente);</dt><dd>O argumento pode ser uma variável. A função recebe o <strong>valor</strong> dela (<code>"Carla"</code>). O nome da variável de fora (<code>cliente</code>) não precisa ser igual ao do parâmetro (<code>nome</code>).</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra saudar.cpp -o saudar
+$ ./saudar
+Olá, Ana! Bem-vinda à lojinha.
+Olá, Bruno! Bem-vinda à lojinha.
+Olá, Carla! Bem-vinda à lojinha.</pre>
+
+<p>Uma função, três frases diferentes. A cada chamada, o parâmetro <code>nome</code> é criado de novo com o argumento daquela chamada, e some quando a função termina.</p>
+
+<h3>O argumento pode ser qualquer expressão</h3>
+<p>Um valor fixo, uma variável ou uma conta: o C++ <strong>calcula primeiro</strong> o argumento e só depois entra na função com o resultado.</p>
+
+<pre class="file" data-file="dobro.cpp">#include &lt;iostream&gt;
+
+void mostrarDobro(int x) {
+    std::cout &lt;&lt; "O dobro de " &lt;&lt; x &lt;&lt; " é " &lt;&lt; x * 2 &lt;&lt; "\n";
+}
+
+int main() {
+    mostrarDobro(5);
+    int idade = 29;
+    mostrarDobro(idade);
+    mostrarDobro(3 + 4);
+    mostrarDobro(idade - 20);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra dobro.cpp -o dobro
+$ ./dobro
+O dobro de 5 é 10
+O dobro de 29 é 58
+O dobro de 7 é 14            « 3 + 4 foi calculado antes: a função recebeu 7
+O dobro de 9 é 18            « idade - 20 = 9</pre>
+
+<p>Repare na linha 11: a função não sabe que você escreveu <code>3 + 4</code>. Ela só recebe o <strong>valor</strong> <code>7</code>.</p>
+
+<div class="tip">
+<strong>O parâmetro é uma cópia</strong>
+<p>Como o parâmetro recebe só o valor, mudar o parâmetro dentro da função <strong>não</strong> muda a variável usada na chamada. Na chamada <code>mostrarDobro(idade)</code>, se a função fizesse <code>x = 0;</code>, a <code>idade</code> do <code>main</code> continuaria 29. Isso se chama <strong>passagem por valor</strong>, e a aula <a href="passagem-referencia.html">Por Valor × Por Referência</a> mostra como fazer a função mudar a variável de fora quando você quer.</p>
+</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> chame <code>saudar</code> com o seu nome. Depois crie uma variável <code>std::string amiga = "...";</code> e passe-a como argumento. Por fim, tente <code>saudar("Ana" + std::string(" Paula"));</code>: o argumento é uma conta de textos.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void saudar(std::string nome) {
+    std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "! Bem-vinda à lojinha.\n";
+}
+
+int main() {
+    saudar("Ana");
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Vários parâmetros</h2>
+<p>Para o recibo, a Ana quer uma função que mostre um item: o produto, a quantidade e o preço. São três informações, então a função tem <strong>três parâmetros</strong>, separados por vírgula:</p>
+
+<pre class="file" data-file="item.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void item(std::string produto, int quantidade, double preco) {
+    std::cout &lt;&lt; quantidade &lt;&lt; " x " &lt;&lt; produto
+              &lt;&lt; " = R$ " &lt;&lt; quantidade * preco &lt;&lt; "\n";
+}
+
+int main() {
+    item("caderno", 3, 10.0);
+    item("caneta", 2, 2.5);
+    item("borracha", 1, 1.75);
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>std::string produto</dt><dd>1º parâmetro: o nome do produto, um texto.</dd>
+  <dt>int quantidade</dt><dd>2º parâmetro: quantas unidades, um número inteiro (<a href="inteiros.html">Inteiros</a>).</dd>
+  <dt>double preco</dt><dd>3º parâmetro: o preço de cada um, um número com casas decimais (<a href="ponto-flutuante.html">float e double</a>).</dd>
+  <dt>item("caderno", 3, 10.0);</dt><dd>Três argumentos, na <strong>mesma ordem</strong>: o 1º vai para <code>produto</code>, o 2º para <code>quantidade</code>, o 3º para <code>preco</code>.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra item.cpp -o item
+$ ./item
+3 x caderno = R$ 30
+2 x caneta = R$ 5
+1 x borracha = R$ 1.75</pre>
+
+<p>(O <code>std::cout</code> mostra <code>30</code> e não <code>30.00</code>; para fixar duas casas, veja <a href="iomanip.html">Formatar com iomanip</a> ou <a href="format-print.html">std::format</a>.)</p>
+
+<h3>Cada parâmetro tem o seu tipo</h3>
+<p>Na criação de variáveis, <code>int a, b;</code> cria duas variáveis <code>int</code> de uma vez. Nos parâmetros, <strong>não</strong>: cada um precisa do próprio tipo, mesmo que seja igual ao anterior.</p>
+
+<pre class="file" data-file="semtipo.cpp">#include &lt;iostream&gt;
+
+void soma(int a, b) {
+    std::cout &lt;&lt; a + b &lt;&lt; "\n";
+}
+
+int main() {
+    soma(2, 3);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semtipo.cpp -o semtipo
+semtipo.cpp:3:18: error: ‘b’ has not been declared
+    3 | void soma(int a, b) {
+      |                  ^
+semtipo.cpp: In function ‘void soma(int, int)’:
+semtipo.cpp:4:22: error: ‘b’ was not declared in this scope
+    4 |     std::cout &lt;&lt; a + b &lt;&lt; "\n";
+      |                      ^</pre>
+
+<p>O compilador leu <code>b</code> como se fosse um <strong>tipo</strong> desconhecido (<em>‘b’ has not been declared</em> = "‘b’ não foi declarado") e, por isso, o parâmetro ficou sem nome; aí o <code>b</code> do corpo também não existe. A correção é <code>void soma(int a, int b)</code>.</p>
+
+<h3>A ordem importa</h3>
+<p>O C++ liga argumentos a parâmetros <strong>pela posição</strong>, nunca pelo nome. Se os tipos forem diferentes, trocar a ordem dá erro de compilação, o que é bom. Aqui a Ana trocou a quantidade e o produto de lugar na linha 10:</p>
+
+<pre class="file" data-file="ordem.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void item(std::string produto, int quantidade, double preco) {
+    std::cout &lt;&lt; quantidade &lt;&lt; " x " &lt;&lt; produto
+              &lt;&lt; " = R$ " &lt;&lt; quantidade * preco &lt;&lt; "\n";
+}
+
+int main() {
+    item(3, "caderno", 10.0);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ordem.cpp -o ordem
+ordem.cpp: In function ‘int main()’:
+ordem.cpp:10:10: error: could not convert ‘3’ from ‘int’ to ‘std::string’ {aka ‘std::__cxx11::basic_string&lt;char&gt;’}
+   10 |     item(3, "caderno", 10.0);
+      |          ^
+      |          |
+      |          int</pre>
+
+<p><em>Could not convert ‘3’ from ‘int’ to ‘std::string’</em> = "não foi possível converter ‘3’ de <code>int</code> para <code>std::string</code>": o 1º parâmetro espera um texto e recebeu um número. O pedaço entre chaves, <code>{aka …}</code> ("também conhecido como"), é o nome completo e assustador de <code>std::string</code> por dentro; pode ignorar.</p>
+
+<p>Mas, se os parâmetros forem do <strong>mesmo tipo</strong>, o compilador não tem como perceber a troca:</p>
+
+<pre class="file" data-file="ordem2.cpp">#include &lt;iostream&gt;
+
+void retangulo(int largura, int altura) {
+    std::cout &lt;&lt; "largura " &lt;&lt; largura &lt;&lt; ", altura " &lt;&lt; altura &lt;&lt; "\n";
+}
+
+int main() {
+    retangulo(5, 2);
+    retangulo(2, 5);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ordem2.cpp -o ordem2
+$ ./ordem2
+largura 5, altura 2
+largura 2, altura 5          « compilou sem aviso: o C++ não sabe o que você quis dizer</pre>
+
+<p>Por isso, dê aos parâmetros nomes que expliquem o papel de cada um (<code>largura</code>, <code>altura</code>, e não <code>a</code>, <code>b</code>) e confira a ordem quando chamar.</p>
+
+<hr>
+
+<h2>3. Número errado de argumentos</h2>
+<p>Uma chamada precisa mandar <strong>exatamente</strong> um argumento para cada parâmetro. A Ana esqueceu o preço:</p>
+
+<pre class="file" data-file="poucos.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void item(std::string produto, int quantidade, double preco) {
+    std::cout &lt;&lt; quantidade &lt;&lt; " x " &lt;&lt; produto
+              &lt;&lt; " = R$ " &lt;&lt; quantidade * preco &lt;&lt; "\n";
+}
+
+int main() {
+    item("caderno", 3);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra poucos.cpp -o poucos
+poucos.cpp: In function ‘int main()’:
+poucos.cpp:10:9: error: too few arguments to function ‘void item(std::string, int, double)’
+   10 |     item("caderno", 3);
+      |     ~~~~^~~~~~~~~~~~~~
+poucos.cpp:4:6: note: declared here
+    4 | void item(std::string produto, int quantidade, double preco) {
+      |      ^~~~</pre>
+
+<dl class="anatomy">
+  <dt>poucos.cpp:10:9</dt><dd>O erro está na chamada, linha 10.</dd>
+  <dt>too few arguments to function</dt><dd>"Argumentos de menos para a função".</dd>
+  <dt>‘void item(std::string, int, double)’</dt><dd>O g++ mostra o que a função espera: três valores, um texto, um inteiro e um <code>double</code>. Compare com a sua chamada e veja qual falta.</dd>
+  <dt>note: declared here</dt><dd>"Nota: declarada aqui": aponta a linha 4, onde a função foi definida, para você conferir os parâmetros.</dd>
+</dl>
+
+<p>Mandar argumentos <strong>a mais</strong> dá o erro irmão:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra muitos.cpp -o muitos       « item("caderno", 3, 10.0, 5);
+muitos.cpp: In function ‘int main()’:
+muitos.cpp:10:9: error: too many arguments to function ‘void item(std::string, int, double)’
+   10 |     item("caderno", 3, 10.0, 5);
+      |     ~~~~^~~~~~~~~~~~~~~~~~~~~~~
+muitos.cpp:4:6: note: declared here
+    4 | void item(std::string produto, int quantidade, double preco) {
+      |      ^~~~</pre>
+
+<p><em>Too many arguments</em> = "argumentos demais". O C++ não "ignora o que sobra" nem "deixa em branco o que falta": a chamada tem de bater com a função. (Dá para tornar um parâmetro <strong>opcional</strong>, dando a ele um valor padrão: é a aula <a href="valor-padrao.html">Valores Padrão</a>.)</p>
+
+<div class="note">
+<strong>No editor do guia, a mesma coisa com outras palavras</strong>
+<p>O compilador do editor é o Clang. Para a chamada com argumentos de menos, ele escreve <code>error: no matching function for call to 'item'</code> ("nenhuma função compatível para a chamada a ‘item’") e explica numa nota: <code>candidate function not viable: requires 3 arguments, but 2 were provided</code> ("função candidata inviável: exige 3 argumentos, mas 2 foram fornecidos").</p>
+</div>
+
+<div class="trycpp" data-goal="compila,out:2 x lápis = R$ 3,out:1 x mochila = R$ 89.9">
+<p class="try-task"><strong>Missão:</strong> o programa não compila. Rode, leia o erro e descubra quais chamadas estão erradas. O lápis custa <code>1.5</code> cada; a mochila, <code>89.9</code> (e a Ana vendeu só uma). Corrija as chamadas, sem mexer na função.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void item(std::string produto, int quantidade, double preco) {
+    std::cout &lt;&lt; quantidade &lt;&lt; " x " &lt;&lt; produto
+              &lt;&lt; " = R$ " &lt;&lt; quantidade * preco &lt;&lt; "\n";
+}
+
+int main() {
+    item("lápis", 2);
+    item("mochila", 89.9);
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void item(std::string produto, int quantidade, double preco) {
+    std::cout &lt;&lt; quantidade &lt;&lt; " x " &lt;&lt; produto
+              &lt;&lt; " = R$ " &lt;&lt; quantidade * preco &lt;&lt; "\n";
+}
+
+int main() {
+    item("lápis", 2, 1.5);
+    item("mochila", 1, 89.9);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>4. Argumento de outro tipo: a conversão implícita</h2>
+<p>E se o argumento for de um tipo diferente do parâmetro, mas "parecido"? Por exemplo, um <code>double</code> para um parâmetro <code>int</code>. O C++ tenta <strong>converter sozinho</strong> o valor para o tipo do parâmetro. Isso se chama <strong>conversão implícita</strong> (implícita = sem você pedir; a aula <a href="conversao-tipos.html">Conversão de Tipos</a> explica todas as regras).</p>
+
+<pre class="file" data-file="conv.cpp">#include &lt;iostream&gt;
+
+void mostrarDobro(int x) {
+    std::cout &lt;&lt; "O dobro de " &lt;&lt; x &lt;&lt; " é " &lt;&lt; x * 2 &lt;&lt; "\n";
+}
+
+void mostrarMetade(double x) {
+    std::cout &lt;&lt; "A metade de " &lt;&lt; x &lt;&lt; " é " &lt;&lt; x / 2 &lt;&lt; "\n";
+}
+
+int main() {
+    mostrarDobro(2.9);
+    mostrarMetade(7);
+    mostrarDobro('A');
+    mostrarDobro(true);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra conv.cpp -o conv       « nenhum aviso!
+$ ./conv
+O dobro de 2 é 4             « 2.9 virou 2: a parte decimal foi jogada fora
+A metade de 7 é 3.5          « 7 virou 7.0: sem perda
+O dobro de 65 é 130          « 'A' virou 65, o código da letra A
+O dobro de 1 é 2             « true virou 1</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Chamada</th><th>Parâmetro</th><th>O que chegou</th><th>Perigo?</th></tr>
+<tr><td><code>mostrarDobro(2.9)</code></td><td><code>int</code></td><td><code>2</code></td><td><strong>Sim</strong>: a parte decimal é cortada (não arredonda), sem erro e, com <code>-Wall -Wextra</code>, sem aviso no g++.</td></tr>
+<tr><td><code>mostrarMetade(7)</code></td><td><code>double</code></td><td><code>7.0</code></td><td>Não: todo <code>int</code> pequeno cabe num <code>double</code>.</td></tr>
+<tr><td><code>mostrarDobro('A')</code></td><td><code>int</code></td><td><code>65</code></td><td>Confuso: um <code>char</code> é um número por dentro (<a href="char.html">Caracteres</a>).</td></tr>
+<tr><td><code>mostrarDobro(true)</code></td><td><code>int</code></td><td><code>1</code></td><td>Confuso: <code>true</code> vira 1 e <code>false</code> vira 0 (<a href="bool.html">Booleanos</a>).</td></tr>
+</table>
+</div>
+
+<p>A primeira linha é a perigosa: se <code>2.9</code> fosse um preço, a Ana perderia 90 centavos em silêncio. Para o g++ avisar, acrescente a opção <code>-Wconversion</code> (avisos de conversão):</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -Wconversion conv.cpp -o conv
+conv.cpp: In function ‘int main()’:
+conv.cpp:12:18: warning: conversion from ‘double’ to ‘int’ changes value from ‘2.8999999999999999e+0’ to ‘2’ [-Wfloat-conversion]
+   12 |     mostrarDobro(2.9);
+      |                  ^~~</pre>
+
+<p>"A conversão de <code>double</code> para <code>int</code> muda o valor de 2.8999… para 2". (O <code>2.8999999999999999e+0</code> é o jeito como o computador guarda 2.9 por dentro, quase igual; veja <a href="ponto-flutuante.html">float e double</a>.)</p>
+
+<div class="note">
+<strong>No editor do guia, o aviso aparece sem pedir</strong>
+<p>O Clang avisa sobre um número <strong>escrito</strong> com vírgula indo para um <code>int</code> mesmo sem <code>-Wconversion</code>: <code>warning: implicit conversion from 'double' to 'int' changes value from 2.9 to 2 [-Wliteral-conversion]</code>. Mas, se o 2.9 estiver numa variável <code>double</code>, nenhum dos dois compiladores avisa sem <code>-Wconversion</code>. A lição é a mesma: escolha o tipo certo para o parâmetro (preço é <code>double</code>) e passe valores do tipo certo.</p>
+</div>
+
+<h3>Quando não existe conversão: erro</h3>
+<p>Entre tipos que não têm nada a ver, o C++ não converte. Um texto entre aspas não vira número:</p>
+
+<pre class="file" data-file="texto.cpp">#include &lt;iostream&gt;
+
+void mostrarDobro(int x) {
+    std::cout &lt;&lt; "O dobro de " &lt;&lt; x &lt;&lt; " é " &lt;&lt; x * 2 &lt;&lt; "\n";
+}
+
+int main() {
+    mostrarDobro("3");
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra texto.cpp -o texto
+texto.cpp: In function ‘int main()’:
+texto.cpp:8:18: error: invalid conversion from ‘const char*’ to ‘int’ [-fpermissive]
+    8 |     mostrarDobro("3");
+      |                  ^~~
+      |                  |
+      |                  const char*
+texto.cpp:3:23: note: initializing argument 1 of ‘void mostrarDobro(int)’
+    3 | void mostrarDobro(int x) {
+      |                   ~~~~^</pre>
+
+<p><em>Invalid conversion from ‘const char*’ to ‘int’</em> = "conversão inválida de texto para <code>int</code>" (<code>const char*</code> é o tipo de um texto entre aspas, como <code>"3"</code>). A nota <em>initializing argument 1</em> diz que o problema é o <strong>1º argumento</strong>. Ignore o <code>[-fpermissive]</code>: é uma opção antiga que transformaria o erro em aviso, e você não quer isso. Para transformar um texto como <code>"3"</code> em número, use <code>std::stoi</code> (<a href="string-numero.html">Texto ↔ Número</a>).</p>
+
+<hr>
+
+<h2>5. Detalhes que aparecem no dia a dia</h2>
+
+<h3>Parâmetro que ninguém usa: aviso do <code>-Wextra</code></h3>
+<pre class="file" data-file="naousado.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void saudar(std::string nome) {
+    std::cout &lt;&lt; "Olá!\n";
+}
+
+int main() {
+    saudar("Ana");
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra naousado.cpp -o naousado
+naousado.cpp: In function ‘void saudar(std::string)’:
+naousado.cpp:4:25: warning: unused parameter ‘nome’ [-Wunused-parameter]
+    4 | void saudar(std::string nome) {
+      |             ~~~~~~~~~~~~^~~~
+$ ./naousado
+Olá!</pre>
+
+<p>"Parâmetro não usado: ‘nome’". O programa funciona, mas o aviso aponta um provável esquecimento: você pediu o nome e não o mostrou. Use o parâmetro ou tire-o da função.</p>
+
+<h3>No protótipo, os nomes dos parâmetros são opcionais</h3>
+<p>Na declaração antecipada (o protótipo, da aula <a href="funcoes.html">Funções</a>), o compilador só precisa dos <strong>tipos</strong>. As duas formas valem:</p>
+<pre class="file" data-file="prototipos.cpp">void item(std::string produto, int quantidade, double preco);   // com nomes: mais fácil de ler
+void item(std::string, int, double);                            // só os tipos: também vale
+</pre>
+<p>Prefira com nomes: quem lê o protótipo entende o que cada valor significa.</p>
+
+<hr>
+
+<h2>Qual tipo usar no parâmetro</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>A informação é…</th><th>Tipo do parâmetro</th><th>Exemplo</th></tr>
+<tr><td>Uma contagem, uma quantidade, uma idade</td><td><code>int</code></td><td><code>void repetir(int vezes)</code></td></tr>
+<tr><td>Dinheiro, medida, nota com casas decimais</td><td><code>double</code></td><td><code>void cobrar(double valor)</code></td></tr>
+<tr><td>Um texto</td><td><code>std::string</code></td><td><code>void saudar(std::string nome)</code></td></tr>
+<tr><td>Uma letra só</td><td><code>char</code></td><td><code>void desenhar(char simbolo)</code></td></tr>
+<tr><td>Sim ou não</td><td><code>bool</code></td><td><code>void mostrar(bool detalhado)</code></td></tr>
+</table>
+</div>
+<p>Para textos longos e listas (<code>std::vector</code>), existe um jeito de passar <strong>sem copiar</strong>, o <code>const&amp;</code>, explicado em <a href="passagem-referencia.html">Por Valor × Por Referência</a>. Nesta aula, a cópia simples basta.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: too few arguments to function</code></strong>
+<p><strong>O que significa:</strong> a chamada mandou menos valores do que a função tem parâmetros. A mensagem mostra a função completa (<code>‘void item(std::string, int, double)’</code>) e a nota <code>declared here</code> aponta onde ela foi definida.</p>
+<p><strong>Como consertar:</strong> conte os parâmetros na definição e os argumentos na chamada. Mande o que falta, na ordem certa. Se o parâmetro deveria ser opcional, dê a ele um <a href="valor-padrao.html">valor padrão</a>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: too many arguments to function</code></strong>
+<p><strong>O que significa:</strong> a chamada mandou valores a mais. É comum quando você confunde duas funções parecidas ou quando a função mudou e a chamada ficou antiga.</p>
+<p><strong>Como consertar:</strong> tire o que sobra, ou acrescente o parâmetro na função, se ele for mesmo necessário.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: could not convert … from ‘int’ to ‘std::string’</code> ou <code>invalid conversion from ‘const char*’ to ‘int’</code></strong>
+<p><strong>O que significa:</strong> um argumento é de um tipo que não serve para o parâmetro daquela posição. Muitas vezes os argumentos estão na <strong>ordem errada</strong>.</p>
+<p><strong>Como consertar:</strong> compare, posição por posição, a chamada com os tipos que o g++ mostra na mensagem. Se um número está em texto (<code>"3"</code>), converta-o com <code>std::stoi</code>/<code>std::stod</code> (<a href="string-numero.html">Texto ↔ Número</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>O resultado sai sem as casas decimais (2.9 virou 2), sem erro nenhum</strong>
+<p><strong>O que significa:</strong> o parâmetro é <code>int</code> e o argumento é um número com casas decimais. A conversão implícita cortou a parte decimal.</p>
+<p><strong>Como consertar:</strong> se a informação tem casas decimais, o parâmetro deve ser <code>double</code>. Para pegar esse tipo de engano, compile às vezes com <code>-Wconversion</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: ‘b’ has not been declared</code> na linha da função</strong>
+<p><strong>O que significa:</strong> um parâmetro está sem tipo, como em <code>void soma(int a, b)</code>.</p>
+<p><strong>Como consertar:</strong> escreva o tipo de cada parâmetro: <code>void soma(int a, int b)</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que é</th></tr>
+<tr><td><code>void f(int x)</code></td><td>Função com um parâmetro <code>x</code> do tipo <code>int</code></td></tr>
+<tr><td><code>void f(std::string a, int b, double c)</code></td><td>Três parâmetros, separados por vírgula, cada um com seu tipo</td></tr>
+<tr><td><code>f(5);</code>, <code>f(idade);</code>, <code>f(3 + 4);</code></td><td>Chamadas com argumentos: valor fixo, variável, expressão</td></tr>
+<tr><td><code>f("Ana", 3, 9.5);</code></td><td>Argumentos ligados aos parâmetros pela posição</td></tr>
+<tr><td><code>void f(std::string, int);</code></td><td>Protótipo só com os tipos (nomes opcionais)</td></tr>
+<tr><td><code>-Wconversion</code></td><td>Opção do g++ que avisa conversões que podem perder valor</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O parâmetro</h3>
+<p>Complete a definição de uma função que recebe um número inteiro chamado <code>vezes</code>:</p>
+<div class="ex-code">void repetir(<input data-answer="int vezes" aria-label="parâmetro">) { … }</div>
+</div>
+
+<div class="exercise">
+<h3>2. A chamada</h3>
+<p>A função é <code>void item(std::string produto, int quantidade, double preco)</code>. Complete a chamada para 4 borrachas de 1.75:</p>
+<div class="ex-code">item(<input data-answer="&quot;borracha&quot;, 4, 1.75|&quot;borracha&quot;,4,1.75" aria-label="argumentos">);</div>
+</div>
+
+<div class="exercise">
+<h3>3. O que chega</h3>
+<p>A função é <code>void mostrarDobro(int x)</code>. Qual valor de <code>x</code> chega na chamada <code>mostrarDobro(7.8)</code>?</p>
+<div class="ex-code">x = <input data-answer="7" aria-label="valor"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Em <code>void saudar(std::string nome)</code> e na chamada <code>saudar("Bruno");</code>, o que é o parâmetro e o que é o argumento?</p>
+<label><input type="radio" name="q4"> Parâmetro: <code>"Bruno"</code>; argumento: <code>nome</code></label>
+<label><input type="radio" name="q4"> Parâmetro: <code>nome</code>; argumento: <code>"Bruno"</code></label>
+<label><input type="radio" name="q4"> Os dois são <code>nome</code></label>
+<label><input type="radio" name="q4"> Parâmetro: <code>std::string</code>; argumento: <code>saudar</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. A função é <code>void retangulo(int largura, int altura)</code> e a Ana chamou <code>retangulo(2, 5)</code> querendo largura 5. O que acontece?</p>
+<label><input type="radio" name="q5"> Erro de compilação: os argumentos estão trocados</label>
+<label><input type="radio" name="q5"> O C++ percebe pelos nomes e troca sozinho</label>
+<label><input type="radio" name="q5"> Aviso do <code>-Wall</code></label>
+<label><input type="radio" name="q5"> Compila e roda com largura 2 e altura 5: a ligação é pela posição</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. A função tem 3 parâmetros e a chamada manda 2 argumentos. O que o g++ diz?</p>
+<label><input type="radio" name="q6"> <code>error: too few arguments to function</code></label>
+<label><input type="radio" name="q6"> <code>warning: unused parameter</code></label>
+<label><input type="radio" name="q6"> Nada: o terceiro parâmetro fica com zero</label>
+<label><input type="radio" name="q6"> <code>error: too many arguments to function</code></label>
+</div>
+
+<h3>Missão final: o boletim da Ana</h3>
+
+<div class="trycpp" data-goal="out:Bruno: nota 7.5 (aprovado),out:Carla: nota 4 (reprovado),out:Davi: nota 9 (aprovado),src:void\s+mostrarNota\s*\(\s*std::string\s+\w+\s*\,\s*double\s+\w+\s*\),semaviso">
+<p class="try-task"><strong>Missão:</strong> a Ana dá aulas de reforço. Crie a função <code>void mostrarNota(std::string aluno, double nota)</code>, que mostra o nome, a nota e, entre parênteses, <code>aprovado</code> se a nota for 6 ou mais, ou <code>reprovado</code> se for menor (use um <a href="if-else.html">if/else</a> dentro da função). Depois chame-a para os três alunos:</p>
+<pre class="out">Bruno: nota 7.5 (aprovado)
+Carla: nota 4 (reprovado)
+Davi: nota 9 (aprovado)</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+// crie a função mostrarNota aqui
+
+int main() {
+    // chame a função para Bruno (7.5), Carla (4) e Davi (9)
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void mostrarNota(std::string aluno, double nota) {
+    std::cout &lt;&lt; aluno &lt;&lt; ": nota " &lt;&lt; nota;
+    if (nota &gt;= 6) {
+        std::cout &lt;&lt; " (aprovado)\n";
+    } else {
+        std::cout &lt;&lt; " (reprovado)\n";
+    }
+}
+
+int main() {
+    mostrarNota("Bruno", 7.5);
+    mostrarNota("Carla", 4);
+    mostrarNota("Davi", 9);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>Parâmetro</strong> = a variável declarada nos parênteses da função (<code>std::string nome</code>). <strong>Argumento</strong> = o valor enviado na chamada (<code>"Bruno"</code>).</li>
+  <li>O parâmetro nasce a cada chamada com o valor do argumento e some quando a função termina. Ele é uma <strong>cópia</strong>.</li>
+  <li>Vários parâmetros são separados por vírgula, <strong>cada um com seu tipo</strong>: <code>(std::string produto, int quantidade, double preco)</code>.</li>
+  <li>Os argumentos são ligados aos parâmetros <strong>pela posição</strong>. Trocar a ordem dá erro se os tipos forem diferentes e passa em silêncio se forem iguais.</li>
+  <li>Argumentos de menos ou de mais: <code>too few arguments to function</code> / <code>too many arguments to function</code>.</li>
+  <li>Tipos parecidos são convertidos sozinhos: <code>2.9</code> num <code>int</code> vira <code>2</code>, sem aviso no g++ com <code>-Wall -Wextra</code>. Use o tipo certo, e <code>-Wconversion</code> para ser avisado.</li>
+  <li>Próxima aula: <a href="retorno.html">Retorno</a>, para a função <strong>devolver</strong> um resultado.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
