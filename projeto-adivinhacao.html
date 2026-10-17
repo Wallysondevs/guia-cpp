@@ -1,0 +1,1393 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Projeto Jogo de Adivinhação — random, laços e recorde passo a passo | Guia C++</title>
+<meta name="description" content="Projeto passo a passo: um jogo de adivinhação em C++. O computador sorteia um número de 1 a 100 com &lt;random&gt; (mt19937 e uniform_int_distribution), dá dicas de maior e menor, conta as tentativas, deixa jogar de novo e guarda o recorde. Seis etapas com saídas reais do g++ 15, semente fixa para testar e semente real no final.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>Projeto <span class="hl">Jogo de Adivinhação</span></h1>
+
+<p class="intro">O computador pensa num número de 1 a 100, e você tenta adivinhar. A cada palpite, ele diz "É maior!" ou "É menor!", até você acertar. No fim, mostra quantas tentativas você precisou e se bateu o recorde. É o projeto clássico de quem está aprendendo a programar, e por um bom motivo: ele junta <strong>decisões</strong>, <strong>laços</strong>, <strong>contadores</strong>, <strong>funções</strong> e <strong>números aleatórios</strong> num programa curto e divertido.</p>
+
+<div class="note">
+<strong>Você vai praticar</strong>
+<ul>
+  <li><a href="if-else.html">if</a> e <a href="else-if.html">else if</a> para as dicas.</li>
+  <li>O laço <a href="while.html">while</a> ("até acertar") e o <a href="do-while.html">do-while</a> ("jogar de novo?").</li>
+  <li>Contadores com <a href="incremento.html">++</a>.</li>
+  <li><a href="aleatorios.html">Números aleatórios</a> com <code>&lt;random&gt;</code>: gerador, distribuição e semente.</li>
+  <li><a href="funcoes.html">Funções</a> e <a href="passagem-referencia.html">passagem por referência</a> (e o que acontece sem ela).</li>
+  <li>Guardar o melhor resultado: o recorde.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>O que vamos construir</h2>
+<p>Esta é uma partida do jogo pronto na máquina da Ana. Os números depois de "Seu palpite" foram digitados por ela; a estratégia é sempre chutar o meio do que sobrou:</p>
+
+<pre class="term" data-cwd="~/cpp/adivinhacao">$ ./adivinhacao
+=== Adivinhe o número ===
+Pensei num número de 1 a 100.
+Seu palpite (1 a 100): 50
+É maior!
+Seu palpite (1 a 100): 75
+É menor!
+Seu palpite (1 a 100): 62
+É menor!
+Seu palpite (1 a 100): 56
+É menor!
+Seu palpite (1 a 100): 53
+É maior!
+Seu palpite (1 a 100): 54
+Acertou em 6 tentativas!
+Novo recorde!
+Recorde: 6 tentativas
+Jogar de novo? (s/n): n
+Até a próxima!</pre>
+
+<p>Seis etapas até lá:</p>
+
+<ol class="passo">
+  <li><a href="#etapa1">Um palpite</a>, com o número secreto fixo (<code>if</code>, <code>else if</code>).</li>
+  <li><a href="#etapa2">Repetir até acertar</a> (<code>while</code>).</li>
+  <li><a href="#etapa3">Contar as tentativas</a> (<code>++</code>).</li>
+  <li><a href="#etapa4">Sortear o número</a> (<code>&lt;random&gt;</code> com semente fixa).</li>
+  <li><a href="#etapa5">Jogar de novo</a> (funções, <code>do-while</code>, referência).</li>
+  <li><a href="#etapa6">Recorde</a>, e a semente de verdade no código final.</li>
+</ol>
+
+<h3>Antes de começar</h3>
+<p>Você precisa saber ler números com <a href="entrada-cin.html">cin</a>, usar <a href="if-else.html">if/else</a> e <a href="while.html">while</a>. A <a href="projeto-calculadora.html">Calculadora</a> é um bom aquecimento: este projeto reaproveita várias ideias dela. Crie a pasta do projeto; o arquivo vai se chamar <code>adivinhacao.cpp</code> (sem acento e sem cedilha no nome do arquivo, para evitar problemas no terminal).</p>
+
+<pre class="term">$ mkdir -p cpp/adivinhacao
+$ cd cpp/adivinhacao</pre>
+
+<hr>
+
+<h2 id="etapa1">Etapa 1 · Um palpite</h2>
+<p>Antes de sortear qualquer coisa, vamos fazer o jogo funcionar com um número secreto <strong>fixo</strong>: 42. Assim você sabe a resposta e consegue testar cada caminho do programa. Esse é um truque que todo programador usa: <strong>primeiro faça funcionar com valores conhecidos</strong>, depois troque pelos valores de verdade.</p>
+
+<pre class="file" data-file="adivinhacao.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+    const int secreto = 42;
+    int palpite = 0;
+
+    std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+    std::cin &gt;&gt; palpite;
+
+    if (palpite &lt; secreto) {
+        std::cout &lt;&lt; "É maior!\n";
+    } else if (palpite &gt; secreto) {
+        std::cout &lt;&lt; "É menor!\n";
+    } else {
+        std::cout &lt;&lt; "Acertou!\n";
+    }
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>const int secreto = 42;</dt><dd>O número a adivinhar. É <code>const</code> porque não muda durante o jogo (veja <a href="constantes.html">Constantes</a>).</dd>
+  <dt>if (palpite &lt; secreto)</dt><dd>Se o palpite for <strong>menor</strong> que o secreto, o secreto é maior: a dica é "É maior!". Cuidado para não inverter: a dica fala do <strong>número secreto</strong>, não do palpite.</dd>
+  <dt>else if (palpite &gt; secreto)</dt><dd>Senão, se o palpite for maior, a dica é "É menor!" (veja <a href="else-if.html">else if</a>).</dd>
+  <dt>else</dt><dd>Nem menor nem maior: só pode ser igual. Acertou!</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/adivinhacao">$ g++ -std=c++23 -Wall -Wextra adivinhacao.cpp -o adivinhacao
+$ ./adivinhacao
+=== Adivinhe o número ===
+Seu palpite (1 a 100): 50
+É menor!
+$ ./adivinhacao
+=== Adivinhe o número ===
+Seu palpite (1 a 100): 42
+Acertou!</pre>
+
+<div class="trycpp" data-stdin="50\n" data-goal="out:É menor!,src:else\s+if">
+<p class="try-task"><strong>Missão (etapa 1):</strong> o programa só sabe dizer "É maior!". Complete com um <code>else if</code> que mostre <code>É menor!</code> quando o palpite for maior que o secreto, e um <code>else</code> que mostre <code>Acertou!</code>. A entrada da missão é <code>50</code>. Depois, troque a entrada por <code>42</code> e por <code>10</code> e confira os outros caminhos.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+    const int secreto = 42;
+    int palpite = 0;
+
+    std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+    std::cin &gt;&gt; palpite;
+
+    if (palpite &lt; secreto) {
+        std::cout &lt;&lt; "É maior!\n";
+    }
+    // acrescente: se o palpite for maior que o secreto, "É menor!";
+    // em qualquer outro caso, "Acertou!"
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+    const int secreto = 42;
+    int palpite = 0;
+
+    std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+    std::cin &gt;&gt; palpite;
+
+    if (palpite &lt; secreto) {
+        std::cout &lt;&lt; "É maior!\n";
+    } else if (palpite &gt; secreto) {
+        std::cout &lt;&lt; "É menor!\n";
+    } else {
+        std::cout &lt;&lt; "Acertou!\n";
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa2">Etapa 2 · Repetir até acertar</h2>
+<p>Um palpite só não é jogo. Queremos repetir "pergunta, dica" <strong>enquanto</strong> o palpite for diferente do secreto. Essa frase já é o código: <code>while (palpite != secreto)</code> (veja <a href="while.html">while</a>).</p>
+
+<pre class="file" data-file="adivinhacao.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+    const int secreto = 42;
+    int palpite = 0;
+
+    while (palpite != secreto) {
+        std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+        if (!(std::cin &gt;&gt; palpite)) {
+            std::cout &lt;&lt; "\nEntrada inválida. Fim do jogo.\n";
+            return 1;
+        }
+
+        if (palpite &lt; secreto) {
+            std::cout &lt;&lt; "É maior!\n";
+        } else if (palpite &gt; secreto) {
+            std::cout &lt;&lt; "É menor!\n";
+        } else {
+            std::cout &lt;&lt; "Acertou!\n";
+        }
+    }
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>int palpite = 0;</code></td><td>Agora a variável precisa existir <strong>antes</strong> do laço, porque a condição do <code>while</code> a usa logo na primeira volta. Começa com 0, que nunca é o secreto: o laço sempre roda pelo menos uma vez.</td></tr>
+<tr><td><code>while (palpite != secreto)</code></td><td>"Enquanto o palpite for diferente do secreto, repita." Quando a pessoa acerta, a dica "Acertou!" aparece e a condição fica falsa: o laço termina.</td></tr>
+<tr><td><code>if (!(std::cin &gt;&gt; palpite))</code></td><td>Lê o palpite e confere se a leitura deu certo. Se a pessoa digitou um texto (ou a entrada acabou), encerra o jogo com <code>return 1;</code>. O porquê está logo abaixo.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp/adivinhacao">$ g++ -std=c++23 -Wall -Wextra adivinhacao.cpp -o adivinhacao
+$ ./adivinhacao
+=== Adivinhe o número ===
+Seu palpite (1 a 100): 50
+É menor!
+Seu palpite (1 a 100): 25
+É maior!
+Seu palpite (1 a 100): 42
+Acertou!</pre>
+
+<div class="cenario">
+<strong>Por que conferir a leitura: o laço infinito</strong>
+<p>Na etapa 1, se a Ana digitasse <code>abc</code>, o <code>cin</code> falhava, o <code>palpite</code> ficava 0 e o programa dizia "É maior!" e terminava. Com o laço e <strong>sem</strong> o <code>if (!(std::cin &gt;&gt; palpite))</code>, o <code>cin</code> fica em estado de falha, cada volta "lê" 0 sem esperar, e o laço nunca termina. A Ana rodou essa versão com <code>timeout 3</code> e <code>head -5</code> para não travar o terminal:</p>
+<pre class="term" data-cwd="~/cpp/adivinhacao">$ printf "abc\n" | timeout 3 ./adivinhacao | head -5
+=== Adivinhe o número ===
+Seu palpite (1 a 100): É maior!
+Seu palpite (1 a 100): É maior!
+Seu palpite (1 a 100): É maior!
+Seu palpite (1 a 100): É maior!</pre>
+<p><strong>Como consertar:</strong> sempre que um laço lê do teclado, confira se a leitura deu certo. Aqui, simplesmente encerramos o jogo. A <a href="projeto-calculadora.html#etapa5">etapa 5 da Calculadora</a> mostra como pedir de novo em vez de encerrar (com <code>clear()</code> e <code>getline</code>), e a aula <a href="validar-entrada.html">Validar a Entrada</a> explica tudo com calma.</p>
+</div>
+
+<div class="trycpp" data-stdin="50\n25\n42\n" data-goal="out:É menor!,out:É maior!,out:Acertou!,src:while\s*\(">
+<p class="try-task"><strong>Missão (etapa 2):</strong> este é o código da etapa 1. Coloque a pergunta, a leitura e as dicas dentro de um <code>while (palpite != secreto)</code>. A entrada da missão tem três palpites: <code>50</code>, <code>25</code> e <code>42</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+    const int secreto = 42;
+    int palpite = 0;
+
+    std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+    std::cin &gt;&gt; palpite;
+
+    if (palpite &lt; secreto) {
+        std::cout &lt;&lt; "É maior!\n";
+    } else if (palpite &gt; secreto) {
+        std::cout &lt;&lt; "É menor!\n";
+    } else {
+        std::cout &lt;&lt; "Acertou!\n";
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+    const int secreto = 42;
+    int palpite = 0;
+
+    while (palpite != secreto) {
+        std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+        if (!(std::cin &gt;&gt; palpite)) {
+            std::cout &lt;&lt; "\nEntrada inválida. Fim do jogo.\n";
+            return 1;
+        }
+
+        if (palpite &lt; secreto) {
+            std::cout &lt;&lt; "É maior!\n";
+        } else if (palpite &gt; secreto) {
+            std::cout &lt;&lt; "É menor!\n";
+        } else {
+            std::cout &lt;&lt; "Acertou!\n";
+        }
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa3">Etapa 3 · Contar as tentativas</h2>
+<p>Quantos palpites a pessoa precisou? Para saber, usamos um <strong>contador</strong>: uma variável que começa em 0 e ganha 1 a cada palpite.</p>
+
+<pre class="file" data-file="adivinhacao.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+    const int secreto = 42;
+    int palpite = 0;
+    int tentativas = 0;
+
+    while (palpite != secreto) {
+        std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+        if (!(std::cin &gt;&gt; palpite)) {
+            std::cout &lt;&lt; "\nEntrada inválida. Fim do jogo.\n";
+            return 1;
+        }
+        ++tentativas;
+
+        if (palpite &lt; secreto) {
+            std::cout &lt;&lt; "É maior!\n";
+        } else if (palpite &gt; secreto) {
+            std::cout &lt;&lt; "É menor!\n";
+        }
+    }
+    std::cout &lt;&lt; "Acertou em " &lt;&lt; tentativas &lt;&lt; " tentativas!\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>int tentativas = 0;</dt><dd>O contador, criado <strong>antes</strong> do laço. Se fosse criado dentro, voltaria a zero a cada volta.</dd>
+  <dt>++tentativas;</dt><dd>Soma 1 (veja <a href="incremento.html">++ e --</a>). Fica logo depois de uma leitura que deu certo: só conta palpites de verdade.</dd>
+  <dt>std::cout &lt;&lt; "Acertou em " … </dt><dd>A mensagem de acerto saiu de dentro do laço e foi para <strong>depois</strong> dele. Quando o laço termina, é porque a pessoa acertou: é o lugar certo para comemorar e mostrar o total. Por isso o <code>else</code> sumiu.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/adivinhacao">$ g++ -std=c++23 -Wall -Wextra adivinhacao.cpp -o adivinhacao
+$ ./adivinhacao
+=== Adivinhe o número ===
+Seu palpite (1 a 100): 50
+É menor!
+Seu palpite (1 a 100): 25
+É maior!
+Seu palpite (1 a 100): 42
+Acertou em 3 tentativas!</pre>
+
+<div class="trycpp" data-stdin="50\n25\n42\n" data-goal="out:Acertou em 3 tentativas!">
+<p class="try-task"><strong>Missão (etapa 3):</strong> acrescente o contador <code>tentativas</code> e, quando o laço terminar, mostre <code>Acertou em 3 tentativas!</code> (com o número vindo da variável). Não esqueça de tirar o "Acertou!" de dentro do laço.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+    const int secreto = 42;
+    int palpite = 0;
+
+    while (palpite != secreto) {
+        std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+        if (!(std::cin &gt;&gt; palpite)) {
+            std::cout &lt;&lt; "\nEntrada inválida. Fim do jogo.\n";
+            return 1;
+        }
+
+        if (palpite &lt; secreto) {
+            std::cout &lt;&lt; "É maior!\n";
+        } else if (palpite &gt; secreto) {
+            std::cout &lt;&lt; "É menor!\n";
+        } else {
+            std::cout &lt;&lt; "Acertou!\n";
+        }
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+    const int secreto = 42;
+    int palpite = 0;
+    int tentativas = 0;
+
+    while (palpite != secreto) {
+        std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+        if (!(std::cin &gt;&gt; palpite)) {
+            std::cout &lt;&lt; "\nEntrada inválida. Fim do jogo.\n";
+            return 1;
+        }
+        ++tentativas;
+
+        if (palpite &lt; secreto) {
+            std::cout &lt;&lt; "É maior!\n";
+        } else if (palpite &gt; secreto) {
+            std::cout &lt;&lt; "É menor!\n";
+        }
+    }
+    std::cout &lt;&lt; "Acertou em " &lt;&lt; tentativas &lt;&lt; " tentativas!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa4">Etapa 4 · Sortear o número</h2>
+<p>Hora de deixar o computador escolher. Números aleatórios em C++ moderno usam o cabeçalho <code>&lt;random&gt;</code> e duas peças, explicadas em detalhes na aula <a href="aleatorios.html">Números Aleatórios</a>:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Peça</th><th>Comparação</th><th>No código</th></tr>
+<tr><td><strong>Gerador</strong> (motor)</td><td>Uma máquina que solta números enormes, sem padrão aparente.</td><td><code>std::mt19937 gerador(42);</code></td></tr>
+<tr><td><strong>Distribuição</strong></td><td>Um "funil" que transforma esses números enormes num intervalo que você escolhe, com chances iguais.</td><td><code>std::uniform_int_distribution&lt;int&gt; sorteio(1, 100);</code></td></tr>
+<tr><td><strong>Sortear</strong></td><td>Passar o gerador pelo funil.</td><td><code>sorteio(gerador)</code></td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="adivinhacao.cpp">#include &lt;iostream&gt;
+#include &lt;random&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+
+    std::mt19937 gerador(42);  // semente fixa: sorteia sempre o mesmo número (bom para testar)
+    std::uniform_int_distribution&lt;int&gt; sorteio(1, 100);
+    const int secreto = sorteio(gerador);
+
+    int palpite = 0;
+    int tentativas = 0;
+    std::cout &lt;&lt; "Pensei num número de 1 a 100.\n";
+
+    while (palpite != secreto) {
+        std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+        if (!(std::cin &gt;&gt; palpite)) {
+            std::cout &lt;&lt; "\nEntrada inválida. Fim do jogo.\n";
+            return 1;
+        }
+        ++tentativas;
+
+        if (palpite &lt; secreto) {
+            std::cout &lt;&lt; "É maior!\n";
+        } else if (palpite &gt; secreto) {
+            std::cout &lt;&lt; "É menor!\n";
+        }
+    }
+    std::cout &lt;&lt; "Acertou em " &lt;&lt; tentativas &lt;&lt; " tentativas!\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>std::mt19937</dt><dd>O gerador mais usado. O nome vem do algoritmo <em>Mersenne Twister</em> (mt) e do número 19937 que faz parte da matemática dele. Não precisa decorar.</dd>
+  <dt>gerador(42)</dt><dd>O <strong>42</strong> é a <strong>semente</strong>: o ponto de partida do gerador. A mesma semente produz sempre a mesma sequência de números. Parece um defeito, mas é ótimo para <strong>testar</strong>: o jogo fica previsível enquanto você o constrói.</dd>
+  <dt>std::uniform_int_distribution&lt;int&gt; sorteio(1, 100);</dt><dd>"Distribuição uniforme de inteiros": todos os números de 1 a 100 (incluindo os dois) têm a mesma chance.</dd>
+  <dt>const int secreto = sorteio(gerador);</dt><dd>Sorteia uma vez e guarda. Continua <code>const</code>: depois de sorteado, o secreto não muda.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/adivinhacao">$ g++ -std=c++23 -Wall -Wextra adivinhacao.cpp -o adivinhacao
+$ ./adivinhacao
+=== Adivinhe o número ===
+Pensei num número de 1 a 100.
+Seu palpite (1 a 100): 50
+É menor!
+Seu palpite (1 a 100): 25
+É maior!
+Seu palpite (1 a 100): 37
+É maior!
+Seu palpite (1 a 100): 43
+É menor!
+Seu palpite (1 a 100): 40
+É menor!
+Seu palpite (1 a 100): 38
+Acertou em 6 tentativas!</pre>
+
+<p>Com a semente 42, o g++ da Ana sorteia o <strong>38</strong>, e vai sortear 38 toda vez que o programa rodar. Um programa só para ver os primeiros sorteios, rodado duas vezes:</p>
+
+<pre class="file" data-file="semente.cpp">#include &lt;iostream&gt;
+#include &lt;random&gt;
+
+int main() {
+    std::mt19937 gerador(42);
+    std::uniform_int_distribution&lt;int&gt; sorteio(1, 100);
+    for (int i = 0; i &lt; 5; ++i) std::cout &lt;&lt; sorteio(gerador) &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+    std::mt19937 g2(42);
+    for (int i = 0; i &lt; 3; ++i) std::cout &lt;&lt; g2() &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/adivinhacao">$ g++ -std=c++23 -Wall -Wextra semente.cpp -o semente
+$ ./semente
+38 80 96 19 74
+1608637542 3421126067 4083286876
+$ ./semente
+38 80 96 19 74                      « mesma semente, mesma sequência
+1608637542 3421126067 4083286876    « os números "crus" do gerador, antes do funil</pre>
+
+<div class="warning">
+<strong>No editor do guia, o número sorteado pode ser outro</strong>
+<p>O C++ garante que o <code>mt19937</code> com a mesma semente solta os mesmos números "crus" em qualquer computador (a segunda linha acima). Mas o "funil" (<code>uniform_int_distribution</code>) é escrito por cada biblioteca do seu jeito. O g++ (biblioteca libstdc++) dá 38 com a semente 42; o editor do guia usa o Clang com outra biblioteca, e pode sortear outro número com a mesma semente. Por isso as missões a partir daqui não dependem de qual número sai: a entrada da missão chuta 1, 2, 3, … até 100, todos na mesma linha, e para quando acerta.</p>
+</div>
+
+<div class="cenario">
+<strong>Esqueceu o <code>#include &lt;random&gt;</code></strong>
+<pre class="term" data-cwd="~/cpp/adivinhacao">$ g++ -std=c++23 -Wall -Wextra adivinhacao.cpp -o adivinhacao
+adivinhacao.cpp: In function ‘int main()’:
+adivinhacao.cpp:6:10: error: ‘mt19937’ is not a member of ‘std’
+    6 |     std::mt19937 gerador(42);  // semente fixa: sorteia sempre o mesmo número (bom para testar)
+      |          ^~~~~~~
+adivinhacao.cpp:8:33: error: ‘gerador’ was not declared in this scope
+    8 |     const int secreto = sorteio(gerador);
+      |                                 ^~~~~~~</pre>
+<p><strong>O que significa:</strong> "<code>mt19937</code> não é membro de <code>std</code>": sem o cabeçalho, o compilador não conhece o gerador. O segundo erro é consequência do primeiro: como a linha 6 falhou, a variável <code>gerador</code> não existe. Curiosamente, o g++ não reclamou do <code>uniform_int_distribution</code>: o <code>&lt;iostream&gt;</code> do g++ 15 acaba trazendo essa parte por acaso. Não conte com isso: em outro compilador, ela também faltaria.</p>
+<p><strong>Como consertar:</strong> <code>#include &lt;random&gt;</code>. Inclua sempre o cabeçalho de tudo o que você usa.</p>
+</div>
+
+<div class="trycpp" data-stdin="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100\n" data-goal="out:Acertou em,src:mt19937,src:uniform_int_distribution">
+<p class="try-task"><strong>Missão (etapa 4):</strong> troque o <code>const int secreto = 42;</code> por um sorteio: crie um <code>std::mt19937 gerador(42);</code>, uma <code>std::uniform_int_distribution&lt;int&gt; sorteio(1, 100);</code> e sorteie o secreto. Não esqueça o <code>#include &lt;random&gt;</code>. A entrada chuta 1, 2, 3… e para no número sorteado; o total de tentativas é o próprio número.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+    const int secreto = 42;
+    int palpite = 0;
+    int tentativas = 0;
+
+    while (palpite != secreto) {
+        std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+        if (!(std::cin &gt;&gt; palpite)) {
+            std::cout &lt;&lt; "\nEntrada inválida. Fim do jogo.\n";
+            return 1;
+        }
+        ++tentativas;
+
+        if (palpite &lt; secreto) {
+            std::cout &lt;&lt; "É maior!\n";
+        } else if (palpite &gt; secreto) {
+            std::cout &lt;&lt; "É menor!\n";
+        }
+    }
+    std::cout &lt;&lt; "Acertou em " &lt;&lt; tentativas &lt;&lt; " tentativas!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;random&gt;
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+
+    std::mt19937 gerador(42);  // semente fixa: sorteia sempre o mesmo número (bom para testar)
+    std::uniform_int_distribution&lt;int&gt; sorteio(1, 100);
+    const int secreto = sorteio(gerador);
+
+    int palpite = 0;
+    int tentativas = 0;
+    std::cout &lt;&lt; "Pensei num número de 1 a 100.\n";
+
+    while (palpite != secreto) {
+        std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+        if (!(std::cin &gt;&gt; palpite)) {
+            std::cout &lt;&lt; "\nEntrada inválida. Fim do jogo.\n";
+            return 1;
+        }
+        ++tentativas;
+
+        if (palpite &lt; secreto) {
+            std::cout &lt;&lt; "É maior!\n";
+        } else if (palpite &gt; secreto) {
+            std::cout &lt;&lt; "É menor!\n";
+        }
+    }
+    std::cout &lt;&lt; "Acertou em " &lt;&lt; tentativas &lt;&lt; " tentativas!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa5">Etapa 5 · Jogar de novo</h2>
+<p>Para jogar várias partidas, o jeito mais limpo é transformar "uma partida" numa <a href="funcoes.html">função</a> e chamá-la num <code>do-while</code>, como o "Outra conta?" da Calculadora. Vamos criar três funções:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Tarefa</th></tr>
+<tr><td><code>int ler_palpite()</code></td><td>Pergunta e lê um palpite. Se a leitura falhar, encerra o jogo.</td></tr>
+<tr><td><code>int jogar(std::mt19937&amp; gerador)</code></td><td>Sorteia o número, joga uma partida inteira e devolve o número de tentativas.</td></tr>
+<tr><td><code>bool quer_jogar_de_novo()</code></td><td>Pergunta "Jogar de novo? (s/n)".</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="adivinhacao.cpp">#include &lt;cstdlib&gt;
+#include &lt;iostream&gt;
+#include &lt;random&gt;
+#include &lt;string&gt;
+
+// Lê um palpite. Se a entrada acabar ou não for número, encerra o jogo.
+int ler_palpite() {
+    int palpite = 0;
+    std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+    if (!(std::cin &gt;&gt; palpite)) {
+        std::cout &lt;&lt; "\nEntrada inválida. Fim do jogo.\n";
+        std::exit(1);
+    }
+    return palpite;
+}
+
+// Joga uma partida e devolve quantas tentativas foram precisas.
+int jogar(std::mt19937&amp; gerador) {
+    std::uniform_int_distribution&lt;int&gt; sorteio(1, 100);
+    const int secreto = sorteio(gerador);
+    int palpite = 0;
+    int tentativas = 0;
+    std::cout &lt;&lt; "Pensei num número de 1 a 100.\n";
+
+    while (palpite != secreto) {
+        palpite = ler_palpite();
+        ++tentativas;
+        if (palpite &lt; secreto) {
+            std::cout &lt;&lt; "É maior!\n";
+        } else if (palpite &gt; secreto) {
+            std::cout &lt;&lt; "É menor!\n";
+        }
+    }
+    std::cout &lt;&lt; "Acertou em " &lt;&lt; tentativas &lt;&lt; " tentativas!\n";
+    return tentativas;
+}
+
+bool quer_jogar_de_novo() {
+    std::string resto;
+    std::getline(std::cin, resto);  // descarta o resto da linha do último palpite
+    char resposta = 'n';
+    std::cout &lt;&lt; "Jogar de novo? (s/n): ";
+    std::cin &gt;&gt; resposta;
+    return resposta == 's' || resposta == 'S';
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+    std::mt19937 gerador(42);  // semente fixa, para testar
+
+    do {
+        jogar(gerador);
+    } while (quer_jogar_de_novo());
+
+    std::cout &lt;&lt; "Até a próxima!\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>std::exit(1);</dt><dd>Dentro de <code>ler_palpite</code>, um <code>return</code> só sairia da função. Para encerrar o programa inteiro de dentro de uma função, usamos <code>std::exit</code>, do <code>&lt;cstdlib&gt;</code>.</dd>
+  <dt>int jogar(std::mt19937&amp; gerador)</dt><dd>O <code>&amp;</code> é essencial: a função recebe o <strong>mesmo</strong> gerador do <code>main</code>, por <a href="referencias.html">referência</a>. Cada partida avança o gerador, e a próxima sorteia um número novo. Veja o cenário abaixo para o que acontece sem o <code>&amp;</code>.</dd>
+  <dt>std::uniform_int_distribution&lt;int&gt; sorteio(1, 100);</dt><dd>A distribuição pode ser criada dentro de <code>jogar</code>: ela é só o "funil" e não guarda nada importante entre uma partida e outra.</dd>
+  <dt>return tentativas;</dt><dd>A partida devolve quantas tentativas foram precisas. Nesta etapa o <code>main</code> ainda ignora esse valor; na etapa 6 ele vira o recorde.</dd>
+  <dt>std::getline(std::cin, resto);</dt><dd>Em <code>quer_jogar_de_novo</code>: descarta o que sobrou na linha do último palpite. Se a pessoa digitou <code>38 40</code>, o <code>&gt;&gt;</code> leu o 38 (e acertou), e o <code>40</code> ainda está lá. Sem o descarte, ele seria lido como resposta da pergunta seguinte.</dd>
+  <dt>std::mt19937 gerador(42);</dt><dd>Agora o gerador mora no <code>main</code> e é criado <strong>uma vez só</strong>, antes de todas as partidas.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/adivinhacao">$ g++ -std=c++23 -Wall -Wextra adivinhacao.cpp -o adivinhacao
+$ ./adivinhacao
+=== Adivinhe o número ===
+Pensei num número de 1 a 100.
+Seu palpite (1 a 100): 50
+É menor!
+Seu palpite (1 a 100): 25
+É maior!
+Seu palpite (1 a 100): 37
+É maior!
+Seu palpite (1 a 100): 43
+É menor!
+Seu palpite (1 a 100): 40
+É menor!
+Seu palpite (1 a 100): 38
+Acertou em 6 tentativas!
+Jogar de novo? (s/n): s
+Pensei num número de 1 a 100.
+Seu palpite (1 a 100): 50
+É maior!
+Seu palpite (1 a 100): 75
+É maior!
+Seu palpite (1 a 100): 88
+É menor!
+Seu palpite (1 a 100): 81
+É menor!
+Seu palpite (1 a 100): 78
+É maior!
+Seu palpite (1 a 100): 79
+É maior!
+Seu palpite (1 a 100): 80
+Acertou em 7 tentativas!               « segunda partida: 80, o segundo número da sequência
+Jogar de novo? (s/n): n
+Até a próxima!</pre>
+
+<div class="cenario">
+<strong>Sem o <code>&amp;</code>: toda partida sorteia o mesmo número</strong>
+<p class="warning" style="margin:6px 0">Este código tem um erro de propósito: <code>int jogar(std::mt19937 gerador)</code>, sem o <code>&amp;</code>.</p>
+<pre class="term" data-cwd="~/cpp/adivinhacao">$ g++ -std=c++23 -Wall -Wextra adivinhacao.cpp -o adivinhacao
+$ ./adivinhacao
+=== Adivinhe o número ===
+Pensei num número de 1 a 100.
+Seu palpite (1 a 100): 50
+É menor!
+Seu palpite (1 a 100): 25
+É maior!
+Seu palpite (1 a 100): 37
+É maior!
+Seu palpite (1 a 100): 43
+É menor!
+Seu palpite (1 a 100): 40
+É menor!
+Seu palpite (1 a 100): 38
+Acertou em 6 tentativas!
+Jogar de novo? (s/n): s
+Pensei num número de 1 a 100.
+Seu palpite (1 a 100): 38
+Acertou em 1 tentativas!               « a Ana já sabia a resposta…</pre>
+<p><strong>O que significa:</strong> nenhum erro nem aviso: o programa está "certo" para o compilador. Mas, sem o <code>&amp;</code>, a função recebe uma <strong>cópia</strong> do gerador (veja <a href="passagem-referencia.html">Por Valor × Por Referência</a>). A cópia sorteia, avança, e é jogada fora no fim da partida. O gerador do <code>main</code> nunca sai do lugar, e toda partida começa do mesmo ponto: 38 de novo.</p>
+<p><strong>Como consertar:</strong> passe o gerador por referência: <code>std::mt19937&amp; gerador</code>. Regra geral: gerador de números aleatórios, sempre por referência.</p>
+</div>
+
+<div class="cenario">
+<strong>Sem o descarte da linha: o jogo termina sozinho</strong>
+<p>Na versão sem o <code>std::getline(std::cin, resto);</code>, a Ana digitou <code>38 40</code> no último palpite:</p>
+<pre class="term" data-cwd="~/cpp/adivinhacao">$ ./adivinhacao
+=== Adivinhe o número ===
+Pensei num número de 1 a 100.
+Seu palpite (1 a 100): 50
+É menor!
+Seu palpite (1 a 100): 25
+É maior!
+Seu palpite (1 a 100): 37
+É maior!
+Seu palpite (1 a 100): 43
+É menor!
+Seu palpite (1 a 100): 40
+É menor!
+Seu palpite (1 a 100): 38 40
+Acertou em 6 tentativas!
+Jogar de novo? (s/n): Até a próxima!</pre>
+<p>O <code>40</code> que sobrou virou a resposta: o <code>char resposta</code> leu o <code>'4'</code>, que não é <code>s</code>, e o jogo acabou sem perguntar. Com o <code>getline</code>, a sobra é descartada e a pergunta espera a Ana responder.</p>
+</div>
+
+<div class="trycpp" data-stdin="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100\ns\n1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100\nn\n" data-goal="outre:Acertou em \d+ tentativas![\s\S]*Acertou em \d+ tentativas!,out:Até a próxima!,src:do\s*\{">
+<p class="try-task"><strong>Missão (etapa 5):</strong> as funções estão prontas, mas o <code>main</code> joga uma partida só. Coloque a chamada <code>jogar(gerador);</code> dentro de um <code>do { … } while (quer_jogar_de_novo());</code>. A entrada joga duas partidas (chutando 1, 2, 3…) e responde <code>s</code> e depois <code>n</code>.</p>
+<pre class="script">#include &lt;cstdlib&gt;
+#include &lt;iostream&gt;
+#include &lt;random&gt;
+#include &lt;string&gt;
+
+// Lê um palpite. Se a entrada acabar ou não for número, encerra o jogo.
+int ler_palpite() {
+    int palpite = 0;
+    std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+    if (!(std::cin &gt;&gt; palpite)) {
+        std::cout &lt;&lt; "\nEntrada inválida. Fim do jogo.\n";
+        std::exit(1);
+    }
+    return palpite;
+}
+
+// Joga uma partida e devolve quantas tentativas foram precisas.
+int jogar(std::mt19937&amp; gerador) {
+    std::uniform_int_distribution&lt;int&gt; sorteio(1, 100);
+    const int secreto = sorteio(gerador);
+    int palpite = 0;
+    int tentativas = 0;
+    std::cout &lt;&lt; "Pensei num número de 1 a 100.\n";
+
+    while (palpite != secreto) {
+        palpite = ler_palpite();
+        ++tentativas;
+        if (palpite &lt; secreto) {
+            std::cout &lt;&lt; "É maior!\n";
+        } else if (palpite &gt; secreto) {
+            std::cout &lt;&lt; "É menor!\n";
+        }
+    }
+    std::cout &lt;&lt; "Acertou em " &lt;&lt; tentativas &lt;&lt; " tentativas!\n";
+    return tentativas;
+}
+
+bool quer_jogar_de_novo() {
+    std::string resto;
+    std::getline(std::cin, resto);  // descarta o resto da linha do último palpite
+    char resposta = 'n';
+    std::cout &lt;&lt; "Jogar de novo? (s/n): ";
+    std::cin &gt;&gt; resposta;
+    return resposta == 's' || resposta == 'S';
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+    std::mt19937 gerador(42);  // semente fixa, para testar
+
+    jogar(gerador);
+    // repita a partida enquanto quer_jogar_de_novo() devolver true
+
+    std::cout &lt;&lt; "Até a próxima!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;cstdlib&gt;
+#include &lt;iostream&gt;
+#include &lt;random&gt;
+#include &lt;string&gt;
+
+// Lê um palpite. Se a entrada acabar ou não for número, encerra o jogo.
+int ler_palpite() {
+    int palpite = 0;
+    std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+    if (!(std::cin &gt;&gt; palpite)) {
+        std::cout &lt;&lt; "\nEntrada inválida. Fim do jogo.\n";
+        std::exit(1);
+    }
+    return palpite;
+}
+
+// Joga uma partida e devolve quantas tentativas foram precisas.
+int jogar(std::mt19937&amp; gerador) {
+    std::uniform_int_distribution&lt;int&gt; sorteio(1, 100);
+    const int secreto = sorteio(gerador);
+    int palpite = 0;
+    int tentativas = 0;
+    std::cout &lt;&lt; "Pensei num número de 1 a 100.\n";
+
+    while (palpite != secreto) {
+        palpite = ler_palpite();
+        ++tentativas;
+        if (palpite &lt; secreto) {
+            std::cout &lt;&lt; "É maior!\n";
+        } else if (palpite &gt; secreto) {
+            std::cout &lt;&lt; "É menor!\n";
+        }
+    }
+    std::cout &lt;&lt; "Acertou em " &lt;&lt; tentativas &lt;&lt; " tentativas!\n";
+    return tentativas;
+}
+
+bool quer_jogar_de_novo() {
+    std::string resto;
+    std::getline(std::cin, resto);  // descarta o resto da linha do último palpite
+    char resposta = 'n';
+    std::cout &lt;&lt; "Jogar de novo? (s/n): ";
+    std::cin &gt;&gt; resposta;
+    return resposta == 's' || resposta == 'S';
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+    std::mt19937 gerador(42);  // semente fixa, para testar
+
+    do {
+        jogar(gerador);
+    } while (quer_jogar_de_novo());
+
+    std::cout &lt;&lt; "Até a próxima!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa6">Etapa 6 · Recorde</h2>
+<p>O recorde é o <strong>menor</strong> número de tentativas entre todas as partidas. Para guardá-lo, uma variável no <code>main</code>, que sobrevive de uma partida para outra. Depois de cada partida, comparamos: se foi melhor, temos um novo recorde.</p>
+
+<p>Só o <code>main</code> muda:</p>
+
+<pre class="file" data-file="adivinhacao.cpp">int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+    std::mt19937 gerador(42);  // semente fixa, para testar
+
+    int recorde = 0;  // 0 = ainda não existe recorde
+
+    do {
+        const int tentativas = jogar(gerador);
+        if (recorde == 0 || tentativas &lt; recorde) {
+            recorde = tentativas;
+            std::cout &lt;&lt; "Novo recorde!\n";
+        }
+        std::cout &lt;&lt; "Recorde: " &lt;&lt; recorde &lt;&lt; " tentativas\n";
+    } while (quer_jogar_de_novo());
+
+    std::cout &lt;&lt; "Até a próxima!\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>int recorde = 0;</dt><dd>Criado <strong>fora</strong> do laço, para não ser zerado a cada partida. O 0 tem um significado combinado: "ainda não existe recorde". Ninguém acerta com 0 tentativas, então não há confusão.</dd>
+  <dt>const int tentativas = jogar(gerador);</dt><dd>Agora o <code>main</code> guarda o que a partida devolveu.</dd>
+  <dt>if (recorde == 0 || tentativas &lt; recorde)</dt><dd>"Se ainda não havia recorde (primeira partida) <strong>ou</strong> se esta partida foi melhor." O <code>||</code> é o "ou" (veja <a href="operadores-logicos.html">Operadores Lógicos</a>). Sem a primeira parte, nenhuma partida bateria o "recorde" 0.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/adivinhacao">$ g++ -std=c++23 -Wall -Wextra adivinhacao.cpp -o adivinhacao
+$ ./adivinhacao
+=== Adivinhe o número ===
+Pensei num número de 1 a 100.
+Seu palpite (1 a 100): 50
+É menor!
+Seu palpite (1 a 100): 25
+É maior!
+Seu palpite (1 a 100): 37
+É maior!
+Seu palpite (1 a 100): 43
+É menor!
+Seu palpite (1 a 100): 40
+É menor!
+Seu palpite (1 a 100): 38
+Acertou em 6 tentativas!
+Novo recorde!                          « a primeira partida sempre é recorde
+Recorde: 6 tentativas
+Jogar de novo? (s/n): s
+Pensei num número de 1 a 100.
+Seu palpite (1 a 100): 50
+É maior!
+Seu palpite (1 a 100): 75
+É maior!
+Seu palpite (1 a 100): 80
+Acertou em 3 tentativas!               « um chute de sorte
+Novo recorde!
+Recorde: 3 tentativas
+Jogar de novo? (s/n): s
+Pensei num número de 1 a 100.
+Seu palpite (1 a 100): 50
+É maior!
+Seu palpite (1 a 100): 75
+É maior!
+Seu palpite (1 a 100): 90
+É maior!
+Seu palpite (1 a 100): 95
+É maior!
+Seu palpite (1 a 100): 98
+É menor!
+Seu palpite (1 a 100): 96
+Acertou em 6 tentativas!
+Recorde: 3 tentativas                  « 6 não bate 3: o recorde continua
+Jogar de novo? (s/n): n
+Até a próxima!</pre>
+
+<div class="trycpp" data-stdin="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100\ns\n1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100\nn\n" data-goal="out:Novo recorde!,out:Recorde:,out:Até a próxima!,src:recorde">
+<p class="try-task"><strong>Missão (etapa 6):</strong> guarde o recorde. Crie <code>int recorde = 0;</code> antes do laço, guarde o retorno de <code>jogar</code> e, se for a primeira partida ou se for melhor, atualize o recorde e mostre <code>Novo recorde!</code>. Depois de cada partida, mostre <code>Recorde: N tentativas</code>.</p>
+<pre class="script">#include &lt;cstdlib&gt;
+#include &lt;iostream&gt;
+#include &lt;random&gt;
+#include &lt;string&gt;
+
+// Lê um palpite. Se a entrada acabar ou não for número, encerra o jogo.
+int ler_palpite() {
+    int palpite = 0;
+    std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+    if (!(std::cin &gt;&gt; palpite)) {
+        std::cout &lt;&lt; "\nEntrada inválida. Fim do jogo.\n";
+        std::exit(1);
+    }
+    return palpite;
+}
+
+// Joga uma partida e devolve quantas tentativas foram precisas.
+int jogar(std::mt19937&amp; gerador) {
+    std::uniform_int_distribution&lt;int&gt; sorteio(1, 100);
+    const int secreto = sorteio(gerador);
+    int palpite = 0;
+    int tentativas = 0;
+    std::cout &lt;&lt; "Pensei num número de 1 a 100.\n";
+
+    while (palpite != secreto) {
+        palpite = ler_palpite();
+        ++tentativas;
+        if (palpite &lt; secreto) {
+            std::cout &lt;&lt; "É maior!\n";
+        } else if (palpite &gt; secreto) {
+            std::cout &lt;&lt; "É menor!\n";
+        }
+    }
+    std::cout &lt;&lt; "Acertou em " &lt;&lt; tentativas &lt;&lt; " tentativas!\n";
+    return tentativas;
+}
+
+bool quer_jogar_de_novo() {
+    std::string resto;
+    std::getline(std::cin, resto);  // descarta o resto da linha do último palpite
+    char resposta = 'n';
+    std::cout &lt;&lt; "Jogar de novo? (s/n): ";
+    std::cin &gt;&gt; resposta;
+    return resposta == 's' || resposta == 'S';
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+    std::mt19937 gerador(42);  // semente fixa, para testar
+
+    do {
+        jogar(gerador);
+    } while (quer_jogar_de_novo());
+
+    std::cout &lt;&lt; "Até a próxima!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;cstdlib&gt;
+#include &lt;iostream&gt;
+#include &lt;random&gt;
+#include &lt;string&gt;
+
+// Lê um palpite. Se a entrada acabar ou não for número, encerra o jogo.
+int ler_palpite() {
+    int palpite = 0;
+    std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+    if (!(std::cin &gt;&gt; palpite)) {
+        std::cout &lt;&lt; "\nEntrada inválida. Fim do jogo.\n";
+        std::exit(1);
+    }
+    return palpite;
+}
+
+// Joga uma partida e devolve quantas tentativas foram precisas.
+int jogar(std::mt19937&amp; gerador) {
+    std::uniform_int_distribution&lt;int&gt; sorteio(1, 100);
+    const int secreto = sorteio(gerador);
+    int palpite = 0;
+    int tentativas = 0;
+    std::cout &lt;&lt; "Pensei num número de 1 a 100.\n";
+
+    while (palpite != secreto) {
+        palpite = ler_palpite();
+        ++tentativas;
+        if (palpite &lt; secreto) {
+            std::cout &lt;&lt; "É maior!\n";
+        } else if (palpite &gt; secreto) {
+            std::cout &lt;&lt; "É menor!\n";
+        }
+    }
+    std::cout &lt;&lt; "Acertou em " &lt;&lt; tentativas &lt;&lt; " tentativas!\n";
+    return tentativas;
+}
+
+bool quer_jogar_de_novo() {
+    std::string resto;
+    std::getline(std::cin, resto);  // descarta o resto da linha do último palpite
+    char resposta = 'n';
+    std::cout &lt;&lt; "Jogar de novo? (s/n): ";
+    std::cin &gt;&gt; resposta;
+    return resposta == 's' || resposta == 'S';
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+    std::mt19937 gerador(42);  // semente fixa, para testar
+
+    int recorde = 0;  // 0 = ainda não existe recorde
+
+    do {
+        const int tentativas = jogar(gerador);
+        if (recorde == 0 || tentativas &lt; recorde) {
+            recorde = tentativas;
+            std::cout &lt;&lt; "Novo recorde!\n";
+        }
+        std::cout &lt;&lt; "Recorde: " &lt;&lt; recorde &lt;&lt; " tentativas\n";
+    } while (quer_jogar_de_novo());
+
+    std::cout &lt;&lt; "Até a próxima!\n";
+}
+</pre>
+</div>
+
+<h3>A semente de verdade</h3>
+<p>O jogo está pronto, mas com a semente 42 a primeira partida é <strong>sempre</strong> o 38. Para o jogo de verdade, a semente precisa mudar a cada vez que o programa roda. Quem fornece essa semente é o <code>std::random_device</code>, que pede ao sistema operacional um número imprevisível (veja <a href="aleatorios.html">Números Aleatórios</a>). Uma linha muda:</p>
+
+<pre class="file" data-file="adivinhacao.cpp">    std::mt19937 gerador(std::random_device{}());  // semente real: muda a cada execução
+</pre>
+
+<dl class="anatomy">
+  <dt>std::random_device{}</dt><dd>Cria um <code>random_device</code> temporário (as chaves vazias criam o objeto).</dd>
+  <dt>()</dt><dd>Chama esse objeto para obter um número imprevisível.</dd>
+  <dt>gerador(…)</dt><dd>Esse número vira a semente do <code>mt19937</code>.</dd>
+</dl>
+
+<p>Por que não usar o <code>random_device</code> para sortear tudo? Ele pode ser lento (às vezes conversa com o hardware). O costume é usá-lo uma vez, para a semente, e deixar o <code>mt19937</code>, que é rápido, fazer o resto.</p>
+
+<p>Duas partidas com a versão final, uma logo depois da outra:</p>
+
+<pre class="term" data-cwd="~/cpp/adivinhacao">$ g++ -std=c++23 -Wall -Wextra adivinhacao.cpp -o adivinhacao
+$ ./adivinhacao
+=== Adivinhe o número ===
+Pensei num número de 1 a 100.
+Seu palpite (1 a 100): 50
+É maior!
+Seu palpite (1 a 100): 75
+É menor!
+Seu palpite (1 a 100): 62
+É menor!
+Seu palpite (1 a 100): 56
+É menor!
+Seu palpite (1 a 100): 53
+É maior!
+Seu palpite (1 a 100): 54
+Acertou em 6 tentativas!
+Novo recorde!
+Recorde: 6 tentativas
+Jogar de novo? (s/n): n
+Até a próxima!
+$ ./adivinhacao
+=== Adivinhe o número ===
+Pensei num número de 1 a 100.
+Seu palpite (1 a 100): 50
+É menor!
+Seu palpite (1 a 100): 25
+É maior!
+Seu palpite (1 a 100): 37
+É menor!
+Seu palpite (1 a 100): 31
+É menor!
+Seu palpite (1 a 100): 28
+Acertou em 5 tentativas!               « outro número: 54 e depois 28
+Novo recorde!
+Recorde: 5 tentativas
+Jogar de novo? (s/n): n
+Até a próxima!</pre>
+
+<p>Quando você rodar, os números serão outros: essa é a ideia. Repare também que o recorde só vale enquanto o programa está aberto; o desafio 3 abaixo resolve isso.</p>
+
+<hr>
+
+<h2>O código completo</h2>
+
+<pre class="file" data-file="adivinhacao.cpp">#include &lt;cstdlib&gt;
+#include &lt;iostream&gt;
+#include &lt;random&gt;
+#include &lt;string&gt;
+
+// Lê um palpite. Se a entrada acabar ou não for número, encerra o jogo.
+int ler_palpite() {
+    int palpite = 0;
+    std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+    if (!(std::cin &gt;&gt; palpite)) {
+        std::cout &lt;&lt; "\nEntrada inválida. Fim do jogo.\n";
+        std::exit(1);
+    }
+    return palpite;
+}
+
+// Joga uma partida e devolve quantas tentativas foram precisas.
+int jogar(std::mt19937&amp; gerador) {
+    std::uniform_int_distribution&lt;int&gt; sorteio(1, 100);
+    const int secreto = sorteio(gerador);
+    int palpite = 0;
+    int tentativas = 0;
+    std::cout &lt;&lt; "Pensei num número de 1 a 100.\n";
+
+    while (palpite != secreto) {
+        palpite = ler_palpite();
+        ++tentativas;
+        if (palpite &lt; secreto) {
+            std::cout &lt;&lt; "É maior!\n";
+        } else if (palpite &gt; secreto) {
+            std::cout &lt;&lt; "É menor!\n";
+        }
+    }
+    std::cout &lt;&lt; "Acertou em " &lt;&lt; tentativas &lt;&lt; " tentativas!\n";
+    return tentativas;
+}
+
+bool quer_jogar_de_novo() {
+    std::string resto;
+    std::getline(std::cin, resto);  // descarta o resto da linha do último palpite
+    char resposta = 'n';
+    std::cout &lt;&lt; "Jogar de novo? (s/n): ";
+    std::cin &gt;&gt; resposta;
+    return resposta == 's' || resposta == 'S';
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+    std::mt19937 gerador(std::random_device{}());  // semente real: muda a cada execução
+
+    int recorde = 0;  // 0 = ainda não existe recorde
+
+    do {
+        const int tentativas = jogar(gerador);
+        if (recorde == 0 || tentativas &lt; recorde) {
+            recorde = tentativas;
+            std::cout &lt;&lt; "Novo recorde!\n";
+        }
+        std::cout &lt;&lt; "Recorde: " &lt;&lt; recorde &lt;&lt; " tentativas\n";
+    } while (quer_jogar_de_novo());
+
+    std::cout &lt;&lt; "Até a próxima!\n";
+}
+</pre>
+
+<p>O projeto juntou <a href="if-else.html">if</a>/<a href="else-if.html">else if</a>, <a href="while.html">while</a>, <a href="do-while.html">do-while</a>, <a href="incremento.html">contadores</a>, <a href="aleatorios.html">&lt;random&gt;</a>, <a href="funcoes.html">funções</a> e <a href="passagem-referencia.html">referência</a>. A estratégia de chutar o meio, que a Ana usou, se chama <strong>busca binária</strong>: com ela, nenhum número de 1 a 100 precisa de mais de 7 tentativas. Você vai reencontrá-la em <a href="algoritmos.html">Algoritmos</a>.</p>
+
+<hr>
+
+<h2>Desafios extras</h2>
+<ol>
+  <li><strong>Palpite fora do intervalo.</strong> Se a pessoa digitar <code>0</code> ou <code>150</code>, mostre <code>Digite um número de 1 a 100.</code> e pergunte de novo, sem contar a tentativa. (Faça no editor, logo abaixo.)</li>
+  <li><strong>Singular.</strong> Quem acerta de primeira lê "Acertou em 1 tentativas!". Use o <a href="ternario.html">operador ternário</a> para escrever "tentativa" quando for 1.</li>
+  <li><strong>Recorde que não se perde.</strong> Grave o recorde num arquivo <code>recorde.txt</code> ao sair e leia-o ao abrir (veja <a href="arquivos.html">Ler e Escrever Arquivos</a> e o <a href="projeto-agenda.html">projeto Agenda</a>).</li>
+  <li><strong>Níveis de dificuldade.</strong> Pergunte o nível no começo: fácil (1 a 10), médio (1 a 100) ou difícil (1 a 1000). Use um <a href="enums.html">enum class</a> para o nível.</li>
+  <li><strong>Texto no palpite.</strong> Em vez de encerrar o jogo quando alguém digita <code>abc</code>, peça de novo, como na <a href="projeto-calculadora.html#etapa5">Calculadora</a>.</li>
+</ol>
+
+<div class="trycpp" data-stdin="0 150 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100\nn\n" data-goal="out:Digite um número de 1 a 100.,out:Acertou em">
+<p class="try-task"><strong>Desafio 1 no editor:</strong> mude <code>ler_palpite</code> para repetir a pergunta enquanto o palpite estiver fora de 1 a 100, mostrando <code>Digite um número de 1 a 100.</code>. A entrada começa com <code>0</code> e <code>150</code>.</p>
+<pre class="script">#include &lt;cstdlib&gt;
+#include &lt;iostream&gt;
+#include &lt;random&gt;
+#include &lt;string&gt;
+
+// Lê um palpite. Se a entrada acabar ou não for número, encerra o jogo.
+int ler_palpite() {
+    int palpite = 0;
+    std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+    if (!(std::cin &gt;&gt; palpite)) {
+        std::cout &lt;&lt; "\nEntrada inválida. Fim do jogo.\n";
+        std::exit(1);
+    }
+    return palpite;
+}
+
+// Joga uma partida e devolve quantas tentativas foram precisas.
+int jogar(std::mt19937&amp; gerador) {
+    std::uniform_int_distribution&lt;int&gt; sorteio(1, 100);
+    const int secreto = sorteio(gerador);
+    int palpite = 0;
+    int tentativas = 0;
+    std::cout &lt;&lt; "Pensei num número de 1 a 100.\n";
+
+    while (palpite != secreto) {
+        palpite = ler_palpite();
+        ++tentativas;
+        if (palpite &lt; secreto) {
+            std::cout &lt;&lt; "É maior!\n";
+        } else if (palpite &gt; secreto) {
+            std::cout &lt;&lt; "É menor!\n";
+        }
+    }
+    std::cout &lt;&lt; "Acertou em " &lt;&lt; tentativas &lt;&lt; " tentativas!\n";
+    return tentativas;
+}
+
+bool quer_jogar_de_novo() {
+    std::string resto;
+    std::getline(std::cin, resto);  // descarta o resto da linha do último palpite
+    char resposta = 'n';
+    std::cout &lt;&lt; "Jogar de novo? (s/n): ";
+    std::cin &gt;&gt; resposta;
+    return resposta == 's' || resposta == 'S';
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+    std::mt19937 gerador(42);  // semente fixa, para testar
+
+    int recorde = 0;  // 0 = ainda não existe recorde
+
+    do {
+        const int tentativas = jogar(gerador);
+        if (recorde == 0 || tentativas &lt; recorde) {
+            recorde = tentativas;
+            std::cout &lt;&lt; "Novo recorde!\n";
+        }
+        std::cout &lt;&lt; "Recorde: " &lt;&lt; recorde &lt;&lt; " tentativas\n";
+    } while (quer_jogar_de_novo());
+
+    std::cout &lt;&lt; "Até a próxima!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;cstdlib&gt;
+#include &lt;iostream&gt;
+#include &lt;random&gt;
+#include &lt;string&gt;
+
+// Lê um palpite de 1 a 100. Repete se estiver fora do intervalo.
+// Se a entrada acabar ou não for número, encerra o jogo.
+int ler_palpite() {
+    int palpite = 0;
+    while (true) {
+        std::cout &lt;&lt; "Seu palpite (1 a 100): ";
+        if (!(std::cin &gt;&gt; palpite)) {
+            std::cout &lt;&lt; "\nEntrada inválida. Fim do jogo.\n";
+            std::exit(1);
+        }
+        if (palpite &gt;= 1 &amp;&amp; palpite &lt;= 100) {
+            return palpite;
+        }
+        std::cout &lt;&lt; "Digite um número de 1 a 100.\n";
+    }
+}
+
+// Joga uma partida e devolve quantas tentativas foram precisas.
+int jogar(std::mt19937&amp; gerador) {
+    std::uniform_int_distribution&lt;int&gt; sorteio(1, 100);
+    const int secreto = sorteio(gerador);
+    int palpite = 0;
+    int tentativas = 0;
+    std::cout &lt;&lt; "Pensei num número de 1 a 100.\n";
+
+    while (palpite != secreto) {
+        palpite = ler_palpite();
+        ++tentativas;
+        if (palpite &lt; secreto) {
+            std::cout &lt;&lt; "É maior!\n";
+        } else if (palpite &gt; secreto) {
+            std::cout &lt;&lt; "É menor!\n";
+        }
+    }
+    std::cout &lt;&lt; "Acertou em " &lt;&lt; tentativas &lt;&lt; " tentativas!\n";
+    return tentativas;
+}
+
+bool quer_jogar_de_novo() {
+    std::string resto;
+    std::getline(std::cin, resto);  // descarta o resto da linha do último palpite
+    char resposta = 'n';
+    std::cout &lt;&lt; "Jogar de novo? (s/n): ";
+    std::cin &gt;&gt; resposta;
+    return resposta == 's' || resposta == 'S';
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Adivinhe o número ===\n";
+    std::mt19937 gerador(42);  // semente fixa, para testar
+
+    int recorde = 0;  // 0 = ainda não existe recorde
+
+    do {
+        const int tentativas = jogar(gerador);
+        if (recorde == 0 || tentativas &lt; recorde) {
+            recorde = tentativas;
+            std::cout &lt;&lt; "Novo recorde!\n";
+        }
+        std::cout &lt;&lt; "Recorde: " &lt;&lt; recorde &lt;&lt; " tentativas\n";
+    } while (quer_jogar_de_novo());
+
+    std::cout &lt;&lt; "Até a próxima!\n";
+}
+</pre>
+</div>
+
+<p>Na máquina da Ana, a solução do desafio 1 rodou assim (com a semente 42):</p>
+
+<pre class="term" data-cwd="~/cpp/adivinhacao">$ ./adivinhacao
+=== Adivinhe o número ===
+Pensei num número de 1 a 100.
+Seu palpite (1 a 100): 0
+Digite um número de 1 a 100.
+Seu palpite (1 a 100): 150
+Digite um número de 1 a 100.
+Seu palpite (1 a 100): 50
+É menor!
+Seu palpite (1 a 100): 25
+É maior!
+Seu palpite (1 a 100): 37
+É maior!
+Seu palpite (1 a 100): 43
+É menor!
+Seu palpite (1 a 100): 40
+É menor!
+Seu palpite (1 a 100): 38
+Acertou em 6 tentativas!               « o 0 e o 150 não contaram
+Novo recorde!
+Recorde: 6 tentativas
+Jogar de novo? (s/n): n
+Até a próxima!</pre>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">1. O palpite foi 30 e o número secreto é 42. Qual dica o jogo deve mostrar?</p>
+<label><input type="radio" name="q1"> "É menor!"</label>
+<label><input type="radio" name="q1"> "É maior!"</label>
+<label><input type="radio" name="q1"> "Acertou!"</label>
+<label><input type="radio" name="q1"> Nenhuma.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">2. Com <code>std::mt19937 gerador(42);</code>, o que acontece ao rodar o programa várias vezes?</p>
+<label><input type="radio" name="q2"> Cada execução sorteia um número diferente.</label>
+<label><input type="radio" name="q2"> O programa não compila: a semente precisa ser <code>random_device</code>.</label>
+<label><input type="radio" name="q2"> Toda execução sorteia a mesma sequência de números (no mesmo compilador).</label>
+<label><input type="radio" name="q2"> O número sorteado é sempre 42.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">3. Por que <code>jogar</code> recebe <code>std::mt19937&amp; gerador</code>, com <code>&amp;</code>?</p>
+<label><input type="radio" name="q3"> Para usar o mesmo gerador do <code>main</code>; sem o <code>&amp;</code>, cada partida usaria uma cópia e sortearia o mesmo número.</label>
+<label><input type="radio" name="q3"> Porque o compilador não aceita copiar um gerador.</label>
+<label><input type="radio" name="q3"> Para o programa ficar mais rápido; o resultado seria o mesmo.</label>
+<label><input type="radio" name="q3"> Porque <code>&amp;</code> é obrigatório em todo parâmetro.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Onde deve ser criada a variável <code>recorde</code>?</p>
+<label><input type="radio" name="q4"> Dentro de <code>jogar</code>.</label>
+<label><input type="radio" name="q4"> Dentro do <code>do { … }</code>, no começo de cada partida.</label>
+<label><input type="radio" name="q4"> Em <code>quer_jogar_de_novo</code>.</label>
+<label><input type="radio" name="q4"> No <code>main</code>, antes do laço, para sobreviver entre as partidas.</label>
+</div>
+
+<div class="exercise">
+<p>5. Complete a distribuição que sorteia números de 1 a 6, como um dado:</p>
+<div class="ex-code">std::uniform_int_distribution&lt;int&gt; dado(<input data-answer="1, 6|1,6" aria-label="intervalo">);</div>
+</div>
+
+<div class="exercise">
+<p>6. Complete o laço que repete enquanto a pessoa não acertar:</p>
+<div class="ex-code">while (palpite <input data-answer="!=" aria-label="operador"> secreto) {</div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Comece com valores fixos (<code>secreto = 42</code>) para testar; troque pelos valores de verdade no fim.</li>
+  <li><code>while (palpite != secreto)</code> repete até acertar; um contador <code>++tentativas</code> conta os palpites.</li>
+  <li>Laço que lê do teclado precisa conferir a leitura (<code>if (!(std::cin &gt;&gt; x))</code>), senão vira laço infinito.</li>
+  <li><code>&lt;random&gt;</code>: um gerador (<code>std::mt19937</code>), uma distribuição (<code>uniform_int_distribution</code>) e uma semente. Semente fixa = sequência repetível (por compilador); <code>std::random_device{}()</code> = semente que muda.</li>
+  <li>Passe o gerador por referência (<code>&amp;</code>), senão cada chamada usa uma cópia e repete os números.</li>
+  <li>O recorde mora fora do laço e começa num valor que significa "nenhum".</li>
+</ul>
+<p>Próximo projeto: <a href="projeto-agenda.html">Agenda de Contatos</a>, com <code>struct</code>, <code>vector</code>, menu e arquivo.</p>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
