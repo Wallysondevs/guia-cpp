@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Caracteres (char) — letras que são números | Guia C++</title>
+<meta name="description" content="O tipo char em C++ para quem nunca programou: um caractere é um número ('A' = 65), aspas simples × duplas, static_cast<int>, um pedaço da tabela ASCII, contas com char, toupper e isdigit de <cctype> e por que 'ç' não cabe num char (aviso multi-character character constant), com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Caracteres (char)</span></h1>
+
+<p class="intro">Uma letra, um algarismo, um sinal de pontuação: cada um é um <strong>caractere</strong>, e em C++ um caractere sozinho cabe no tipo <code>char</code> (de <em>character</em>, "caractere"). O segredo desta aula é que, para o computador, <strong>um <code>char</code> é um número</strong>: a letra <code>A</code> é guardada como 65. Entender isso explica por que dá para "somar" letras, por que <code>std::toupper</code> às vezes mostra um número e por que o <code>ç</code> não cabe num <code>char</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como criar um <code>char</code> e a diferença entre aspas simples (<code>'A'</code>) e duplas (<code>"A"</code>).</li>
+  <li>Que todo caractere tem um código: <code>static_cast&lt;int&gt;('A')</code> mostra 65.</li>
+  <li>Um pedaço da <strong>tabela ASCII</strong> e os padrões que ela esconde.</li>
+  <li>Contas com caracteres: <code>'a' + 1</code>, <code>'7' - '0'</code>.</li>
+  <li>As funções de <code>&lt;cctype&gt;</code>: <code>std::toupper</code>, <code>std::tolower</code>, <code>std::isdigit</code> e companhia.</li>
+  <li>Por que <code>'ç'</code> dá o aviso <code>multi-character character constant</code>.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: o código secreto combinado</h2>
+<p>Imagine duas crianças que combinam um código: 1 = A, 2 = B, 3 = C… Para mandar "CAB", uma escreve <code>3 1 2</code> no bilhete, e a outra traduz de volta. O bilhete só tem números; as letras existem no <strong>combinado</strong>.</p>
+
+<p>O computador faz igual. A memória só guarda números. Para guardar letras, todo mundo segue uma tabela combinada, chamada <strong>ASCII</strong> (sigla em inglês de "Código Padrão Americano para Troca de Informações", criado nos anos 1960). Nela, <code>A</code> é 65, <code>B</code> é 66, o espaço é 32. Um <code>char</code> guarda o número; quem mostra a letra é o <code>std::cout</code>, que consulta a tabela.</p>
+
+<hr>
+
+<h2>1. Criar um <code>char</code></h2>
+
+<pre class="file" data-file="letra.cpp">#include &lt;iostream&gt;
+
+int main() {
+    char letra = 'A';
+    std::cout &lt;&lt; "letra: " &lt;&lt; letra &lt;&lt; "\n";
+    std::cout &lt;&lt; "código: " &lt;&lt; static_cast&lt;int&gt;(letra) &lt;&lt; "\n";
+    char outra = 66;
+    std::cout &lt;&lt; "outra: " &lt;&lt; outra &lt;&lt; "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>char letra = 'A';</dt><dd>Um caractere vai entre <strong>aspas simples</strong>. Por dentro, a variável guarda 65.</dd>
+  <dt>std::cout &lt;&lt; letra</dt><dd>O <code>cout</code> vê que o tipo é <code>char</code> e mostra a <strong>letra</strong>.</dd>
+  <dt>static_cast&lt;int&gt;(letra)</dt><dd>"Converta para <code>int</code>". O valor é o mesmo 65, mas agora o <code>cout</code> vê um número e mostra o número. <code>static_cast</code> ("conversão estática", feita na compilação) é o jeito moderno de converter tipos; ele tem aula própria em <a href="conversao-tipos.html">Conversão de Tipos</a>.</dd>
+  <dt>char outra = 66;</dt><dd>O caminho inverso: guardamos o número 66, e o <code>cout</code> mostra a letra que tem esse código.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra letra.cpp -o letra
+$ ./letra
+letra: A
+código: 65
+outra: B</pre>
+
+<p>Um <code>char</code> ocupa <strong>1 byte</strong> e guarda números de -128 a 127 no Linux da Ana (aula <a href="tipos-dados.html">Tipos de Dados</a>). Existem também <code>unsigned char</code> (0 a 255) e <code>signed char</code>; para guardar letras, o <code>char</code> simples é o que você usa.</p>
+
+<div class="trycpp" data-goal="out:Z = 90,out:0 = 48">
+<p class="try-task"><strong>Missão:</strong> o programa mostra o código da letra A. Acrescente duas linhas iguais para descobrir o código da letra <code>Z</code> e do <strong>caractere</strong> <code>0</code> (o algarismo zero, entre aspas simples). A saída deve ter <code>Z = 90</code> e <code>0 = 48</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; 'A' &lt;&lt; " = " &lt;&lt; static_cast&lt;int&gt;('A') &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; 'A' &lt;&lt; " = " &lt;&lt; static_cast&lt;int&gt;('A') &lt;&lt; "\n";
+    std::cout &lt;&lt; 'Z' &lt;&lt; " = " &lt;&lt; static_cast&lt;int&gt;('Z') &lt;&lt; "\n";
+    std::cout &lt;&lt; '0' &lt;&lt; " = " &lt;&lt; static_cast&lt;int&gt;('0') &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<p>Repare: o <strong>caractere</strong> <code>'0'</code> vale 48, e não 0. O algarismo que aparece na tela e o número zero são coisas diferentes. Isso vai ser útil na seção 4.</p>
+
+<hr>
+
+<h2>2. Aspas simples × aspas duplas</h2>
+<p>Esta é a confusão número 1 com <code>char</code>:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que é</th><th>Tipo</th></tr>
+<tr><td><code>'A'</code></td><td><strong>Um</strong> caractere</td><td><code>char</code></td></tr>
+<tr><td><code>"A"</code></td><td>Um <strong>texto</strong> que, por acaso, tem uma letra só</td><td>texto (vira <code>std::string</code> quando guardado num)</td></tr>
+<tr><td><code>"Ana"</code></td><td>Um texto com três letras</td><td>texto</td></tr>
+<tr><td><code>'Ana'</code></td><td>Um engano (veja abaixo)</td><td>—</td></tr>
+</table>
+</div>
+
+<p>Trocar uma pela outra dá erro. Texto entre aspas duplas num <code>char</code>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat aspas.cpp
+#include &lt;iostream&gt;
+
+int main() {
+    char inicial = "A";
+    std::cout &lt;&lt; inicial &lt;&lt; "\n";
+}
+$ g++ -std=c++23 -Wall -Wextra aspas.cpp -o aspas
+aspas.cpp: In function ‘int main()’:
+aspas.cpp:4:20: error: invalid conversion from ‘const char*’ to ‘char’ [-fpermissive]
+    4 |     char inicial = "A";
+      |                    ^~~
+      |                    |
+      |                    const char*</pre>
+
+<p><em>Invalid conversion from ‘const char*’ to ‘char’</em>: o <code>"A"</code> é um texto (tipo <code>const char*</code>, explicado em <a href="auto.html">auto</a>), e não cabe numa caixa de um caractere só.</p>
+
+<p>E um caractere num <code>std::string</code>:</p>
+<pre class="term" data-cwd="~/cpp">$ cat aspas2.cpp
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = 'A';
+    std::cout &lt;&lt; nome &lt;&lt; "\n";
+}
+$ g++ -std=c++23 -Wall -Wextra aspas2.cpp -o aspas2
+aspas2.cpp: In function ‘int main()’:
+aspas2.cpp:5:24: error: conversion from ‘char’ to non-scalar type ‘std::string’ {aka ‘std::__cxx11::basic_string&lt;char&gt;’} requested</pre>
+
+<p><em>Conversion from ‘char’ to non-scalar type ‘std::string’ requested</em> = "pediu-se uma conversão de <code>char</code> para o tipo <code>std::string</code>" (que o C++ não faz sozinho com <code>=</code>). O trecho entre chaves (<code>{aka ‘std::__cxx11::basic_string&lt;char&gt;’}</code>, "também conhecido como") é o nome completo do <code>std::string</code> dentro da biblioteca; pode ignorar. Conserto: <code>std::string nome = "A";</code>.</p>
+
+<p>E várias letras entre aspas simples? O g++ aceita, com dois avisos, e guarda só a última:</p>
+<pre class="term" data-cwd="~/cpp">$ cat aspas3.cpp
+#include &lt;iostream&gt;
+
+int main() {
+    char inicial = 'Ana';
+    std::cout &lt;&lt; inicial &lt;&lt; "\n";
+}
+$ g++ -std=c++23 -Wall -Wextra aspas3.cpp -o aspas3
+aspas3.cpp:4:20: warning: multi-character character constant [-Wmultichar]
+    4 |     char inicial = 'Ana';
+      |                    ^~~~~
+aspas3.cpp: In function ‘int main()’:
+aspas3.cpp:4:20: warning: overflow in conversion from ‘int’ to ‘char’ changes value from ‘4288097’ to ‘97’ [-Woverflow]
+$ ./aspas3
+a                        « sobrou só o último "a" (código 97)</pre>
+
+<p><em>Multi-character character constant</em> = "constante de caractere com vários caracteres". O compilador juntou os códigos das três letras num número só (4288097) e, ao guardar num <code>char</code>, sobrou apenas o pedaço do último <code>a</code>, que vale 97. Guarde este aviso: ele volta na seção 6, com o <code>ç</code>.</p>
+
+<hr>
+
+<h2>3. Um pedaço da tabela ASCII</h2>
+<p>Este programa mostra o código de alguns caracteres. Ele usa uma lista e um laço que repete o <code>cout</code> para cada item (<a href="arrays.html">Arrays</a> e <a href="for-range.html">for de intervalo</a>, aulas futuras); aqui, só a saída importa:</p>
+
+<pre class="file" data-file="tabela.cpp">#include &lt;iostream&gt;
+
+int main() {
+    const char exemplos[] = {' ', '!', '0', '1', '9', 'A', 'B', 'Z', 'a', 'b', 'z', '~'};
+    for (char c : exemplos) {
+        std::cout &lt;&lt; "'" &lt;&lt; c &lt;&lt; "' = " &lt;&lt; static_cast&lt;int&gt;(c) &lt;&lt; "\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tabela.cpp -o tabela
+$ ./tabela
+' ' = 32
+'!' = 33
+'0' = 48
+'1' = 49
+'9' = 57
+'A' = 65
+'B' = 66
+'Z' = 90
+'a' = 97
+'b' = 98
+'z' = 122
+'~' = 126</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Faixa</th><th>Caracteres</th><th>Códigos</th></tr>
+<tr><td>Controle</td><td>Invisíveis: <code>'\n'</code> (nova linha) = 10, <code>'\t'</code> (tabulação) = 9…</td><td>0 a 31</td></tr>
+<tr><td>Espaço e pontuação</td><td><code>' '</code> = 32, <code>!</code> <code>"</code> <code>#</code> <code>$</code> <code>%</code>…</td><td>32 a 47</td></tr>
+<tr><td>Algarismos</td><td><code>'0'</code> a <code>'9'</code></td><td>48 a 57</td></tr>
+<tr><td>Maiúsculas</td><td><code>'A'</code> a <code>'Z'</code></td><td>65 a 90</td></tr>
+<tr><td>Minúsculas</td><td><code>'a'</code> a <code>'z'</code></td><td>97 a 122</td></tr>
+<tr><td>Último</td><td><code>'~'</code> = 126 (127 é um controle, "apagar")</td><td>até 127</td></tr>
+</table>
+</div>
+
+<p>Três padrões que valem ouro:</p>
+<ul>
+  <li><strong>As letras estão em ordem</strong>: <code>'B'</code> é <code>'A' + 1</code>, <code>'C'</code> é <code>'A' + 2</code>…</li>
+  <li><strong>Minúscula = maiúscula + 32</strong>: <code>'a'</code> (97) − <code>'A'</code> (65) = 32.</li>
+  <li><strong>Os algarismos também estão em ordem</strong>: <code>'7'</code> − <code>'0'</code> = 55 − 48 = 7.</li>
+</ul>
+
+<p>A tabela ASCII só tem as letras do inglês: nada de <code>á</code>, <code>ç</code>, <code>ã</code>. Eles vêm de uma tabela maior, o Unicode (seção 6).</p>
+
+<hr>
+
+<h2>4. Contas com <code>char</code></h2>
+<p>Como <code>char</code> é número, dá para fazer contas. Mas cuidado com o tipo do resultado:</p>
+
+<pre class="file" data-file="conta.cpp">#include &lt;iostream&gt;
+
+int main() {
+    char letra = 'a';
+    std::cout &lt;&lt; letra + 1 &lt;&lt; "\n";
+    char proxima = letra + 1;
+    std::cout &lt;&lt; proxima &lt;&lt; "\n";
+    std::cout &lt;&lt; static_cast&lt;char&gt;('A' + 2) &lt;&lt; "\n";
+    std::cout &lt;&lt; static_cast&lt;char&gt;('a' - 32) &lt;&lt; "\n";
+    char digito = '7';
+    int valor = digito - '0';
+    std::cout &lt;&lt; "valor: " &lt;&lt; valor &lt;&lt; "\n";
+    letra++;
+    std::cout &lt;&lt; letra &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra conta.cpp -o conta
+$ ./conta
+98                       « 'a' + 1 virou número!
+b
+C
+A
+valor: 7
+b</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>Saída</th><th>Por quê</th></tr>
+<tr><td><code>letra + 1</code></td><td><code>98</code></td><td>Numa conta, o C++ <strong>promove</strong> o <code>char</code> para <code>int</code> (97 + 1 = 98, um <code>int</code>). O <code>cout</code> recebe um <code>int</code> e mostra número.</td></tr>
+<tr><td><code>char proxima = letra + 1;</code></td><td><code>b</code></td><td>O 98 foi guardado numa caixa <code>char</code>; o <code>cout</code> mostra a letra.</td></tr>
+<tr><td><code>static_cast&lt;char&gt;('A' + 2)</code></td><td><code>C</code></td><td>Mesmo efeito, sem variável: converter o resultado de volta para <code>char</code>.</td></tr>
+<tr><td><code>'a' - 32</code></td><td><code>A</code></td><td>Minúscula menos 32 = maiúscula.</td></tr>
+<tr><td><code>digito - '0'</code></td><td><code>7</code></td><td>O truque clássico: transforma o <strong>caractere</strong> <code>'7'</code> no <strong>número</strong> 7.</td></tr>
+<tr><td><code>letra++</code></td><td><code>b</code></td><td>O <code>++</code> soma 1 e a variável continua <code>char</code> (aula <a href="incremento.html">++ e --</a>).</td></tr>
+</table>
+</div>
+
+<p>Conta com letra funciona, mas o código fica difícil de ler (o que é esse 32?). Para trocar maiúsculas e minúsculas, prefira as funções da próxima seção.</p>
+
+<hr>
+
+<h2>5. As funções de <code>&lt;cctype&gt;</code></h2>
+<p>O cabeçalho <code>&lt;cctype&gt;</code> ("c" de herdado do C, "ctype" de <em>character type</em>, tipo de caractere) tem funções prontas para perguntar e transformar caracteres:</p>
+
+<pre class="file" data-file="cctype.cpp">#include &lt;cctype&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    char c = 'a';
+    std::cout &lt;&lt; std::toupper(c) &lt;&lt; "\n";
+    std::cout &lt;&lt; static_cast&lt;char&gt;(std::toupper(c)) &lt;&lt; "\n";
+    std::cout &lt;&lt; static_cast&lt;char&gt;(std::tolower('Q')) &lt;&lt; "\n";
+    std::cout &lt;&lt; "isdigit('7'): " &lt;&lt; std::isdigit('7') &lt;&lt; "\n";
+    std::cout &lt;&lt; "isdigit('x'): " &lt;&lt; std::isdigit('x') &lt;&lt; "\n";
+    std::cout &lt;&lt; "isalpha('x'): " &lt;&lt; std::isalpha('x') &lt;&lt; "\n";
+    std::cout &lt;&lt; "isupper('x'): " &lt;&lt; std::isupper('x') &lt;&lt; "\n";
+    std::cout &lt;&lt; "isspace(' '): " &lt;&lt; std::isspace(' ') &lt;&lt; "\n";
+    bool ehDigito = std::isdigit('7');
+    std::cout &lt;&lt; "como bool: " &lt;&lt; ehDigito &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra cctype.cpp -o cctype
+$ ./cctype
+65                       « toupper devolve int: aparece o código, e não a letra
+A
+q
+isdigit('7'): 1
+isdigit('x'): 0
+isalpha('x'): 1024       « "verdadeiro" pode vir como qualquer número diferente de 0
+isupper('x'): 0
+isspace(' '): 8192
+como bool: 1</pre>
+
+<p>Duas surpresas, ambas porque essas funções vêm da linguagem C, que não tinha <code>bool</code> nem gostava de <code>char</code> como resultado:</p>
+<ul>
+  <li><strong><code>std::toupper</code> devolve um <code>int</code></strong>, o código da letra. Para ver a letra, converta: <code>static_cast&lt;char&gt;(std::toupper(c))</code>.</li>
+  <li><strong>As funções <code>is…</code> devolvem <code>int</code></strong>: <code>0</code> quer dizer falso, e <strong>qualquer outro número</strong> quer dizer verdadeiro (1024, 8192…). Guardadas num <code>bool</code>, viram <code>1</code> (aula <a href="bool.html">Booleanos</a>). Num <code>if</code>, funcionam direto.</li>
+</ul>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Pergunta ou faz</th><th>Exemplo</th></tr>
+<tr><td><code>std::isdigit(c)</code></td><td>É algarismo (0–9)?</td><td><code>'7'</code> → sim</td></tr>
+<tr><td><code>std::isalpha(c)</code></td><td>É letra (A–Z, a–z)?</td><td><code>'x'</code> → sim; <code>'7'</code> → não</td></tr>
+<tr><td><code>std::isalnum(c)</code></td><td>É letra ou algarismo?</td><td><code>'x'</code>, <code>'7'</code> → sim; <code>'!'</code> → não</td></tr>
+<tr><td><code>std::isupper(c)</code> / <code>std::islower(c)</code></td><td>É maiúscula? / minúscula?</td><td><code>'Q'</code> → maiúscula</td></tr>
+<tr><td><code>std::isspace(c)</code></td><td>É espaço, tabulação ou nova linha?</td><td><code>' '</code>, <code>'\n'</code> → sim</td></tr>
+<tr><td><code>std::ispunct(c)</code></td><td>É pontuação?</td><td><code>'!'</code>, <code>'?'</code> → sim</td></tr>
+<tr><td><code>std::toupper(c)</code></td><td>Devolve a maiúscula (como <code>int</code>)</td><td><code>'a'</code> → 65 (<code>'A'</code>)</td></tr>
+<tr><td><code>std::tolower(c)</code></td><td>Devolve a minúscula (como <code>int</code>)</td><td><code>'Q'</code> → 113 (<code>'q'</code>)</td></tr>
+</table>
+</div>
+
+<p>Essas funções só conhecem a tabela ASCII: <code>std::toupper</code> não transforma <code>ç</code> em <code>Ç</code>. Para textos inteiros (<code>std::string</code>), você vai aplicá-las letra por letra em <a href="acessar-caracteres.html">Acessar Caracteres</a>.</p>
+
+<div class="trycpp" data-goal="out:Resposta: S">
+<p class="try-task"><strong>Missão:</strong> o programa deveria mostrar a resposta em maiúscula, <code>Resposta: S</code>, mas mostra <code>Resposta: 83</code>. Conserte a linha do <code>cout</code>.</p>
+<pre class="script">#include &lt;cctype&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    char resposta = 's';
+    std::cout &lt;&lt; "Resposta: " &lt;&lt; std::toupper(resposta) &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;cctype&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    char resposta = 's';
+    std::cout &lt;&lt; "Resposta: " &lt;&lt; static_cast&lt;char&gt;(std::toupper(resposta)) &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>6. Por que <code>'ç'</code> não cabe num <code>char</code></h2>
+<pre class="file" data-file="cedilha.cpp">#include &lt;iostream&gt;
+
+int main() {
+    char letra = 'ç';
+    std::cout &lt;&lt; letra &lt;&lt; "\n";
+    std::cout &lt;&lt; static_cast&lt;int&gt;(letra) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra cedilha.cpp -o cedilha
+cedilha.cpp:4:18: warning: multi-character character constant [-Wmultichar]
+    4 |     char letra = 'ç';
+      |                  ^~~
+cedilha.cpp: In function ‘int main()’:
+cedilha.cpp:4:18: warning: overflow in conversion from ‘int’ to ‘char’ changes value from ‘50087’ to ‘-89’ [-Woverflow]
+$ ./cedilha
+�                        « um pedaço de letra que o terminal não sabe desenhar
+-89</pre>
+
+<p>O mesmo aviso do <code>'Ana'</code>: <em>multi-character character constant</em>. Mas <code>ç</code> é uma letra só! O que aconteceu?</p>
+
+<ol class="passo">
+  <li>O arquivo <code>.cpp</code> está salvo em <strong>UTF-8</strong>, o jeito moderno de guardar texto, que tem todas as letras do mundo. No UTF-8, as letras do ASCII ocupam 1 byte, mas o <code>ç</code> ocupa <strong>2 bytes</strong> (195 e 167).</li>
+  <li>Para o compilador, <code>'ç'</code> é como <code>'Ana'</code>: dois "caracteres" de 1 byte entre aspas simples. Ele os junta num número só: 195 × 256 + 167 = <strong>50087</strong>.</li>
+  <li>Um <code>char</code> tem 1 byte. Ao guardar 50087, sobra só o último byte, 167, que num <code>char</code> com sinal aparece como <strong>-89</strong> (o <em>overflow in conversion</em>).</li>
+  <li>Na hora de mostrar, o <code>cout</code> manda <strong>meio</strong> <code>ç</code> para o terminal, que desenha <code>�</code> ("não sei o que é isto").</li>
+</ol>
+
+<div class="note">
+<strong>No editor do guia é erro</strong>
+<p>O Clang é mais rígido e recusa o programa: <code>error: character too large for enclosing character literal type</code> ("caractere grande demais para o tipo de literal de caractere").</p>
+</div>
+
+<p><strong>Como guardar letras acentuadas, então?</strong> Num <code>std::string</code>, entre aspas duplas: <code>std::string letra = "ç";</code>. O texto ocupa 2 bytes, e o terminal recebe o <code>ç</code> inteiro. Os detalhes do UTF-8, e o que acontece quando você conta as letras de <code>"ação"</code>, estão na aula <a href="acentos-utf8.html">Acentos e UTF-8</a>.</p>
+
+<hr>
+
+<h2>Caracteres especiais</h2>
+<p>Alguns caracteres não dá para digitar entre aspas simples, então têm um código com barra invertida, a <strong>sequência de escape</strong>:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Caractere</th><th>Código</th></tr>
+<tr><td><code>'\n'</code></td><td>Nova linha</td><td>10</td></tr>
+<tr><td><code>'\t'</code></td><td>Tabulação</td><td>9</td></tr>
+<tr><td><code>'\''</code></td><td>A própria aspa simples</td><td>39</td></tr>
+<tr><td><code>'\\'</code></td><td>A própria barra invertida</td><td>92</td></tr>
+<tr><td><code>'\0'</code></td><td>O caractere nulo (marca o fim de textos no estilo C)</td><td>0</td></tr>
+</table>
+</div>
+
+<p>Parecem dois caracteres, mas são um só. A lista completa está em <a href="escapes.html">Caracteres Especiais e Raw Strings</a>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: invalid conversion from ‘const char*’ to ‘char’</code></strong>
+<p><strong>O que significa:</strong> você pôs aspas duplas (<code>"A"</code>) num <code>char</code>.</p>
+<p><strong>Como consertar:</strong> aspas simples para um caractere (<code>'A'</code>); ou mude a variável para <code>std::string</code> se é texto.</p>
+</div>
+
+<div class="cenario">
+<strong><code>warning: multi-character character constant [-Wmultichar]</code></strong>
+<p><strong>O que significa:</strong> entre aspas simples há mais de um byte: várias letras (<code>'Ana'</code>) ou uma letra acentuada (<code>'ç'</code>, <code>'é'</code>).</p>
+<p><strong>Como consertar:</strong> textos e letras acentuadas vão em <code>std::string</code>, com aspas duplas.</p>
+</div>
+
+<div class="cenario">
+<strong>Apareceu um número (65, 98…) onde deveria aparecer uma letra</strong>
+<p><strong>O que significa:</strong> a letra passou por uma conta (<code>'a' + 1</code>) ou por <code>std::toupper</code>, e virou <code>int</code>.</p>
+<p><strong>Como consertar:</strong> guarde num <code>char</code> ou converta: <code>static_cast&lt;char&gt;(...)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A conta com um algarismo deu um número estranho (como 55 em vez de 7)</strong>
+<p><strong>O que significa:</strong> você usou o caractere <code>'7'</code> (código 55) como se fosse o número 7.</p>
+<p><strong>Como consertar:</strong> subtraia <code>'0'</code>: <code>int valor = digito - '0';</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>char c = 'A';</code></td><td>Um caractere (aspas simples)</td></tr>
+<tr><td><code>static_cast&lt;int&gt;(c)</code></td><td>O código do caractere (65)</td></tr>
+<tr><td><code>static_cast&lt;char&gt;(66)</code></td><td>O caractere de um código (<code>B</code>)</td></tr>
+<tr><td><code>c + 1</code></td><td>Conta: resultado <code>int</code></td></tr>
+<tr><td><code>digito - '0'</code></td><td>Caractere de algarismo → número</td></tr>
+<tr><td><code>std::toupper(c)</code>, <code>std::tolower(c)</code></td><td>Maiúscula/minúscula (devolvem <code>int</code>; <code>&lt;cctype&gt;</code>)</td></tr>
+<tr><td><code>std::isdigit(c)</code>, <code>std::isalpha(c)</code>, <code>std::isspace(c)</code></td><td>Perguntas: 0 = não, outro número = sim</td></tr>
+<tr><td><code>'\n'</code>, <code>'\t'</code>, <code>'\''</code>, <code>'\\'</code></td><td>Caracteres especiais</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Código da letra</h3>
+<p>Qual é o código ASCII de <code>'B'</code>?</p>
+<div class="ex-code"><input data-answer="66" aria-label="código"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Algarismo para número</h3>
+<p>Complete para transformar o caractere <code>'5'</code> no número 5:</p>
+<div class="ex-code">int n = '5' - <input data-answer="'0'|48" aria-label="valor">;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. O que <code>std::cout &lt;&lt; 'a' + 1;</code> mostra?</p>
+<label><input type="radio" name="q3"> b</label>
+<label><input type="radio" name="q3"> 98</label>
+<label><input type="radio" name="q3"> a1</label>
+<label><input type="radio" name="q3"> Erro de compilação</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Qual destas linhas está certa?</p>
+<label><input type="radio" name="q4"> <code>char c = "x";</code></label>
+<label><input type="radio" name="q4"> <code>char c = 'xy';</code></label>
+<label><input type="radio" name="q4"> <code>std::string s = 'x';</code></label>
+<label><input type="radio" name="q4"> <code>char c = 'x';</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Por que o g++ avisa <code>multi-character character constant</code> em <code>char c = 'ç';</code>?</p>
+<label><input type="radio" name="q5"> Porque no UTF-8 o <code>ç</code> ocupa 2 bytes, e um <code>char</code> tem 1</label>
+<label><input type="radio" name="q5"> Porque o C++ proíbe acentos</label>
+<label><input type="radio" name="q5"> Porque faltou o <code>#include &lt;cctype&gt;</code></label>
+<label><input type="radio" name="q5"> Porque <code>ç</code> é maiúscula</label>
+</div>
+
+<h3>Missão final: o dobro do algarismo</h3>
+
+<div class="trycpp" data-goal="out:Dobro: 14,semaviso">
+<p class="try-task"><strong>Missão:</strong> a Ana digitou o algarismo <code>'7'</code> num formulário, e o programa deveria mostrar o dobro, <code>Dobro: 14</code>. Mas mostra <code>Dobro: 110</code>. Por quê? (Dica: qual é o código de <code>'7'</code>?) Conserte a linha do <code>valor</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    char digito = '7';
+    int valor = digito;
+    std::cout &lt;&lt; "Dobro: " &lt;&lt; valor * 2 &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    char digito = '7';
+    int valor = digito - '0';
+    std::cout &lt;&lt; "Dobro: " &lt;&lt; valor * 2 &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>char</code> guarda <strong>um</strong> caractere, entre aspas simples: <code>'A'</code>. Texto vai entre aspas duplas, em <code>std::string</code>.</li>
+  <li>Por dentro, um <code>char</code> é um número (tabela ASCII): <code>'A'</code> = 65, <code>'a'</code> = 97, <code>'0'</code> = 48, espaço = 32. <code>static_cast&lt;int&gt;(c)</code> mostra o código.</li>
+  <li>Numa conta, o <code>char</code> vira <code>int</code>: <code>'a' + 1</code> mostra 98. Guarde num <code>char</code> ou use <code>static_cast&lt;char&gt;</code>. <code>digito - '0'</code> dá o valor do algarismo.</li>
+  <li><code>&lt;cctype&gt;</code>: <code>std::toupper</code>/<code>std::tolower</code> (devolvem <code>int</code>!) e as perguntas <code>std::isdigit</code>, <code>std::isalpha</code>, <code>std::isspace</code>… (0 = não; outro número = sim).</li>
+  <li><code>'ç'</code> ocupa 2 bytes em UTF-8 e não cabe num <code>char</code>: aviso <code>multi-character character constant</code> no g++, erro no Clang. Use <code>std::string</code> (aula <a href="acentos-utf8.html">Acentos e UTF-8</a>).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
