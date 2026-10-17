@@ -594,6 +594,7 @@ clang++: error: linker command failed with exit code 1 (use -v to see invocation
 $ g++ -std=c++23 -Wall -Wextra main.cpp soma.cpp -o main
 $ ./main
 5</pre>
+<p>No editor do guia, o ligador é outro (<code>wasm-ld</code>) e a mesma falha aparece como <code>wasm-ld: error: /tmp/main-62bf3f.o: undefined symbol: soma(int, int)</code> ("símbolo não definido").</p>
 <p><strong>O que significa:</strong> "dentro da função <code>main</code>, há uma chamada a <code>soma(int, int)</code>, mas ninguém a definiu". O compilador aceitou a chamada porque viu a declaração no <code>.h</code>; o ligador não achou o corpo da função.</p>
 <p><strong>Causas e consertos:</strong></p>
 <ul>
@@ -834,7 +835,18 @@ $ echo $?
 
 <div class="note">
 <strong>E no editor do guia?</strong>
-<p>O editor compila com o Clang e roda o programa como WebAssembly, dentro do navegador. Os <strong>erros de compilação</strong> são os da coluna do clang++. Os de <strong>ligação</strong> e de <strong>execução</strong> não vêm do <code>ld</code> nem do bash do Linux, então o texto muda (não há "Falha de segmentação" nem código 139 no navegador). Veja o que o editor mostra em <a href="simulador.html">O Editor do Guia</a>. Para ver as mensagens exatamente como nesta página, compile no seu terminal (<a href="instalar-linux.html">Instalar no Linux</a>).</p>
+<p>O editor compila com o Clang e roda o programa como WebAssembly, dentro do navegador. Os <strong>erros de compilação</strong> são os da coluna do clang++. Os de <strong>ligação</strong> e de <strong>execução</strong> não vêm do <code>ld</code> nem do bash do Linux, e a memória do WebAssembly funciona de outro jeito, então o resultado muda. Os mesmos programas desta página, rodados no editor:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Programa</th><th>No terminal (g++)</th><th>No editor do guia</th></tr>
+<tr><td>função sem definição</td><td><code>undefined reference to `soma(int, int)'</code></td><td><code>wasm-ld: error: /tmp/main-62bf3f.o: undefined symbol: soma(int, int)</code></td></tr>
+<tr><td><code>at.cpp</code> (exceção não capturada)</td><td><code>terminate called after throwing an instance of 'std::out_of_range'</code>, código 134</td><td><code>libc++abi: terminating due to uncaught exception of type std::out_of_range: vector</code>, código 134</td></tr>
+<tr><td><code>divisao.cpp</code> (divisão por zero)</td><td><code>Exceção de ponto flutuante</code>, código 136</td><td>sem mensagem, código 136</td></tr>
+<tr><td><code>nulo.cpp</code> (<code>*p</code> com <code>p = nullptr</code>)</td><td><code>Falha de segmentação</code>, código 139</td><td><strong>não trava</strong>: mostra <code>antes</code> e <code>0</code>, código 0</td></tr>
+<tr><td><code>colchete.cpp</code>, <code>doublefree.cpp</code></td><td>abortam (código 134)</td><td>não acusam nada: mostram <code>0</code> ou nada, código 0</td></tr>
+</table>
+</div>
+<p>Repare nas duas últimas linhas: o comportamento indefinido pode <strong>parecer</strong> funcionar. Um programa que "deu certo" no editor ainda pode ter um erro de memória; para caçá-los, compile no seu terminal com os sanitizers (<a href="instalar-linux.html">Instalar no Linux</a>). Mais sobre o editor em <a href="simulador.html">O Editor do Guia</a>.</p>
 </div>
 
 <hr>
