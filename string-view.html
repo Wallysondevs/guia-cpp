@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ string_view — ver um texto sem copiar | Guia C++</title>
+<meta name="description" content="std::string_view em C++ para quem está começando: olhar um texto sem copiá-lo, parâmetros de função que aceitam std::string e literais, substr barato, remove_prefix, e o perigo de apontar para uma string temporária (comportamento indefinido), com saídas reais do g++ 15, o aviso do Clang e o AddressSanitizer.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">string_view</span> <span class="versao">C++17</span></h1>
+
+<p class="intro">Uma <code>std::string</code> é <strong>dona</strong> do seu texto: ela guarda as letras na memória e, quando você a copia, todas as letras são copiadas. Muitas vezes, porém, você só quer <strong>ler</strong> um texto que já existe, ou um pedaço dele, sem fazer cópia nenhuma. Para isso existe o <code>std::string_view</code>: uma "janela" para um texto que pertence a outra pessoa. É leve e rápido, mas tem um perigo sério, que esta aula mostra com calma: se o dono do texto sumir, a janela passa a mostrar lixo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um <code>std::string_view</code> e o que ele guarda (e o que não guarda).</li>
+  <li>Usar <code>std::string_view</code> como parâmetro de função, aceitando <code>std::string</code> e literais.</li>
+  <li>Cortar pedaços sem copiar: <code>substr</code>, <code>remove_prefix</code>, <code>remove_suffix</code>.</li>
+  <li>Voltar de <code>string_view</code> para <code>std::string</code> quando precisar.</li>
+  <li>O perigo de apontar para uma string temporária: o que acontece, por que o g++ não avisa e quem avisa.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Na seção do perigo aparece também o <strong>clang++ 21</strong>, o mesmo compilador do editor do guia. Antes desta aula, vale ter visto <a href="strings.html">Strings</a>, <a href="funcoes-string.html">Funções de String</a> e <a href="passagem-referencia.html">Por Valor × Por Referência</a>.</p>
+
+<hr>
+
+<h2>A ideia: o livro e o marcador de página</h2>
+<p>A Ana tem um livro (a <code>std::string</code>). Ela quer mostrar a uma amiga um parágrafo da página 40. Ela pode <strong>fotocopiar</strong> o parágrafo (fazer uma cópia, com custo) ou simplesmente <strong>apontar</strong>: "olha aqui, da linha 3 até a linha 8". Apontar é de graça. Mas, se alguém levar o livro embora, o dedo da Ana aponta para o nada.</p>
+
+<p>O <code>string_view</code> é o dedo apontando. Por dentro, ele guarda só <strong>duas coisas</strong>:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Guarda</th><th>Na analogia</th></tr>
+<tr><td>Onde o texto começa na memória (um <a href="ponteiros.html">ponteiro</a>)</td><td>"A partir desta linha"</td></tr>
+<tr><td>Quantos caracteres olhar</td><td>"…estas 6 linhas"</td></tr>
+</table>
+</div>
+<p>Ele <strong>não</strong> guarda as letras. Por isso copiar um <code>string_view</code> é barato, não importa o tamanho do texto, e por isso ele depende de o texto original continuar existindo.</p>
+
+<hr>
+
+<h2>1. Criar e ler um <code>string_view</code></h2>
+
+<pre class="file" data-file="basico.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;string_view&gt;
+
+int main() {
+    std::string frase = "Lista de compras da Ana";
+    std::string_view visao = frase;
+
+    std::cout &lt;&lt; visao &lt;&lt; '\n';
+    std::cout &lt;&lt; "Tamanho: " &lt;&lt; visao.size() &lt;&lt; '\n';
+    std::cout &lt;&lt; "Primeira letra: " &lt;&lt; visao[0] &lt;&lt; '\n';
+    std::cout &lt;&lt; "Começa com \"Lista\"? " &lt;&lt; std::boolalpha &lt;&lt; visao.starts_with("Lista") &lt;&lt; '\n';
+
+    std::string_view literal = "Olá, mundo";
+    std::cout &lt;&lt; literal &lt;&lt; " (" &lt;&lt; literal.size() &lt;&lt; " bytes)\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra basico.cpp -o basico
+$ ./basico
+Lista de compras da Ana
+Tamanho: 23
+Primeira letra: L
+Começa com "Lista"? true
+Olá, mundo (11 bytes)                « 10 letras, mas o "á" ocupa 2 bytes</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;string_view&gt;</dt><dd>O cabeçalho do <code>std::string_view</code> (<em>view</em> = "vista", "visão").</dd>
+  <dt>std::string_view visao = frase;</dt><dd>A janela passa a olhar para o texto de <code>frase</code>. Nenhuma letra foi copiada.</dd>
+  <dt>visao.size(), visao[0]</dt><dd>Os mesmos nomes da <code>std::string</code>: tamanho e acesso a um caractere.</dd>
+  <dt>visao.starts_with("Lista")</dt><dd>"Começa com…?" (C++20; também existe <code>ends_with</code>, "termina com").</dd>
+  <dt>std::string_view literal = "Olá, mundo";</dt><dd>Também dá para olhar direto para um literal. Literais vivem durante o programa inteiro, então essa janela é sempre segura.</dd>
+</dl>
+
+<p>Um <code>string_view</code> é <strong>só para ler</strong>: <code>visao[0] = 'X';</code> não compila. Ele tem quase todos os métodos de leitura da string (<code>find</code>, <code>rfind</code>, <code>substr</code>, <code>compare</code>, <code>==</code>…), mas nenhum que mude o texto (<code>+=</code>, <code>append</code>, <code>insert</code>).</p>
+
+<h3>A janela vê as mudanças do dono</h3>
+<p>Como o <code>string_view</code> não tem cópia, se o texto original mudar, a janela mostra a mudança:</p>
+
+<pre class="file" data-file="mesma_memoria.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;string_view&gt;
+
+int main() {
+    std::string frase = "bom dia";
+    std::string_view visao = frase;
+
+    frase[0] = 'B';
+    std::cout &lt;&lt; visao &lt;&lt; '\n';
+
+    std::string copia = frase.substr(0, 3);
+    std::string_view pedaco = visao.substr(0, 3);
+    frase[1] = 'O';
+    std::cout &lt;&lt; "copia:  " &lt;&lt; copia &lt;&lt; '\n';
+    std::cout &lt;&lt; "pedaco: " &lt;&lt; pedaco &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra mesma_memoria.cpp -o mesma_memoria
+$ ./mesma_memoria
+Bom dia                              « a view viu o 'B' trocado na string
+copia:  Bom                          « a cópia ficou como estava
+pedaco: BOm                          « a view do pedaço viu o 'O'</pre>
+
+<p>Esse exemplo mostra a diferença essencial: <code>frase.substr(0, 3)</code> de uma <strong>string</strong> cria uma string nova (copia 3 letras); <code>visao.substr(0, 3)</code> de uma <strong>view</strong> cria outra view (copia só o "onde" e o "quantos").</p>
+
+<hr>
+
+<h2>2. O uso principal: parâmetro de função</h2>
+<p>Onde o <code>string_view</code> mais aparece é no parâmetro de funções que <strong>só leem</strong> um texto:</p>
+
+<pre class="file" data-file="funcao.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;string_view&gt;
+
+void saudar(std::string_view nome) {
+    std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "!\n";
+}
+
+int main() {
+    std::string ana = "Ana";
+    saudar(ana);            // uma std::string
+    saudar("Bruno");        // um literal
+    std::string_view c = "Carla Souza";
+    saudar(c.substr(0, 5)); // um pedaço de outra view
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra funcao.cpp -o funcao
+$ ./funcao
+Olá, Ana!
+Olá, Bruno!
+Olá, Carla!</pre>
+
+<p>Por que não <code>const std::string&amp;</code>, que você aprendeu em <a href="passagem-referencia.html">Por Valor × Por Referência</a>? Compare as três formas:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parâmetro</th><th>Chamada com <code>std::string</code></th><th>Chamada com <code>"Bruno"</code> (literal)</th><th>Chamada com um pedaço</th></tr>
+<tr><td><code>std::string nome</code></td><td>Copia o texto</td><td>Cria uma string nova</td><td>Cria uma string nova</td></tr>
+<tr><td><code>const std::string&amp; nome</code></td><td>Sem cópia</td><td><strong>Cria uma string temporária</strong> só para poder fazer a referência</td><td>Precisa de <code>s.substr(…)</code>, que cria uma string nova</td></tr>
+<tr><td><code>std::string_view nome</code></td><td>Sem cópia</td><td>Sem cópia</td><td>Sem cópia</td></tr>
+</table>
+</div>
+
+<p>Com <code>string_view</code>, a função aceita qualquer tipo de texto e nunca copia. A diferença só aparece em programas que chamam a função milhões de vezes; mesmo assim, virou o costume moderno para parâmetros de texto "só de leitura". Repare que o <code>string_view</code> é passado <strong>por valor</strong> (sem <code>&amp;</code>): ele é tão pequeno (um ponteiro e um tamanho) que copiá-lo é tão barato quanto passar uma referência.</p>
+
+<div class="tip">
+<strong>Quando a função precisa guardar o texto</strong>
+<p>Se a função vai <strong>guardar</strong> o texto para depois (num campo de uma classe, num vetor), receba <code>std::string</code>: quem guarda precisa ser dono. Guardar um <code>string_view</code> é pedir para ele ficar apontando para um texto que pode sumir.</p>
+</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> a função conta vogais e aceita tanto <code>std::string</code> quanto literais. Rode. Depois chame <code>contar_vogais</code> com um pedaço da frase, sem copiar: <code>std::string_view(frase).substr(0, 9)</code> (só "programar").</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;string_view&gt;
+
+int contar_vogais(std::string_view texto) {
+    int total = 0;
+    for (char c : texto) {
+        if (c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u') {
+            ++total;
+        }
+    }
+    return total;
+}
+
+int main() {
+    std::string frase = "programar em casa";
+    std::cout &lt;&lt; contar_vogais(frase) &lt;&lt; '\n';
+    std::cout &lt;&lt; contar_vogais("banana") &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Cortar pedaços de graça</h2>
+<p>Para "picar" um texto (separar campos de uma linha, tirar uma extensão de arquivo), o <code>string_view</code> brilha: cada pedaço é só uma janela nova sobre o mesmo texto.</p>
+
+<pre class="file" data-file="pedacos.cpp">#include &lt;iostream&gt;
+#include &lt;string_view&gt;
+
+int main() {
+    std::string_view linha = "2026-10-16;Ana;arroz;12.50";
+
+    std::string_view data = linha.substr(0, 10);
+    std::string_view resto = linha.substr(11);
+
+    std::cout &lt;&lt; "Data: " &lt;&lt; data &lt;&lt; '\n';
+    std::cout &lt;&lt; "Resto: " &lt;&lt; resto &lt;&lt; '\n';
+
+    auto pos = resto.find(';');
+    std::string_view nome = resto.substr(0, pos);
+    std::cout &lt;&lt; "Nome: " &lt;&lt; nome &lt;&lt; '\n';
+
+    std::string_view arquivo = "relatorio.txt";
+    arquivo.remove_suffix(4);
+    std::cout &lt;&lt; "Sem extensão: " &lt;&lt; arquivo &lt;&lt; '\n';
+    arquivo.remove_prefix(3);
+    std::cout &lt;&lt; "Sem 3 primeiras: " &lt;&lt; arquivo &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra pedacos.cpp -o pedacos
+$ ./pedacos
+Data: 2026-10-16
+Resto: Ana;arroz;12.50
+Nome: Ana
+Sem extensão: relatorio
+Sem 3 primeiras: atorio</pre>
+
+<dl class="anatomy">
+  <dt>linha.substr(0, 10)</dt><dd>Da posição 0, 10 caracteres. Igual ao <code>substr</code> da string, mas devolve uma view.</dd>
+  <dt>linha.substr(11)</dt><dd>Da posição 11 até o fim.</dd>
+  <dt>resto.find(';')</dt><dd>A posição do primeiro <code>;</code> (ou <code>std::string_view::npos</code>, "posição nenhuma", se não houver).</dd>
+  <dt>arquivo.remove_suffix(4)</dt><dd>Encolhe a janela, tirando 4 caracteres do <strong>fim</strong>. O texto original não muda; só a janela.</dd>
+  <dt>arquivo.remove_prefix(3)</dt><dd>Encolhe a janela, tirando 3 caracteres do <strong>começo</strong>.</dd>
+</dl>
+
+<hr>
+
+<h2>4. De volta para <code>std::string</code></h2>
+<p>Quando você precisar de uma string de verdade (para mudar o texto, juntar com <code>+=</code>, ou guardar), crie uma a partir da view. Mas não com <code>=</code>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat para_string.cpp
+#include &lt;string&gt;
+#include &lt;string_view&gt;
+
+int main() {
+    std::string_view sv = "Ana";
+    std::string s = sv;
+    return static_cast&lt;int&gt;(s.size());
+}
+$ g++ -std=c++23 -Wall -Wextra para_string.cpp -o para_string
+para_string.cpp: In function ‘int main()’:
+para_string.cpp:6:21: error: conversion from ‘std::string_view’ {aka ‘std::basic_string_view&lt;char&gt;’} to non-scalar type ‘std::string’ {aka ‘std::__cxx11::basic_string&lt;char&gt;’} requested
+    6 |     std::string s = sv;
+      |                     ^~</pre>
+
+<p>O C++ não deixa a conversão acontecer "escondida" com <code>=</code>, porque ela custa uma cópia, e o objetivo do <code>string_view</code> é justamente evitar cópias sem você perceber. Você tem de pedir explicitamente:</p>
+
+<pre class="file" data-file="para_string_ok.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;string_view&gt;
+
+int main() {
+    std::string_view sv = "Ana";
+    std::string s{sv};
+    std::string t = std::string(sv);
+    s += " Maria";
+    std::cout &lt;&lt; s &lt;&lt; " / " &lt;&lt; t &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra para_string_ok.cpp -o para_string_ok
+$ ./para_string_ok
+Ana Maria / Ana</pre>
+
+<p>O caminho contrário é automático: toda <code>std::string</code> vira <code>string_view</code> sem você escrever nada (por isso <code>saudar(ana)</code> funcionou).</p>
+
+<hr>
+
+<h2>5. O perigo: apontar para um texto que já morreu</h2>
+<p>Agora o lado ruim. Esta função devolve uma <code>std::string</code> nova. O <code>main</code> guarda o resultado numa <code>string_view</code>:</p>
+
+<pre class="file" data-file="pendurada.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;string_view&gt;
+
+std::string nome_completo() {
+    return "Ana Maria da Silva Souza";
+}
+
+int main() {
+    std::string_view nome = nome_completo();
+    std::cout &lt;&lt; nome &lt;&lt; '\n';
+}
+</pre>
+
+<p>O que acontece na linha 10, passo a passo:</p>
+<ol class="passo">
+  <li><code>nome_completo()</code> cria uma <code>std::string</code> <strong>temporária</strong>, sem nome, com o texto.</li>
+  <li><code>nome</code> passa a apontar para as letras dessa temporária.</li>
+  <li>No <code>;</code>, a linha acaba, e a temporária é <strong>destruída</strong>: a memória das letras é devolvida.</li>
+  <li>Na linha 11, <code>nome</code> aponta para uma memória que não pertence mais a ninguém. Ler dali é <a href="comportamento-indefinido.html">comportamento indefinido</a>.</li>
+</ol>
+
+<p>E o g++? Não diz nada:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra pendurada.cpp -o pendurada       « nenhum aviso
+$ ./pendurada | cat -v
+'?^MM-'^E^@^@^@M-^HEgM-z1M-^[)^Fva Souza
+$ ./pendurada | cat -v
+~I^NM-^^E^@^@^@#I^[^Z^Tc=M-,va Souza                          « lixo diferente a cada execução</pre>
+
+<p>O <code>| cat -v</code> só serve para mostrar os bytes "invisíveis" do lixo como <code>^E</code>, <code>M-</code> etc., em vez de bagunçar o terminal. O começo do nome foi sobrescrito por outros dados quando a memória foi devolvida; o fim (<code>va Souza</code>) ainda estava lá, por acaso. Num programa maior, isso pode virar dados errados, travamentos ou falhas de segurança, e o pior: às vezes "funciona", o que esconde o erro.</p>
+
+<p>Testamos também com <code>-O2</code>, com <code>-Wdangling-reference</code> e com <code>-Wdangling-pointer=2</code>: o g++ 15 continuou calado nesse caso. Quem avisa é o <strong>Clang</strong>, o compilador do editor do guia:</p>
+
+<pre class="term" data-cwd="~/cpp">$ clang++ -std=c++23 -Wall -Wextra pendurada.cpp -o pendurada_clang
+pendurada.cpp:10:29: warning: object backing the pointer will be destroyed at the end of the full-expression [-Wdangling-gsl]
+   10 |     std::string_view nome = nome_completo();
+      |                             ^~~~~~~~~~~~~~~
+1 warning generated.</pre>
+
+<dl class="anatomy">
+  <dt>object backing the pointer</dt><dd>"O objeto por trás do ponteiro": a string temporária que guarda as letras.</dd>
+  <dt>will be destroyed at the end of the full-expression</dt><dd>"Será destruído no fim da expressão completa", ou seja, no <code>;</code> desta linha.</dd>
+  <dt>[-Wdangling-gsl]</dt><dd>O nome do aviso. <em>Dangling</em> = "pendurado", "solto": um ponteiro (ou view) que aponta para algo que não existe mais.</dd>
+</dl>
+
+<p>O mesmo erro aparece quando uma função devolve uma view de uma variável <strong>local</strong>:</p>
+
+<pre class="file" data-file="pendurada2.cpp">std::string_view saudacao(const std::string&amp; nome) {
+    std::string texto = "Bom dia, " + nome + "! Tudo bem com você?";
+    return texto;   // texto morre aqui, no fim da função
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra pendurada2.cpp -o pendurada2     « de novo, nenhum aviso
+$ clang++ -std=c++23 -Wall -Wextra pendurada2.cpp -o pendurada2_clang
+pendurada2.cpp:7:12: warning: address of stack memory associated with local variable 'texto' returned [-Wreturn-stack-address]
+    7 |     return texto;
+      |            ^~~~~
+1 warning generated.</pre>
+
+<p><em>Address of stack memory associated with local variable 'texto' returned</em> = "foi devolvido o endereço de memória da pilha ligada à variável local <code>texto</code>". A variável local morre quando a função termina (aula <a href="escopo.html">Escopo</a>).</p>
+
+<h3>Pegando o erro com o AddressSanitizer</h3>
+<p>Como o g++ não avisa na compilação, a ferramenta para pegar esse erro ao rodar é o <strong>AddressSanitizer</strong> (aula <a href="sanitizers.html">Sanitizers</a>). Ele aponta a linha da leitura (11) e a linha em que a memória foi liberada (10). A saída completa tem dezenas de linhas; aqui, filtrada com <code>grep</code>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -g -fsanitize=address pendurada.cpp -o pendurada_asan
+$ ./pendurada_asan 2&gt;&amp;1 | grep -E "ERROR|READ|#3 .*main|freed by|#7 .*main|SUMMARY"
+==543719==ERROR: AddressSanitizer: heap-use-after-free on address 0x74923afe0040 at pc 0x78623c48aae8 bp 0x7ffe3730e3d0 sp 0x7ffe3730db88
+READ of size 24 at 0x74923afe0040 thread T0
+    #3 0x5d899726c6e0 in main /home/ana/cpp/pendurada.cpp:11
+freed by thread T0 here:
+    #7 0x5d899726c689 in main /home/ana/cpp/pendurada.cpp:10
+SUMMARY: AddressSanitizer: heap-use-after-free (/usr/lib/x86_64-linux-gnu/libstdc++.so.6+0x162d9b) (BuildId: 3a7a8c6bd922e6314edb7a710fdc0293265c2c42) in std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp; std::__ostream_insert&lt;char, std::char_traits&lt;char&gt; &gt;(std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp;, char const*, long)</pre>
+
+<p><em>Heap-use-after-free</em> = "uso da memória depois de liberada". <em>READ of size 24</em>: o programa tentou ler os 24 bytes do nome. Os números em hexadecimal mudam a cada execução.</p>
+
+<div class="warning">
+<strong>As regras de ouro do <code>string_view</code></strong>
+<ul>
+  <li>Use-o para <strong>parâmetros</strong> de funções que só leem: aí o texto de quem chamou com certeza existe durante a chamada.</li>
+  <li><strong>Nunca</strong> guarde numa <code>string_view</code> o resultado de uma função que devolve <code>std::string</code>. Guarde numa <code>std::string</code>.</li>
+  <li><strong>Nunca</strong> devolva uma <code>string_view</code> que aponta para uma variável local.</li>
+  <li>Devolver uma view é seguro quando ela aponta para algo que vive mais que a função: um literal ou o próprio parâmetro recebido (como na missão final).</li>
+  <li>Na dúvida, use <code>std::string</code>. Uma cópia a mais quase nunca é problema; um ponteiro solto sempre é.</li>
+</ul>
+</div>
+
+<div class="trycpp" data-goal="semaviso,out:Ana Maria da Silva Souza">
+<p class="try-task"><strong>Missão:</strong> rode este programa no editor. O Clang do editor mostra o aviso <code>-Wdangling-gsl</code> e a saída pode sair estragada. Conserte trocando o tipo da variável <code>nome</code>, para que ela seja <strong>dona</strong> do texto. A meta é compilar sem aviso e mostrar o nome inteiro.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;string_view&gt;
+
+std::string nome_completo() {
+    return "Ana Maria da Silva Souza";
+}
+
+int main() {
+    std::string_view nome = nome_completo();
+    std::cout &lt;&lt; nome &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;string_view&gt;
+
+std::string nome_completo() {
+    return "Ana Maria da Silva Souza";
+}
+
+int main() {
+    std::string nome = nome_completo();
+    std::cout &lt;&lt; nome &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2><code>std::string</code> ou <code>std::string_view</code>? Qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th></tr>
+<tr><td>Parâmetro de uma função que só lê o texto</td><td><code>std::string_view</code></td></tr>
+<tr><td>Variável local que guarda o resultado de uma função</td><td><code>std::string</code></td></tr>
+<tr><td>Campo de uma struct/classe</td><td><code>std::string</code></td></tr>
+<tr><td>Você vai mudar o texto (<code>+=</code>, <code>insert</code>, trocar letras)</td><td><code>std::string</code></td></tr>
+<tr><td>Picar uma linha em pedaços que você só vai ler logo em seguida</td><td><code>std::string_view</code></td></tr>
+<tr><td>Passar o texto para uma função do C que espera <code>const char*</code> terminado em <code>'\0'</code></td><td><code>std::string</code> e <code>.c_str()</code>: uma view de um pedaço não tem o <code>'\0'</code> no fim</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Lixo no lugar do texto (e nenhum aviso do g++)</strong>
+<p><strong>O que significa:</strong> uma <code>string_view</code> está olhando para uma <code>std::string</code> que já foi destruída: uma temporária (resultado de função, <code>s1 + s2</code>) ou uma variável local que saiu de escopo.</p>
+<p><strong>Como consertar:</strong> guarde o texto numa <code>std::string</code>. Para encontrar o erro, compile também com <code>clang++ -Wall</code> (aviso <code>-Wdangling-gsl</code> ou <code>-Wreturn-stack-address</code>) ou rode com <code>-fsanitize=address</code> (<code>heap-use-after-free</code>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: conversion from ‘std::string_view’ … to non-scalar type ‘std::string’ … requested</code></strong>
+<p><strong>O que significa:</strong> você tentou <code>std::string s = sv;</code>. A conversão de view para string não acontece sozinha.</p>
+<p><strong>Como consertar:</strong> <code>std::string s{sv};</code> ou <code>std::string s = std::string(sv);</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: ‘string_view’ is not a member of ‘std’</code></strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++14 -Wall -Wextra basico.cpp -o b14
+basico.cpp: In function ‘int main()’:
+basico.cpp:7:10: error: ‘string_view’ is not a member of ‘std’
+    7 |     std::string_view visao = frase;
+      |          ^~~~~~~~~~~
+basico.cpp:7:10: note: ‘std::string_view’ is only available from C++17 onwards
+                                     « … e outros erros que vêm deste</pre>
+<p><strong>O que significa:</strong> o programa foi compilado com um padrão anterior ao C++17, e a nota diz isso com todas as letras: "só está disponível a partir do C++17". Também pode ser falta do <code>#include &lt;string_view&gt;</code>. (No g++ 15, um programa sem esse include mas com <code>&lt;iostream&gt;</code> compilou, porque o <code>&lt;iostream&gt;</code> o trouxe "de carona"; não conte com isso em outros compiladores.)</p>
+<p><strong>Como consertar:</strong> compile com <code>-std=c++23</code> (ou pelo menos <code>-std=c++17</code>) e inclua o cabeçalho. <code>starts_with</code> e <code>ends_with</code> exigem C++20.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>std::string_view v = s;</code></td><td>Janela para a string <code>s</code> (ou um literal), sem cópia</td></tr>
+<tr><td><code>v.size()</code>, <code>v.empty()</code>, <code>v[i]</code></td><td>Tamanho, vazio?, caractere (só leitura)</td></tr>
+<tr><td><code>v.substr(pos, n)</code></td><td>Outra view: um pedaço, sem cópia</td></tr>
+<tr><td><code>v.find(x)</code>, <code>v.rfind(x)</code></td><td>Posição da primeira / última ocorrência, ou <code>std::string_view::npos</code></td></tr>
+<tr><td><code>v.remove_prefix(n)</code> / <code>v.remove_suffix(n)</code></td><td>Encolhe a janela no começo / no fim</td></tr>
+<tr><td><code>v.starts_with(x)</code> / <code>v.ends_with(x)</code></td><td>Começa / termina com? (C++20)</td></tr>
+<tr><td><code>std::string s{v};</code></td><td>Cópia de verdade, quando você precisar ser dono</td></tr>
+<tr><td><code>void f(std::string_view texto)</code></td><td>Parâmetro que aceita string, literal e pedaços, sem cópia</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O cabeçalho</h3>
+<p>Complete para poder usar <code>std::string_view</code>:</p>
+<div class="ex-code">#include &lt;<input data-answer="string_view" aria-label="cabeçalho">&gt;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Virar dono</h3>
+<p>Complete para criar uma <code>std::string</code> a partir da view <code>v</code>:</p>
+<div class="ex-code">std::string s<input data-answer="{v}|(v)" aria-label="inicialização">;</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. O que um <code>std::string_view</code> guarda por dentro?</p>
+<label><input type="radio" name="q3"> Uma cópia de todas as letras</label>
+<label><input type="radio" name="q3"> Só a primeira letra</label>
+<label><input type="radio" name="q3"> Onde o texto começa e quantos caracteres olhar</label>
+<label><input type="radio" name="q3"> Uma <code>std::string</code> inteira</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Qual destas linhas cria uma view pendurada (que aponta para texto destruído)?</p>
+<label><input type="radio" name="q4"> <code>std::string_view v = "Olá";</code></label>
+<label><input type="radio" name="q4"> <code>std::string_view v = std::string("Olá") + "!";</code></label>
+<label><input type="radio" name="q4"> <code>std::string s = "Olá"; std::string_view v = s;</code></label>
+<label><input type="radio" name="q4"> <code>void f(std::string_view v);</code> chamada com <code>f("Olá");</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Uma classe <code>Contato</code> precisa guardar o nome da pessoa num campo. Qual tipo usar para o campo?</p>
+<label><input type="radio" name="q5"> <code>std::string_view</code>, para economizar</label>
+<label><input type="radio" name="q5"> <code>const char*</code></label>
+<label><input type="radio" name="q5"> <code>std::string_view&amp;</code></label>
+<label><input type="radio" name="q5"> <code>std::string</code>, porque o campo precisa ser dono do texto</label>
+</div>
+
+<h3>Missão final: a extensão do arquivo</h3>
+
+<div class="trycpp" data-goal="out:txt,out:png,out:(sem extensão),src:rfind,semaviso">
+<p class="try-task"><strong>Missão:</strong> complete <code>extensao</code>: ache a posição do <strong>último</strong> ponto com <code>rfind('.')</code>. Se não houver ponto (<code>std::string_view::npos</code>), devolva <code>"(sem extensão)"</code>; senão, devolva o pedaço depois do ponto com <code>substr(ponto + 1)</code>. A saída deve ser:</p>
+<pre class="out">txt
+png
+(sem extensão)</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;string_view&gt;
+
+std::string_view extensao(std::string_view arquivo) {
+    // sua vez
+    return arquivo;
+}
+
+int main() {
+    std::string foto = "ferias.praia.png";
+    std::cout &lt;&lt; extensao("notas.txt") &lt;&lt; '\n';
+    std::cout &lt;&lt; extensao(foto) &lt;&lt; '\n';
+    std::cout &lt;&lt; extensao("LEIAME") &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;string_view&gt;
+
+std::string_view extensao(std::string_view arquivo) {
+    auto ponto = arquivo.rfind('.');
+    if (ponto == std::string_view::npos) {
+        return "(sem extensão)";
+    }
+    return arquivo.substr(ponto + 1);
+}
+
+int main() {
+    std::string foto = "ferias.praia.png";
+    std::cout &lt;&lt; extensao("notas.txt") &lt;&lt; '\n';
+    std::cout &lt;&lt; extensao(foto) &lt;&lt; '\n';
+    std::cout &lt;&lt; extensao("LEIAME") &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<p>Aqui devolver uma view é seguro: ela aponta para dentro do texto que <strong>quem chamou</strong> passou (a <code>foto</code> do <code>main</code>, ou um literal), e esse texto continua vivo depois que <code>extensao</code> termina. A solução no laboratório:</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra extensao.cpp -o extensao
+$ ./extensao
+txt
+png
+(sem extensão)</pre>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>std::string_view</code> (<code>&lt;string_view&gt;</code>) é uma janela de leitura: guarda onde o texto começa e quantos caracteres olhar, sem copiar.</li>
+  <li>O uso principal é o parâmetro de funções que só leem: aceita <code>std::string</code>, literais e pedaços, sem cópia. Passe por valor.</li>
+  <li><code>substr</code>, <code>remove_prefix</code> e <code>remove_suffix</code> de uma view são baratos: só movem a janela.</li>
+  <li>Para virar dono do texto: <code>std::string s{v};</code>.</li>
+  <li>A view não mantém o texto vivo. Apontar para uma string temporária ou local é comportamento indefinido; o g++ 15 não avisa, o Clang avisa (<code>-Wdangling-gsl</code>, <code>-Wreturn-stack-address</code>) e o AddressSanitizer pega ao rodar.</li>
+  <li>Variáveis que guardam resultados e campos de classes: <code>std::string</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
