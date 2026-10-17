@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Namespaces — namespace, ::, using e namespace anônimo | Guia C++</title>
+<meta name="description" content="Namespaces em C++ para quem nunca programou: criar namespace loja, usar loja::preco, resolver conflitos de nome, o que é o std::, using namespace std e o erro real reference to ‘count’ is ambiguous, using std::cout, namespaces aninhados, apelidos e namespace anônimo, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Namespaces</span></h1>
+
+<p class="intro">Desde a primeira aula você escreve <code>std::cout</code>, <code>std::string</code>, <code>std::vector</code>. Esse <code>std::</code> na frente é um <strong>namespace</strong>, um "sobrenome" que separa os nomes da biblioteca padrão dos seus. Quando um programa cresce, e principalmente quando junta código de várias pessoas e bibliotecas, dois pedaços acabam querendo o mesmo nome: duas funções <code>preco</code>, duas <code>imprimir</code>. Nesta aula você vai criar os seus próprios namespaces, entender o famoso <code>using namespace std;</code> e ver o erro real que ele causa.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que dois nomes iguais dão erro, e como um namespace resolve isso.</li>
+  <li>Como criar <code>namespace loja { … }</code> e usar <code>loja::preco</code>.</li>
+  <li>O que o <code>std::</code> significa.</li>
+  <li>As três formas de encurtar: o nome completo, <code>using loja::preco;</code> e <code>using namespace loja;</code>.</li>
+  <li>O problema do <code>using namespace std;</code>: um nome seu colidindo com <code>std::count</code> ou <code>std::distance</code>.</li>
+  <li>Namespaces dentro de namespaces (<code>loja::caixa</code>), apelidos e o namespace anônimo.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: nome e sobrenome</h2>
+<p>Na turma da Ana há duas Marias. Quando a professora chama "Maria!", as duas olham. A solução é usar o sobrenome: "Maria Silva" e "Maria Souza". Ou pense em endereços: existe uma "Rua das Flores" em centenas de cidades, e ninguém se confunde, porque o endereço completo inclui a cidade.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No dia a dia</th><th>No C++</th></tr>
+<tr><td>O sobrenome, a cidade</td><td>o <strong>namespace</strong> (em inglês, "espaço de nomes")</td></tr>
+<tr><td>"Maria Silva", "Rua das Flores, Campinas"</td><td><code>loja::preco</code>, <code>std::cout</code></td></tr>
+<tr><td>Dentro de casa, todo mundo diz só "Maria"</td><td>dentro do namespace, basta o nome curto</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. O problema: dois nomes iguais</h2>
+<p>A Ana vende na lojinha e também faz as contas da padaria do bairro. Cada uma tem sua tabela de preços, e as duas funções se chamam <code>preco</code>:</p>
+
+<pre class="file" data-file="conflito.cpp">#include &lt;iostream&gt;
+
+double preco(int codigo) { return codigo * 1.5; }      // da lojinha
+double preco(int codigo) { return codigo * 2.0; }      // da padaria
+
+int main() {
+    std::cout &lt;&lt; preco(10) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra conflito.cpp -o conflito
+conflito.cpp:4:8: error: redefinition of ‘double preco(int)’
+    4 | double preco(int codigo) { return codigo * 2.0; }      // da padaria
+      |        ^~~~~
+conflito.cpp:3:8: note: ‘double preco(int)’ previously defined here
+    3 | double preco(int codigo) { return codigo * 1.5; }      // da lojinha
+      |        ^~~~~</pre>
+
+<p>"Redefinição de <code>double preco(int)</code>": a nota mostra onde estava a primeira. Duas funções com o mesmo nome e os mesmos parâmetros não podem conviver no mesmo lugar (com parâmetros diferentes até poderiam: é a <a href="sobrecarga.html">sobrecarga</a>). Renomear para <code>precoLoja</code> e <code>precoPadaria</code> funciona aqui, mas não resolve o caso geral: quando o conflito é com uma biblioteca de outra pessoa, você não pode renomear o código dela.</p>
+
+<hr>
+
+<h2>2. Criando um namespace</h2>
+
+<pre class="file" data-file="loja.cpp">#include &lt;iostream&gt;
+
+namespace loja {
+    double preco(int codigo) { return codigo * 1.5; }
+}
+
+namespace padaria {
+    double preco(int codigo) { return codigo * 2.0; }
+}
+
+int main() {
+    std::cout &lt;&lt; "Loja: " &lt;&lt; loja::preco(10) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Padaria: " &lt;&lt; padaria::preco(10) &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>namespace loja</dt><dd>Cria (ou reabre) um namespace chamado <code>loja</code>. O nome segue as regras de <a href="identificadores.html">nomes de variáveis</a>; o costume é tudo em minúsculas.</dd>
+  <dt>{ … }</dt><dd>Tudo o que for declarado entre as chaves ganha o "sobrenome" <code>loja</code>. Não vai <code>;</code> depois da chave que fecha.</dd>
+  <dt>loja::preco(10)</dt><dd>Chama a <code>preco</code> do namespace <code>loja</code>. O <code>::</code> se chama <strong>operador de escopo</strong>: leia como "o <code>preco</code> que mora em <code>loja</code>".</dd>
+</dl>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra loja.cpp -o loja &amp;&amp; ./loja
+Loja: 15
+Padaria: 20</pre>
+
+<p>Agora as duas funções existem lado a lado: o nome completo de uma é <code>loja::preco</code> e o da outra é <code>padaria::preco</code>. Um namespace pode guardar qualquer coisa que tenha nome: funções, variáveis, constantes, <a href="structs.html">structs</a>, <a href="classes-objetos.html">classes</a>, outros namespaces.</p>
+
+<div class="cenario">
+<strong>"‘preco’ was not declared in this scope; did you mean ‘loja::preco’?"</strong>
+<p>Depois de pôr a função dentro do namespace, a Ana esqueceu de mudar a chamada:</p>
+<pre class="file" data-file="sem.cpp">#include &lt;iostream&gt;
+
+namespace loja {
+    double preco(int codigo) { return codigo * 1.5; }
+}
+
+int main() {
+    std::cout &lt;&lt; preco(10) &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra sem.cpp -o sem
+sem.cpp: In function ‘int main()’:
+sem.cpp:8:18: error: ‘preco’ was not declared in this scope; did you mean ‘loja::preco’?
+    8 |     std::cout &lt;&lt; preco(10) &lt;&lt; '\n';
+      |                  ^~~~~
+      |                  loja::preco
+sem.cpp:4:12: note: ‘loja::preco’ declared here
+    4 |     double preco(int codigo) { return codigo * 1.5; }
+      |            ^~~~~</pre>
+<p><strong>O que significa:</strong> fora do namespace, não existe nenhuma <code>preco</code> "solta". O g++ é gentil: pergunta "você quis dizer <code>loja::preco</code>?", mostra a correção embaixo do código e aponta onde ela foi declarada.</p>
+<p><strong>Como resolver:</strong> use o nome completo, <code>loja::preco(10)</code>, ou um dos atalhos da seção 4.</p>
+</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode. Depois acrescente ao namespace <code>padaria</code> uma constante <code>constexpr double TAXA = 0.05;</code> e mostre <code>padaria::TAXA</code> no <code>main</code>. Por último, tente chamar <code>preco(10)</code> sem sobrenome e leia a mensagem.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+namespace loja {
+    double preco(int codigo) { return codigo * 1.5; }
+}
+
+namespace padaria {
+    double preco(int codigo) { return codigo * 2.0; }
+}
+
+int main() {
+    std::cout &lt;&lt; "Loja: " &lt;&lt; loja::preco(10) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Padaria: " &lt;&lt; padaria::preco(10) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. O <code>std</code> é um namespace</h2>
+<p>Agora o <code>std::cout</code> faz sentido: <code>cout</code> mora no namespace <code>std</code> (de <em>standard</em>, "padrão"), onde fica <strong>toda</strong> a biblioteca padrão do C++: <code>std::string</code>, <code>std::vector</code>, <code>std::sort</code>, <code>std::count</code>… Sem o <code>std::</code>, o compilador não acha:</p>
+
+<pre class="file" data-file="semstd.cpp">#include &lt;iostream&gt;
+
+int main() {
+    cout &lt;&lt; "Olá!\n";
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra semstd.cpp -o semstd
+semstd.cpp: In function ‘int main()’:
+semstd.cpp:4:5: error: ‘cout’ was not declared in this scope; did you mean ‘std::cout’?
+    4 |     cout &lt;&lt; "Olá!\n";
+      |     ^~~~
+      |     std::cout
+In file included from semstd.cpp:1:
+/usr/include/c++/15/iostream:65:18: note: ‘std::cout’ declared here
+   65 |   extern ostream cout;          ///< Linked to standard output
+      |                  ^~~~</pre>
+
+<p>A nota mostra até a linha do arquivo <code>iostream</code> onde o <code>std::cout</code> é declarado. A biblioteca padrão tem <strong>centenas</strong> de nomes, muitos deles palavras comuns em inglês (<code>count</code>, "contar"; <code>distance</code>, "distância"; <code>size</code>, "tamanho"; <code>max</code>, "máximo"). Guardá-los todos no <code>std</code> deixa os nomes "soltos" livres para você.</p>
+
+<hr>
+
+<h2>4. Três formas de chamar: qual usar</h2>
+<p>Escrever <code>loja::</code> toda vez pode cansar. O C++ tem dois atalhos com a palavra <code>using</code> ("usando"):</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>O que faz</th><th>Risco</th></tr>
+<tr><td>Nome completo</td><td><code>loja::preco(10)</code></td><td>diz exatamente qual</td><td>nenhum; só é mais comprido</td></tr>
+<tr><td>Trazer <strong>um</strong> nome (<em>using-declaration</em>)</td><td><code>using loja::preco;</code><br>depois: <code>preco(10)</code></td><td>daqui em diante, <code>preco</code> quer dizer <code>loja::preco</code></td><td>pequeno: você escolheu o nome, sabe que ele está ali</td></tr>
+<tr><td>Trazer <strong>todos</strong> os nomes (<em>using-directive</em>)</td><td><code>using namespace loja;</code><br>depois: <code>preco(10)</code></td><td>todo nome de <code>loja</code> pode ser usado sem sobrenome</td><td>grande: traz nomes que você nem sabe que existem</td></tr>
+</table>
+</div>
+
+<p>Veja o risco do <code>using namespace</code> com os dois namespaces da Ana:</p>
+
+<pre class="file" data-file="dois.cpp">#include &lt;iostream&gt;
+
+namespace loja    { double preco(int codigo) { return codigo * 1.5; } }
+namespace padaria { double preco(int codigo) { return codigo * 2.0; } }
+
+using namespace loja;
+using namespace padaria;
+
+int main() {
+    std::cout &lt;&lt; preco(10) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra dois.cpp -o dois
+dois.cpp: In function ‘int main()’:
+dois.cpp:10:23: error: call of overloaded ‘preco(int)’ is ambiguous
+   10 |     std::cout &lt;&lt; preco(10) &lt;&lt; '\n';
+      |                  ~~~~~^~~~
+dois.cpp:10:23: note: there are 2 candidates
+dois.cpp:3:28: note: candidate 1: ‘double loja::preco(int)’
+    3 | namespace loja    { double preco(int codigo) { return codigo * 1.5; } }
+      |                            ^~~~~
+dois.cpp:4:28: note: candidate 2: ‘double padaria::preco(int)’
+    4 | namespace padaria { double preco(int codigo) { return codigo * 2.0; } }
+      |                            ^~~~~</pre>
+
+<p>"A chamada de <code>preco(int)</code> é <strong>ambígua</strong>": há dois candidatos (<em>candidates</em>) que servem igualmente bem, e o compilador se recusa a adivinhar. Os <code>using namespace</code> derrubaram as paredes que os namespaces tinham levantado. A saída é voltar ao nome completo (<code>loja::preco(10)</code>).</p>
+
+<hr>
+
+<h2>5. <code>using namespace std;</code></h2>
+<p>Em muitos tutoriais e livros você vai ver, logo depois dos <code>#include</code>:</p>
+<pre class="file" data-file="trecho">using namespace std;</pre>
+<p>Ela traz <strong>todos</strong> os nomes da biblioteca padrão para o seu arquivo, e aí dá para escrever <code>cout</code>, <code>string</code> e <code>vector</code> sem <code>std::</code>. Parece ótimo, até o dia em que um nome seu coincide com um dos centenas de nomes do <code>std</code>. A Ana guardou quantos itens há no carrinho numa variável chamada <code>count</code> ("contagem"):</p>
+
+<pre class="file" data-file="count.cpp">#include &lt;iostream&gt;
+using namespace std;
+
+int count = 3;   // quantos itens há no carrinho
+
+int main() {
+    cout &lt;&lt; "Itens: " &lt;&lt; count &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra count.cpp -o count
+count.cpp: In function ‘int main()’:
+count.cpp:7:26: error: reference to ‘count’ is ambiguous
+    7 |     cout &lt;&lt; "Itens: " &lt;&lt; count &lt;&lt; '\n';
+      |                          ^~~~~
+In file included from /usr/include/c++/15/bits/unicode.h:39,
+                 from /usr/include/c++/15/format:61,
+                 from /usr/include/c++/15/ostream:44,
+                 from /usr/include/c++/15/iostream:43,
+                 from count.cpp:1:
+/usr/include/c++/15/bits/stl_algo.h:4070:5: note: candidates are: ‘template&lt;class _IIter, class _Tp&gt; constexpr typename std::iterator_traits&lt;_Iterator&gt;::difference_type std::count(_IIter, _IIter, const _Tp&amp;)’
+ 4070 |     count(_InputIterator __first, _InputIterator __last, const _Tp&amp; __value)
+      |     ^~~~~
+count.cpp:4:5: note:                 ‘int count’
+    4 | int count = 3;   // quantos itens há no carrinho
+      |     ^~~~~</pre>
+
+<p>Assusta, mas dá para ler com calma:</p>
+<dl class="anatomy">
+  <dt>error: reference to ‘count’ is ambiguous</dt><dd>"A referência a <code>count</code> é ambígua": existem dois <code>count</code> visíveis e o compilador não sabe qual você quer.</dd>
+  <dt>In file included from … iostream:43, from count.cpp:1</dt><dd>O caminho da colagem: o <code>&lt;iostream&gt;</code> inclui o <code>&lt;ostream&gt;</code>, que inclui o <code>&lt;format&gt;</code>… e lá no fundo vem o <code>stl_algo.h</code>. A Ana nem incluiu <code>&lt;algorithm&gt;</code>, e mesmo assim o <code>std::count</code> chegou.</dd>
+  <dt>note: candidates are: ‘template&lt;…&gt; … std::count(_IIter, _IIter, const _Tp&amp;)’</dt><dd>Candidato 1: a função <code>std::count</code> da biblioteca padrão, que conta quantas vezes um valor aparece numa lista (você vai vê-la em <a href="algoritmos.html">Algoritmos</a>). A parte com <code>template</code> é o jeito técnico de escrever o tipo dela; não precisa entender agora.</dd>
+  <dt>note: ‘int count’</dt><dd>Candidato 2: a variável da Ana, na linha 4.</dd>
+</dl>
+
+<p>Sem o <code>using namespace std;</code>, não haveria problema: o da biblioteca se chama <code>std::count</code> e o da Ana, <code>count</code>. O mesmo acontece com <code>distance</code>, outra palavra comum:</p>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra distancia.cpp -o distancia
+distancia.cpp: In function ‘int main()’:
+distancia.cpp:7:30: error: reference to ‘distance’ is ambiguous
+    7 |     cout &lt;&lt; "Distância: " &lt;&lt; distance &lt;&lt; " km\n";
+      |                              ^~~~~~~~
+In file included from /usr/include/c++/15/bits/stl_construct.h:62,
+                 from /usr/include/c++/15/bits/char_traits.h:59,
+                 from /usr/include/c++/15/ios:44,
+                 from /usr/include/c++/15/bits/ostream.h:43,
+                 from /usr/include/c++/15/ostream:42,
+                 from /usr/include/c++/15/iostream:43,
+                 from distancia.cpp:1:
+/usr/include/c++/15/bits/stl_iterator_base_funcs.h:150:5: note: candidates are: ‘template&lt;class _InputIterator&gt; constexpr typename std::iterator_traits&lt;_Iterator&gt;::difference_type std::distance(_InputIterator, _InputIterator)’
+  150 |     distance(_InputIterator __first, _InputIterator __last)
+      |     ^~~~~~~~
+distancia.cpp:4:5: note:                 ‘int distance’
+    4 | int distance = 12;   // km até a padaria
+      |     ^~~~~~~~</pre>
+
+<p>(O <code>distancia.cpp</code> é igual ao <code>count.cpp</code>, com <code>int distance = 12;   // km até a padaria</code> na linha 4.) O pior desse problema é que ele pode aparecer <strong>sozinho</strong>: um programa que compilava hoje pode parar de compilar quando você atualizar o compilador e a biblioteca padrão ganhar um nome novo que coincide com um seu.</p>
+
+<h3>O conserto: traga só o que você usa</h3>
+<pre class="file" data-file="count2.cpp">#include &lt;iostream&gt;
+using std::cout;
+
+int count = 3;   // quantos itens há no carrinho
+
+int main() {
+    cout &lt;&lt; "Itens: " &lt;&lt; count &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra count2.cpp -o count2 &amp;&amp; ./count2
+Itens: 3</pre>
+
+<p><code>using std::cout;</code> traz só o <code>cout</code>. O <code>std::count</code> continua guardado no <code>std</code>, sem atrapalhar.</p>
+
+<div class="tip">
+<strong>A regra deste guia</strong>
+<ul>
+  <li>Escreva <code>std::</code> por extenso. São cinco letras, e quem lê sabe na hora de onde vem cada nome.</li>
+  <li>Se quiser encurtar num <code>.cpp</code>, prefira <code>using std::cout;</code> (um nome por vez), depois dos <code>#include</code>.</li>
+  <li><code>using namespace std;</code> é aceitável em programas pequenos de estudo, mas <strong>nunca</strong> num arquivo <code>.h</code>: o cabeçalho é colado em todos os arquivos que o incluem (veja <a href="headers.html">Arquivos .h e .cpp</a>), e o <code>using</code> iria junto, sem que eles pedissem.</li>
+  <li>Um <code>using</code> também pode ficar <strong>dentro de uma função</strong>; aí ele vale só entre as chaves dela.</li>
+</ul>
+</div>
+
+<div class="trycpp" data-goal="compila,out:Itens: 3">
+<p class="try-task"><strong>Missão:</strong> este programa não compila por causa do <code>using namespace std;</code>. Rode e leia o <code>ambiguous</code>. Conserte <strong>sem renomear a variável</strong>: troque o <code>using namespace std;</code> por <code>using</code> só dos nomes que o programa usa (ou use <code>std::</code> por extenso). A saída deve ser <code>Itens: 3</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;algorithm&gt;
+using namespace std;
+
+int count = 3;   // quantos itens há no carrinho
+
+int main() {
+    cout &lt;&lt; "Itens: " &lt;&lt; count &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;algorithm&gt;
+using std::cout;
+
+int count = 3;   // quantos itens há no carrinho
+
+int main() {
+    cout &lt;&lt; "Itens: " &lt;&lt; count &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>6. Namespaces dentro de namespaces</h2>
+<p>Um namespace pode ter outros dentro. Projetos grandes usam isso para organizar as partes: <code>loja::caixa</code>, <code>loja::estoque</code>.</p>
+
+<pre class="file" data-file="aninhado.cpp">#include &lt;iostream&gt;
+
+namespace loja {
+    namespace caixa {
+        double troco(double pago, double total) { return pago - total; }
+    }
+}
+
+namespace loja::estoque {
+    int minimo = 5;
+}
+
+int main() {
+    std::cout &lt;&lt; "Troco: " &lt;&lt; loja::caixa::troco(50, 32.5) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Estoque mínimo: " &lt;&lt; loja::estoque::minimo &lt;&lt; '\n';
+    namespace lc = loja::caixa;
+    std::cout &lt;&lt; "Troco: " &lt;&lt; lc::troco(20, 7) &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>namespace loja { namespace caixa { … } }</dt><dd>O jeito clássico: um dentro do outro. O nome completo da função é <code>loja::caixa::troco</code>.</dd>
+  <dt>namespace loja::estoque { … }</dt><dd>O jeito curto, com os dois nomes de uma vez <span class="versao">C++17</span>. Faz o mesmo que escrever os dois <code>namespace</code> aninhados.</dd>
+  <dt>namespace lc = loja::caixa;</dt><dd>Um <strong>apelido</strong> (<em>alias</em>): daqui em diante, <code>lc::</code> quer dizer <code>loja::caixa::</code>. Útil quando o nome é comprido, como o <code>namespace fs = std::filesystem;</code> que você vai ver em muito código.</dd>
+</dl>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra aninhado.cpp -o aninhado &amp;&amp; ./aninhado
+Troco: 17.5
+Estoque mínimo: 5
+Troco: 13</pre>
+
+<p>Repare que o namespace <code>loja</code> foi aberto <strong>duas vezes</strong> no mesmo arquivo, e tudo bem: um namespace pode ser reaberto quantas vezes for preciso, inclusive em arquivos diferentes. É assim que a biblioteca padrão põe coisas no <code>std</code> a partir de dezenas de cabeçalhos.</p>
+
+<h3>O namespace global e o <code>::</code> sozinho</h3>
+<p>O que não está em namespace nenhum mora no <strong>namespace global</strong>. Para pedir explicitamente o de lá, use <code>::</code> sem nada antes:</p>
+
+<pre class="file" data-file="global.cpp">#include &lt;iostream&gt;
+
+double preco(int codigo) { return codigo * 1.0; }
+
+namespace loja {
+    double preco(int codigo) { return codigo * 1.5; }
+
+    void mostrar() {
+        std::cout &lt;&lt; "preco(10)   = " &lt;&lt; preco(10) &lt;&lt; '\n';
+        std::cout &lt;&lt; "::preco(10) = " &lt;&lt; ::preco(10) &lt;&lt; '\n';
+    }
+}
+
+int main() {
+    loja::mostrar();
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra global.cpp -o global &amp;&amp; ./global
+preco(10)   = 15
+::preco(10) = 10</pre>
+
+<p>Dentro do namespace <code>loja</code>, o nome curto <code>preco</code> acha primeiro o da própria <code>loja</code> (como "Maria", dito dentro de casa, é a Maria da família). O <code>::preco</code> vai direto ao global.</p>
+
+<hr>
+
+<h2>7. Namespaces com <code>.h</code> e <code>.cpp</code></h2>
+<p>Num projeto dividido em arquivos, o cabeçalho declara dentro do namespace e o <code>.cpp</code> reabre o mesmo namespace para definir:</p>
+
+<pre class="file" data-file="calculos.h">#pragma once
+
+namespace loja {
+    double calcularTotal(double preco, int quantidade);
+}
+</pre>
+
+<pre class="file" data-file="calculos.cpp">#include "calculos.h"
+
+namespace loja {
+    double calcularTotal(double preco, int quantidade) {
+        return preco * quantidade;
+    }
+}
+</pre>
+
+<p>Quem inclui o <code>calculos.h</code> chama <code>loja::calcularTotal(2.50, 4)</code>. Você vai montar exatamente isso na missão final.</p>
+
+<hr>
+
+<h2>8. O namespace anônimo: "só deste arquivo"</h2>
+<p>Às vezes uma função é só uma ajudante, usada dentro de um <code>.cpp</code>. A Ana tem uma <code>linha()</code> que desenha um traço no <code>main.cpp</code> e outra <code>linha()</code>, diferente, no <code>relatorio.cpp</code>. Cada arquivo compila bem sozinho, mas na ligação:</p>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra main.cpp relatorio.cpp -o loja
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccOHoCsw.o: na função "linha()":
+relatorio.cpp:(.text+0x0): múltiplas definições de "linha()"; /tmp/cc1uZyIO.o:main.cpp:(.text+0x0): definido primeiro aqui
+collect2: error: ld returned 1 exit status</pre>
+
+<p>É o erro do ligador que você conheceu em <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>: o programa inteiro só pode ter uma <code>linha()</code>. A solução é dizer que cada <code>linha()</code> é <strong>particular</strong> do seu arquivo, com um namespace <strong>sem nome</strong>:</p>
+
+<pre class="file" data-file="main.cpp">#include &lt;iostream&gt;
+
+namespace {
+    void linha() { std::cout &lt;&lt; "----------\n"; }
+}
+
+void relatorio();
+
+int main() {
+    linha();
+    relatorio();
+    linha();
+}
+</pre>
+
+<pre class="file" data-file="relatorio.cpp">#include &lt;iostream&gt;
+
+namespace {
+    void linha() { std::cout &lt;&lt; "==========\n"; }
+}
+
+void relatorio() {
+    linha();
+    std::cout &lt;&lt; "Relatório do dia\n";
+    linha();
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra main.cpp relatorio.cpp -o loja &amp;&amp; ./loja
+----------
+==========
+Relatório do dia
+==========
+----------</pre>
+
+<dl class="anatomy">
+  <dt>namespace { … }</dt><dd>Namespace <strong>anônimo</strong> (sem nome). Dentro do próprio arquivo, os nomes são usados normalmente, sem prefixo. Para os outros arquivos, eles são invisíveis.</dd>
+  <dt>o resultado</dt><dd>Cada <code>.cpp</code> tem a sua <code>linha()</code> particular, e o ligador não vê conflito: o <code>main</code> usou o traço <code>-</code> e o relatório usou o <code>=</code>.</dd>
+</dl>
+
+<p>O <code>nm</code> mostra a diferença: a letra é <code>t</code> <strong>minúscula</strong>, que quer dizer "definida aqui, mas só para uso local".</p>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra -c main.cpp &amp;&amp; nm -C main.o | grep linha
+0000000000000000 t (anonymous namespace)::linha()</pre>
+
+<p>Em código antigo, o mesmo efeito é obtido escrevendo <code>static</code> antes da função (<code>static void linha() { … }</code>). Em C++ moderno, prefira o namespace anônimo, que vale também para structs e classes. Use-o para toda ajudante que não aparece no <code>.h</code>, e <strong>nunca</strong> dentro de um <code>.h</code> (cada arquivo que o incluísse ganharia uma cópia particular).</p>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>namespace loja { … }</code></td><td>cria ou reabre o namespace <code>loja</code></td></tr>
+<tr><td><code>loja::preco</code></td><td>o <code>preco</code> de dentro da <code>loja</code></td></tr>
+<tr><td><code>::preco</code></td><td>o <code>preco</code> do namespace global</td></tr>
+<tr><td><code>using loja::preco;</code></td><td>traz um nome</td></tr>
+<tr><td><code>using namespace loja;</code></td><td>traz todos os nomes (evite com <code>std</code> e nos <code>.h</code>)</td></tr>
+<tr><td><code>namespace loja { namespace caixa { … } }</code></td><td>namespace aninhado</td></tr>
+<tr><td><code>namespace loja::caixa { … }</code></td><td>o mesmo, forma curta <span class="versao">C++17</span></td></tr>
+<tr><td><code>namespace lc = loja::caixa;</code></td><td>apelido</td></tr>
+<tr><td><code>namespace { … }</code></td><td>anônimo: só deste <code>.cpp</code></td></tr>
+</table>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem</th><th>Causa provável</th></tr>
+<tr><td><code>‘x’ was not declared in this scope; did you mean ‘loja::x’?</code></td><td>faltou o sobrenome (<code>loja::</code> ou <code>std::</code>)</td></tr>
+<tr><td><code>reference to ‘count’ is ambiguous</code></td><td>um nome seu igual a um do <code>std</code>, com <code>using namespace std;</code></td></tr>
+<tr><td><code>call of overloaded ‘f(int)’ is ambiguous</code></td><td>dois <code>using namespace</code> trazendo funções iguais</td></tr>
+<tr><td><code>redefinition of ‘double preco(int)’</code></td><td>duas definições iguais no mesmo namespace</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Chamar pelo nome completo</h3>
+<p>A função <code>desconto</code> está no namespace <code>loja</code>. Complete a chamada:</p>
+<div class="ex-code"><input data-answer="loja::desconto|loja :: desconto" aria-label="nome completo">(100)</div>
+</div>
+
+<div class="exercise">
+<h3>2. Trazer um nome só</h3>
+<p>Complete para poder escrever <code>cout</code> sem <code>std::</code>, sem trazer o resto da biblioteca padrão:</p>
+<div class="ex-code"><input data-answer="using std::cout;|using std::cout" aria-label="linha"></div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Com <code>using namespace std;</code>, a Ana criou <code>int count = 0;</code> fora do <code>main</code> e recebeu <code>reference to ‘count’ is ambiguous</code>. Por quê?</p>
+<label><input type="radio" name="q3"> <code>count</code> é uma palavra reservada do C++.</label>
+<label><input type="radio" name="q3"> A biblioteca padrão também tem um <code>count</code> (<code>std::count</code>), e o <code>using</code> trouxe os dois para o mesmo lugar.</label>
+<label><input type="radio" name="q3"> Variáveis fora do <code>main</code> não podem se chamar <code>count</code>.</label>
+<label><input type="radio" name="q3"> Faltou incluir <code>&lt;algorithm&gt;</code>.</label>
+</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Para que serve um namespace anônimo (<code>namespace { … }</code>)?</p>
+<label><input type="radio" name="q4"> Para usar todos os nomes do <code>std</code>.</label>
+<label><input type="radio" name="q4"> Para criar um apelido para outro namespace.</label>
+<label><input type="radio" name="q4"> Para que os nomes fiquem disponíveis em todos os arquivos.</label>
+<label><input type="radio" name="q4"> Para que os nomes valham só dentro daquele arquivo <code>.cpp</code>.</label>
+</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Qual é o nome completo de <code>minimo</code> em <code>namespace loja { namespace estoque { int minimo = 5; } }</code>?</p>
+<label><input type="radio" name="q5"> <code>loja::estoque::minimo</code></label>
+<label><input type="radio" name="q5"> <code>estoque::loja::minimo</code></label>
+<label><input type="radio" name="q5"> <code>loja.estoque.minimo</code></label>
+<label><input type="radio" name="q5"> <code>loja::minimo</code></label>
+</div>
+</div>
+
+<h3>Missão final: a padaria ganha o seu namespace</h3>
+
+<div class="trycpp" data-goal="compila,out:Loja: 15,out:Padaria: 20">
+<p class="try-task"><strong>Missão:</strong> a lojinha já tem o namespace <code>loja</code>, declarado no <code>precos.h</code> e definido no <code>precos.cpp</code>. Acrescente um namespace <code>padaria</code> com uma função <code>double preco(int codigo)</code> que devolve <code>codigo * 2.0</code>: declare no <code>precos.h</code>, defina no <code>precos.cpp</code> e mostre <code>padaria::preco(10)</code> no <code>main.cpp</code>. A saída deve ser:</p>
+<pre class="out">Loja: 15
+Padaria: 20</pre>
+<pre class="script" data-file="main.cpp">#include &lt;iostream&gt;
+#include "precos.h"
+
+int main() {
+    std::cout &lt;&lt; "Loja: " &lt;&lt; loja::preco(10) &lt;&lt; '\n';
+    // mostre aqui o preço da padaria
+}
+</pre>
+<pre class="script" data-file="precos.h">#pragma once
+
+namespace loja {
+    double preco(int codigo);
+}
+</pre>
+<pre class="script" data-file="precos.cpp">#include "precos.h"
+
+namespace loja {
+    double preco(int codigo) {
+        return codigo * 1.5;
+    }
+}
+</pre>
+<pre class="solucao" data-file="main.cpp">#include &lt;iostream&gt;
+#include "precos.h"
+
+int main() {
+    std::cout &lt;&lt; "Loja: " &lt;&lt; loja::preco(10) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Padaria: " &lt;&lt; padaria::preco(10) &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao" data-file="precos.h">#pragma once
+
+namespace loja {
+    double preco(int codigo);
+}
+
+namespace padaria {
+    double preco(int codigo);
+}
+</pre>
+<pre class="solucao" data-file="precos.cpp">#include "precos.h"
+
+namespace loja {
+    double preco(int codigo) {
+        return codigo * 1.5;
+    }
+}
+
+namespace padaria {
+    double preco(int codigo) {
+        return codigo * 2.0;
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um <strong>namespace</strong> é um sobrenome para nomes: <code>loja::preco</code> e <code>padaria::preco</code> convivem sem conflito.</li>
+  <li><code>::</code> separa o namespace do nome. <code>std</code> é o namespace da biblioteca padrão; <code>::x</code> sozinho é o global.</li>
+  <li><code>using loja::preco;</code> traz um nome; <code>using namespace loja;</code> traz todos, e pode causar <code>ambiguous</code>.</li>
+  <li><code>using namespace std;</code> mistura os seus nomes com centenas da biblioteca: <code>count</code> e <code>distance</code> dão <code>reference to … is ambiguous</code>. Prefira <code>std::</code> por extenso ou <code>using std::cout;</code>, e nunca ponha <code>using namespace</code> num <code>.h</code>.</li>
+  <li>Namespaces podem ser aninhados (<code>loja::caixa</code>, ou <code>namespace loja::caixa</code> no C++17), reabertos em vários arquivos e ganhar apelidos (<code>namespace lc = loja::caixa;</code>).</li>
+  <li><code>namespace { … }</code> deixa as ajudantes de um <code>.cpp</code> particulares a ele, sem conflito na ligação.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
