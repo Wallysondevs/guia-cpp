@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Algoritmos — referência de &lt;algorithm&gt;, &lt;numeric&gt; e ranges | Guia C++</title>
+<meta name="description" content="Referência rápida dos algoritmos da biblioteca padrão do C++: sort, stable_sort, find, find_if, count, min_element, accumulate, reduce, transform, copy, fill, reverse, unique, remove e erase, std::erase_if, binary_search, lower_bound, any_of, iota, std::ranges e views, com exemplo e resultado real do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Algoritmos</span></h1>
+
+<p class="intro">A biblioteca padrão do C++ traz dezenas de <strong>algoritmos</strong> prontos: funções que ordenam, procuram, contam, somam, copiam e apagam itens de uma coleção. Esta página é uma <strong>consulta rápida</strong>: cada linha tem a forma de chamar (simplificada), o que a função faz, um exemplo e o <strong>resultado real</strong>, conferido com o g++ 15 na máquina da Ana. Para aprender com calma, veja as aulas <a href="algoritmos.html">Algoritmos</a>, <a href="iteradores.html">Iteradores</a>, <a href="lambdas.html">Lambdas</a> e <a href="ranges.html">Ranges</a>.</p>
+
+<div class="note">
+<strong>Como ler as tabelas</strong>
+<ul>
+  <li>Quase todos os exemplos usam este vetor (cada exemplo começa do zero, com os valores originais):
+<pre class="file" data-file="exemplos.cpp">std::vector&lt;int&gt; v{5, 3, 8, 1, 3};
+</pre></li>
+  <li><strong>Resultado</strong> mostra um valor (<code>20</code>, <code>true</code>) ou como o vetor ficou, no formato em que o <code>std::println("{}", v)</code> do C++23 escreve um vetor: <code>[1, 3, 3, 5, 8]</code>. Veja <a href="format-print.html">std::format e std::print</a>.</li>
+  <li>Os algoritmos clássicos recebem um <strong>começo</strong> e um <strong>fim</strong>: <code>v.begin()</code> aponta o primeiro item e <code>v.end()</code> aponta <em>um depois</em> do último. Na assinatura, eles aparecem como <code>(início, fim)</code>.</li>
+  <li>Muitos devolvem um <strong>iterador</strong> (um "marcador de posição"), e não o valor. Para ver o valor, use <code>*it</code>; para saber a posição, <code>it - v.begin()</code>. "Posição 2" quer dizer o terceiro item (a contagem começa em 0). Se nada foi achado, o iterador é igual a <code>v.end()</code>. Veja <a href="iteradores.html">Iteradores</a>.</li>
+  <li><code>pred</code> é um <strong>predicado</strong>: uma função que recebe um item e responde <code>true</code> ou <code>false</code>, quase sempre uma <a href="lambdas.html">lambda</a> como <code>[](int x) { return x &gt; 5; }</code>. <code>comp</code> é uma <strong>comparação</strong>: recebe dois itens e responde "o primeiro vem antes?".</li>
+  <li>Todos os exemplos foram compilados com <code>g++ -std=c++23 -Wall -Wextra</code> (g++ 15.2) e também com o clang++ 21.</li>
+</ul>
+</div>
+
+<p>Atalhos: <a href="#cabecalhos">Cabeçalhos</a> · <a href="#ordenar">Ordenar</a> · <a href="#procurar">Procurar</a> · <a href="#contar">Contar e testar</a> · <a href="#minmax">Mínimo e máximo</a> · <a href="#somar">Somar e acumular</a> · <a href="#transformar">Transformar, copiar, preencher</a> · <a href="#remover">Remover</a> · <a href="#binaria">Busca binária</a> · <a href="#ranges">std::ranges</a> · <a href="#views">Views</a> · <a href="#armadilhas">Armadilhas</a></p>
+
+<hr>
+
+<h2 id="ideia">A ideia: uma caixa de ferramentas</h2>
+<p>Imagine que a Ana tem uma pilha de provas para corrigir. Ela pode inventar, toda vez, um jeito de pôr as provas em ordem, achar a maior nota ou contar quantos passaram. Ou pode abrir a caixa de ferramentas da escola, onde já existe uma ferramenta pronta para cada tarefa, testada por milhares de pessoas.</p>
+<p>Os algoritmos são essa caixa. Em vez de escrever um laço <code>for</code> para achar o maior número, você chama <code>std::max_element</code>. O código fica menor, diz <strong>o que</strong> faz (e não só <strong>como</strong>) e tem menos chance de erro.</p>
+
+<p>Um programa completo, com quatro algoritmos:</p>
+<pre class="file" data-file="exemplo.cpp">#include &lt;algorithm&gt;   // sort, count, max_element...
+#include &lt;iostream&gt;
+#include &lt;numeric&gt;     // accumulate
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; v{5, 3, 8, 1, 3};
+
+    std::sort(v.begin(), v.end());
+    for (int x : v) {
+        std::cout &lt;&lt; x &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+
+    std::cout &lt;&lt; "quantos 3: " &lt;&lt; std::count(v.begin(), v.end(), 3) &lt;&lt; '\n';
+    std::cout &lt;&lt; "soma: " &lt;&lt; std::accumulate(v.begin(), v.end(), 0) &lt;&lt; '\n';
+    std::cout &lt;&lt; "maior: " &lt;&lt; *std::max_element(v.begin(), v.end()) &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra exemplo.cpp -o exemplo
+$ ./exemplo
+1 3 3 5 8
+quantos 3: 2
+soma: 20
+maior: 8</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;algorithm&gt;</dt><dd>Traz a maioria dos algoritmos: <code>sort</code>, <code>find</code>, <code>count</code>, <code>max_element</code>… Inclua sempre. Às vezes o programa compila sem ele, porque outro cabeçalho o traz "de carona" (no g++ 15, um programa só com <code>&lt;iostream&gt;</code> e <code>&lt;vector&gt;</code> aceitou o <code>std::sort</code>), mas isso não é garantido e pode quebrar em outro compilador.</dd>
+  <dt>#include &lt;numeric&gt;</dt><dd>Traz os algoritmos "de conta": <code>accumulate</code>, <code>reduce</code>, <code>iota</code>.</dd>
+  <dt>std::sort(v.begin(), v.end())</dt><dd>Ordena do começo ao fim, do menor para o maior. <strong>Muda</strong> o próprio vetor.</dd>
+  <dt>std::count(v.begin(), v.end(), 3)</dt><dd>Conta quantos itens são iguais a 3. Não muda nada.</dd>
+  <dt>std::accumulate(…, 0)</dt><dd>Soma tudo, começando do valor inicial <code>0</code>.</dd>
+  <dt>*std::max_element(…)</dt><dd><code>max_element</code> devolve um iterador que aponta o maior; o <code>*</code> pega o valor que está lá.</dd>
+</dl>
+
+<div class="trycpp" data-goal="out:8 5 3 3 1">
+<p class="try-task"><strong>Missão:</strong> o programa ordena do menor para o maior. Faça-o ordenar do <strong>maior para o menor</strong>, passando <code>std::greater&lt;&gt;()</code> como terceiro argumento do <code>std::sort</code>.</p>
+<pre class="script">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; v{5, 3, 8, 1, 3};
+
+    std::sort(v.begin(), v.end());
+
+    for (int x : v) {
+        std::cout &lt;&lt; x &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; v{5, 3, 8, 1, 3};
+
+    std::sort(v.begin(), v.end(), std::greater&lt;&gt;());
+
+    for (int x : v) {
+        std::cout &lt;&lt; x &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="cabecalhos">Cabeçalhos: onde mora cada um</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Cabeçalho</th><th>O que traz</th></tr>
+<tr><td><code>&lt;algorithm&gt;</code></td><td>Quase tudo: <code>sort</code>, <code>stable_sort</code>, <code>find</code>, <code>find_if</code>, <code>count</code>, <code>count_if</code>, <code>min_element</code>, <code>max_element</code>, <code>min</code>, <code>max</code>, <code>clamp</code>, <code>transform</code>, <code>copy</code>, <code>copy_if</code>, <code>fill</code>, <code>reverse</code>, <code>unique</code>, <code>remove</code>, <code>binary_search</code>, <code>lower_bound</code>, <code>any_of</code>… e as versões <code>std::ranges::</code> de todos eles.</td></tr>
+<tr><td><code>&lt;numeric&gt;</code></td><td><code>accumulate</code>, <code>reduce</code>, <code>iota</code>, <code>inner_product</code>, <code>gcd</code>, <code>lcm</code>.</td></tr>
+<tr><td><code>&lt;ranges&gt;</code></td><td>As <a href="#views">views</a> (<code>std::views::filter</code>, <code>transform</code>, <code>take</code>…) e <code>std::ranges::to</code>.</td></tr>
+<tr><td><code>&lt;functional&gt;</code></td><td>As comparações prontas <code>std::greater&lt;&gt;</code>, <code>std::less&lt;&gt;</code>, <code>std::plus&lt;&gt;</code>, <code>std::multiplies&lt;&gt;</code> (o <code>&lt;algorithm&gt;</code> do g++ já as inclui, mas não conte com isso em outro compilador).</td></tr>
+<tr><td><code>&lt;vector&gt;</code>, <code>&lt;string&gt;</code>…</td><td><code>std::erase</code> e <code>std::erase_if</code> <span class="versao">C++20</span> moram no cabeçalho do próprio container.</td></tr>
+</table>
+</div>
+
+<h2 id="ordenar">Ordenar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>sort(início, fim)</code></td><td>Ordena do menor para o maior (usa o <code>&lt;</code>). Muda o container. Só funciona com containers de acesso direto (<code>vector</code>, <code>array</code>, <code>deque</code>, <code>string</code>); veja a <a href="#armadilhas">armadilha do <code>std::list</code></a>.</td><td><code>std::sort(v.begin(), v.end());</code></td><td><code>[1, 3, 3, 5, 8]</code></td></tr>
+<tr><td><code>sort(início, fim, comp)</code></td><td>Ordena com a sua regra: <code>comp(a, b)</code> responde "<code>a</code> vem antes de <code>b</code>?".</td><td><code>std::sort(v.begin(), v.end(), std::greater&lt;&gt;());</code><br><code>std::sort(v.begin(), v.end(),</code><br><code>&nbsp;&nbsp;[](int a, int b) { return a &gt; b; });</code></td><td><code>[8, 5, 3, 3, 1]</code><br><code>[8, 5, 3, 3, 1]</code></td></tr>
+<tr><td><code>stable_sort(início, fim, comp)</code></td><td>Igual ao <code>sort</code>, mas <strong>estável</strong>: itens "empatados" ficam na ordem em que estavam. Útil para ordenar por um critério sem bagunçar outro.</td><td>Turma <code>{Caio 8, Ana 9, Bia 8, Davi 9}</code> ordenada por nota, maior primeiro:<br><code>std::stable_sort(t.begin(), t.end(),</code><br><code>&nbsp;&nbsp;[](const Aluno&amp; a, const Aluno&amp; b)</code><br><code>&nbsp;&nbsp;{ return a.nota &gt; b.nota; });</code></td><td><code>Ana 9, Davi 9, Caio 8, Bia 8</code><br>(Ana continua antes de Davi; Caio antes de Bia)</td></tr>
+<tr><td><code>reverse(início, fim)</code></td><td>Inverte a ordem. Não ordena: só vira de trás para a frente.</td><td><code>std::reverse(v.begin(), v.end());</code></td><td><code>[3, 1, 8, 3, 5]</code></td></tr>
+</table>
+</div>
+<p>Texto é ordenado pelo código de cada letra: <strong>maiúsculas vêm antes das minúsculas</strong>, e letras acentuadas vão para o fim. Ordenando <code>{"uva", "Maçã", "banana", "abacaxi"}</code> com <code>std::ranges::sort</code>, o resultado é <code>["Maçã", "abacaxi", "banana", "uva"]</code>. Veja <a href="acentos-utf8.html">Acentos e UTF-8</a>.</p>
+
+<h2 id="procurar">Procurar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>find(início, fim, valor)</code></td><td>Iterador para o <strong>primeiro</strong> item igual a <code>valor</code>, ou <code>fim</code> se não achar. Sempre compare com <code>v.end()</code> antes de usar <code>*it</code>.</td><td><code>auto it = std::find(v.begin(), v.end(), 8);</code><br><code>it - v.begin()</code><br><code>std::find(v.begin(), v.end(), 7) == v.end()</code></td><td><br><code>2</code> (posição)<br><code>true</code> (não achou)</td></tr>
+<tr><td><code>find_if(início, fim, pred)</code></td><td>O primeiro item para o qual <code>pred</code> responde <code>true</code>.</td><td><code>auto it = std::find_if(v.begin(), v.end(),</code><br><code>&nbsp;&nbsp;[](int x) { return x &gt; 5; });</code><br><code>*it</code></td><td><br><br><code>8</code> (posição 2)</td></tr>
+<tr><td><code>ranges::contains(v, valor)</code> <span class="versao">C++23</span></td><td>Só responde se está lá (<code>true</code>/<code>false</code>). Antes do C++23: <code>std::find(…) != v.end()</code>.</td><td><code>std::ranges::contains(v, 8)</code><br><code>std::ranges::contains(v, 7)</code></td><td><code>true</code><br><code>false</code></td></tr>
+<tr><td><code>s.find(…)</code> (texto)</td><td>Para procurar dentro de uma <code>std::string</code>, use o método dela, que devolve uma posição numérica. Veja <a href="ref-string.html">std::string</a>.</td><td>—</td><td>—</td></tr>
+</table>
+</div>
+
+<h2 id="contar">Contar e testar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>count(início, fim, valor)</code></td><td>Quantos itens são iguais a <code>valor</code>.</td><td><code>std::count(v.begin(), v.end(), 3)</code></td><td><code>2</code></td></tr>
+<tr><td><code>count_if(início, fim, pred)</code></td><td>Quantos itens fazem <code>pred</code> responder <code>true</code>.</td><td><code>std::count_if(v.begin(), v.end(),</code><br><code>&nbsp;&nbsp;[](int x) { return x % 2 == 0; })</code></td><td><code>1</code> (só o 8 é par)</td></tr>
+<tr><td><code>any_of(início, fim, pred)</code></td><td>Pelo menos um item satisfaz?</td><td><code>std::any_of(v.begin(), v.end(),</code><br><code>&nbsp;&nbsp;[](int x) { return x &gt; 7; })</code></td><td><code>true</code></td></tr>
+<tr><td><code>all_of(início, fim, pred)</code></td><td>Todos satisfazem? (Num vetor vazio, responde <code>true</code>.)</td><td><code>std::all_of(v.begin(), v.end(),</code><br><code>&nbsp;&nbsp;[](int x) { return x &gt; 0; })</code></td><td><code>true</code></td></tr>
+<tr><td><code>none_of(início, fim, pred)</code></td><td>Nenhum satisfaz?</td><td><code>std::none_of(v.begin(), v.end(),</code><br><code>&nbsp;&nbsp;[](int x) { return x &lt; 0; })</code></td><td><code>true</code></td></tr>
+<tr><td><code>equal(início, fim, início2)</code><br><code>ranges::equal(a, b)</code></td><td>As duas sequências têm os mesmos itens, na mesma ordem? (Para dois <code>vector</code>, <code>a == b</code> já basta.)</td><td><code>std::ranges::equal(v, std::vector&lt;int&gt;{5, 3, 8, 1, 3})</code></td><td><code>true</code></td></tr>
+</table>
+</div>
+<p>O <code>count</code> funciona também em texto: <code>std::ranges::count(std::string{"banana"}, 'a')</code> dá <code>3</code>.</p>
+
+<h2 id="minmax">Mínimo e máximo</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>min_element(início, fim)</code></td><td>Iterador para o <strong>menor</strong> item (o primeiro, se houver empate). Num vetor vazio, devolve <code>fim</code>: não use <code>*</code> sem conferir.</td><td><code>auto it = std::min_element(v.begin(), v.end());</code><br><code>*it</code> e <code>it - v.begin()</code></td><td><br><code>1</code>, posição <code>3</code></td></tr>
+<tr><td><code>max_element(início, fim)</code></td><td>Iterador para o <strong>maior</strong> item.</td><td><code>*std::max_element(v.begin(), v.end())</code></td><td><code>8</code> (posição 2)</td></tr>
+<tr><td><code>minmax_element(início, fim)</code></td><td>Os dois de uma vez, num par de iteradores.</td><td><code>auto [a, b] = std::minmax_element(v.begin(), v.end());</code><br><code>*a</code> e <code>*b</code></td><td><br><code>1</code> e <code>8</code></td></tr>
+<tr><td><code>min(a, b)</code>, <code>max(a, b)</code></td><td>O menor/maior de <strong>dois valores</strong> (do mesmo tipo).</td><td><code>std::min(3, 7)</code><br><code>std::max(3, 7)</code></td><td><code>3</code><br><code>7</code></td></tr>
+<tr><td><code>max({a, b, c…})</code></td><td>O maior de uma lista entre chaves.</td><td><code>std::max({4, 9, 2})</code></td><td><code>9</code></td></tr>
+<tr><td><code>clamp(x, menor, maior)</code> <span class="versao">C++17</span></td><td>"Prende" <code>x</code> no intervalo: abaixo de <code>menor</code> vira <code>menor</code>, acima de <code>maior</code> vira <code>maior</code>.</td><td><code>std::clamp(15, 0, 10)</code></td><td><code>10</code></td></tr>
+<tr><td><code>ranges::min(v)</code>, <code>ranges::max(v)</code> <span class="versao">C++20</span></td><td>O <strong>valor</strong> menor/maior de uma coleção inteira (não um iterador). A coleção não pode estar vazia.</td><td><code>std::ranges::min(v)</code><br><code>std::ranges::max(v)</code></td><td><code>1</code><br><code>8</code></td></tr>
+</table>
+</div>
+
+<h2 id="somar">Somar e acumular (<code>&lt;numeric&gt;</code>)</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>accumulate(início, fim, inicial)</code></td><td>Soma tudo a partir de <code>inicial</code>. <strong>O tipo do resultado é o tipo de <code>inicial</code></strong>: use <code>0.0</code> para somar <code>double</code> (veja a <a href="#armadilhas">armadilha</a>).</td><td><code>std::accumulate(v.begin(), v.end(), 0)</code></td><td><code>20</code></td></tr>
+<tr><td><code>accumulate(início, fim, inicial, op)</code></td><td>"Acumula" com outra operação no lugar do <code>+</code>.</td><td><code>std::accumulate(v.begin(), v.end(), 1, std::multiplies&lt;&gt;())</code></td><td><code>360</code> (5×3×8×1×3)</td></tr>
+<tr><td><code>reduce(início, fim)</code> <span class="versao">C++17</span></td><td>Soma, como o <code>accumulate</code>, mas pode somar <strong>em qualquer ordem</strong> (e até em paralelo). Sem valor inicial, começa do zero do tipo dos itens.</td><td><code>std::reduce(v.begin(), v.end())</code></td><td><code>20</code></td></tr>
+<tr><td><code>iota(início, fim, primeiro)</code></td><td>Preenche com <code>primeiro</code>, <code>primeiro+1</code>, <code>primeiro+2</code>… (o nome vem da letra grega ι).</td><td><code>std::vector&lt;int&gt; i(5);</code><br><code>std::iota(i.begin(), i.end(), 1);</code></td><td><br><code>[1, 2, 3, 4, 5]</code></td></tr>
+<tr><td><code>ranges::fold_left(v, inicial, op)</code> <span class="versao">C++23</span></td><td>O <code>accumulate</code> da família ranges (em <code>&lt;algorithm&gt;</code>).</td><td><code>std::ranges::fold_left(v, 0, std::plus&lt;&gt;())</code></td><td><code>20</code></td></tr>
+</table>
+</div>
+<p>Média de notas: some com <code>0.0</code> e divida pela quantidade. Com <code>std::vector&lt;double&gt; notas{9.5, 7.0, 8.5};</code>, <code>std::accumulate(notas.begin(), notas.end(), 0.0) / notas.size()</code> dá <code>8.333333333333334</code>.</p>
+
+<h2 id="transformar">Transformar, copiar e preencher</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>transform(início, fim, destino, f)</code></td><td>Aplica <code>f</code> em cada item e escreve o resultado em <code>destino</code>. O destino precisa ter espaço (ou ser o próprio vetor).</td><td><code>std::vector&lt;int&gt; d(v.size());</code><br><code>std::transform(v.begin(), v.end(), d.begin(),</code><br><code>&nbsp;&nbsp;[](int x) { return x * 2; });</code><br><code>d</code></td><td><br><br><br><code>[10, 6, 16, 2, 6]</code></td></tr>
+<tr><td>(no próprio vetor)</td><td>Destino = <code>v.begin()</code>: troca cada item pelo resultado.</td><td><code>std::transform(v.begin(), v.end(), v.begin(),</code><br><code>&nbsp;&nbsp;[](int x) { return x * 10; });</code></td><td><code>[50, 30, 80, 10, 30]</code></td></tr>
+<tr><td><code>copy(início, fim, destino)</code></td><td>Copia tudo para <code>destino</code> (que precisa ter espaço).</td><td><code>std::vector&lt;int&gt; c(v.size());</code><br><code>std::copy(v.begin(), v.end(), c.begin());</code></td><td><code>c</code> = <code>[5, 3, 8, 1, 3]</code></td></tr>
+<tr><td><code>copy_if(início, fim, destino, pred)</code></td><td>Copia só os itens que satisfazem <code>pred</code>. Com <code>std::back_inserter(p)</code> como destino, cada cópia vira um <code>push_back</code> e o vetor cresce sozinho.</td><td><code>std::vector&lt;int&gt; p;</code><br><code>std::copy_if(v.begin(), v.end(),</code><br><code>&nbsp;&nbsp;std::back_inserter(p),</code><br><code>&nbsp;&nbsp;[](int x) { return x &gt; 2; });</code></td><td><code>p</code> = <code>[5, 3, 8, 3]</code></td></tr>
+<tr><td><code>fill(início, fim, valor)</code></td><td>Põe <code>valor</code> em todas as posições.</td><td><code>std::vector&lt;int&gt; f(4);</code><br><code>std::fill(f.begin(), f.end(), 7);</code></td><td><code>f</code> = <code>[7, 7, 7, 7]</code></td></tr>
+</table>
+</div>
+
+<h2 id="remover">Remover itens</h2>
+<p>Aqui mora a maior surpresa da biblioteca: <code>std::remove</code> e <code>std::unique</code> <strong>não apagam nada</strong>. Eles só empurram os itens que ficam para a frente e devolvem um iterador para o "novo fim"; o tamanho do vetor continua o mesmo, e o que sobra depois do novo fim é lixo. Quem apaga de verdade é o método <code>erase</code> do vetor. Desde o C++20, <code>std::erase</code> e <code>std::erase_if</code> fazem tudo numa linha só.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>erase(v, valor)</code> <span class="versao">C++20</span></td><td>Apaga <strong>de verdade</strong> todos os itens iguais a <code>valor</code>; devolve quantos apagou. <strong>Use este.</strong></td><td><code>auto q = std::erase(v, 3);</code></td><td><code>v</code> = <code>[5, 8, 1]</code>, <code>q</code> = <code>2</code></td></tr>
+<tr><td><code>erase_if(v, pred)</code> <span class="versao">C++20</span></td><td>Apaga todos os que satisfazem <code>pred</code>; devolve quantos.</td><td><code>auto q = std::erase_if(v,</code><br><code>&nbsp;&nbsp;[](int x) { return x &lt; 4; });</code></td><td><code>v</code> = <code>[5, 8]</code>, <code>q</code> = <code>3</code></td></tr>
+<tr><td><code>remove(início, fim, valor)</code></td><td>Sozinho, só reorganiza: devolve o novo fim e o tamanho não muda.</td><td><code>auto fim = std::remove(v.begin(), v.end(), 3);</code><br><code>v</code> e <code>v.size()</code></td><td><br><code>[5, 8, 1, 1, 3]</code> e <code>5</code></td></tr>
+<tr><td><code>v.erase(remove(…), v.end())</code></td><td>O jeito antigo (antes do C++20) de apagar de verdade: <code>remove</code> + <code>erase</code>, a "dupla erase-remove".</td><td><code>v.erase(std::remove(v.begin(), v.end(), 3), v.end());</code></td><td><code>[5, 8, 1]</code></td></tr>
+<tr><td><code>remove_if(início, fim, pred)</code></td><td>Como <code>remove</code>, com predicado. Também precisa do <code>erase</code> depois (ou use <code>std::erase_if</code>).</td><td><code>v.erase(std::remove_if(v.begin(), v.end(),</code><br><code>&nbsp;&nbsp;[](int x) { return x &lt; 4; }), v.end());</code></td><td><code>[5, 8]</code></td></tr>
+<tr><td><code>unique(início, fim)</code></td><td>Junta repetidos <strong>vizinhos</strong> num só; devolve o novo fim. Para tirar todas as repetições, <strong>ordene antes</strong> e apague depois.</td><td><code>std::sort(v.begin(), v.end());</code><br><code>v.erase(std::unique(v.begin(), v.end()), v.end());</code></td><td><br><code>[1, 3, 5, 8]</code></td></tr>
+</table>
+</div>
+
+<div class="trycpp" data-goal="out:5 8 1,src:erase">
+<p class="try-task"><strong>Missão:</strong> tire <strong>todos</strong> os 3 do vetor com uma linha só, usando <code>std::erase</code> (C++20). A saída deve ser <code>5 8 1</code>.</p>
+<pre class="script">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; v{5, 3, 8, 1, 3};
+
+    // escreva aqui a linha que tira todos os 3
+
+    for (int x : v) {
+        std::cout &lt;&lt; x &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; v{5, 3, 8, 1, 3};
+
+    std::erase(v, 3);
+
+    for (int x : v) {
+        std::cout &lt;&lt; x &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<h2 id="binaria">Busca binária (só em coleções <strong>ordenadas</strong>)</h2>
+<p>Num vetor ordenado, dá para achar um valor muito mais rápido: olha-se o meio, descarta-se a metade em que ele não pode estar, e repete-se. É como procurar uma palavra no dicionário. Os exemplos abaixo usam o vetor já ordenado <code>[1, 3, 3, 5, 8]</code>.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>binary_search(início, fim, valor)</code></td><td>O valor está lá? (<code>true</code>/<code>false</code>)</td><td><code>std::binary_search(v.begin(), v.end(), 5)</code><br><code>std::binary_search(v.begin(), v.end(), 4)</code></td><td><code>true</code><br><code>false</code></td></tr>
+<tr><td><code>lower_bound(início, fim, valor)</code></td><td>Iterador para o primeiro item <strong>maior ou igual</strong> a <code>valor</code>: onde ele entraria para manter a ordem. Se todos forem menores, devolve <code>fim</code>.</td><td><code>std::lower_bound(v.begin(), v.end(), 3)</code><br><code>std::lower_bound(v.begin(), v.end(), 4)</code><br><code>std::lower_bound(v.begin(), v.end(), 9)</code></td><td>posição <code>1</code><br>posição <code>3</code> (o 5)<br><code>v.end()</code></td></tr>
+<tr><td><code>upper_bound(início, fim, valor)</code></td><td>O primeiro item <strong>maior</strong> que <code>valor</code>. De <code>lower_bound</code> até <code>upper_bound</code> ficam todas as cópias do valor.</td><td><code>std::upper_bound(v.begin(), v.end(), 3)</code></td><td>posição <code>3</code> (os 3 estão nas posições 1 e 2)</td></tr>
+</table>
+</div>
+
+<h2 id="ranges">A família <code>std::ranges</code> <span class="versao">C++20</span></h2>
+<p>Desde o C++20, quase todo algoritmo tem uma versão em <code>std::ranges::</code> que recebe o <strong>container inteiro</strong>, sem <code>begin()</code>/<code>end()</code>. Ela também aceita uma <strong>projeção</strong>: o campo pelo qual comparar. E dá mensagens de erro mais diretas quando o container não serve. Veja a aula <a href="ranges.html">Ranges</a>.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Clássico</th><th>Com ranges</th><th>Resultado</th></tr>
+<tr><td><code>std::sort(v.begin(), v.end())</code></td><td><code>std::ranges::sort(v)</code></td><td><code>[1, 3, 3, 5, 8]</code></td></tr>
+<tr><td><code>std::sort(v.begin(), v.end(), std::greater&lt;&gt;())</code></td><td><code>std::ranges::sort(v, std::ranges::greater{})</code></td><td><code>[8, 5, 3, 3, 1]</code></td></tr>
+<tr><td><code>std::find(v.begin(), v.end(), 8)</code></td><td><code>std::ranges::find(v, 8)</code></td><td>iterador, posição <code>2</code></td></tr>
+<tr><td><code>std::count(v.begin(), v.end(), 3)</code></td><td><code>std::ranges::count(v, 3)</code></td><td><code>2</code></td></tr>
+<tr><td><code>*std::max_element(v.begin(), v.end())</code></td><td><code>std::ranges::max(v)</code></td><td><code>8</code></td></tr>
+<tr><td><code>std::reverse(v.begin(), v.end())</code></td><td><code>std::ranges::reverse(v)</code></td><td><code>[3, 1, 8, 3, 5]</code></td></tr>
+<tr><td><code>std::iota(u.begin(), u.end(), 0)</code></td><td><code>std::ranges::iota(u, 0)</code> <span class="versao">C++23</span></td><td>com <code>u</code> de 10 itens: <code>[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]</code></td></tr>
+<tr><td><code>std::accumulate(v.begin(), v.end(), 0)</code></td><td><code>std::ranges::fold_left(v, 0, std::plus&lt;&gt;())</code> <span class="versao">C++23</span></td><td><code>20</code></td></tr>
+</table>
+</div>
+
+<p><strong>Projeção:</strong> com <code>struct Aluno { std::string nome; int nota; };</code> e a turma <code>{Caio 8, Ana 9, Bia 8, Davi 9}</code>:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Exemplo</th><th>O que faz</th><th>Resultado</th></tr>
+<tr><td><code>std::ranges::sort(turma, {}, &amp;Aluno::nome);</code></td><td>Ordena pelo campo <code>nome</code>. O <code>{}</code> quer dizer "a comparação padrão" (<code>&lt;</code>).</td><td><code>Ana 9, Bia 8, Caio 8, Davi 9</code></td></tr>
+<tr><td><code>std::ranges::max_element(turma, {}, &amp;Aluno::nota)-&gt;nome</code></td><td>Quem tem a maior nota (a primeira, em caso de empate).</td><td><code>Ana</code></td></tr>
+</table>
+</div>
+
+<h2 id="views">Views: filtrar e transformar sem copiar <span class="versao">C++20</span></h2>
+<p>Uma <strong>view</strong> ("visão") é uma janela sobre a coleção: ela mostra os itens de outro jeito (só os pares, multiplicados por 10, de trás para a frente) <strong>sem copiar nem mudar</strong> o original. Os itens só são calculados quando alguém percorre a view (ela é "preguiçosa"). As views se encadeiam com a barra <code>|</code>, como canos. Ficam em <code>&lt;ranges&gt;</code>.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>View</th><th>O que mostra</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>views::filter(pred)</code></td><td>Só os itens que satisfazem <code>pred</code>.</td><td><code>v | std::views::filter([](int x) { return x % 2 == 1; })</code></td><td><code>[5, 3, 1, 3]</code></td></tr>
+<tr><td><code>views::transform(f)</code></td><td>Cada item passado por <code>f</code>.</td><td><code>v | std::views::transform([](int x) { return x * x; })</code></td><td><code>[25, 9, 64, 1, 9]</code></td></tr>
+<tr><td><code>views::take(n)</code></td><td>Os <code>n</code> primeiros.</td><td><code>v | std::views::take(2)</code></td><td><code>[5, 3]</code></td></tr>
+<tr><td><code>views::drop(n)</code></td><td>Pula os <code>n</code> primeiros.</td><td><code>v | std::views::drop(2)</code></td><td><code>[8, 1, 3]</code></td></tr>
+<tr><td><code>views::reverse</code></td><td>De trás para a frente (sem mudar <code>v</code>).</td><td><code>v | std::views::reverse</code></td><td><code>[3, 1, 8, 3, 5]</code></td></tr>
+<tr><td><code>views::iota(a, b)</code></td><td>Os números de <code>a</code> até <code>b - 1</code>, sem criar vetor. Sem <code>b</code>, não acaba nunca (use com <code>take</code>).</td><td><code>std::views::iota(1, 6)</code><br><code>std::views::iota(1) | std::views::take(3)</code></td><td><code>[1, 2, 3, 4, 5]</code><br><code>[1, 2, 3]</code></td></tr>
+<tr><td><code>views::enumerate</code> <span class="versao">C++23</span></td><td>Pares (posição, item), para saber o índice num range-for.</td><td><code>for (auto [i, x] : v | std::views::enumerate)</code><br><code>&nbsp;&nbsp;std::print("{}:{} ", i, x);</code></td><td><code>0:5 1:3 2:8 3:1 4:3</code></td></tr>
+<tr><td><code>views::zip(a, b)</code> <span class="versao">C++23</span></td><td>Anda em duas coleções ao mesmo tempo.</td><td><code>for (auto [nome, nota] : std::views::zip(nomes, notas))</code><br>com <code>nomes{"Ana", "Bia", "Caio"}</code> e <code>notas{9.5, 7.0, 8.5}</code></td><td><code>Ana=9.5 Bia=7 Caio=8.5</code></td></tr>
+<tr><td><code>views::keys</code>, <code>views::values</code></td><td>Só o primeiro / só o segundo de cada par (ótimo com <a href="map.html"><code>std::map</code></a>).</td><td><code>std::views::keys(std::views::zip(nomes, notas))</code></td><td><code>["Ana", "Bia", "Caio"]</code></td></tr>
+<tr><td><code>| std::ranges::to&lt;std::vector&gt;()</code> <span class="versao">C++23</span></td><td>Transforma a view num vetor de verdade (uma cópia).</td><td><code>auto pares = v | std::views::filter(</code><br><code>&nbsp;&nbsp;[](int x) { return x % 2 == 0; })</code><br><code>&nbsp;&nbsp;| std::ranges::to&lt;std::vector&gt;();</code></td><td><code>[8]</code></td></tr>
+</table>
+</div>
+
+<p>Encadeando: os itens maiores que 2, multiplicados por 10, depois de ordenar. Repare que, nas views, a ordem da leitura é a ordem em que as coisas acontecem.</p>
+<pre class="file" data-file="views.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;ranges&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; v{5, 3, 8, 1, 3};
+
+    std::ranges::sort(v);
+
+    auto grandes = v | std::views::filter([](int x) { return x &gt; 2; })
+                     | std::views::transform([](int x) { return x * 10; });
+
+    for (int x : grandes) {
+        std::cout &lt;&lt; x &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra views.cpp -o views
+$ ./views
+30 30 50 80</pre>
+
+<div class="tip">
+<strong>Clássico ou ranges: qual usar?</strong>
+<ul>
+  <li>Em código novo com C++20 ou mais, prefira <code>std::ranges::</code>: é mais curto, não tem como trocar o <code>begin</code> de um vetor pelo <code>end</code> de outro, e aceita projeção.</li>
+  <li>A forma clássica continua valendo e aparece em todo código antigo, em livros e em respostas na internet; você precisa saber ler as duas. Ela também é a única que funciona num <strong>pedaço</strong> do vetor sem views (<code>std::sort(v.begin(), v.begin() + 3)</code>).</li>
+  <li>Os algoritmos <code>&lt;numeric&gt;</code> (<code>accumulate</code>, <code>reduce</code>) não têm versão <code>ranges::</code>; o substituto do C++23 é o <code>std::ranges::fold_left</code>.</li>
+  <li>Use <strong>views</strong> quando quiser só olhar os itens de outro jeito; use o <strong>algoritmo</strong> quando quiser mudar o container.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2 id="armadilhas">Armadilhas (resultados reais)</h2>
+
+<div class="cenario">
+<strong><code>std::remove</code> "não removeu"</strong>
+<p>Depois de <code>std::remove(v.begin(), v.end(), 3);</code> sozinho, o vetor ficou <code>[5, 8, 1, 1, 3]</code>, ainda com 5 itens. Os dois últimos são sobras. Por sorte, o g++ 15 avisa quando você joga fora o "novo fim" que o <code>remove</code> (e o <code>unique</code>) devolve:</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra rem.cpp -o rem
+rem.cpp: In function ‘int main()’:
+rem.cpp:7:16: warning: ignoring return value of ‘constexpr _FIter std::remove(_FIter, _FIter, const _Tp&amp;) [with _FIter = __gnu_cxx::__normal_iterator&lt;int*, vector&lt;int&gt; &gt;; _Tp = int]’, declared with attribute ‘nodiscard’ [-Wunused-result]
+    7 |     std::remove(v.begin(), v.end(), 3);
+      |     ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/c++/15/algorithm:63,
+                 from rem.cpp:1:
+/usr/include/c++/15/bits/stl_algo.h:772:5: note: declared here
+  772 |     remove(_ForwardIterator __first, _ForwardIterator __last,
+      |     ^~~~~~</pre>
+<p><strong>O que significa:</strong> "ignorando o valor de retorno de <code>std::remove</code>, que foi declarada com o atributo <code>nodiscard</code>" (não descartar). O resultado era importante e você o jogou fora. O Clang diz o mesmo: <code>warning: ignoring return value of function declared with 'nodiscard' attribute</code>.</p>
+<p><strong>Como consertar:</strong> use <code>std::erase(v, 3);</code> (C++20) ou a dupla <code>v.erase(std::remove(v.begin(), v.end(), 3), v.end());</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>std::unique</code> deixou repetidos</strong>
+<p>No vetor original <code>[5, 3, 8, 1, 3]</code>, <code>unique</code> + <code>erase</code> não muda nada: os dois 3 não estão <strong>lado a lado</strong>.</p>
+<p><strong>Como consertar:</strong> ordene antes (<code>std::sort</code>), aí os repetidos ficam vizinhos e o resultado é <code>[1, 3, 5, 8]</code>. Se precisar de itens únicos sempre, considere um <a href="set.html"><code>std::set</code></a>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>binary_search</code> num vetor fora de ordem</strong>
+<p>Em <code>[5, 3, 8, 1, 3]</code>, sem ordenar, <code>std::binary_search(v.begin(), v.end(), 8)</code> deu <code>true</code>, mas <code>std::binary_search(v.begin(), v.end(), 5)</code> deu <code>false</code>, embora o 5 esteja lá, na primeira posição.</p>
+<p><strong>O que significa:</strong> a busca binária <strong>supõe</strong> que o vetor está ordenado; se não estiver, a resposta é qualquer coisa. Nenhum erro, nenhum aviso.</p>
+<p><strong>Como consertar:</strong> ordene antes, ou use <code>std::find</code>/<code>std::ranges::contains</code>, que funcionam em qualquer ordem.</p>
+</div>
+
+<div class="cenario">
+<strong>A média saiu errada com <code>accumulate</code></strong>
+<p>Com <code>std::vector&lt;double&gt; notas{9.5, 7.0, 8.5};</code>, <code>std::accumulate(notas.begin(), notas.end(), 0)</code> deu <code>24</code>, e não <code>25</code>.</p>
+<p><strong>O que significa:</strong> o valor inicial <code>0</code> é um <code>int</code>, então a conta inteira é feita em <code>int</code>: a cada passo, a parte decimal é jogada fora (0 + 9.5 → 9; 9 + 7 → 16; 16 + 8.5 → 24). Nem o <code>-Wall -Wextra</code> avisa, porque a conversão acontece dentro do cabeçalho da biblioteca.</p>
+<p><strong>Como consertar:</strong> comece com <code>0.0</code>: <code>std::accumulate(notas.begin(), notas.end(), 0.0)</code> dá <code>25</code>. Veja <a href="conversao-tipos.html">Conversão de Tipos</a>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>*max_element</code> (ou <code>*find</code>) sem conferir</strong>
+<p>Num vetor vazio, <code>std::max_element(v.begin(), v.end())</code> devolve <code>v.end()</code>; num <code>find</code> que não acha, também. Usar <code>*</code> nesse iterador lê memória que não é do vetor: é <a href="comportamento-indefinido.html">comportamento indefinido</a>, e o programa pode mostrar lixo, travar ou parecer funcionar.</p>
+<p><strong>Como consertar:</strong> confira antes: <code>if (it != v.end()) { … *it … }</code>, ou confira <code>v.empty()</code>. Os <a href="sanitizers.html">sanitizers</a> ajudam a achar esse erro.</p>
+</div>
+
+<div class="cenario">
+<strong><code>std::sort</code> num <code>std::list</code></strong>
+<pre class="file" data-file="lista.cpp">#include &lt;algorithm&gt;
+#include &lt;list&gt;
+
+int main() {
+    std::list&lt;int&gt; l{5, 3, 8};
+    std::sort(l.begin(), l.end());
+}
+</pre>
+<p>O g++ escreve cerca de 30 linhas, quase todas de dentro da biblioteca. A linha que importa é esta (e a <code>required from here</code>, que aponta a <strong>sua</strong> linha):</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra lista.cpp -o lista
+In file included from /usr/include/c++/15/algorithm:63,
+                 from lista.cpp:1:
+/usr/include/c++/15/bits/stl_algo.h: In instantiation of ‘constexpr void std::__sort(_RandomAccessIterator, _RandomAccessIterator, _Compare) [with _RandomAccessIterator = _List_iterator&lt;int&gt;; _Compare = __gnu_cxx::__ops::_Iter_less_iter]’:
+/usr/include/c++/15/bits/stl_algo.h:4841:18:   required from ‘constexpr void std::sort(_RAIter, _RAIter) [with _RAIter = _List_iterator&lt;int&gt;]’
+ 4841 |       std::__sort(__first, __last, __gnu_cxx::__ops::__iter_less_iter());
+      |       ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lista.cpp:6:14:   required from here
+    6 |     std::sort(l.begin(), l.end());
+      |     ~~~~~~~~~^~~~~~~~~~~~~~~~~~~~
+/usr/include/c++/15/bits/stl_algo.h:1907:50: error: no match for ‘operator-’ (operand types are ‘std::_List_iterator&lt;int&gt;’ and ‘std::_List_iterator&lt;int&gt;’)
+ 1907 |                                 std::__lg(__last - __first) * 2,
+      |                                           ~~~~~~~^~~~~~~~~
+«  … mais 20 linhas de "note: candidate" …</pre>
+<p><strong>O que significa:</strong> o <code>sort</code> precisa pular direto para o meio da coleção (fazer <code>fim - início</code>), e os iteradores de uma lista encadeada não sabem fazer essa conta: eles só andam um passo de cada vez. Com <code>std::ranges::sort(l)</code>, o erro chega mais cedo e mais claro: <code>required for the satisfaction of ‘random_access_range&lt;_Range&gt;’</code>, ou seja, "a lista não é um range de acesso aleatório".</p>
+<p><strong>Como consertar:</strong> listas têm o próprio método: <code>l.sort();</code>. Veja <a href="list-deque.html">list e deque</a>. Mais sobre ler erros de template em <a href="ref-erros.html#templates">Mensagens de Erro</a>.</p>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Ordenar</h3>
+<p>Complete para ordenar o vetor <code>notas</code> do menor para o maior:</p>
+<div class="ex-code">std::<input data-answer="sort" aria-label="função">(notas.begin(), notas.<input data-answer="end()" aria-label="fim">);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Apagar de verdade</h3>
+<p>Complete a linha (C++20) que apaga do vetor <code>v</code> todos os números negativos:</p>
+<div class="ex-code">std::<input data-answer="erase_if" aria-label="função">(v, [](int x) { return x &lt; 0; });</div>
+</div>
+
+<div class="exercise">
+<h3>3. Somar com casas decimais</h3>
+<p>Complete o valor inicial para que a soma de um <code>std::vector&lt;double&gt;</code> não perca as casas decimais:</p>
+<div class="ex-code">std::accumulate(precos.begin(), precos.end(), <input data-answer="0.0|0." aria-label="valor inicial">)</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Com <code>std::vector&lt;int&gt; v{5, 3, 8, 1, 3};</code>, o que vale <code>std::count_if(v.begin(), v.end(), [](int x) { return x &gt; 2; })</code>?</p>
+<label><input type="radio" name="q4"> <code>2</code></label>
+<label><input type="radio" name="q4"> <code>3</code></label>
+<label><input type="radio" name="q4"> <code>4</code></label>
+<label><input type="radio" name="q4"> <code>5</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Em <code>[1, 3, 3, 5, 8]</code>, para qual posição aponta <code>std::lower_bound(v.begin(), v.end(), 4)</code>?</p>
+<label><input type="radio" name="q5"> 2 (o segundo 3)</label>
+<label><input type="radio" name="q5"> 3 (o 5)</label>
+<label><input type="radio" name="q5"> <code>v.end()</code>, porque o 4 não está lá</label>
+<label><input type="radio" name="q5"> 0</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Qual destas linhas <strong>não</strong> muda o vetor <code>v</code>?</p>
+<label><input type="radio" name="q6"> <code>auto par = v | std::views::filter([](int x) { return x % 2 == 0; });</code></label>
+<label><input type="radio" name="q6"> <code>std::ranges::sort(v);</code></label>
+<label><input type="radio" name="q6"> <code>std::erase(v, 3);</code></label>
+<label><input type="radio" name="q6"> <code>std::reverse(v.begin(), v.end());</code></label>
+</div>
+
+<h2>Missão final: o boletim da turma</h2>
+<div class="trycpp" data-goal="out:aprovados: 3,out:maior: 10,out:soma: 41,src:count_if,src:max_element,src:accumulate">
+<p class="try-task"><strong>Missão:</strong> sem escrever nenhum laço, use <code>std::count_if</code> para contar as notas maiores ou iguais a 7, <code>std::max_element</code> para achar a maior e <code>std::accumulate</code> para somar todas. A saída deve ser <code>aprovados: 3</code>, <code>maior: 10</code> e <code>soma: 41</code>.</p>
+<pre class="script">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;numeric&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 4, 9, 6, 10, 5};
+
+    // 1. conte as notas maiores ou iguais a 7 com std::count_if
+    int aprovados = 0;
+
+    // 2. ache a maior nota com std::max_element
+    int maior = 0;
+
+    // 3. some todas as notas com std::accumulate
+    int soma = 0;
+
+    std::cout &lt;&lt; "aprovados: " &lt;&lt; aprovados &lt;&lt; '\n';
+    std::cout &lt;&lt; "maior: " &lt;&lt; maior &lt;&lt; '\n';
+    std::cout &lt;&lt; "soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;numeric&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 4, 9, 6, 10, 5};
+
+    // 1. conte as notas maiores ou iguais a 7 com std::count_if
+    auto aprovados = std::count_if(notas.begin(), notas.end(),
+                                   [](int n) { return n &gt;= 7; });
+
+    // 2. ache a maior nota com std::max_element
+    int maior = *std::max_element(notas.begin(), notas.end());
+
+    // 3. some todas as notas com std::accumulate
+    int soma = std::accumulate(notas.begin(), notas.end(), 0);
+
+    std::cout &lt;&lt; "aprovados: " &lt;&lt; aprovados &lt;&lt; '\n';
+    std::cout &lt;&lt; "maior: " &lt;&lt; maior &lt;&lt; '\n';
+    std::cout &lt;&lt; "soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Os algoritmos ficam em <code>&lt;algorithm&gt;</code> (quase todos) e <code>&lt;numeric&gt;</code> (<code>accumulate</code>, <code>reduce</code>, <code>iota</code>); as views, em <code>&lt;ranges&gt;</code>.</li>
+  <li>Forma clássica: <code>algoritmo(v.begin(), v.end(), …)</code>. Forma C++20: <code>std::ranges::algoritmo(v, …)</code>.</li>
+  <li><code>find</code>, <code>min_element</code>, <code>max_element</code> e <code>lower_bound</code> devolvem <strong>iteradores</strong>: compare com <code>v.end()</code> antes de usar <code>*</code>.</li>
+  <li><code>remove</code> e <code>unique</code> não apagam: use <code>std::erase</code>/<code>std::erase_if</code> (C++20) ou a dupla erase-remove. <code>unique</code> só junta vizinhos.</li>
+  <li><code>binary_search</code>, <code>lower_bound</code> e <code>upper_bound</code> só funcionam em coleções <strong>ordenadas</strong>.</li>
+  <li>No <code>accumulate</code>, o tipo do valor inicial manda: <code>0.0</code> para somar <code>double</code>.</li>
+  <li>Views (<code>filter</code>, <code>transform</code>, <code>take</code>…) mostram os itens de outro jeito sem copiar nem mudar o original.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
