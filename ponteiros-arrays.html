@@ -216,7 +216,7 @@ int main() {
 
 <div class="warning">
 <strong>Ponteiro fora do array</strong>
-<p>Nada impede você de escrever <code>*(p + 10)</code> num array de 4 itens. O C++ não confere: ele calcula o endereço e lê o que estiver lá, que pode ser outra variável, lixo ou memória proibida. Isso é <a href="comportamento-indefinido.html">comportamento indefinido</a>, e os <a href="sanitizers.html">sanitizers</a> são a ferramenta para pegar esse erro. Com <code>std::vector</code> e <code>std::array</code>, o <code>.at(i)</code> confere e avisa.</p>
+<p>Nada impede você de escrever <code>*(p + 10)</code> num array de 4 itens. O C++ não confere: ele calcula o endereço e lê o que estiver lá, que pode ser outra variável, lixo ou memória proibida. Isso é <a href="comportamento-indefinido.html">comportamento indefinido</a>, e os <a href="sanitizers.html">sanitizers</a> são a ferramenta para pegar esse erro. Com <code>std::vector</code> e <code>std::array</code>, o <code>.at(i)</code> confere e avisa. No editor do guia, ler fora do array passa calado (mostra um valor qualquer e o programa segue): é exatamente o perigo do comportamento indefinido.</p>
 </div>
 
 <hr>

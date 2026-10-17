@@ -34,6 +34,11 @@
 
 <p>Os programas foram compilados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Para os erros de memória, a aula usa também <code>-g -fsanitize=address</code>, o <strong>AddressSanitizer</strong> (ASan), que tem aula própria em <a href="sanitizers.html">Sanitizers</a>. Os relatórios dele são longos; aqui aparecem só os trechos importantes, e os cortes estão marcados com <code>…</code>. Os sanitizers rodam no terminal, com o g++ ou o clang++; o editor do guia não os tem.</p>
 
+<div class="warning">
+<strong>No editor do guia, estes erros passam calados</strong>
+<p>O editor roda o programa em WebAssembly, sem sanitizers. Lá, usar memória depois do <code>delete</code> e fazer <code>delete</code> duas vezes <strong>não dão erro nenhum</strong>: o programa segue e termina com código 0. Isso não quer dizer que o código está certo. É justamente o perigo do <a href="comportamento-indefinido.html">comportamento indefinido</a>: o mesmo programa que "funciona" num lugar cai ou corrompe dados em outro. Por isso as quedas e os relatórios desta aula aparecem só nos terminais da Ana, e as missões treinam o jeito certo de usar <code>new</code> e <code>delete</code>.</p>
+</div>
+
 <hr>
 
 <h2>A ideia: um depósito de aluguel</h2>

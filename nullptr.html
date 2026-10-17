@@ -175,7 +175,7 @@ SUMMARY: AddressSanitizer: SEGV /home/ana/cpp/crash.cpp:6 in main
 
 <div class="note">
 <strong>No editor do guia</strong>
-<p>O editor roda o programa em WebAssembly, e lá o endereço 0 não é proibido como no Linux. Por isso, no editor, desreferenciar um ponteiro nulo pode <strong>não</strong> derrubar o programa: ele pode mostrar um número qualquer e seguir em frente. Isso não torna o código correto. É comportamento indefinido nos dois lugares; só o sintoma muda. As missões abaixo treinam o hábito que resolve em qualquer lugar: checar antes.</p>
+<p>O editor roda o programa em WebAssembly, e lá o endereço 0 não é proibido como no Linux. Por isso, no editor, desreferenciar um ponteiro nulo <strong>não</strong> derruba o programa: o <code>*p</code> mostra <code>0</code>, o programa segue e termina com código 0, como se nada tivesse acontecido. Isso é justamente o perigo do <a href="comportamento-indefinido.html">comportamento indefinido</a>: o erro pode passar calado num lugar e derrubar o programa em outro. É por isso que a queda e o relatório do sanitizer aparecem só no terminal da Ana. As missões abaixo treinam o hábito que resolve em qualquer lugar: checar antes.</p>
 </div>
 
 <div class="trycpp" data-goal="out:Preço: 4.5,out:Sem preço">

@@ -245,7 +245,7 @@ $ echo $?
   <dt>Falha de segmentação</dt><dd>Desta vez o lixo era um endereço proibido, e o sistema matou o programa (código 139). Em inglês: <code>Segmentation fault</code>.</dd>
 </dl>
 
-<p>Neste caso, a queda foi a <strong>sorte</strong>. Se o lixo fosse o endereço de outra variável do programa, o 5 seria escrito em cima dela, sem erro nenhum, e o programa seguiria com um valor trocado em algum lugar. Esse tipo de defeito pode levar dias para ser encontrado. É <a href="comportamento-indefinido.html">comportamento indefinido</a>.</p>
+<p>Neste caso, a queda foi a <strong>sorte</strong>. Se o lixo fosse o endereço de outra variável do programa, o 5 seria escrito em cima dela, sem erro nenhum, e o programa seguiria com um valor trocado em algum lugar. Esse tipo de defeito pode levar dias para ser encontrado. É <a href="comportamento-indefinido.html">comportamento indefinido</a>. No editor do guia, que roda em WebAssembly, esse tipo de erro costuma passar calado, sem queda nenhuma; por isso a queda aparece só no terminal da Ana.</p>
 
 <div class="tip">
 <strong>Regra: todo ponteiro nasce com um valor</strong>
