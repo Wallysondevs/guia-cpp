@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Cópia e Movimento — construtor de cópia, operator=, cópia rasa × profunda e regra dos três/cinco/zero | Guia C++</title>
+<meta name="description" content="Como o C++ copia objetos: construtor de cópia e atribuição de cópia, quando cada um é chamado (com saídas reais), o bug da cópia rasa com ponteiro cru (double free pego pelo AddressSanitizer), cópia profunda, regra dos três, dos cinco e do zero, e = delete para proibir cópias.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Cópia e Movimento</span></h1>
+
+<p class="intro">Quando você escreve <code>int b = a;</code>, o C++ copia um número. Fácil. Mas o que acontece em <code>Caderno b = a;</code>, quando <code>a</code> é um objeto de uma classe sua? Quem faz a cópia? Copia o quê? Nesta aula você vai ver as duas funções que o C++ usa para copiar objetos, descobrir <strong>quando</strong> elas rodam (às vezes em lugares inesperados), conhecer o bug clássico da "cópia rasa" que derruba o programa e aprender as regras que os programadores C++ seguem para nunca cair nele.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O <strong>construtor de cópia</strong> <code>Classe(const Classe&amp;)</code> e a <strong>atribuição de cópia</strong> <code>operator=</code>.</li>
+  <li>Em que linhas cada um é chamado: <code>Classe b = a;</code>, <code>b = a;</code>, passagem por valor, <code>push_back</code>.</li>
+  <li>A diferença entre <strong>cópia rasa</strong> e <strong>cópia profunda</strong>, e o erro <em>double free</em> que a cópia rasa causa.</li>
+  <li>A <strong>regra dos três</strong>, a <strong>regra dos cinco</strong> e a melhor de todas, a <strong>regra do zero</strong>.</li>
+  <li>Como proibir cópias com <code>= delete</code>, e o erro que o compilador mostra.</li>
+  <li>Onde entra o <strong>movimento</strong> (a aula completa é <a href="move.html">Semântica de Movimento</a>).</li>
+</ul>
+</div>
+
+<p>Esta aula usa o que você viu em <a href="construtores.html">Construtores</a>, <a href="destrutores-raii.html">Destrutores e RAII</a> e <a href="referencias.html">Referências</a>. Os programas foram compilados com o <strong>g++ 15</strong> na máquina da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: xerox ou caderno compartilhado?</h2>
+<p>A Ana empresta o caderno de receitas para a Bia. Há dois jeitos:</p>
+<ul>
+  <li><strong>Tirar uma xerox</strong> de cada página. A Bia pode rabiscar a cópia dela à vontade: o caderno da Ana continua igual.</li>
+  <li><strong>Dar um bilhete</strong> dizendo "o caderno está na minha estante". Agora as duas usam <strong>o mesmo</strong> caderno: o que a Bia rabiscar, a Ana vai ver. E se as duas resolverem jogar "o seu" caderno fora, alguém vai tentar jogar fora um caderno que não existe mais.</li>
+</ul>
+<p>Em C++, a xerox é a <strong>cópia profunda</strong>; o bilhete é a <strong>cópia rasa</strong>. Para tipos como <code>int</code>, <code>std::string</code> e <code>std::vector</code>, o C++ já faz a xerox sozinho. O perigo aparece quando a classe guarda um <strong>ponteiro cru</strong> (<code>int*</code>), que é exatamente um "bilhete" dizendo onde está a coisa.</p>
+
+<hr>
+
+<h2>1. As duas funções de cópia</h2>
+<p>Toda classe tem duas funções responsáveis por copiar. Se você não escrever, o compilador cria as duas, e elas copiam atributo por atributo.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Forma</th><th>Quando roda</th></tr>
+<tr><td><strong>Construtor de cópia</strong></td><td><code>Classe(const Classe&amp; outro)</code></td><td>Quando um objeto <strong>novo</strong> nasce como cópia de outro.</td></tr>
+<tr><td><strong>Atribuição de cópia</strong></td><td><code>Classe&amp; operator=(const Classe&amp; outro)</code></td><td>Quando um objeto que <strong>já existe</strong> recebe o valor de outro.</td></tr>
+</table>
+</div>
+
+<p>Para ver quando cada uma roda, vamos escrevê-las nós mesmos, com um <code>std::cout</code> dentro:</p>
+
+<pre class="file" data-file="copia.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Caderno {
+public:
+    Caderno(std::string dono) : dono_{dono} {
+        std::cout &lt;&lt; "  [construtor] " &lt;&lt; dono_ &lt;&lt; '\n';
+    }
+    Caderno(const Caderno&amp; outro) : dono_{outro.dono_} {
+        std::cout &lt;&lt; "  [cópia] copiei o caderno de " &lt;&lt; dono_ &lt;&lt; '\n';
+    }
+    Caderno&amp; operator=(const Caderno&amp; outro) {
+        std::cout &lt;&lt; "  [atribuição] " &lt;&lt; dono_ &lt;&lt; " recebe o de " &lt;&lt; outro.dono_ &lt;&lt; '\n';
+        dono_ = outro.dono_;
+        return *this;
+    }
+    ~Caderno() {
+        std::cout &lt;&lt; "  [destrutor] " &lt;&lt; dono_ &lt;&lt; '\n';
+    }
+    std::string dono() const { return dono_; }
+private:
+    std::string dono_;
+};
+
+void por_valor(Caderno c) {
+    std::cout &lt;&lt; "  dentro de por_valor: " &lt;&lt; c.dono() &lt;&lt; '\n';
+}
+
+void por_referencia(const Caderno&amp; c) {
+    std::cout &lt;&lt; "  dentro de por_referencia: " &lt;&lt; c.dono() &lt;&lt; '\n';
+}
+
+int main() {
+    std::cout &lt;&lt; "1) criar a\n";
+    Caderno a{"Ana"};
+    std::cout &lt;&lt; "2) Caderno b = a;\n";
+    Caderno b = a;
+    std::cout &lt;&lt; "3) Caderno c{a};\n";
+    Caderno c{a};
+    std::cout &lt;&lt; "4) Caderno d{\"Bia\"}; d = a;\n";
+    Caderno d{"Bia"};
+    d = a;
+    std::cout &lt;&lt; "5) por_valor(a)\n";
+    por_valor(a);
+    std::cout &lt;&lt; "6) por_referencia(a)\n";
+    por_referencia(a);
+    std::cout &lt;&lt; "7) fim do main\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>Caderno(const Caderno&amp; outro)</dt><dd>O construtor de cópia. Recebe o objeto original <strong>por referência constante</strong>: <code>&amp;</code> para não copiar (copiar para poder copiar seria um círculo sem fim) e <code>const</code> porque copiar não deve mudar o original.</dd>
+  <dt>: dono_{outro.dono_}</dt><dd>Inicializa o atributo do objeto novo com o do original. Uma classe pode ler os atributos privados de <strong>outro</strong> objeto da mesma classe.</dd>
+  <dt>Caderno&amp; operator=(const Caderno&amp; outro)</dt><dd>A atribuição de cópia: é a função que roda no sinal <code>=</code> entre dois objetos que já existem. O nome <code>operator=</code> é a forma de "ensinar" um operador a uma classe (aula <a href="sobrecarga-operadores.html">Sobrecarga de Operadores</a>).</dd>
+  <dt>return *this;</dt><dd>Devolve o próprio objeto (<a href="this.html">this</a>), para permitir <code>x = y = z;</code>, como com números.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra copia.cpp -o copia
+$ ./copia
+1) criar a
+  [construtor] Ana
+2) Caderno b = a;
+  [cópia] copiei o caderno de Ana     « tem um "=", mas é construtor de cópia: b está nascendo
+3) Caderno c{a};
+  [cópia] copiei o caderno de Ana
+4) Caderno d{"Bia"}; d = a;
+  [construtor] Bia
+  [atribuição] Bia recebe o de Ana    « d já existia: atribuição
+5) por_valor(a)
+  [cópia] copiei o caderno de Ana     « o parâmetro c é uma cópia nova
+  dentro de por_valor: Ana
+  [destrutor] Ana                     « e morre no fim da função
+6) por_referencia(a)
+  dentro de por_referencia: Ana       « nenhuma cópia!
+7) fim do main
+  [destrutor] Ana
+  [destrutor] Ana
+  [destrutor] Ana
+  [destrutor] Ana</pre>
+
+<p>A pegadinha está no caso 2: <code>Caderno b = a;</code> tem um sinal de igual, mas <strong>não</strong> chama a atribuição. Como <code>b</code> está nascendo nessa linha, quem roda é o <strong>construtor</strong> de cópia. A regra para não errar:</p>
+
+<div class="note">
+<strong>Nasce ou já existia?</strong>
+<ul>
+  <li>O objeto da esquerda está <strong>nascendo</strong> nesta linha (tem o tipo na frente)? Construtor de cópia.</li>
+  <li>O objeto da esquerda <strong>já existia</strong>? Atribuição de cópia (<code>operator=</code>).</li>
+</ul>
+</div>
+
+<p>Os casos 5 e 6 mostram por que, nas aulas de funções, o guia recomenda <code>const Classe&amp;</code> para objetos (<a href="passagem-referencia.html">Por Valor × Por Referência</a>): passar por valor fez uma cópia inteira (e uma destruição) só para ler o nome.</p>
+
+<h3>Mais dois lugares: <code>return</code> e <code>push_back</code></h3>
+<pre class="file" data-file="retorno.cpp">Caderno criar() {
+    Caderno novo{"Caio"};
+    return novo;
+}
+
+int main() {
+    std::cout &lt;&lt; "1) Caderno x = criar();\n";
+    Caderno x = criar();
+    std::cout &lt;&lt; "2) vector + push_back(x)\n";
+    std::vector&lt;Caderno&gt; pilha;
+    pilha.push_back(x);
+    std::cout &lt;&lt; "3) fim do main\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra retorno.cpp -o retorno
+$ ./retorno
+1) Caderno x = criar();
+  [construtor] Caio                   « nenhuma cópia no return!
+2) vector + push_back(x)
+  [cópia] Caio                        « o vetor guarda uma cópia de x
+3) fim do main
+  [destrutor] Caio
+  [destrutor] Caio</pre>
+
+<p>Devolver um objeto de uma função <strong>não</strong> copiou nada: o compilador construiu o <code>novo</code> direto no lugar de <code>x</code>. Isso se chama <strong>elisão de cópia</strong> (<em>copy elision</em>, "omitir a cópia"), e é por isso que devolver objetos por valor é barato em C++. Já o <code>push_back</code> guardou uma <strong>cópia</strong> de <code>x</code>: o vetor tem o seu próprio caderno.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode e confira cada linha. Depois troque <code>por_valor(Caderno c)</code> por <code>por_valor(const Caderno&amp; c)</code> e veja a cópia e a destruição desaparecerem. Por último, acrescente <code>a = a;</code> no fim do <code>main</code>: quem roda?</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Caderno {
+public:
+    Caderno(std::string dono) : dono_{dono} {
+        std::cout &lt;&lt; "  [construtor] " &lt;&lt; dono_ &lt;&lt; '\n';
+    }
+    Caderno(const Caderno&amp; outro) : dono_{outro.dono_} {
+        std::cout &lt;&lt; "  [cópia] " &lt;&lt; dono_ &lt;&lt; '\n';
+    }
+    Caderno&amp; operator=(const Caderno&amp; outro) {
+        std::cout &lt;&lt; "  [atribuição] " &lt;&lt; dono_ &lt;&lt; " recebe o de " &lt;&lt; outro.dono_ &lt;&lt; '\n';
+        dono_ = outro.dono_;
+        return *this;
+    }
+    ~Caderno() {
+        std::cout &lt;&lt; "  [destrutor] " &lt;&lt; dono_ &lt;&lt; '\n';
+    }
+    std::string dono() const { return dono_; }
+private:
+    std::string dono_;
+};
+
+void por_valor(Caderno c) {
+    std::cout &lt;&lt; "  lendo: " &lt;&lt; c.dono() &lt;&lt; '\n';
+}
+
+int main() {
+    Caderno a{"Ana"};
+    Caderno b = a;
+    Caderno d{"Bia"};
+    d = a;
+    por_valor(a);
+    std::cout &lt;&lt; "fim do main\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Cópia rasa × cópia profunda</h2>
+<p>A cópia que o compilador gera copia <strong>atributo por atributo</strong>. Para um <code>std::string</code>, "copiar o atributo" chama a cópia da própria string, que faz uma xerox do texto. Tudo certo. Mas, para um ponteiro cru, "copiar o atributo" copia só o <strong>endereço</strong>: o bilhete, não o caderno. Veja uma classe que guarda notas num array criado com <code>new[]</code>:</p>
+
+<pre class="file" data-file="rasa.cpp">#include &lt;iostream&gt;
+
+class Notas {
+public:
+    Notas(int tamanho) : tamanho_{tamanho}, dados_{new int[tamanho]{}} {}
+    ~Notas() { delete[] dados_; }
+
+    int tamanho() const { return tamanho_; }
+    void definir(int i, int valor) { dados_[i] = valor; }
+    int pegar(int i) const { return dados_[i]; }
+private:
+    int tamanho_;
+    int* dados_;
+};
+
+int main() {
+    Notas ana{3};
+    ana.definir(0, 7);
+
+    Notas bia = ana;          // cópia feita pelo compilador
+    bia.definir(0, 10);       // mudei só a Bia...
+
+    std::cout &lt;&lt; "Ana: " &lt;&lt; ana.pegar(0) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Bia: " &lt;&lt; bia.pegar(0) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra rasa.cpp -o rasa
+$ ./rasa
+Ana: 10                  « a nota da Ana mudou sozinha!
+Bia: 10
+free(): double free detected in tcache 2
+Abortado                   (imagem do núcleo gravada) ./rasa
+$ echo $?
+134</pre>
+
+<p>Dois problemas, nenhum aviso do compilador:</p>
+<ol class="passo">
+  <li><strong>Estado compartilhado.</strong> <code>bia.dados_</code> recebeu o mesmo endereço de <code>ana.dados_</code>. As duas apontam para o mesmo array; mudar a Bia mudou a Ana.</li>
+  <li><strong><em>Double free</em> ("liberação dupla").</strong> No fim do <code>main</code>, <code>bia</code> morre e faz <code>delete[]</code> no array. Depois <code>ana</code> morre e faz <code>delete[]</code> <strong>no mesmo array</strong>, que já tinha sido devolvido. A biblioteca C percebeu (<code>double free detected</code>) e abortou o programa.</li>
+</ol>
+
+<p>Com o <a href="sanitizers.html">AddressSanitizer</a> (<code>-fsanitize=address</code>), o diagnóstico fica bem mais claro. A saída é longa; aqui vão as partes que importam:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -g -fsanitize=address rasa.cpp -o rasa
+$ ./rasa
+Ana: 10
+Bia: 10
+=================================================================
+==526964==ERROR: AddressSanitizer: attempting double-free on 0x799f015e0010 in thread T0:
+    #0 0x7d7f02b2d46f in operator delete[](void*) ../../../../src/libsanitizer/asan/asan_new_delete.cpp:179
+    #1 0x608446baf7eb in Notas::~Notas() /home/ana/cpp/rasa.cpp:6
+    #2 0x608446baf578 in main /home/ana/cpp/rasa.cpp:25
+                         « (linhas internas da biblioteca omitidas)
+freed by thread T0 here:
+    #0 0x7d7f02b2d46f in operator delete[](void*) ../../../../src/libsanitizer/asan/asan_new_delete.cpp:179
+    #1 0x608446baf7eb in Notas::~Notas() /home/ana/cpp/rasa.cpp:6
+    #2 0x608446baf56c in main /home/ana/cpp/rasa.cpp:25
+                         « (…)
+previously allocated by thread T0 here:
+    #0 0x7d7f02b2c8cf in operator new[](unsigned long) ../../../../src/libsanitizer/asan/asan_new_delete.cpp:111
+    #1 0x608446baf6ec in Notas::Notas(int) /home/ana/cpp/rasa.cpp:5
+    #2 0x608446baf458 in main /home/ana/cpp/rasa.cpp:17
+                         « (…)
+SUMMARY: AddressSanitizer: double-free /home/ana/cpp/rasa.cpp:6 in Notas::~Notas()
+==526964==ABORTING</pre>
+
+<p>Leia em três blocos: <strong>"attempting double-free"</strong> (tentativa de liberar duas vezes) no destrutor, linha 6; <strong>"freed by … here"</strong> (já tinha sido liberado aqui), no mesmo destrutor, chamado para o <em>outro</em> objeto; e <strong>"previously allocated"</strong> (alocado antes aqui), no construtor, linha 5, quando a Ana nasceu na linha 17. Só um array foi criado, e dois objetos tentaram devolvê-lo.</p>
+
+<h3>O conserto à moda antiga: cópia profunda</h3>
+<p>Para a cópia virar uma xerox, você escreve as duas funções de cópia à mão. Cada uma cria um array <strong>novo</strong> e copia os valores, um por um:</p>
+
+<pre class="file" data-file="profunda.cpp">class Notas {
+public:
+    Notas(int tamanho) : tamanho_{tamanho}, dados_{new int[tamanho]{}} {}
+    ~Notas() { delete[] dados_; }
+
+    // construtor de cópia: memória NOVA, com os mesmos valores
+    Notas(const Notas&amp; outra)
+        : tamanho_{outra.tamanho_}, dados_{new int[outra.tamanho_]} {
+        for (int i = 0; i &lt; tamanho_; ++i) {
+            dados_[i] = outra.dados_[i];
+        }
+    }
+
+    // atribuição de cópia: joga fora o antigo e copia o novo
+    Notas&amp; operator=(const Notas&amp; outra) {
+        if (this == &amp;outra) return *this;      // a = a; não faz nada
+        int* novos = new int[outra.tamanho_];
+        for (int i = 0; i &lt; outra.tamanho_; ++i) {
+            novos[i] = outra.dados_[i];
+        }
+        delete[] dados_;
+        dados_ = novos;
+        tamanho_ = outra.tamanho_;
+        return *this;
+    }
+    // ... tamanho, definir e pegar como antes
+private:
+    int tamanho_;
+    int* dados_;
+};
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>Por quê</th></tr>
+<tr><td><code>dados_{new int[outra.tamanho_]}</code></td><td>O objeto novo ganha o <strong>seu próprio</strong> array.</td></tr>
+<tr><td>o <code>for</code></td><td>Copia os valores, um por um: a xerox.</td></tr>
+<tr><td><code>if (this == &amp;outra)</code></td><td>Protege contra <code>ana = ana;</code>. Sem isso, o objeto apagaria os próprios dados antes de copiá-los.</td></tr>
+<tr><td><code>new</code> antes do <code>delete[]</code></td><td>Se o <code>new</code> falhar (falta de memória), o objeto continua com os dados antigos, inteiro.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -g -fsanitize=address profunda.cpp -o profunda
+$ ./profunda
+Ana: 7                   « a Ana não foi afetada
+Bia: 10
+Caio: 5 (tamanho 3)      « caio = ana; depois caio.definir(0, 5);</pre>
+
+<p>Funciona, e o AddressSanitizer ficou quieto. Mas veja quanto código foi preciso para um array de inteiros, e quantos lugares para errar. Existe um jeito muito melhor.</p>
+
+<hr>
+
+<h2>3. Regra dos três, dos cinco e do zero</h2>
+
+<h3>Regra dos três</h3>
+<p>Se a sua classe precisou de <strong>um</strong> destes três, quase certamente precisa dos <strong>três</strong>:</p>
+<ol>
+  <li>destrutor (<code>~Classe()</code>);</li>
+  <li>construtor de cópia (<code>Classe(const Classe&amp;)</code>);</li>
+  <li>atribuição de cópia (<code>operator=(const Classe&amp;)</code>).</li>
+</ol>
+<p>O motivo: se você escreveu um destrutor, é porque a classe cuida de um recurso "na mão" (o <code>delete[]</code>), e a cópia automática não sabe duplicar esse recurso. Foi exatamente o caso da <code>Notas</code>.</p>
+
+<h3>Regra dos cinco <span class="versao">C++11</span></h3>
+<p>O C++11 acrescentou duas funções de <strong>movimento</strong>: o construtor de movimento <code>Classe(Classe&amp;&amp;)</code> e a atribuição de movimento <code>operator=(Classe&amp;&amp;)</code>. Elas "roubam" o recurso de um objeto que vai morrer, em vez de copiá-lo, o que é muito mais rápido. A regra dos três virou a <strong>regra dos cinco</strong>: quem escreve uma das cinco deve pensar nas cinco. O movimento tem aula própria: <a href="move.html">Semântica de Movimento</a>.</p>
+
+<h3>Regra do zero: a melhor</h3>
+<p>A recomendação moderna é <strong>não escrever nenhuma das cinco</strong>. Em vez de guardar um ponteiro cru e cuidar dele à mão, guarde um tipo que já sabe se copiar, mover e destruir (RAII, da aula anterior): <code>std::vector</code>, <code>std::string</code>, <code>std::unique_ptr</code>. A cópia automática, atributo por atributo, passa a fazer a coisa certa:</p>
+
+<pre class="file" data-file="zero.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+class Notas {
+public:
+    Notas(int tamanho) : dados_(tamanho) {}
+
+    int tamanho() const { return static_cast&lt;int&gt;(dados_.size()); }
+    void definir(int i, int valor) { dados_[i] = valor; }
+    int pegar(int i) const { return dados_[i]; }
+private:
+    std::vector&lt;int&gt; dados_;
+};
+
+int main() {
+    Notas ana{3};
+    ana.definir(0, 7);
+
+    Notas bia = ana;
+    bia.definir(0, 10);
+
+    std::cout &lt;&lt; "Ana: " &lt;&lt; ana.pegar(0) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Bia: " &lt;&lt; bia.pegar(0) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra zero.cpp -o zero
+$ ./zero
+Ana: 7
+Bia: 10</pre>
+
+<p>Sem destrutor, sem construtor de cópia, sem <code>operator=</code>, sem <code>new</code>: a classe ficou menor e correta. Repare no <code>dados_(tamanho)</code> com <strong>parênteses</strong>: para <code>std::vector</code>, <code>(3)</code> cria três elementos valendo zero, enquanto <code>{3}</code> criaria um elemento só, valendo 3 (detalhe da aula <a href="vector.html">std::vector</a>).</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Regra</th><th>Quando usar</th></tr>
+<tr><td><strong>Zero</strong></td><td>Quase sempre. Atributos que já se cuidam (<code>string</code>, <code>vector</code>, <code>unique_ptr</code>…) e nenhuma das cinco funções escrita à mão.</td></tr>
+<tr><td><strong>Cinco</strong></td><td>Quando você escreve uma classe que <strong>é</strong> o dono de um recurso cru (como a <code>Arquivo</code> da aula anterior). Escreva as cinco, ou proíba as que não fazem sentido.</td></tr>
+<tr><td><strong>Três</strong></td><td>O mesmo que a dos cinco, em código anterior ao C++11.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>4. Proibir a cópia com <code>= delete</code></h2>
+<p>Alguns objetos não deveriam ser copiados de jeito nenhum: um arquivo aberto, uma conexão com o banco, uma senha guardada na memória. Para proibir, declare as funções de cópia e escreva <code>= delete</code> no lugar do corpo <span class="versao">C++11</span>:</p>
+
+<pre class="file" data-file="proibido.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Senha {
+public:
+    Senha(std::string texto) : texto_{texto} {}
+
+    Senha(const Senha&amp;) = delete;             // proíbe: Senha b = a;
+    Senha&amp; operator=(const Senha&amp;) = delete;  // proíbe: b = a;
+
+    bool confere(const std::string&amp; tentativa) const { return tentativa == texto_; }
+private:
+    std::string texto_;
+};
+
+int main() {
+    Senha minha{"gato123"};
+    Senha copia = minha;
+    std::cout &lt;&lt; copia.confere("gato123") &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra proibido.cpp -o proibido
+proibido.cpp: In function ‘int main()’:
+proibido.cpp:18:19: error: use of deleted function ‘Senha::Senha(const Senha&amp;)’
+   18 |     Senha copia = minha;
+      |                   ^~~~~
+proibido.cpp:8:5: note: declared here
+    8 |     Senha(const Senha&amp;) = delete;             // proíbe: Senha b = a;
+      |     ^~~~~
+proibido.cpp:18:19: note: use ‘-fdiagnostics-all-candidates’ to display considered candidates
+   18 |     Senha copia = minha;
+      |                   ^~~~~</pre>
+
+<dl class="anatomy">
+  <dt>error: use of deleted function</dt><dd>"uso de função apagada": a linha 18 tentou usar uma função marcada com <code>= delete</code>.</dd>
+  <dt>‘Senha::Senha(const Senha&amp;)’</dt><dd>Qual função: o construtor de cópia da <code>Senha</code>.</dd>
+  <dt>note: declared here</dt><dd>Onde ela foi apagada (linha 8). É o compilador mostrando que a proibição foi de propósito.</dd>
+  <dt>note: use ‘-fdiagnostics-all-candidates’</dt><dd>Uma dica: com essa opção, o g++ lista todas as funções que considerou. Pode ignorar.</dd>
+</dl>
+
+<p>O erro aparece na <strong>compilação</strong>, antes de o programa existir: muito melhor que um <em>double free</em> em produção. O Clang do editor diz o mesmo com outras palavras: <code>call to deleted constructor of 'Senha'</code>. Proibir a cópia também proíbe passar uma <code>Senha</code> por valor; use <code>const Senha&amp;</code>.</p>
+
+<div class="note">
+<strong><code>= default</code>: o contrário</strong>
+<p>Se você quer deixar claro que a cópia automática está boa, escreva <code>Classe(const Classe&amp;) = default;</code>: "use a versão que o compilador gera". Pela regra do zero, normalmente nem isso é preciso.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"free(): double free detected in tcache 2"</strong>
+<pre class="term" data-cwd="~/cpp">$ ./rasa
+Ana: 10
+Bia: 10
+free(): double free detected in tcache 2
+Abortado                   (imagem do núcleo gravada) ./rasa</pre>
+<p><strong>O que significa:</strong> a mesma memória foi liberada duas vezes. Quase sempre é uma classe com ponteiro cru e destrutor, mas com a cópia automática (rasa). <code>tcache</code> é um detalhe interno da biblioteca C; não ajuda a achar o erro. O código de saída é <code>134</code> (abortado).</p>
+<p><strong>Como consertar:</strong> regra do zero (troque o ponteiro cru por <code>std::vector</code>, <code>std::string</code> ou <code>std::unique_ptr</code>), ou escreva a cópia profunda, ou proíba a cópia com <code>= delete</code>. Para achar onde, compile com <code>-g -fsanitize=address</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Mudei uma cópia e o original mudou junto</strong>
+<p><strong>O que significa:</strong> é a outra cara da cópia rasa: os dois objetos dividem o mesmo recurso por um ponteiro. Pode acontecer sem nenhum erro visível, se a classe não tiver destrutor (e aí ela vaza memória).</p>
+<p><strong>Como consertar:</strong> o mesmo do cenário anterior.</p>
+</div>
+
+<div class="cenario">
+<strong>"use of deleted function" ao passar para uma função</strong>
+<p><strong>O que significa:</strong> a classe proíbe cópias (como <code>Senha</code>, <code>std::unique_ptr</code> ou <code>std::ofstream</code>), e a função recebe o parâmetro <strong>por valor</strong>, o que exigiria uma cópia.</p>
+<p><strong>Como consertar:</strong> receba por referência (<code>const Senha&amp;</code>). Se a intenção é <strong>entregar</strong> o objeto para a função, use <code>std::move</code> (aula <a href="move.html">Semântica de Movimento</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>O <code>operator=</code> apagou os próprios dados</strong>
+<p><strong>O que significa:</strong> um <code>operator=</code> escrito à mão que faz <code>delete[] dados_</code> antes de copiar quebra em <code>a = a;</code>: ele apaga o array e depois tenta copiar do array apagado. Isso também acontece de forma escondida, como em <code>lista[i] = lista[j];</code> quando <code>i == j</code>.</p>
+<p><strong>Como consertar:</strong> teste <code>if (this == &amp;outra) return *this;</code> e crie o array novo <strong>antes</strong> de apagar o antigo. Ou, melhor, regra do zero.</p>
+</div>
+
+<hr>
+
+<h2>Missões</h2>
+
+<div class="trycpp" data-goal="out:Ana: 7,out:Bia: 10,src:vector">
+<p class="try-task"><strong>Missão 1 (regra do zero):</strong> esta <code>Notas</code> usa um ponteiro cru, e a cópia da Bia muda a nota da Ana. Troque o <code>int*</code> por um <code>std::vector&lt;int&gt;</code> (inclua <code>&lt;vector&gt;</code>), apague o destrutor e ajuste o construtor, até a saída ser <code>Ana: 7</code> e <code>Bia: 10</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+class Notas {
+public:
+    Notas(int tamanho) : dados_{new int[tamanho]{}} {}
+    ~Notas() { delete[] dados_; }
+
+    void definir(int i, int valor) { dados_[i] = valor; }
+    int pegar(int i) const { return dados_[i]; }
+private:
+    int* dados_;
+};
+
+int main() {
+    Notas ana{3};
+    ana.definir(0, 7);
+
+    Notas bia = ana;
+    bia.definir(0, 10);
+
+    std::cout &lt;&lt; "Ana: " &lt;&lt; ana.pegar(0) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Bia: " &lt;&lt; bia.pegar(0) &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+class Notas {
+public:
+    Notas(int tamanho) : dados_(tamanho) {}
+
+    void definir(int i, int valor) { dados_[i] = valor; }
+    int pegar(int i) const { return dados_[i]; }
+private:
+    std::vector&lt;int&gt; dados_;
+};
+
+int main() {
+    Notas ana{3};
+    ana.definir(0, 7);
+
+    Notas bia = ana;
+    bia.definir(0, 10);
+
+    std::cout &lt;&lt; "Ana: " &lt;&lt; ana.pegar(0) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Bia: " &lt;&lt; bia.pegar(0) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<div class="trycpp" data-goal="erro:/deleted/,src:=\s*delete">
+<p class="try-task"><strong>Missão 2 (provoque o erro):</strong> uma <code>Chave</code> do cofre não pode ter cópias. Acrescente na classe as duas linhas com <code>= delete</code> que proíbem copiar e rode: a compilação deve <strong>falhar</strong> na linha <code>Chave reserva = chave;</code>, com um erro que fala de função <em>deleted</em>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Chave {
+public:
+    Chave(std::string codigo) : codigo_{codigo} {}
+    // proíba a cópia aqui
+
+    std::string codigo() const { return codigo_; }
+private:
+    std::string codigo_;
+};
+
+int main() {
+    Chave chave{"cofre-42"};
+    Chave reserva = chave;
+    std::cout &lt;&lt; reserva.codigo() &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Chave {
+public:
+    Chave(std::string codigo) : codigo_{codigo} {}
+    Chave(const Chave&amp;) = delete;
+    Chave&amp; operator=(const Chave&amp;) = delete;
+
+    std::string codigo() const { return codigo_; }
+private:
+    std::string codigo_;
+};
+
+int main() {
+    Chave chave{"cofre-42"};
+    Chave reserva = chave;
+    std::cout &lt;&lt; reserva.codigo() &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>O que roda</th></tr>
+<tr><td><code>Classe b = a;</code> ou <code>Classe b{a};</code></td><td>Construtor de cópia</td></tr>
+<tr><td><code>b = a;</code> (b já existe)</td><td>Atribuição de cópia, <code>operator=</code></td></tr>
+<tr><td><code>f(a)</code> com <code>void f(Classe x)</code></td><td>Construtor de cópia (para o parâmetro)</td></tr>
+<tr><td><code>f(a)</code> com <code>void f(const Classe&amp; x)</code></td><td>Nada: é uma referência</td></tr>
+<tr><td><code>return obj;</code> de um objeto local</td><td>Normalmente nada (elisão de cópia); senão, movimento</td></tr>
+<tr><td><code>v.push_back(a);</code></td><td>Construtor de cópia (o vetor guarda a sua própria cópia)</td></tr>
+<tr><td><code>Classe(const Classe&amp;) = delete;</code></td><td>Proíbe a cópia: erro de compilação em quem tentar</td></tr>
+<tr><td><code>Classe(const Classe&amp;) = default;</code></td><td>Pede a cópia automática, atributo por atributo</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A assinatura</h3>
+<p>Complete o construtor de cópia da classe <code>Produto</code>:</p>
+<div class="ex-code">Produto(<input data-answer="const Produto&amp; outro|const Produto&amp;outro|const Produto &amp;outro|const Produto&amp; p|const Produto&amp; outra|const Produto&amp;" aria-label="parâmetro">)</div>
+</div>
+
+<div class="exercise">
+<h3>2. Proibir</h3>
+<p>Complete para proibir a atribuição de cópia da classe <code>Conexao</code>:</p>
+<div class="ex-code">Conexao&amp; operator=(const Conexao&amp;) = <input data-answer="delete|delete;" aria-label="palavra">;</div>
+</div>
+
+<div class="exercise">
+<h3>3. Quantas cópias?</h3>
+<p>Com a classe <code>Caderno</code> da seção 1 (que imprime <code>[cópia]</code>), quantas linhas <code>[cópia]</code> aparecem em: <code>Caderno a{"Ana"}; Caderno b = a; Caderno c{"Caio"}; c = b;</code>?</p>
+<div class="ex-code"><input data-answer="1|uma" aria-label="número"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Uma classe guarda <code>int* dados_</code> criado com <code>new[]</code> e tem destrutor com <code>delete[]</code>, mas não tem construtor de cópia. O que acontece em <code>Classe b = a;</code> e no fim do programa?</p>
+<label><input type="radio" name="q4"> Nada de errado: o compilador faz uma cópia profunda.</label>
+<label><input type="radio" name="q4"> <code>a</code> e <code>b</code> dividem o mesmo array, e o destrutor libera o array duas vezes.</label>
+<label><input type="radio" name="q4"> O compilador recusa o programa com <code>use of deleted function</code>.</label>
+<label><input type="radio" name="q4"> O array é copiado, mas o destrutor nunca roda.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. O que diz a regra do zero?</p>
+<label><input type="radio" name="q5"> Toda classe deve ter zero atributos públicos.</label>
+<label><input type="radio" name="q5"> Escreva sempre as cinco funções especiais.</label>
+<label><input type="radio" name="q5"> Inicialize tudo com zero.</label>
+<label><input type="radio" name="q5"> Use atributos que já sabem se copiar e destruir (como <code>std::vector</code>) e não escreva nenhuma das funções especiais.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Em qual linha roda a <strong>atribuição</strong> de cópia (e não o construtor de cópia)?</p>
+<label><input type="radio" name="q6"> <code>Caderno x{"X"}; x = y;</code> (na segunda instrução)</label>
+<label><input type="radio" name="q6"> <code>Caderno x = y;</code></label>
+<label><input type="radio" name="q6"> <code>Caderno x{y};</code></label>
+<label><input type="radio" name="q6"> <code>por_valor(y);</code></label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>O <strong>construtor de cópia</strong> <code>Classe(const Classe&amp;)</code> roda quando um objeto nasce como cópia (inclusive em <code>Classe b = a;</code>, passagem por valor e <code>push_back</code>).</li>
+  <li>A <strong>atribuição de cópia</strong> <code>operator=</code> roda quando um objeto que já existe recebe outro.</li>
+  <li>A cópia automática copia atributo por atributo. Com ponteiro cru, isso é uma <strong>cópia rasa</strong>: estado compartilhado e <em>double free</em>.</li>
+  <li><strong>Cópia profunda</strong> = memória nova + copiar os valores. Funciona, mas dá trabalho.</li>
+  <li><strong>Regra dos três/cinco</strong>: escreveu uma das funções especiais, pense em todas. <strong>Regra do zero</strong>: prefira atributos RAII e não escreva nenhuma.</li>
+  <li><code>= delete</code> proíbe a cópia com erro de compilação (<code>use of deleted function</code>).</li>
+  <li>Devolver objeto por valor costuma não copiar nada (elisão de cópia). O movimento, a outra metade desta história, está em <a href="move.html">Semântica de Movimento</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
