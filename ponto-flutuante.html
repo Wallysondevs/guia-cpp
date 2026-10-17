@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ float e double — precisão, 0.1 + 0.2, inf e nan | Guia C++</title>
+<meta name="description" content="Números com vírgula em C++ para quem nunca programou: float × double e a precisão real de cada um com setprecision(20), por que 0.1 + 0.2 == 0.3 é falso, notação científica, inf e nan na divisão por zero e como comparar com tolerância, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">float e double</span></h1>
+
+<p class="intro">Altura, peso, média de notas, temperatura, preço: quase tudo o que se mede tem vírgula. Em C++, números com vírgula moram nos tipos de <strong>ponto flutuante</strong>: <code>float</code> e <code>double</code>. Eles são rápidos e práticos, mas têm uma surpresa que todo programador precisa conhecer cedo: <strong>muitos números não são guardados exatamente</strong>. Nesta aula você vai ver, com saídas reais, por que <code>0.1 + 0.2</code> não é exatamente <code>0.3</code>, o que são <code>inf</code> e <code>nan</code> e como comparar números com vírgula do jeito certo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A diferença entre <code>float</code> e <code>double</code>, medida com <code>std::setprecision(20)</code>.</li>
+  <li>Por que <code>0.1 + 0.2 == 0.3</code> dá falso.</li>
+  <li>Notação científica: <code>6.022e23</code>, <code>1e-3</code>, e por que o <code>cout</code> às vezes mostra <code>1.23457e+06</code>.</li>
+  <li><code>inf</code> e <code>nan</code>: o que a divisão por zero faz com um <code>double</code>.</li>
+  <li>Como comparar números com vírgula usando uma tolerância.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: a régua com riscos</h2>
+<p>Pegue uma régua escolar. Ela tem riscos a cada milímetro. Se você medir algo com 3,47 mm, vai ter que escolher: 3 mm ou 4 mm? Você anota o risco <strong>mais próximo</strong>. A régua não é "errada"; ela só não tem riscos para todos os números.</p>
+
+<p>Um <code>double</code> é uma régua com uma quantidade enorme de riscos, mas finita. Muitos números caem <strong>exatamente</strong> num risco (0.5, 0.25, 3.0); muitos outros, como 0.1, caem <strong>entre</strong> dois riscos, e o computador guarda o mais próximo. A diferença é minúscula, mas existe, e às vezes aparece.</p>
+
+<p>Por que 0.1 não tem risco? O computador guarda números em <strong>binário</strong> (base 2). Em binário, 1/10 é uma "dízima periódica", do mesmo jeito que 1/3 = 0,3333… em decimal: não dá para escrever com um número finito de casas. Já 0.5 (= 1/2) e 0.25 (= 1/4) são exatos em binário.</p>
+
+<p>O nome "ponto flutuante" vem de como o número é guardado: alguns dígitos significativos e uma "posição da vírgula" que pode flutuar. É o mesmo truque da notação científica (seção 3).</p>
+
+<hr>
+
+<h2>1. <code>float</code> × <code>double</code></h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Bytes</th><th>Dígitos confiáveis</th><th>Como escrever o valor</th></tr>
+<tr><td><code>float</code></td><td>4</td><td>6 a 7</td><td><code>1.5f</code> (com <code>f</code> no fim)</td></tr>
+<tr><td><code>double</code></td><td>8</td><td>15 a 16</td><td><code>1.5</code> (o padrão)</td></tr>
+<tr><td><code>long double</code></td><td>16 no Linux da Ana</td><td>18</td><td><code>1.5L</code></td></tr>
+</table>
+</div>
+
+<p>Ver a diferença exige mostrar mais casas do que o <code>cout</code> mostra normalmente. Para isso existe o <code>std::setprecision</code> ("definir a precisão"), do cabeçalho <code>&lt;iomanip&gt;</code>:</p>
+
+<pre class="file" data-file="precisao.cpp">#include &lt;iomanip&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    float f = 1.0f / 3;
+    double d = 1.0 / 3;
+    std::cout &lt;&lt; "float:  " &lt;&lt; f &lt;&lt; "\n";
+    std::cout &lt;&lt; "double: " &lt;&lt; d &lt;&lt; "\n";
+    std::cout &lt;&lt; std::setprecision(20);
+    std::cout &lt;&lt; "float:  " &lt;&lt; f &lt;&lt; "\n";
+    std::cout &lt;&lt; "double: " &lt;&lt; d &lt;&lt; "\n";
+    std::cout &lt;&lt; "0.1 em float:  " &lt;&lt; 0.1f &lt;&lt; "\n";
+    std::cout &lt;&lt; "0.1 em double: " &lt;&lt; 0.1 &lt;&lt; "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>1.0f / 3</dt><dd>O <code>f</code> faz o <code>1.0</code> ser <code>float</code>. Como ele tem ponto, a divisão tem vírgula (lembre que <code>1 / 3</code>, inteiro com inteiro, daria 0; aula <a href="inteiros.html">Inteiros</a>).</dd>
+  <dt>std::setprecision(20)</dt><dd>Dali em diante, o <code>cout</code> mostra até 20 algarismos significativos. Sem ele, mostra 6.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra precisao.cpp -o precisao
+$ ./precisao
+float:  0.333333
+double: 0.333333                      « com 6 algarismos, os dois parecem iguais
+float:  0.3333333432674407959         « 7 algarismos certos, depois "lixo"
+double: 0.33333333333333331483        « 16 algarismos certos
+0.1 em float:  0.10000000149011611938
+0.1 em double: 0.10000000000000000555 « o 0.1 guardado não é exatamente 0.1</pre>
+
+<p>As duas últimas linhas são a régua em ação: o <code>0.1</code> que você escreveu foi guardado como o risco mais próximo. No <code>double</code>, o erro aparece só na 18ª casa; no <code>float</code>, já na 9ª.</p>
+
+<h3>O <code>float</code> perde até números inteiros</h3>
+<pre class="file" data-file="limite-float.cpp">#include &lt;iomanip&gt;
+#include &lt;iostream&gt;
+#include &lt;limits&gt;
+
+int main() {
+    float grande = 16777217;
+    double grandeD = 16777217;
+    std::cout &lt;&lt; std::fixed &lt;&lt; std::setprecision(1);
+    std::cout &lt;&lt; "float:  " &lt;&lt; grande &lt;&lt; "\n";
+    std::cout &lt;&lt; "double: " &lt;&lt; grandeD &lt;&lt; "\n";
+    std::cout &lt;&lt; "dígitos confiáveis: float " &lt;&lt; std::numeric_limits&lt;float&gt;::digits10
+              &lt;&lt; ", double " &lt;&lt; std::numeric_limits&lt;double&gt;::digits10 &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra limite-float.cpp -o limite-float
+$ ./limite-float
+float:  16777216.0                    « guardou 16777217, saiu 16777216
+double: 16777217.0
+dígitos confiáveis: float 6, double 15</pre>
+
+<p>Com 8 algarismos, o número passou do que o <code>float</code> consegue guardar, e ele arredondou para o risco mais próximo, sem nenhum aviso do compilador. O <code>std::numeric_limits&lt;float&gt;::digits10</code> confirma: o <code>float</code> garante só 6 dígitos decimais. (O <code>std::fixed</code> pede "notação fixa", sem <code>e+07</code>; seção 3.)</p>
+
+<div class="tip">
+<strong>Qual usar: <code>double</code></strong>
+<p>Use <code>double</code> sempre, a não ser que tenha um motivo forte. O <code>float</code> economiza memória e aparece em jogos, gráficos 3D e placas de vídeo, onde há milhões de números e 7 dígitos bastam. Num programa comum, a economia não compensa a precisão perdida. Os números com ponto que você escreve (<code>1.65</code>) já são <code>double</code>.</p>
+</div>
+
+<hr>
+
+<h2>2. <code>0.1 + 0.2 == 0.3</code> é falso</h2>
+<p>Este é o exemplo mais famoso da computação, e acontece em praticamente toda linguagem:</p>
+
+<pre class="file" data-file="soma.cpp">#include &lt;iomanip&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    double a = 0.1;
+    double b = 0.2;
+    std::cout &lt;&lt; "0.1 + 0.2 = " &lt;&lt; a + b &lt;&lt; "\n";
+    std::cout &lt;&lt; "É igual a 0.3? " &lt;&lt; (a + b == 0.3) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::setprecision(17) &lt;&lt; "0.1 + 0.2 = " &lt;&lt; a + b &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra soma.cpp -o soma
+$ ./soma
+0.1 + 0.2 = 0.3                       « o cout arredonda para 6 algarismos
+É igual a 0.3? 0                      « 0 = falso
+0.1 + 0.2 = 0.30000000000000004       « a verdade, com 17 algarismos</pre>
+
+<p>O <code>==</code> pergunta "são iguais?" e responde <code>1</code> (verdadeiro) ou <code>0</code> (falso); a aula <a href="bool.html">Booleanos</a> explica por que aparece como número. Os parênteses em <code>(a + b == 0.3)</code> são necessários por causa da ordem dos operadores (aula <a href="precedencia.html">Precedência</a>).</p>
+
+<p>O que aconteceu: o 0.1 guardado é um tiquinho maior que 0.1, o 0.2 também, e a soma dos dois "tiquinhos" caiu num risco <strong>diferente</strong> do risco onde o 0.3 é guardado. A diferença está na 17ª casa, mas o <code>==</code> exige igualdade perfeita.</p>
+
+<p>O mesmo acontece somando 0.1 dez vezes (o <code>for</code> repete a soma 10 vezes; aula <a href="for.html">for</a>):</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat dez.cpp
+#include &lt;iomanip&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    double total = 0.0;
+    for (int i = 0; i &lt; 10; i++) {
+        total = total + 0.1;
+    }
+    std::cout &lt;&lt; "total = " &lt;&lt; total &lt;&lt; "\n";
+    std::cout &lt;&lt; "total == 1.0? " &lt;&lt; (total == 1.0) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::setprecision(20) &lt;&lt; "total = " &lt;&lt; total &lt;&lt; "\n";
+}
+$ g++ -std=c++23 -Wall -Wextra dez.cpp -o dez
+$ ./dez
+total = 1
+total == 1.0? 0
+total = 0.99999999999999988898</pre>
+
+<div class="warning">
+<strong>E o dinheiro?</strong>
+<p>Por isso, sistemas de banco e de loja não guardam dinheiro em <code>double</code>: um centavo perdido aqui e ali, somado milhões de vezes, vira problema. A solução simples é guardar <strong>centavos</strong> num inteiro: R$ 12,50 vira <code>long long precoCentavos = 1250;</code>. Nos exercícios do Nível 1, <code>double</code> para preços está ótimo; só saiba que existe essa armadilha.</p>
+</div>
+
+<hr>
+
+<h2>3. Notação científica</h2>
+<p>Para números muito grandes ou muito pequenos, a ciência escreve 6,022 × 10²³ em vez de 602 200 000 000 000 000 000 000. Em C++, o "× 10 elevado a" se escreve com a letra <code>e</code> (de "expoente"):</p>
+
+<pre class="file" data-file="cientifica.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double avogadro = 6.022e23;
+    double milimetro = 1e-3;
+    double salario = 1234567.89;
+    double pequeno = 0.0000123;
+    std::cout &lt;&lt; avogadro &lt;&lt; "\n";
+    std::cout &lt;&lt; milimetro &lt;&lt; "\n";
+    std::cout &lt;&lt; salario &lt;&lt; "\n";
+    std::cout &lt;&lt; pequeno &lt;&lt; "\n";
+    std::cout &lt;&lt; std::fixed &lt;&lt; salario &lt;&lt; "\n";
+    std::cout &lt;&lt; std::scientific &lt;&lt; salario &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra cientifica.cpp -o cientifica
+$ ./cientifica
+6.022e+23
+0.001
+1.23457e+06                           « o salário virou notação científica, e perdeu os centavos
+1.23e-05
+1234567.890000                        « std::fixed: sem notação científica
+1.234568e+06                          « std::scientific: sempre com e</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Lê-se</th><th>Vale</th></tr>
+<tr><td><code>6.022e23</code></td><td>6,022 × 10<sup>23</sup></td><td>602 200 000 000 000 000 000 000</td></tr>
+<tr><td><code>1e-3</code></td><td>1 × 10<sup>-3</sup></td><td>0,001</td></tr>
+<tr><td><code>1.23457e+06</code></td><td>1,23457 × 10<sup>6</sup></td><td>1 234 570</td></tr>
+<tr><td><code>1.23e-05</code></td><td>1,23 × 10<sup>-5</sup></td><td>0,0000123</td></tr>
+</table>
+</div>
+
+<p>Por padrão, o <code>cout</code> mostra <strong>6 algarismos significativos</strong> e troca para notação científica quando o número ficaria comprido demais. Por isso o salário de 1234567.89 apareceu como <code>1.23457e+06</code>: o valor guardado continua certo, só a <strong>exibição</strong> foi arredondada. Para mostrar dinheiro com duas casas, use <code>std::fixed</code> com <code>std::setprecision(2)</code> (aula <a href="iomanip.html">Formatar com iomanip</a>) ou <code>std::format</code> (aula <a href="format-print.html">std::format e std::print</a>).</p>
+
+<hr>
+
+<h2>4. <code>inf</code> e <code>nan</code>: divisão por zero com <code>double</code></h2>
+<p>Na aula <a href="inteiros.html">Inteiros</a>, dividir um <code>int</code> por zero matou o programa. Com <code>double</code>, não: o padrão de ponto flutuante usado pelos computadores (o IEEE 754) tem valores especiais para esses casos.</p>
+
+<pre class="file" data-file="infnan.cpp">#include &lt;cmath&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    double zero = 0.0;
+    double positivo = 1.0 / zero;
+    double negativo = -1.0 / zero;
+    double nada = zero / zero;
+    double raiz = std::sqrt(-1.0);
+    std::cout &lt;&lt; positivo &lt;&lt; " " &lt;&lt; negativo &lt;&lt; " " &lt;&lt; nada &lt;&lt; " " &lt;&lt; raiz &lt;&lt; "\n";
+    std::cout &lt;&lt; "isinf: " &lt;&lt; std::isinf(positivo) &lt;&lt; "  isnan: " &lt;&lt; std::isnan(nada) &lt;&lt; "\n";
+    std::cout &lt;&lt; "nan == nan? " &lt;&lt; (nada == nada) &lt;&lt; "\n";
+    std::cout &lt;&lt; "inf + 1 = " &lt;&lt; positivo + 1 &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra infnan.cpp -o infnan
+$ ./infnan
+inf -inf -nan -nan
+isinf: 1  isnan: 1
+nan == nan? 0
+inf + 1 = inf</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Conta</th><th>Resultado</th><th>Significa</th></tr>
+<tr><td><code>1.0 / 0.0</code></td><td><code>inf</code></td><td><em>infinity</em>, infinito positivo</td></tr>
+<tr><td><code>-1.0 / 0.0</code></td><td><code>-inf</code></td><td>Infinito negativo</td></tr>
+<tr><td><code>0.0 / 0.0</code></td><td><code>nan</code> (aqui, <code>-nan</code>)</td><td><em>not a number</em>, "não é um número": a conta não tem resposta</td></tr>
+<tr><td><code>std::sqrt(-1.0)</code></td><td><code>nan</code> (aqui, <code>-nan</code>)</td><td>Raiz quadrada de negativo não existe nos números reais</td></tr>
+<tr><td><code>inf + 1</code></td><td><code>inf</code></td><td>Infinito mais um continua infinito</td></tr>
+</table>
+</div>
+
+<ul>
+  <li><strong>O <code>-</code> no <code>-nan</code></strong>: no processador do PC da Ana, o <code>nan</code> produzido por essas contas vem com o "bit de sinal" ligado, e o <code>cout</code> mostra o sinal. Não tem significado útil; em outros sistemas (inclusive no editor do guia) pode aparecer só <code>nan</code>.</li>
+  <li><strong><code>nan == nan</code> é falso</strong>: um <code>nan</code> não é igual a nada, nem a ele mesmo. Por isso, para perguntar "isto é nan?", use <code>std::isnan(x)</code>; para infinito, <code>std::isinf(x)</code>. As duas vêm de <code>&lt;cmath&gt;</code> (aula <a href="matematica.html">Matemática</a>).</li>
+  <li><strong>O <code>nan</code> contamina</strong>: qualquer conta com <code>nan</code> dá <code>nan</code>. Uma média com <code>nan</code> no meio vira <code>nan</code> no fim, longe de onde o problema nasceu.</li>
+</ul>
+
+<p>O programa continuou rodando, mas com valores sem sentido. Um preço <code>inf</code> é tão errado quanto um programa que trava, só que mais difícil de perceber. Confira o divisor antes de dividir, com um <a href="if-else.html">if</a>.</p>
+
+<hr>
+
+<h2>5. Comparar com tolerância</h2>
+<p>Se <code>==</code> não serve, como saber se dois números com vírgula são "iguais"? Pergunte se eles estão <strong>pertinho o suficiente</strong>: se a distância entre eles é menor que uma tolerância que você escolhe.</p>
+
+<pre class="file" data-file="tolerancia.cpp">#include &lt;cmath&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    double soma = 0.1 + 0.2;
+    double tolerancia = 1e-9;
+    std::cout &lt;&lt; "Com ==:         " &lt;&lt; (soma == 0.3) &lt;&lt; "\n";
+    std::cout &lt;&lt; "Com tolerância: " &lt;&lt; (std::abs(soma - 0.3) &lt; tolerancia) &lt;&lt; "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>soma - 0.3</dt><dd>A diferença entre os dois números. Pode dar negativa, dependendo de qual é maior.</dd>
+  <dt>std::abs(...)</dt><dd>O <strong>valor absoluto</strong> ("sem sinal"): transforma -0,00001 em 0,00001. Vem de <code>&lt;cmath&gt;</code>.</dd>
+  <dt>&lt; tolerancia</dt><dd>"É menor que 0,000000001?" Se sim, para o seu programa, os números são iguais.</dd>
+  <dt>1e-9</dt><dd>A tolerância: um bilionésimo. Escolha conforme o problema: para preços em reais, <code>0.001</code> já basta; para medidas científicas, talvez menos.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tolerancia.cpp -o tolerancia
+$ ./tolerancia
+Com ==:         0
+Com tolerância: 1</pre>
+
+<div class="trycpp" data-goal="out:Iguais? 1">
+<p class="try-task"><strong>Missão:</strong> a balança da lojinha pesou 3 pacotes de 0.1 kg, e o programa diz que o total não é 0.3. Troque o <code>==</code> por uma comparação com tolerância (use <code>std::abs</code> e <code>1e-9</code>) para sair <code>Iguais? 1</code>.</p>
+<pre class="script">#include &lt;cmath&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    double total = 0.1 + 0.1 + 0.1;
+    std::cout &lt;&lt; "Iguais? " &lt;&lt; (total == 0.3) &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;cmath&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    double total = 0.1 + 0.1 + 0.1;
+    std::cout &lt;&lt; "Iguais? " &lt;&lt; (std::abs(total - 0.3) &lt; 1e-9) &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<div class="note">
+<strong>Comparar com <code>&lt;</code> e <code>&gt;</code> é tranquilo</strong>
+<p>O problema é só a igualdade exata (<code>==</code> e <code>!=</code>). Perguntas como "a nota é maior que 7?" (<code>nota &gt; 7.0</code>) funcionam bem, a não ser que o valor esteja colado no limite (6.9999999 × 7.0). Comparações têm aula própria: <a href="operadores-comparacao.html">Operadores de Comparação</a>.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Uma comparação com <code>==</code> dá falso para números "iguais"</strong>
+<p><strong>O que significa:</strong> os dois números diferem lá na 16ª ou 17ª casa, por causa dos arredondamentos da "régua".</p>
+<p><strong>Como consertar:</strong> compare com tolerância: <code>std::abs(a - b) &lt; 1e-9</code>. Para ver a diferença, mostre com <code>std::setprecision(17)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O resultado sai <code>inf</code>, <code>-inf</code>, <code>nan</code> ou <code>-nan</code></strong>
+<p><strong>O que significa:</strong> houve uma divisão por zero, uma raiz de negativo ou uma conta com um valor que já era <code>nan</code>.</p>
+<p><strong>Como consertar:</strong> procure de trás para frente a primeira conta que gerou o valor especial. Confira divisores antes de dividir; use <code>std::isnan</code>/<code>std::isinf</code> para detectar.</p>
+</div>
+
+<div class="cenario">
+<strong>O número aparece como <code>1.23457e+06</code> ou perdeu casas</strong>
+<p><strong>O que significa:</strong> o <code>cout</code> mostra 6 algarismos significativos por padrão. O valor guardado está certo; só a exibição foi arredondada.</p>
+<p><strong>Como consertar:</strong> <code>std::cout &lt;&lt; std::fixed &lt;&lt; std::setprecision(2)</code> para duas casas fixas (<a href="iomanip.html">iomanip</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>Uma conta com vírgula deu inteiro (ou 0)</strong>
+<p><strong>O que significa:</strong> parte da conta era só de inteiros, como <code>5 / 9</code>, que dá 0 antes de entrar no <code>double</code>.</p>
+<p><strong>Como consertar:</strong> escreva os números da conta com ponto: <code>5.0 / 9</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>double x = 1.65;</code></td><td>Número com vírgula, 15–16 dígitos (o padrão)</td></tr>
+<tr><td><code>float x = 1.65f;</code></td><td>Número com vírgula, 6–7 dígitos</td></tr>
+<tr><td><code>6.022e23</code>, <code>1e-3</code></td><td>Notação científica</td></tr>
+<tr><td><code>std::setprecision(n)</code></td><td>Mostrar <code>n</code> algarismos (<code>&lt;iomanip&gt;</code>)</td></tr>
+<tr><td><code>std::fixed</code> / <code>std::scientific</code></td><td>Notação fixa / científica na saída</td></tr>
+<tr><td><code>std::abs(a - b) &lt; 1e-9</code></td><td>Comparar com tolerância (<code>&lt;cmath&gt;</code>)</td></tr>
+<tr><td><code>std::isnan(x)</code>, <code>std::isinf(x)</code></td><td>Detectar <code>nan</code> e infinito (<code>&lt;cmath&gt;</code>)</td></tr>
+<tr><td><code>std::numeric_limits&lt;double&gt;::digits10</code></td><td>Dígitos decimais garantidos (15)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Sufixo do float</h3>
+<p>Complete para o valor ser <code>float</code>:</p>
+<div class="ex-code">float peso = 2.5<input data-answer="f|F" aria-label="sufixo">;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Notação científica</h3>
+<p>Escreva 0,005 em notação científica do C++ (5 × 10<sup>-3</sup>):</p>
+<div class="ex-code">double x = <input data-answer="5e-3|5.0e-3|5E-3" aria-label="valor">;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. O que <code>std::cout &lt;&lt; (0.1 + 0.2 == 0.3);</code> mostra?</p>
+<label><input type="radio" name="q3"> 1</label>
+<label><input type="radio" name="q3"> 0</label>
+<label><input type="radio" name="q3"> 0.3</label>
+<label><input type="radio" name="q3"> Um erro de compilação</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Quanto vale <code>1.0 / 0.0</code>?</p>
+<label><input type="radio" name="q4"> 0</label>
+<label><input type="radio" name="q4"> O programa morre com "Exceção de ponto flutuante"</label>
+<label><input type="radio" name="q4"> <code>inf</code></label>
+<label><input type="radio" name="q4"> <code>nan</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Qual é o jeito certo de perguntar se <code>x</code> é <code>nan</code>?</p>
+<label><input type="radio" name="q5"> <code>x == nan</code></label>
+<label><input type="radio" name="q5"> <code>x == x</code></label>
+<label><input type="radio" name="q5"> <code>x &lt; 0</code></label>
+<label><input type="radio" name="q5"> <code>std::isnan(x)</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Quantos dígitos decimais um <code>double</code> garante?</p>
+<label><input type="radio" name="q6"> 15</label>
+<label><input type="radio" name="q6"> 6</label>
+<label><input type="radio" name="q6"> 2</label>
+<label><input type="radio" name="q6"> Infinitos</label>
+</div>
+
+<h3>Missão final: a febre</h3>
+
+<div class="trycpp" data-goal="out:Celsius: 37,semaviso">
+<p class="try-task"><strong>Missão:</strong> o termômetro americano marcou 98.6 °F. A fórmula para Celsius é (F − 32) × 5/9, que dá 37 °C. Mas o programa mostra <code>Celsius: 0</code>. Ache a conta que está sendo feita só com inteiros e conserte para sair <code>Celsius: 37</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    double fahrenheit = 98.6;
+    double celsius = (fahrenheit - 32) * (5 / 9);
+    std::cout &lt;&lt; "Celsius: " &lt;&lt; celsius &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    double fahrenheit = 98.6;
+    double celsius = (fahrenheit - 32) * (5.0 / 9);
+    std::cout &lt;&lt; "Celsius: " &lt;&lt; celsius &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<p>Curiosidade: desta vez a régua ajudou. No laboratório, mostrando esse resultado com <code>std::setprecision(20)</code>, saiu exatamente <code>37</code>: os arredondamentos das contas caíram bem no risco do 37. Nem sempre é assim, e é por isso que a comparação com tolerância existe.</p>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>double</code> (8 bytes, 15–16 dígitos) é o padrão para números com vírgula; <code>float</code> (4 bytes, 6–7 dígitos, sufixo <code>f</code>) só quando houver motivo.</li>
+  <li>Muitos números (como 0.1) não são guardados exatamente; <code>std::setprecision(20)</code> mostra a diferença.</li>
+  <li><code>0.1 + 0.2 == 0.3</code> é falso. Compare com tolerância: <code>std::abs(a - b) &lt; 1e-9</code>.</li>
+  <li>Notação científica: <code>6.022e23</code>, <code>1e-3</code>. O <code>cout</code> mostra 6 algarismos e às vezes usa <code>e+06</code>; <code>std::fixed</code> muda isso.</li>
+  <li>Divisão por zero com <code>double</code> não mata o programa: dá <code>inf</code>, <code>-inf</code> ou <code>nan</code>. <code>nan</code> não é igual a nada; use <code>std::isnan</code>.</li>
+  <li>Dinheiro "de verdade": centavos num inteiro.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
