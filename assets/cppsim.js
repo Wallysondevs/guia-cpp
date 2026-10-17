@@ -12,7 +12,7 @@
    ===================================================================== */
 (function () {
   "use strict";
-  var CPP_BYTES = 32544469;  // download na 1ª vez (atualizado por tools/construir-cpp.mjs)
+  var CPP_BYTES = 32545547;  // download na 1ª vez (atualizado por tools/construir-cpp.mjs)
   var TEMPO_MAX = 15000;     // ms rodando sem parar (sem contar a espera por entrada)
   var MAX_LINHAS = 3000;     // linhas mostradas no terminal (o resto é resumido)
   var FLAGS_PADRAO = "-std=c++23 -Wall -Wextra";

@@ -155,8 +155,9 @@ function objeto(nome, extra) {
 log("compilando guia-rt.o e libguia.a…");
 sys.lib["wasm32-wasip1"]["guia-rt.o"] = objeto("guia-rt.cpp").slice();
 const fmtO = objeto("guia-format.cpp").slice();
+const sisO = objeto("guia-sistema.cpp").slice();
 {
-  const r = C.ferramenta(["ar", "rcs", "libguia.a", "guia-format.o"], [{ nome: "guia-format.o", codigo: fmtO }]);
+  const r = C.ferramenta(["ar", "rcs", "libguia.a", "guia-format.o", "guia-sistema.o"], [{ nome: "guia-format.o", codigo: fmtO }, { nome: "guia-sistema.o", codigo: sisO }]);
   if (r.exit) throw new Error("ar: " + r.saida);
   sys.lib["wasm32-wasip1"]["libguia.a"] = r.ler("libguia.a").slice();
 }
@@ -165,7 +166,7 @@ C = compiladorCom(sys);
 log("gerando os PCHs…");
 const manifestoPchs = [];
 sys.pch = {};
-const cc1Padrao = C.comandos(["clang++"].concat(M.FLAGS_PADRAO, ["-fwasm-exceptions", "-fcolor-diagnostics", "-fansi-escape-codes", "programa.cpp", "-o", "programa"]), [{ nome: "programa.cpp", codigo: "" }]).find((c) => c[1] === "-cc1");
+const cc1Padrao = C.comandos(["clang++"].concat(M.FLAGS_PADRAO, M.FLAGS_DRIVER, ["programa.cpp", "-o", "programa"]), [{ nome: "programa.cpp", codigo: "" }]).find((c) => c[1] === "-cc1");
 const assinatura = M.assinaturaCc1(cc1Padrao);
 const pchBytes = {};
 for (const p of PCHS) {

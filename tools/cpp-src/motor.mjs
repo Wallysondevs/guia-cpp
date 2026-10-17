@@ -36,10 +36,18 @@ export const AMBIENTE = {
 // Opções que o editor sempre acrescenta (o leitor vê só as dele).
 // -fwasm-exceptions: try/catch/throw de verdade (exceções do WebAssembly).
 export const FLAGS_PADRAO = ["-std=c++23", "-Wall", "-Wextra"];
-const FLAGS_DRIVER = ["-fwasm-exceptions", "-fcolor-diagnostics", "-fansi-escape-codes"];
+// -fsanitize=null (modo trap): no WebAssembly o endereço 0 é memória válida, então
+// *ptr com ptr nulo não daria erro nenhum; com a checagem, o programa para como
+// no Linux ("Falha de segmentação").
+// -D_WASI_EMULATED_*: <csignal> (signal/raise), clock() e getpid() existem como no Linux.
+const FLAGS_DRIVER = ["-fwasm-exceptions", "-fsanitize=null", "-fsanitize-trap=null",
+  "-D_WASI_EMULATED_SIGNAL", "-D_WASI_EMULATED_PROCESS_CLOCKS", "-D_WASI_EMULATED_GETPID",
+  "-fcolor-diagnostics", "-fansi-escape-codes"];
+export { FLAGS_DRIVER };
 const LIB = "/usr/lib/wasm32-wasip1";
 const FLAGS_LINK = [
   LIB + "/guia-rt.o", "-lguia", "-lunwind",
+  "-lwasi-emulated-signal", "-lwasi-emulated-process-clocks", "-lwasi-emulated-getpid",
   "--wrap=__main_void", "--wrap=abort",
   "--stack-first", "-z", "stack-size=8388608",      // pilha de 8 MB, como no Linux; estouro = falha de segmentação
   "--max-memory=268435456",                          // 256 MB: depois disso, new lança std::bad_alloc
@@ -771,14 +779,14 @@ export async function rodarPrograma(modulo, opts) {
   } catch (e) {
     if (e instanceof SaidaPrograma) {
       if (sinalPedido) return { exit: 128 + sinalPedido, sinal: sinalPedido, leuNoFim: entrada.leuNoFim };
-      return { exit: e.code, sinal: null, leuNoFim: entrada.leuNoFim };
+      return { exit: e.code & 255, sinal: null, leuNoFim: entrada.leuNoFim }; // como no Linux: só 8 bits
     }
     if (e instanceof PrecisaEntrada || e instanceof LimiteSaida) throw e;
     const msg = String((e && e.message) || e);
     let sinal = 11;
     if (sinalPedido === 6) sinal = 6;
     else if (e instanceof WebAssembly.RuntimeError || e instanceof RangeError) {
-      if (/unreachable/i.test(msg)) sinal = 4;
+      if (/unreachable/i.test(msg)) sinal = 11; // checagem de ponteiro nulo (ou __builtin_trap)
       else if (/divi(de|sion) by zero|remainder by zero|integer overflow|divide result unrepresentable/i.test(msg)) sinal = 8;
       else sinal = 11; // memória fora dos limites, pilha estourada, ponteiro de função inválido…
     } else if (typeof WebAssembly.Exception === "function" && e instanceof WebAssembly.Exception) sinal = 6;

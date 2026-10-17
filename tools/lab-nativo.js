@@ -36,7 +36,8 @@ function rodar(arquivos, opts) {
     "echo @@COMPILA@@",
     cc + " " + flags + " " + fontes.map(q).join(" ") + " -o " + q(prog) + " 2>&1",
     'echo "@@CEXIT@@$?"',
-    "if [ -x " + q(prog) + " ]; then timeout 10 ./" + q(prog) + " " + (opts.args || []).map(q).join(" ") + " < /tmp/entrada.txt 2>&1; echo \"@@EXIT@@$?\"; fi",
+    // stdbuf -oL: saída em linhas, como num terminal (senão um programa que aborta perde o que estava no buffer)
+    "if [ -x " + q(prog) + " ]; then timeout 10 stdbuf -oL -eL ./" + q(prog) + " " + (opts.args || []).map(q).join(" ") + " < /tmp/entrada.txt 2>&1 | grep -v '^timeout: o comando monitorado'; echo \"@@EXIT@@${PIPESTATUS[0]}\"; fi",
     cc + " --version | head -1",
   ].join("\n");
   const r = spawnSync("timeout", ["60", LAB, "-n", NOME, "-N", "--", "bash", "-s"], { input: script, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
@@ -49,8 +50,9 @@ function rodar(arquivos, opts) {
 
 // Diferenças linha a linha (LCS simples).  "- " = editor (Clang/libc++), "+ " = nativo (g++/libstdc++)
 function diferencas(a, b) {
-  const A = String(a).replace(/\n$/, "").split("\n").slice(0, 600), B = String(b).replace(/\n$/, "").split("\n").slice(0, 600);
   if (String(a) === String(b)) return [];
+  const linhas = (s) => { s = String(s).replace(/\n$/, ""); return s === "" ? [] : s.split("\n").slice(0, 600); };
+  const A = linhas(a), B = linhas(b);
   const n = A.length, m = B.length, L = [];
   for (let i = 0; i <= n; i++) L.push(new Int32Array(m + 1));
   for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
@@ -70,6 +72,8 @@ const CONHECIDAS = [
   [/_M_range_check|basic_string::(at|substr|_M_|erase|insert|replace)|vector::at|^[-+] .*\b(vector|basic_string|string_view::substr)\s*$/, "what() de at()/substr() (mensagens da libc++ × libstdc++)"],
   [/Assertion .*failed/, "assert (wasi-libc × glibc)"],
   [/0x[0-9a-f]{3,}/i, "endereços de memória"],
+  [/NSt3__2|__cxx11|St3__2/, "nomes de tipos (typeid().name(): std::__2 na libc++, std::__cxx11 na libstdc++)"],
+  [/^\+ .*\bthread\b|thread constructor failed/, "std::thread (o editor não cria threads)"],
 ];
 function classificar(dif, fonte) {
   const r = new Set();
