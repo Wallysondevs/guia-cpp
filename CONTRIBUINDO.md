@@ -124,6 +124,7 @@ printf '%s\n' 'mkdir -p cpp && cd cpp' "cat > ola.cpp <<'FIM'" '#include <iostre
   - `compilar.html` explica cada opção.
   - Daí em diante, use sempre o comando padrão.
   - O g++ 15 usa **C++17 se você não pedir outro padrão** (`__cplusplus` = `201703L`). Por isso o `-std=c++23` é obrigatório para `std::print`, `std::format` e ranges.
+- **O ligador (`ld`) e o `make` saem em português** no laboratório (`referência não definida para "main"`, `múltiplas definições de`, `faltando o separador`), porque o Ubuntu traz a tradução do binutils e do make. Mostre a saída real e cite o inglês (`LANG=C`: `undefined reference to`), que é o que aparece em fóruns e no editor do guia.
 - **As mensagens do g++ saem em inglês** no laboratório, mesmo com o sistema em português. É o que o leitor vê no Ubuntu sem o pacote de tradução. Elas usam aspas tipográficas ‘assim’: copie como saíram.
   - Explique cada mensagem em português.
   - A aula `erros-compilacao.html` ensina a ler a estrutura `arquivo:linha:coluna: error: …`.
