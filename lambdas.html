@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Lambdas — funções sem nome, capturas e std::sort | Guia C++</title>
+<meta name="description" content="Lambdas em C++ para quem nunca programou: a anatomia de [](int x) { return x * 2; }, guardar uma lambda em auto, capturar variáveis com [x], [&amp;x], [=] e [&amp;] (e o erro real ‘desconto’ is not captured), mutable, ordenar os alunos da Ana por nota com std::sort, contar aprovados com std::count_if e a ideia do std::function. Com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Lambdas</span></h1>
+
+<p class="intro">Às vezes você precisa de uma função pequena, de uma linha, que só vai ser usada num lugar: "compare dois alunos pela nota", "diga se esta nota é de aprovado". Criar uma função com nome lá em cima do arquivo para isso é exagero. A <strong>lambda</strong> <span class="versao">C++11</span> é uma função <strong>sem nome</strong>, escrita no meio do código, exatamente onde é usada. Nesta aula você vai entender cada pedaço de <code>[](int x) { return x * 2; }</code>, guardar lambdas em variáveis, deixar a lambda usar variáveis de fora (a <strong>captura</strong>) e, o mais importante, entregar lambdas para as funções da biblioteca padrão, como <code>std::sort</code>, para ordenar os alunos da Ana por nota.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A anatomia de uma lambda: <code>[]</code>, <code>()</code> e <code>{}</code>.</li>
+  <li>Como guardar uma lambda numa variável com <code>auto</code> e chamá-la.</li>
+  <li>Como a lambda usa variáveis de fora: <code>[x]</code> (cópia), <code>[&amp;x]</code> (referência), <code>[=]</code> e <code>[&amp;]</code>, e o erro <code>‘desconto’ is not captured</code>.</li>
+  <li>O que <code>mutable</code> faz (só para reconhecer).</li>
+  <li>Como passar lambdas para <code>std::sort</code> e <code>std::count_if</code>.</li>
+  <li>A ideia do <code>std::function</code>, um tipo para guardar "qualquer função".</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com o comando padrão do guia, <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: o bilhete na hora</h2>
+<p>Quando a Ana sai e deixa o filho com a avó, ela não escreve um manual com capa e índice: escreve um <strong>bilhete</strong> rápido, ali na hora, e entrega: "esquentar a sopa às 19h". O bilhete não tem título, só serve para aquela situação, e pode mencionar coisas da casa ("a sopa que está na geladeira").</p>
+
+<p>Uma lambda é o bilhete do C++: uma função curta, sem nome, escrita na hora e entregue para quem vai usá-la. E, como o bilhete, ela pode mencionar coisas que estão em volta, as variáveis do lugar onde foi escrita.</p>
+
+<hr>
+
+<h2>1. A primeira lambda</h2>
+
+<pre class="file" data-file="primeira.cpp">#include &lt;iostream&gt;
+
+int main() {
+    auto dobro = [](int x) { return x * 2; };
+    std::cout &lt;&lt; dobro(5) &lt;&lt; "\n";
+    std::cout &lt;&lt; dobro(21) &lt;&lt; "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>[]</dt><dd>A <strong>lista de captura</strong>: é o que avisa "aqui começa uma lambda". Entre os colchetes vão as variáveis de fora que a lambda pode usar (seção 3). Vazia: a lambda não usa nada de fora.</dd>
+  <dt>(int x)</dt><dd>Os <strong>parâmetros</strong>, iguais aos de uma função comum (aula <a href="parametros.html">Parâmetros</a>).</dd>
+  <dt>{ return x * 2; }</dt><dd>O <strong>corpo</strong>, igual ao de uma função. O tipo de retorno é deduzido do <code>return</code>, como no <code>auto</code> da aula <a href="retorno.html">Retorno</a>: aqui, <code>int</code>.</dd>
+  <dt>auto dobro = … ;</dt><dd>A lambda é um <strong>valor</strong>, e pode ser guardada numa variável. O tipo dela é um nome inventado pelo compilador, que ninguém consegue escrever; por isso o <code>auto</code> é obrigatório (aula <a href="auto.html">auto</a>). Repare no <code>;</code> no fim: é uma linha de criação de variável, como <code>int x = 5;</code>.</dd>
+  <dt>dobro(5)</dt><dd>Chama a lambda como se fosse uma função comum.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra primeira.cpp -o primeira
+$ ./primeira
+10
+42</pre>
+
+<p>Compare com a função da aula <a href="retorno.html">Retorno</a>:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função comum</th><th>Lambda guardada em variável</th></tr>
+<tr><td><code>int dobro(int x) { return x * 2; }</code></td><td><code>auto dobro = [](int x) { return x * 2; };</code></td></tr>
+<tr><td>Escrita fora de qualquer função, no topo do arquivo</td><td>Escrita <strong>dentro</strong> de uma função, onde for preciso</td></tr>
+<tr><td>Tipo de retorno escrito antes do nome</td><td>Tipo de retorno deduzido (ou escrito com <code>-&gt;</code>)</td></tr>
+<tr><td>Só enxerga globais e os próprios parâmetros</td><td>Pode <strong>capturar</strong> variáveis locais de onde foi criada</td></tr>
+</table>
+</div>
+
+<p>Lembra que, na aula <a href="funcoes.html">Funções</a>, escrever uma função dentro do <code>main</code> dava erro (<code>a function-definition is not allowed here</code>)? A lambda é o jeito permitido de fazer isso.</p>
+
+<h3>Mais formas</h3>
+<pre class="file" data-file="varios.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    auto saudar = []() { std::cout &lt;&lt; "Olá!\n"; };
+    auto soma = [](int a, int b) { return a + b; };
+    auto media = [](double a, double b) -&gt; double { return (a + b) / 2; };
+    auto rotulo = [](const std::string&amp; nome, double nota) {
+        return nome + ": " + std::to_string(nota);
+    };
+    saudar();
+    std::cout &lt;&lt; soma(2, 3) &lt;&lt; "\n";
+    std::cout &lt;&lt; media(7, 8) &lt;&lt; "\n";
+    std::cout &lt;&lt; rotulo("Bruno", 7.5) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra varios.cpp -o varios
+$ ./varios
+Olá!
+5
+7.5
+Bruno: 7.500000          « o std::to_string sempre mostra 6 casas</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Lambda</th><th>O que mostra</th></tr>
+<tr><td><code>[]() { … }</code></td><td>Sem parâmetros e sem <code>return</code>: é como uma função <code>void</code>. (Os <code>()</code> vazios podem até ser omitidos: <code>[] { … }</code>.)</td></tr>
+<tr><td><code>[](int a, int b) { … }</code></td><td>Vários parâmetros.</td></tr>
+<tr><td><code>[](double a, double b) -&gt; double { … }</code></td><td>Tipo de retorno escrito com <code>-&gt; tipo</code>, depois dos parâmetros. Útil quando os <code>return</code> dariam tipos diferentes.</td></tr>
+<tr><td><code>[](const std::string&amp; nome, …) { … }</code></td><td>Parâmetros por <code>const&amp;</code>, como em qualquer função (aula <a href="passagem-referencia.html">Por Valor × Por Referência</a>). O corpo pode ter várias linhas.</td></tr>
+</table>
+</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> crie uma lambda <code>triplo</code> e mostre <code>triplo(7)</code>. Depois crie uma lambda <code>ehPar</code> que recebe um <code>int</code> e devolve <code>true</code> se ele for par, e use-a num <code>if</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    auto dobro = [](int x) { return x * 2; };
+    std::cout &lt;&lt; dobro(5) &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. O erro mais comum: o <code>;</code> do fim</h2>
+<p>Como a lambda termina com <code>}</code>, é fácil esquecer que a linha inteira é uma criação de variável e precisa de <code>;</code>:</p>
+
+<pre class="file" data-file="semponto.cpp">#include &lt;iostream&gt;
+
+int main() {
+    auto dobro = [](int x) { return x * 2; }
+    std::cout &lt;&lt; dobro(5) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semponto.cpp -o semponto
+semponto.cpp: In function ‘int main()’:
+semponto.cpp:5:5: error: expected ‘,’ or ‘;’ before ‘std’
+    5 |     std::cout &lt;&lt; dobro(5) &lt;&lt; "\n";
+      |     ^~~</pre>
+
+<p>"Esperava <code>,</code> ou <code>;</code> antes de <code>std</code>". Como sempre com <code>;</code> esquecido, o erro aponta a linha <strong>seguinte</strong>. Olhe o fim da linha anterior: <code>}</code> sem <code>;</code>.</p>
+
+<hr>
+
+<h2>3. Captura: usar variáveis de fora</h2>
+<p>A Ana quer uma lambda que aplica o desconto do dia, que está numa variável do <code>main</code>. Primeira tentativa:</p>
+
+<pre class="file" data-file="semcaptura.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double desconto = 0.1;
+    auto comDesconto = [](double preco) { return preco * (1 - desconto); };
+    std::cout &lt;&lt; comDesconto(50) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semcaptura.cpp -o semcaptura
+semcaptura.cpp: In lambda function:
+semcaptura.cpp:5:63: error: ‘desconto’ is not captured
+    5 |     auto comDesconto = [](double preco) { return preco * (1 - desconto); };
+      |                                                               ^~~~~~~~
+semcaptura.cpp:5:25: note: the lambda has no capture-default
+    5 |     auto comDesconto = [](double preco) { return preco * (1 - desconto); };
+      |                         ^
+semcaptura.cpp:4:12: note: ‘double desconto’ declared here
+    4 |     double desconto = 0.1;
+      |            ^~~~~~~~</pre>
+
+<dl class="anatomy">
+  <dt>In lambda function</dt><dd>"Dentro da função lambda": o problema está no corpo da lambda.</dd>
+  <dt>‘desconto’ is not captured</dt><dd>"‘desconto’ não foi capturado". A variável existe, no <code>main</code>, mas a lambda não pediu para usá-la.</dd>
+  <dt>note: the lambda has no capture-default</dt><dd>"A lambda não tem captura padrão": os colchetes estão vazios, então ela não leva nada de fora (o <code>[=]</code> e o <code>[&amp;]</code>, mais abaixo, são as "capturas padrão").</dd>
+  <dt>note: ‘double desconto’ declared here</dt><dd>Onde a variável que faltou foi criada.</dd>
+</dl>
+
+<p>Uma lambda é como uma função à parte (lembre da aula <a href="escopo.html">Escopo</a>): por padrão, ela não enxerga as variáveis locais de quem a criou. Para usar, é preciso <strong>capturar</strong>, escrevendo o nome entre os colchetes:</p>
+
+<pre class="file" data-file="captura.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double desconto = 0.1;
+    auto comDesconto = [desconto](double preco) { return preco * (1 - desconto); };
+    std::cout &lt;&lt; comDesconto(50) &lt;&lt; "\n";
+    std::cout &lt;&lt; comDesconto(20) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra captura.cpp -o captura
+$ ./captura
+45
+18</pre>
+
+<div class="trycpp" data-goal="compila,out:Total com frete: 65">
+<p class="try-task"><strong>Missão:</strong> a lambda <code>total</code> precisa somar o <code>frete</code> ao preço, mas o programa não compila (no editor, o Clang diz <code>variable 'frete' cannot be implicitly captured</code> e ainda sugere as correções numa lista de notas). Capture o <code>frete</code> para aparecer <code>Total com frete: 65</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    double frete = 15;
+    auto total = [](double preco) { return preco + frete; };
+    std::cout &lt;&lt; "Total com frete: " &lt;&lt; total(50) &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    double frete = 15;
+    auto total = [frete](double preco) { return preco + frete; };
+    std::cout &lt;&lt; "Total com frete: " &lt;&lt; total(50) &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<h3>Por cópia <code>[x]</code> ou por referência <code>[&amp;x]</code></h3>
+<p>É a mesma escolha da aula <a href="passagem-referencia.html">Por Valor × Por Referência</a>. <code>[desconto]</code> guarda uma <strong>cópia</strong> do valor no momento em que a lambda é criada. <code>[&amp;desconto]</code> guarda uma <strong>referência</strong>: a lambda sempre olha a variável original. A diferença aparece quando a variável muda depois:</p>
+
+<pre class="file" data-file="copiaref.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double desconto = 0.1;
+    auto porCopia = [desconto](double preco) { return preco * (1 - desconto); };
+    auto porReferencia = [&amp;desconto](double preco) { return preco * (1 - desconto); };
+    desconto = 0.5;
+    std::cout &lt;&lt; "cópia: " &lt;&lt; porCopia(100) &lt;&lt; "\n";
+    std::cout &lt;&lt; "referência: " &lt;&lt; porReferencia(100) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra copiaref.cpp -o copiaref
+$ ./copiaref
+cópia: 90                « ainda usa o 0.1 da hora em que foi criada
+referência: 50           « vê o 0.5 atual</pre>
+
+<p>Outra diferença: uma variável capturada por cópia é <strong>somente leitura</strong> dentro da lambda. Para a lambda <strong>mudar</strong> uma variável de fora, como um contador de vendas, a captura tem de ser por referência:</p>
+
+<pre class="file" data-file="mudar.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int vendas = 0;
+    auto vender = [vendas]() { vendas++; };
+    vender();
+    std::cout &lt;&lt; vendas &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra mudar.cpp -o mudar
+mudar.cpp: In lambda function:
+mudar.cpp:5:32: error: increment of read-only variable ‘vendas’
+    5 |     auto vender = [vendas]() { vendas++; };
+      |                                ^~~~~~</pre>
+
+<p>"Incremento de variável somente leitura ‘vendas’". Com <code>[&amp;vendas]</code>:</p>
+
+<pre class="file" data-file="mudarref.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int vendas = 0;
+    auto vender = [&amp;vendas]() { vendas++; };
+    vender();
+    vender();
+    vender();
+    std::cout &lt;&lt; "Vendas: " &lt;&lt; vendas &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra mudarref.cpp -o mudarref
+$ ./mudarref
+Vendas: 3</pre>
+
+<h3>Capturar tudo: <code>[=]</code> e <code>[&amp;]</code></h3>
+<p>Em vez de listar cada variável, você pode capturar <strong>todas</strong> as que a lambda usar: <code>[=]</code> captura tudo por cópia; <code>[&amp;]</code>, tudo por referência.</p>
+
+<pre class="file" data-file="todas.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string loja = "Lojinha da Ana";
+    double desconto = 0.1;
+    int vendas = 0;
+
+    auto etiqueta = [=](double preco) {
+        std::cout &lt;&lt; loja &lt;&lt; ": R$ " &lt;&lt; preco * (1 - desconto) &lt;&lt; "\n";
+    };
+    auto vender = [&amp;](double preco) {
+        vendas++;
+        std::cout &lt;&lt; "venda " &lt;&lt; vendas &lt;&lt; " de R$ " &lt;&lt; preco * (1 - desconto) &lt;&lt; "\n";
+    };
+
+    etiqueta(30);
+    vender(30);
+    vender(10);
+    std::cout &lt;&lt; "Total de vendas: " &lt;&lt; vendas &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra todas.cpp -o todas
+$ ./todas
+Lojinha da Ana: R$ 27
+venda 1 de R$ 27
+venda 2 de R$ 9
+Total de vendas: 2</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Captura</th><th>O que a lambda leva</th><th>Pode mudar a variável de fora?</th></tr>
+<tr><td><code>[]</code></td><td>Nada</td><td>—</td></tr>
+<tr><td><code>[x]</code></td><td>Uma cópia de <code>x</code>, tirada na criação</td><td>Não</td></tr>
+<tr><td><code>[&amp;x]</code></td><td>Uma referência a <code>x</code></td><td>Sim</td></tr>
+<tr><td><code>[x, &amp;y]</code></td><td>Cópia de <code>x</code> e referência a <code>y</code></td><td>Só <code>y</code></td></tr>
+<tr><td><code>[=]</code></td><td>Cópia de tudo o que usar</td><td>Não</td></tr>
+<tr><td><code>[&amp;]</code></td><td>Referência a tudo o que usar</td><td>Sim</td></tr>
+<tr><td><code>[&amp;, x]</code> / <code>[=, &amp;y]</code></td><td>Tudo de um jeito, com exceções</td><td>Conforme cada uma</td></tr>
+</table>
+</div>
+
+<p><strong>Qual usar?</strong> Prefira listar as variáveis (<code>[desconto]</code>, <code>[&amp;vendas]</code>): quem lê vê na hora o que a lambda usa e o que ela pode mudar. <code>[&amp;]</code> é prático para lambdas curtas usadas na mesma linha (como as do <code>std::sort</code>, abaixo). Cuidado com referências que duram mais que a variável: uma lambda com <code>[&amp;]</code> guardada e chamada depois que a variável já morreu é o mesmo problema da <a href="referencias.html">referência pendurada</a>.</p>
+
+<div class="note">
+<strong><code>mutable</code>: só para reconhecer</strong>
+<p>Se você quer mudar a <strong>cópia</strong> dentro da lambda (sem afetar a variável de fora), escreva <code>mutable</code> depois dos parâmetros: <code>[vendas]() mutable { vendas++; }</code>. A cópia passa a ser da lambda e lembra o valor entre chamadas, como um <code>static</code> (aula <a href="escopo.html">Escopo</a>). Num teste da Ana, duas chamadas mostraram <code>1</code> e <code>2</code> dentro da lambda, e a <code>vendas</code> de fora continuou <code>0</code>. É raro no dia a dia; quando quiser mudar a variável de fora, use <code>[&amp;vendas]</code>.</p>
+</div>
+
+<hr>
+
+<h2>4. Onde as lambdas brilham: entregar para outras funções</h2>
+<p>Guardar uma lambda numa variável é bom para aprender. Mas o uso principal é outro: <strong>entregar</strong> a lambda, na hora, para uma função que precisa saber "como fazer" alguma coisa. As funções de <code>&lt;algorithm&gt;</code> (aula <a href="algoritmos.html">Algoritmos</a>) funcionam assim.</p>
+
+<h3>Ordenar com <code>std::sort</code></h3>
+<p><code>std::sort</code> ordena um vetor. Sem lambda, ele ordena do menor para o maior. Com uma lambda, você diz <strong>como comparar</strong>:</p>
+
+<pre class="file" data-file="ordenar.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;double&gt; notas = {7.5, 4, 9, 6, 5.5};
+
+    std::sort(notas.begin(), notas.end());
+    for (double n : notas) std::cout &lt;&lt; n &lt;&lt; " ";
+    std::cout &lt;&lt; "\n";
+
+    std::sort(notas.begin(), notas.end(), [](double a, double b) { return a &gt; b; });
+    for (double n : notas) std::cout &lt;&lt; n &lt;&lt; " ";
+    std::cout &lt;&lt; "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;algorithm&gt;</dt><dd>Onde moram <code>std::sort</code>, <code>std::count_if</code> e muitos outros.</dd>
+  <dt>notas.begin(), notas.end()</dt><dd>O começo e o fim do trecho a ordenar: aqui, o vetor inteiro (<a href="iteradores.html">Iteradores</a> explica o que são).</dd>
+  <dt>[](double a, double b) { return a &gt; b; }</dt><dd>A <strong>regra de comparação</strong>: recebe dois elementos e devolve <code>true</code> se <code>a</code> deve vir <strong>antes</strong> de <code>b</code>. Com <code>a &gt; b</code>, o maior vem antes: ordem decrescente. O <code>std::sort</code> chama essa lambda várias vezes, com vários pares, enquanto ordena.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ordenar.cpp -o ordenar
+$ ./ordenar
+4 5.5 6 7.5 9            « sem lambda: crescente
+9 7.5 6 5.5 4            « com a lambda a &gt; b: decrescente</pre>
+
+<h3>Ordenar os alunos da Ana por nota</h3>
+<p>Agora o caso real: a Ana tem uma turma, cada aluno com nome e nota, e quer o ranking. Para guardar nome e nota juntos, ela usa uma <code>struct</code>, uma "ficha" com dois campos (aula <a href="structs.html">Structs</a>; aqui basta saber que <code>aluno.nome</code> e <code>aluno.nota</code> leem cada campo). O <code>std::sort</code> não sabe comparar fichas sozinho; a lambda ensina:</p>
+
+<pre class="file" data-file="alunos.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Aluno {
+    std::string nome;
+    double nota;
+};
+
+int main() {
+    std::vector&lt;Aluno&gt; turma = {
+        {"Bruno", 7.5}, {"Carla", 4}, {"Davi", 9}, {"Elis", 6}, {"Fábio", 5.5}
+    };
+
+    std::sort(turma.begin(), turma.end(), [](const Aluno&amp; a, const Aluno&amp; b) {
+        return a.nota &gt; b.nota;
+    });
+
+    for (const Aluno&amp; aluno : turma) {
+        std::cout &lt;&lt; aluno.nome &lt;&lt; ": " &lt;&lt; aluno.nota &lt;&lt; "\n";
+    }
+
+    double media = 6;
+    long aprovados = std::count_if(turma.begin(), turma.end(), [media](const Aluno&amp; a) {
+        return a.nota &gt;= media;
+    });
+    std::cout &lt;&lt; aprovados &lt;&lt; " aprovados\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra alunos.cpp -o alunos
+$ ./alunos
+Davi: 9
+Bruno: 7.5
+Elis: 6
+Fábio: 5.5
+Carla: 4
+3 aprovados</pre>
+
+<dl class="anatomy">
+  <dt>[](const Aluno&amp; a, const Aluno&amp; b) { return a.nota &gt; b.nota; }</dt><dd>"O aluno <code>a</code> vem antes do <code>b</code> se a nota dele for maior". Os parâmetros são <code>const&amp;</code> para não copiar as fichas a cada comparação. Para ordenar por nome, bastaria <code>return a.nome &lt; b.nome;</code>.</dd>
+  <dt>std::count_if(…, [media](const Aluno&amp; a) { … })</dt><dd><code>count_if</code> ("conte se") passa cada elemento para a lambda e conta quantas vezes ela devolveu <code>true</code>. Esta lambda <strong>captura</strong> a <code>media</code> do <code>main</code>: é aqui que a captura mostra seu valor, porque o <code>count_if</code> só passa um argumento (o aluno), e a nota de corte precisa vir de fora.</dd>
+</dl>
+
+<p>Sem lambdas, a Ana teria de escrever, lá no topo do arquivo, uma função <code>bool notaMaior(const Aluno&amp; a, const Aluno&amp; b)</code> só para usar uma vez, e não conseguiria passar a <code>media</code> para o <code>count_if</code> sem uma variável global. Com a lambda, a regra fica exatamente onde é usada.</p>
+
+<hr>
+
+<h2>5. <code>std::function</code>: só a ideia</h2>
+<p>Cada lambda tem um tipo próprio, sem nome, e é por isso que usamos <code>auto</code>. Mas e se você quiser um <strong>parâmetro</strong> que aceite "qualquer função que recebe um <code>double</code> e devolve um <code>double</code>"? Para isso existe <code>std::function</code>, de <code>&lt;functional&gt;</code>:</p>
+
+<pre class="file" data-file="function.cpp">#include &lt;functional&gt;
+#include &lt;iostream&gt;
+
+double aplicar(double preco, std::function&lt;double(double)&gt; regra) {
+    return regra(preco);
+}
+
+int main() {
+    std::function&lt;double(double)&gt; promocao = [](double p) { return p * 0.9; };
+    std::function&lt;double(double)&gt; frete = [](double p) { return p + 15; };
+
+    std::cout &lt;&lt; aplicar(100, promocao) &lt;&lt; "\n";
+    std::cout &lt;&lt; aplicar(100, frete) &lt;&lt; "\n";
+    std::cout &lt;&lt; aplicar(100, [](double p) { return p; }) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra function.cpp -o function
+$ ./function
+90
+115
+100</pre>
+
+<p><code>std::function&lt;double(double)&gt;</code> lê-se "uma função que recebe um <code>double</code> e devolve um <code>double</code>". Dentro dos <code>&lt; &gt;</code>, vem o tipo de retorno e, entre parênteses, os tipos dos parâmetros. A função <code>aplicar</code> não sabe qual regra vai receber; quem chama decide. Isso permite, por exemplo, guardar várias regras num <code>std::vector&lt;std::function&lt;…&gt;&gt;</code>. Ele tem um pequeno custo de desempenho em relação ao <code>auto</code>; nas funções da biblioteca, como o <code>std::sort</code>, quem faz esse trabalho são os <a href="templates-funcao.html">templates</a>, sem custo extra.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: ‘desconto’ is not captured</code></strong>
+<p><strong>O que significa:</strong> a lambda usa uma variável local de fora que não está entre os colchetes. A nota <code>the lambda has no capture-default</code> lembra que os colchetes estão vazios.</p>
+<p><strong>Como consertar:</strong> capture a variável: <code>[desconto]</code> para ler uma cópia, <code>[&amp;desconto]</code> para ver mudanças ou alterar o original. (Variáveis globais e constantes <code>constexpr</code> não precisam de captura.)</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: increment of read-only variable</code> (ou <code>assignment of read-only variable</code>) dentro da lambda</strong>
+<p><strong>O que significa:</strong> a lambda capturou por cópia (<code>[x]</code> ou <code>[=]</code>) e tentou mudar a variável. Cópias capturadas são somente leitura. No editor, o Clang diz <code>cannot assign to a variable captured by copy in a non-mutable lambda</code>.</p>
+<p><strong>Como consertar:</strong> se a ideia é mudar a variável de fora, capture por referência: <code>[&amp;x]</code>. Se a ideia é só mexer numa cópia interna, use <code>mutable</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: expected ‘,’ or ‘;’ before …</code> na linha depois da lambda</strong>
+<p><strong>O que significa:</strong> faltou o <code>;</code> depois do <code>}</code> da lambda guardada em variável.</p>
+<p><strong>Como consertar:</strong> <code>auto f = [](int x) { return x * 2; };</code> — com <code>;</code> no fim.</p>
+</div>
+
+<div class="cenario">
+<strong>A lambda usou o valor antigo da variável</strong>
+<p><strong>O que significa:</strong> a captura foi por cópia (<code>[x]</code> ou <code>[=]</code>), e a cópia é tirada quando a lambda é <strong>criada</strong>, não quando é chamada.</p>
+<p><strong>Como consertar:</strong> capture por referência (<code>[&amp;x]</code>), ou crie a lambda depois de dar o valor final à variável.</p>
+</div>
+
+<div class="cenario">
+<strong>O <code>std::sort</code> ordenou ao contrário</strong>
+<p><strong>O que significa:</strong> a lambda de comparação deve devolver <code>true</code> quando o primeiro deve vir <strong>antes</strong>. <code>a &lt; b</code> dá ordem crescente; <code>a &gt; b</code>, decrescente.</p>
+<p><strong>Como consertar:</strong> troque o sinal. E nunca use <code>&lt;=</code> ou <code>&gt;=</code> numa comparação do <code>std::sort</code>: com elementos iguais, isso quebra as regras que ele espera e pode até derrubar o programa.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>[](int x) { return x * 2; }</code></td><td>Lambda sem captura, um parâmetro, retorno deduzido</td></tr>
+<tr><td><code>auto f = [](…) { … };</code></td><td>Guarda a lambda numa variável; chame com <code>f(…)</code></td></tr>
+<tr><td><code>[](double a) -&gt; double { … }</code></td><td>Tipo de retorno explícito</td></tr>
+<tr><td><code>[x]</code> / <code>[&amp;x]</code></td><td>Captura <code>x</code> por cópia / por referência</td></tr>
+<tr><td><code>[=]</code> / <code>[&amp;]</code></td><td>Captura tudo o que usar, por cópia / por referência</td></tr>
+<tr><td><code>[x]() mutable { … }</code></td><td>Permite mudar a cópia capturada</td></tr>
+<tr><td><code>std::sort(v.begin(), v.end(), [](…a, …b) { return …; })</code></td><td>Ordena com a regra da lambda (<code>true</code> = <code>a</code> antes de <code>b</code>)</td></tr>
+<tr><td><code>std::count_if(v.begin(), v.end(), [](…x) { return …; })</code></td><td>Conta os elementos para os quais a lambda devolve <code>true</code></td></tr>
+<tr><td><code>std::function&lt;R(A)&gt;</code></td><td>Tipo que guarda qualquer função que recebe <code>A</code> e devolve <code>R</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Completar a lambda</h3>
+<p>Complete a lambda que devolve o quadrado de um número:</p>
+<div class="ex-code">auto quadrado = <input data-answer="[]" aria-label="captura">(int x) { return x * x; };</div>
+</div>
+
+<div class="exercise">
+<h3>2. Capturar por referência</h3>
+<p>Complete a captura para que a lambda possa aumentar a variável <code>pontos</code> do <code>main</code>:</p>
+<div class="ex-code">auto marcar = [<input data-answer="&amp;pontos|&amp;" aria-label="captura">]() { pontos += 10; };</div>
+</div>
+
+<div class="exercise">
+<h3>3. Ordem crescente</h3>
+<p>Complete a regra para o <code>std::sort</code> ordenar os preços do menor para o maior:</p>
+<div class="ex-code">[](double a, double b) { return a <input data-answer="&lt;" aria-label="operador"> b; }</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. <code>int x = 1; auto f = [x]() { return x; }; x = 5;</code> Quanto vale <code>f()</code>?</p>
+<label><input type="radio" name="q4"> 5</label>
+<label><input type="radio" name="q4"> 1</label>
+<label><input type="radio" name="q4"> 0</label>
+<label><input type="radio" name="q4"> Erro de compilação</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Por que guardamos lambdas em <code>auto</code>?</p>
+<label><input type="radio" name="q5"> Porque lambdas sempre devolvem <code>int</code></label>
+<label><input type="radio" name="q5"> Porque <code>auto</code> deixa a lambda mais rápida</label>
+<label><input type="radio" name="q5"> Porque é obrigatório usar <code>auto</code> em C++23</label>
+<label><input type="radio" name="q5"> Porque o tipo de cada lambda é inventado pelo compilador e não tem um nome que possamos escrever</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Para contar quantas notas de um vetor são maiores que um <code>corte</code> guardado numa variável, qual chamada está certa?</p>
+<label><input type="radio" name="q6"> <code>std::count_if(v.begin(), v.end(), [corte](double n) { return n &gt; corte; })</code></label>
+<label><input type="radio" name="q6"> <code>std::count_if(v.begin(), v.end(), [](double n) { return n &gt; corte; })</code></label>
+<label><input type="radio" name="q6"> <code>std::sort(v.begin(), v.end(), [corte](double n) { return n &gt; corte; })</code></label>
+<label><input type="radio" name="q6"> <code>std::count_if(v.begin(), v.end(), corte)</code></label>
+</div>
+
+<h3>Missão final: a vitrine da lojinha</h3>
+
+<div class="trycpp" data-goal="out:caneta: R$ 2.5,outre:caneta[^\n]*\nborracha[^\n]*\ncaderno[^\n]*\nmochila,out:2 produtos até R$ 10,src:std::sort\s*\(,src:std::count_if\s*\(,semaviso">
+<p class="try-task"><strong>Missão:</strong> complete as duas chamadas com lambdas. O <code>std::sort</code> deve ordenar os produtos do <strong>mais barato para o mais caro</strong>. O <code>std::count_if</code> deve contar quantos custam <strong>até</strong> <code>limite</code> (capture a variável). Saída esperada:</p>
+<pre class="out">caneta: R$ 2.5
+borracha: R$ 3
+caderno: R$ 12
+mochila: R$ 89.9
+2 produtos até R$ 10</pre>
+<pre class="script">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Produto {
+    std::string nome;
+    double preco;
+};
+
+int main() {
+    std::vector&lt;Produto&gt; vitrine = {
+        {"caderno", 12}, {"caneta", 2.5}, {"mochila", 89.9}, {"borracha", 3}
+    };
+
+    // std::sort(vitrine.begin(), vitrine.end(), /* sua lambda aqui */);
+
+    for (const Produto&amp; p : vitrine) {
+        std::cout &lt;&lt; p.nome &lt;&lt; ": R$ " &lt;&lt; p.preco &lt;&lt; "\n";
+    }
+
+    double limite = 10;
+    long baratos = 0; // troque o 0 por std::count_if(...) com uma lambda
+    std::cout &lt;&lt; baratos &lt;&lt; " produtos até R$ " &lt;&lt; limite &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Produto {
+    std::string nome;
+    double preco;
+};
+
+int main() {
+    std::vector&lt;Produto&gt; vitrine = {
+        {"caderno", 12}, {"caneta", 2.5}, {"mochila", 89.9}, {"borracha", 3}
+    };
+
+    std::sort(vitrine.begin(), vitrine.end(), [](const Produto&amp; a, const Produto&amp; b) {
+        return a.preco &lt; b.preco;
+    });
+
+    for (const Produto&amp; p : vitrine) {
+        std::cout &lt;&lt; p.nome &lt;&lt; ": R$ " &lt;&lt; p.preco &lt;&lt; "\n";
+    }
+
+    double limite = 10;
+    long baratos = std::count_if(vitrine.begin(), vitrine.end(), [limite](const Produto&amp; p) {
+        return p.preco &lt;= limite;
+    });
+    std::cout &lt;&lt; baratos &lt;&lt; " produtos até R$ " &lt;&lt; limite &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma <strong>lambda</strong> é uma função sem nome, escrita onde é usada: <code>[captura](parâmetros) { corpo }</code>.</li>
+  <li>Guarde-a com <code>auto f = …;</code> (não esqueça o <code>;</code>) e chame com <code>f(…)</code>. O retorno é deduzido; para escrever, use <code>-&gt; tipo</code>.</li>
+  <li>Para usar variáveis locais de fora, capture: <code>[x]</code> (cópia, tirada na criação, somente leitura), <code>[&amp;x]</code> (referência, vê e muda o original), <code>[=]</code> e <code>[&amp;]</code> (tudo). Sem captura: <code>‘x’ is not captured</code>.</li>
+  <li><code>mutable</code> deixa mudar a cópia capturada; é raro.</li>
+  <li>O grande uso: entregar a regra para os algoritmos. <code>std::sort</code> com <code>[](a, b) { return a.nota &gt; b.nota; }</code> ordena a turma por nota; <code>std::count_if</code> com <code>[media](a) { … }</code> conta os aprovados.</li>
+  <li><code>std::function&lt;R(A)&gt;</code> guarda qualquer função com aquela forma, útil como parâmetro.</li>
+  <li>Este é o fim do grupo Funções. O próximo grupo começa em <a href="referencias.html">Referências</a>, que aprofunda o <code>&amp;</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
