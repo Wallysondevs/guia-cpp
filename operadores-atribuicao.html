@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Operadores de Atribuição — =, +=, -=, *=, /=, %= | Guia C++</title>
+<meta name="description" content="Operadores de atribuição em C++ para quem nunca programou: o = que quer dizer recebe, os atalhos +=, -=, *=, /= e %=, atribuição encadeada, a confusão entre = e == e o engano =+, com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Operadores de Atribuição</span></h1>
+
+<p class="intro">Atribuir é <strong>colocar um valor numa variável</strong>. Você faz isso desde a aula de <a href="variaveis.html">Variáveis</a>, com o sinal <code>=</code>. Mas programas mudam variáveis o tempo todo: o saldo aumenta, o estoque diminui, os pontos do jogo dobram. Para essas mudanças, o C++ tem atalhos: <code>+=</code>, <code>-=</code>, <code>*=</code>, <code>/=</code> e <code>%=</code>. Nesta aula você vai usar todos eles e conhecer dois enganos famosos: trocar <code>=</code> por <code>==</code>, e escrever <code>=+</code> no lugar de <code>+=</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que o <code>=</code> do C++ quer dizer "recebe", e não "é igual a".</li>
+  <li>Os atalhos <code>+=</code>, <code>-=</code>, <code>*=</code>, <code>/=</code> e <code>%=</code>, e a conta exata que cada um faz.</li>
+  <li>Como dar o mesmo valor a várias variáveis de uma vez: <code>a = b = c = 0;</code>.</li>
+  <li>A diferença entre <code>=</code> (atribuição) e <code>==</code> (comparação), e o aviso que o g++ dá quando você troca um pelo outro.</li>
+  <li>Por que <code>x =+ 5</code> compila, mas não soma nada.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: o placar do jogo</h2>
+<p>Pense no placar de um jogo de futebol. Quando sai um gol, o operador do placar <strong>não</strong> escreve uma frase nova do zero: ele olha o número que está lá (2), soma um, apaga e escreve o novo número (3). O placar é a variável; "olhar, calcular, apagar e escrever" é a atribuição.</p>
+<p>Por isso, em C++, <code>gols = gols + 1;</code> faz todo sentido, mesmo parecendo absurdo na matemática ("um número igual a ele mais um?"). O <code>=</code> não afirma que os dois lados são iguais; ele é uma <strong>ordem</strong>: "calcule o lado direito e guarde na variável da esquerda". Leia sempre como <strong>"recebe"</strong>: <em>gols recebe gols + 1</em>.</p>
+
+<hr>
+
+<h2>1. O <code>=</code>: atribuição simples</h2>
+
+<pre class="file" data-file="estoque.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int estoque = 10;            // criar a variável já com um valor
+    estoque = 7;                 // atribuição: o 10 é jogado fora
+    estoque = estoque + 5;       // usa o valor atual (7) para calcular o novo
+    std::cout &lt;&lt; estoque &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra estoque.cpp -o estoque
+$ ./estoque
+12</pre>
+
+<ol class="passo">
+  <li><code>int estoque = 10;</code> cria a variável e já põe 10 nela. Tecnicamente isso é uma <strong>inicialização</strong> (o valor de nascença), não uma atribuição, mas usa o mesmo sinal.</li>
+  <li><code>estoque = 7;</code> é uma <strong>atribuição</strong>: a variável já existe e recebe um valor novo. O 10 se perde.</li>
+  <li><code>estoque = estoque + 5;</code>: primeiro o C++ calcula o lado direito com o valor atual (7 + 5 = 12); <strong>depois</strong> guarda o 12 em <code>estoque</code>.</li>
+</ol>
+
+<h3>O lado esquerdo precisa ser um lugar</h3>
+<p>Do lado esquerdo do <code>=</code> vai <strong>onde guardar</strong>: uma variável. Um número, uma conta ou uma constante não são lugares onde se guarda alguma coisa:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra esquerda.cpp -o esquerda
+esquerda.cpp: In function ‘int main()’:
+esquerda.cpp:3:5: error: lvalue required as left operand of assignment
+    3 |     10 = estoque;
+      |     ^~</pre>
+
+<p>"É necessário um <em>lvalue</em> como operando esquerdo da atribuição." <strong>lvalue</strong> (de <em>left value</em>, "valor da esquerda") é o nome técnico de "algo que tem um lugar na memória e pode receber um valor", como uma variável. O <code>10</code> é só um valor, não tem lugar. O mesmo vale para uma variável <code>const</code> (aula <a href="constantes.html">Constantes</a>): ela tem lugar, mas está trancada.</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra constante.cpp -o constante
+constante.cpp: In function ‘int main()’:
+constante.cpp:3:12: error: assignment of read-only variable ‘limite’
+    3 |     limite += 5;
+      |     ~~~~~~~^~~~</pre>
+
+<p>"Atribuição a uma variável somente leitura, <code>limite</code>." O <code>limite</code> foi criado com <code>const int limite = 10;</code>, e nenhum operador de atribuição pode mudá-lo.</p>
+
+<hr>
+
+<h2>2. Os atalhos: <code>+=</code>, <code>-=</code>, <code>*=</code>, <code>/=</code>, <code>%=</code></h2>
+<p>Mudar uma variável a partir do valor dela mesma é tão comum que existe um atalho para cada operação aritmética. <code>saldo += 50;</code> quer dizer exatamente <code>saldo = saldo + 50;</code>, só que escrito uma vez só. São os <strong>operadores de atribuição composta</strong> (compostos de uma conta e uma atribuição).</p>
+
+<pre class="file" data-file="carteira.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int saldo = 100;
+    std::cout &lt;&lt; "Início: " &lt;&lt; saldo &lt;&lt; '\n';
+    saldo += 50;
+    std::cout &lt;&lt; "Depois de += 50: " &lt;&lt; saldo &lt;&lt; '\n';
+    saldo -= 30;
+    std::cout &lt;&lt; "Depois de -= 30: " &lt;&lt; saldo &lt;&lt; '\n';
+    saldo *= 2;
+    std::cout &lt;&lt; "Depois de *= 2: " &lt;&lt; saldo &lt;&lt; '\n';
+    saldo /= 3;
+    std::cout &lt;&lt; "Depois de /= 3: " &lt;&lt; saldo &lt;&lt; '\n';
+    saldo %= 7;
+    std::cout &lt;&lt; "Depois de %= 7: " &lt;&lt; saldo &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra carteira.cpp -o carteira
+$ ./carteira
+Início: 100
+Depois de += 50: 150      « 100 + 50
+Depois de -= 30: 120      « 150 - 30
+Depois de *= 2: 240       « 120 * 2
+Depois de /= 3: 80        « 240 / 3
+Depois de %= 7: 3         « 80 % 7: 7 × 11 = 77, sobram 3</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Atalho</th><th>É o mesmo que</th><th>Leia como</th><th>Exemplo do dia a dia</th></tr>
+<tr><td><code>x += 5</code></td><td><code>x = x + 5</code></td><td>"x aumenta 5"</td><td>Depositar dinheiro</td></tr>
+<tr><td><code>x -= 5</code></td><td><code>x = x - 5</code></td><td>"x diminui 5"</td><td>Vender do estoque</td></tr>
+<tr><td><code>x *= 5</code></td><td><code>x = x * 5</code></td><td>"x fica 5 vezes maior"</td><td>Pontos em dobro (<code>*= 2</code>)</td></tr>
+<tr><td><code>x /= 5</code></td><td><code>x = x / 5</code></td><td>"x é dividido por 5"</td><td>Dividir a conta</td></tr>
+<tr><td><code>x %= 5</code></td><td><code>x = x % 5</code></td><td>"x vira o resto da divisão por 5"</td><td>Dar a volta no relógio (<code>hora %= 24</code>)</td></tr>
+</table>
+</div>
+
+<p>O sinal da conta vem <strong>antes</strong> do <code>=</code>, e os dois ficam <strong>grudados</strong>: <code>+=</code>, nunca <code>+ =</code> nem <code>=+</code> (este último tem uma armadilha própria, na seção 5).</p>
+
+<p>Por que usar o atalho? Ele é mais curto, e você escreve o nome da variável <strong>uma vez só</strong>, o que evita enganos como <code>saldo = sado + 50</code>. Com nomes compridos (<code>pontos_do_jogador_um</code>), a diferença aparece.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> a Ana tem 12 laranjas. Acrescente linhas para ela comprar mais 8 (<code>+=</code>), dar 5 para a vizinha (<code>-=</code>) e mostre o resultado após cada mudança.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int laranjas = 12;
+    std::cout &lt;&lt; "Laranjas: " &lt;&lt; laranjas &lt;&lt; '\n';
+    laranjas += 3;
+    std::cout &lt;&lt; "Depois da feira: " &lt;&lt; laranjas &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<h3>O lado direito é calculado inteiro antes</h3>
+<p>Quando o lado direito do atalho é uma conta, ela é feita <strong>toda</strong>, e só então combinada com a variável. <code>x *= 2 + 3</code> é <code>x = x * (2 + 3)</code>, e não <code>x = x * 2 + 3</code>:</p>
+
+<pre class="file" data-file="vezes.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int x = 4;
+    x *= 2 + 3;
+    std::cout &lt;&lt; x &lt;&lt; '\n';
+    int y = 4;
+    y = y * 2 + 3;
+    std::cout &lt;&lt; y &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra vezes.cpp -o vezes
+$ ./vezes
+20       « 4 * (2 + 3)
+11       « (4 * 2) + 3</pre>
+
+<h3>Os atalhos respeitam o tipo da variável</h3>
+<p>O resultado do atalho é guardado <strong>na própria variável</strong>, com o tipo dela. Com um <code>int</code>, isso quer dizer que <code>/=</code> faz divisão inteira, e que um <code>*= 1.5</code> é cortado sem aviso:</p>
+
+<pre class="file" data-file="mistura.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int itens = 10;
+    itens *= 1.5;
+    std::cout &lt;&lt; itens &lt;&lt; '\n';
+    itens /= 4;
+    std::cout &lt;&lt; itens &lt;&lt; '\n';
+    double preco = 10;
+    preco /= 4;
+    std::cout &lt;&lt; preco &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra mistura.cpp -o mistura
+$ ./mistura
+15       « 10 * 1.5 = 15.0, guardado como int 15 (aqui não perdeu nada, por sorte)
+3        « 15 / 4 = 3,75: divisão inteira, ficou 3
+2.5      « com double, a divisão é real
+$ g++ -std=c++23 -Wall -Wextra -Wconversion mistura.cpp -o mistura
+mistura.cpp: In function ‘int main()’:
+mistura.cpp:5:11: warning: conversion from ‘double’ to ‘int’ may change value [-Wfloat-conversion]
+    5 |     itens *= 1.5;
+      |     ~~~~~~^~~~~~</pre>
+
+<p>Com <code>-Wconversion</code>, o g++ avisa que <code>itens *= 1.5</code> faz uma conta com <code>double</code> e guarda num <code>int</code>. Se <code>itens</code> valesse 11, o resultado 16.5 viraria 16. Veja <a href="conversao-tipos.html">Conversão de Tipos</a>. E, como na aula de <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>, o <code>%=</code> só funciona com inteiros, e <code>/= 0</code> com inteiro quebra o programa.</p>
+
+<h3><code>+=</code> também junta textos</h3>
+<p>Com um <code>std::string</code>, o <code>+=</code> acrescenta texto no fim. É muito usado para montar uma frase aos poucos:</p>
+
+<pre class="file" data-file="frase.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string lista = "arroz";
+    lista += ", feijão";
+    lista += ", café";
+    std::cout &lt;&lt; lista &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra frase.cpp -o frase
+$ ./frase
+arroz, feijão, café</pre>
+
+<p>Os detalhes ficam para a aula <a href="concatenacao.html">Juntar Strings</a>. Só o <code>+=</code> funciona com texto; <code>-=</code>, <code>*=</code> e companhia, não.</p>
+
+<div class="note">
+<strong>Existem mais atalhos</strong>
+<p>O C++ ainda tem <code>&amp;=</code>, <code>|=</code>, <code>^=</code>, <code>&lt;&lt;=</code> e <code>&gt;&gt;=</code>, que combinam a atribuição com operadores de <strong>bits</strong>. Eles seguem a mesma regra (<code>x &amp;= y</code> é <code>x = x &amp; y</code>) e quase não aparecem em programas de iniciante.</p>
+</div>
+
+<hr>
+
+<h2>3. Atribuição encadeada</h2>
+<p>Em C++, uma atribuição não só guarda o valor: ela também <strong>devolve</strong> o valor guardado, que pode ser usado de novo. Isso permite dar o mesmo valor a várias variáveis numa linha:</p>
+
+<pre class="file" data-file="encadeada.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int a, b, c;
+    a = b = c = 0;
+    std::cout &lt;&lt; a &lt;&lt; ' ' &lt;&lt; b &lt;&lt; ' ' &lt;&lt; c &lt;&lt; '\n';
+    int x = 5;
+    int y = (x = 8) + 1;
+    std::cout &lt;&lt; x &lt;&lt; ' ' &lt;&lt; y &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra encadeada.cpp -o encadeada
+$ ./encadeada
+0 0 0
+8 9</pre>
+
+<ol class="passo">
+  <li>A atribuição é feita <strong>da direita para a esquerda</strong>: <code>a = b = c = 0</code> é <code>a = (b = (c = 0))</code>.</li>
+  <li><code>c = 0</code> guarda 0 em <code>c</code> e devolve 0.</li>
+  <li><code>b = 0</code> (o valor devolvido) guarda 0 em <code>b</code> e devolve 0.</li>
+  <li><code>a = 0</code>. As três ficam com 0.</li>
+  <li>Na linha de baixo, <code>(x = 8)</code> guarda 8 em <code>x</code> e devolve 8; o <code>+ 1</code> dá 9 para o <code>y</code>.</li>
+</ol>
+
+<p>A primeira forma (zerar várias variáveis) é comum e clara. A segunda (atribuir no meio de uma conta) funciona, mas deixa o código difícil de ler: prefira duas linhas, <code>x = 8;</code> e <code>int y = x + 1;</code>. E repare que <code>int a, b, c;</code> cria as variáveis <strong>sem valor</strong>; aqui não tem problema porque a linha seguinte já dá um valor a elas, mas o hábito de inicializar (<code>int a = 0;</code>) é mais seguro.</p>
+
+<hr>
+
+<h2>4. <code>=</code> × <code>==</code>: atribuir não é comparar</h2>
+<p>Este é um dos enganos mais famosos da programação. Os dois sinais são parecidos, mas fazem coisas completamente diferentes:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sinal</th><th>Nome</th><th>Leia como</th><th>O que faz</th></tr>
+<tr><td><code>=</code></td><td>Atribuição</td><td>"recebe"</td><td><strong>Muda</strong> a variável da esquerda.</td></tr>
+<tr><td><code>==</code></td><td>Igualdade</td><td>"é igual a?"</td><td><strong>Pergunta</strong> se os dois lados são iguais e responde verdadeiro ou falso, sem mudar nada (aula <a href="operadores-comparacao.html">Operadores de Comparação</a>).</td></tr>
+</table>
+</div>
+
+<p>O problema aparece quando você quer <strong>perguntar</strong> e escreve um <code>=</code> só. O programa abaixo usa um <code>if</code> ("se"), que você vai estudar em <a href="if-else.html">if e else</a>: o bloco entre chaves só roda se a condição entre parênteses for verdadeira. A intenção era perguntar "o estoque é 10?":</p>
+
+<pre class="file" data-file="igual.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int estoque = 0;
+    if (estoque = 10) {
+        std::cout &lt;&lt; "Estoque é 10\n";
+    }
+    std::cout &lt;&lt; "estoque agora vale " &lt;&lt; estoque &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra igual.cpp -o igual
+igual.cpp: In function ‘int main()’:
+igual.cpp:5:17: warning: suggest parentheses around assignment used as truth value [-Wparentheses]
+    5 |     if (estoque = 10) {
+      |         ~~~~~~~~^~~~
+$ ./igual
+Estoque é 10              « mas o estoque era 0!
+estoque agora vale 10     « e o "teste" mudou o estoque</pre>
+
+<p>Dois estragos de uma vez:</p>
+<ol>
+  <li><code>estoque = 10</code> <strong>guardou</strong> 10 no estoque (o valor verdadeiro, 0, foi perdido).</li>
+  <li>A atribuição devolveu 10, e qualquer número diferente de zero conta como "verdadeiro" (veja <a href="conversao-tipos.html">Conversão de Tipos</a>). Então o <code>if</code> sempre entra.</li>
+</ol>
+<p>O aviso diz: "sugiro parênteses em volta da atribuição usada como valor verdade". O g++ desconfia que você quis comparar e escreveu atribuição. (Os parênteses extras, <code>if ((estoque = 10))</code>, servem para dizer "eu quero mesmo atribuir aqui", e calam o aviso; não faça isso sem motivo.) No editor do guia, o Clang diz a mesma coisa com outras palavras: <code>using the result of an assignment as a condition without parentheses</code>, e sugere: <code>use '==' to turn this assignment into an equality comparison</code>.</p>
+
+<p>O engano contrário também existe: escrever <code>==</code> querendo atribuir. A linha não muda nada, e o g++ avisa que ela é inútil:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra igual2.cpp -o igual2
+igual2.cpp: In function ‘int main()’:
+igual2.cpp:5:13: warning: statement has no effect [-Wunused-value]
+    5 |     estoque == 10;
+      |     ~~~~~~~~^~~~~</pre>
+
+<p>"A instrução não tem efeito": comparar e jogar a resposta fora não serve para nada. Os dois avisos só aparecem porque você compilou com <code>-Wall</code>. Mais um motivo para nunca compilar sem ele.</p>
+
+<hr>
+
+<h2>5. A armadilha do <code>=+</code></h2>
+<p>Inverter a ordem dos sinais é fácil de fazer e difícil de enxergar:</p>
+
+<pre class="file" data-file="invertido.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int pontos = 10;
+    pontos =+ 5;
+    std::cout &lt;&lt; pontos &lt;&lt; '\n';
+    pontos =- 3;
+    std::cout &lt;&lt; pontos &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra invertido.cpp -o invertido
+$ ./invertido
+5        « deveria ser 15
+-3       « deveria ser 2</pre>
+
+<p>O g++ compilou <strong>sem nenhum aviso</strong>. O C++ leu <code>pontos =+ 5</code> como <code>pontos = +5</code>: atribuição de "mais cinco" (o <code>+</code> unário, que não muda nada). E <code>pontos =- 3</code> é <code>pontos = -3</code>. Os espaços enganam o olho, mas o compilador não liga para eles. No editor do guia, o Clang percebe: <code>use of unary operator that may be intended as compound assignment (+=)</code>, "uso de operador unário que talvez devesse ser atribuição composta (+=)".</p>
+
+<p>Regra para não errar: o sinal da conta vem <strong>primeiro</strong>, o <code>=</code> vem <strong>por último</strong>. <code>+=</code> se lê "mais, recebe".</p>
+
+<hr>
+
+<h2>6. Somar em uma variável sem valor</h2>
+<p>Os atalhos <strong>leem</strong> o valor atual da variável. Se ela nunca recebeu um valor, a leitura pega lixo:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat naoinit.cpp
+#include &lt;iostream&gt;
+
+int main() {
+    int total;
+    total += 5;
+    std::cout &lt;&lt; total &lt;&lt; '\n';
+}
+$ g++ -std=c++23 -Wall -Wextra naoinit.cpp -o naoinit
+naoinit.cpp: In function ‘int main()’:
+naoinit.cpp:5:11: warning: ‘total’ is used uninitialized [-Wuninitialized]
+    5 |     total += 5;
+      |     ~~~~~~^~~~
+naoinit.cpp:4:9: note: ‘total’ was declared here
+    4 |     int total;
+      |         ^~~~~
+$ ./naoinit
+5        « deu 5 por sorte: o lixo na memória era 0 desta vez</pre>
+
+<p>"<code>total</code> é usada sem ter sido inicializada." O resultado 5 é <strong>sorte</strong>: o que havia naquele pedaço de memória por acaso era 0. Em outro programa, em outro computador ou com outras opções de compilação, pode sair qualquer número. Isso é <a href="comportamento-indefinido.html">comportamento indefinido</a>. A solução é simples: <strong>sempre inicialize</strong> os acumuladores, <code>int total = 0;</code>.</p>
+
+<hr>
+
+<h2>Formas diferentes: qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Para…</th><th>Forma longa</th><th>Atalho</th><th>Qual usar</th></tr>
+<tr><td>Aumentar</td><td><code>x = x + n;</code></td><td><code>x += n;</code></td><td>O atalho: nome da variável uma vez só.</td></tr>
+<tr><td>Aumentar de 1 em 1</td><td><code>x = x + 1;</code></td><td><code>x += 1;</code> ou <code>++x;</code></td><td><code>++x</code>, da aula <a href="incremento.html">++ e --</a>.</td></tr>
+<tr><td>Dar um valor novo, sem usar o antigo</td><td><code>x = 7;</code></td><td>(não há)</td><td><code>=</code></td></tr>
+<tr><td>Zerar várias variáveis</td><td><code>a = 0; b = 0; c = 0;</code></td><td><code>a = b = c = 0;</code></td><td>Os dois são claros; escolha um.</td></tr>
+<tr><td>Uma conta diferente, como <code>x = 2 * x + 1</code></td><td><code>x = 2 * x + 1;</code></td><td>(não há)</td><td>A forma longa. Não force um atalho.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>warning: suggest parentheses around assignment used as truth value</code></strong>
+<p><strong>O que aconteceu:</strong> há um <code>=</code> (atribuição) onde o C++ esperava uma condição, como dentro de um <code>if</code>. Quase sempre você quis escrever <code>==</code>.</p>
+<p><strong>Como resolver:</strong> troque por <code>==</code>. Não ignore esse aviso: o programa compila, mas a variável é alterada e a condição dá sempre o mesmo resultado.</p>
+</div>
+
+<div class="cenario">
+<strong><code>warning: statement has no effect [-Wunused-value]</code></strong>
+<p><strong>O que aconteceu:</strong> a linha calcula algo e joga fora, como <code>estoque == 10;</code>. Provavelmente você quis atribuir.</p>
+<p><strong>Como resolver:</strong> <code>estoque = 10;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: lvalue required as left operand of assignment</code></strong>
+<p><strong>O que aconteceu:</strong> do lado esquerdo do <code>=</code> (ou do <code>+=</code> etc.) há algo que não é uma variável: um número, uma conta (<code>a + b = 5</code>) ou, de novo, um <code>=</code> que deveria ser <code>==</code> numa expressão maior.</p>
+<p><strong>Como resolver:</strong> deixe só a variável à esquerda: <code>estoque = 10;</code>, nunca <code>10 = estoque;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: assignment of read-only variable ‘limite’</code></strong>
+<p><strong>O que aconteceu:</strong> você tentou mudar uma variável <code>const</code>.</p>
+<p><strong>Como resolver:</strong> se o valor precisa mudar, tire o <code>const</code>. Se não precisa, crie outra variável para o valor novo: <code>int novo_limite = limite + 5;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A soma não soma: o resultado é o próprio número</strong>
+<p><strong>O que aconteceu:</strong> você escreveu <code>=+</code> (ou <code>=-</code>) no lugar de <code>+=</code> (ou <code>-=</code>). O g++ não avisa.</p>
+<p><strong>Como resolver:</strong> inverta os sinais: <code>pontos += 5;</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operador</th><th>Exemplo</th><th>Equivale a</th><th>Com <code>x</code> = 20, <code>x</code> fica</th></tr>
+<tr><td><code>=</code></td><td><code>x = 5</code></td><td></td><td>5</td></tr>
+<tr><td><code>+=</code></td><td><code>x += 5</code></td><td><code>x = x + 5</code></td><td>25</td></tr>
+<tr><td><code>-=</code></td><td><code>x -= 5</code></td><td><code>x = x - 5</code></td><td>15</td></tr>
+<tr><td><code>*=</code></td><td><code>x *= 5</code></td><td><code>x = x * 5</code></td><td>100</td></tr>
+<tr><td><code>/=</code></td><td><code>x /= 6</code></td><td><code>x = x / 6</code></td><td>3 (divisão inteira)</td></tr>
+<tr><td><code>%=</code></td><td><code>x %= 6</code></td><td><code>x = x % 6</code></td><td>2</td></tr>
+<tr><td><code>&amp;= |= ^= &lt;&lt;= &gt;&gt;=</code></td><td><code>x &amp;= 6</code></td><td><code>x = x &amp; 6</code></td><td>(operadores de bits)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O atalho</h3>
+<p>Reescreva <code>vidas = vidas - 1;</code> usando um operador de atribuição composta (complete com o operador):</p>
+<div class="ex-code">vidas <input data-answer="-=" aria-label="operador"> 1;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Quanto vale?</h3>
+<p><code>int x = 3;</code> e depois <code>x *= 4 + 1;</code>. Quanto vale <code>x</code>?</p>
+<div class="ex-code"><input data-answer="15" aria-label="valor de x"></div>
+</div>
+
+<div class="exercise">
+<h3>3. Divisão no atalho</h3>
+<p><code>int fatias = 17;</code> e depois <code>fatias /= 2;</code>. Quanto vale <code>fatias</code>?</p>
+<div class="ex-code"><input data-answer="8" aria-label="valor de fatias"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. <code>int nivel = 4;</code> e depois <code>nivel =+ 2;</code>. Quanto vale <code>nivel</code>?</p>
+<label><input type="radio" name="q4"> <code>6</code></label>
+<label><input type="radio" name="q4"> <code>4</code></label>
+<label><input type="radio" name="q4"> <code>2</code></label>
+<label><input type="radio" name="q4"> Não compila</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Qual linha <strong>pergunta</strong> se <code>senha</code> é igual a 1234, sem mudar <code>senha</code>?</p>
+<label><input type="radio" name="q5"> <code>senha = 1234</code></label>
+<label><input type="radio" name="q5"> <code>senha == 1234</code></label>
+<label><input type="radio" name="q5"> <code>senha =+ 1234</code></label>
+<label><input type="radio" name="q5"> <code>senha := 1234</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Depois de <code>int a = 1, b = 2, c = 3;</code> e <code>a = b = c;</code>, quanto valem <code>a</code>, <code>b</code> e <code>c</code>?</p>
+<label><input type="radio" name="q6"> 3, 3 e 3</label>
+<label><input type="radio" name="q6"> 1, 1 e 1</label>
+<label><input type="radio" name="q6"> 2, 3 e 3</label>
+<label><input type="radio" name="q6"> 1, 2 e 3</label>
+</div>
+
+<h3>Missão final: o placar do jogo</h3>
+
+<div class="trycpp" data-goal="out:Pontos: 240,src:\+=,src:-=,src:\*=">
+<p class="try-task"><strong>Missão:</strong> a Ana começa o jogo com <code>100</code> pontos. Usando os atalhos, faça: ela ganha 50 pontos (<code>+=</code>), perde 30 numa armadilha (<code>-=</code>) e pega um bônus que dobra os pontos (<code>*=</code>). A saída final deve ser:</p>
+<pre class="out">Pontos: 240</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int pontos = 100;
+    // ganha 50
+
+    // perde 30
+
+    // dobra
+
+    std::cout &lt;&lt; "Pontos: " &lt;&lt; pontos &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int pontos = 100;
+    // ganha 50
+    pontos += 50;
+    // perde 30
+    pontos -= 30;
+    // dobra
+    pontos *= 2;
+    std::cout &lt;&lt; "Pontos: " &lt;&lt; pontos &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>=</code> é <strong>atribuição</strong>: "recebe". O lado direito é calculado primeiro, depois guardado na variável da esquerda. À esquerda só vai uma variável (um <em>lvalue</em>) que não seja <code>const</code>.</li>
+  <li><code>x += n</code> é <code>x = x + n</code>. O mesmo vale para <code>-=</code>, <code>*=</code>, <code>/=</code> e <code>%=</code>. O lado direito é calculado inteiro antes: <code>x *= 2 + 3</code> é <code>x = x * 5</code>.</li>
+  <li>O resultado fica com o tipo da variável: com <code>int</code>, <code>/=</code> é divisão inteira e <code>*= 1.5</code> corta.</li>
+  <li><code>+=</code> também junta textos num <code>std::string</code>.</li>
+  <li><code>a = b = c = 0;</code> atribui da direita para a esquerda.</li>
+  <li><code>=</code> muda; <code>==</code> pergunta. <code>if (x = 10)</code> é um engano: o g++ avisa com <code>suggest parentheses around assignment used as truth value</code>.</li>
+  <li><code>x =+ 5</code> é <code>x = +5</code>, não soma. O sinal da conta vem antes do <code>=</code>.</li>
+  <li>Inicialize os acumuladores (<code>int total = 0;</code>) antes de usar <code>+=</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
