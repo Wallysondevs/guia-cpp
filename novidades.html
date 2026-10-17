@@ -599,7 +599,7 @@ baratos.cpp:8:9: error: conversion from ‘std::ranges::filter_view&lt;std::rang
 </table>
 </div>
 
-<p>As três primeiras linhas são as mais faladas, e ainda <strong>não</strong> estão no g++ 15. Veja o que ele responde a cada uma:</p>
+<p>As colunas valem para os compiladores do laboratório (Ubuntu 26.04). O editor do guia usa o Clang 22, um pouco mais novo, então pode aceitar algum item a mais com <code>-std=c++26</code>. As três primeiras linhas são as mais faladas, e ainda <strong>não</strong> estão no g++ 15. Veja o que ele responde a cada uma:</p>
 
 <pre class="term" data-cwd="~/cpp/novidades">$ g++ -std=c++26 -Wall -Wextra c26_reflect.cpp -o c26_reflect
 c26_reflect.cpp:1:10: fatal error: meta: Arquivo ou diretório inexistente

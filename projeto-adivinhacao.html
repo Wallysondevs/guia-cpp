@@ -460,7 +460,24 @@ $ ./semente
 
 <div class="warning">
 <strong>No editor do guia, o número sorteado pode ser outro</strong>
-<p>O C++ garante que o <code>mt19937</code> com a mesma semente solta os mesmos números "crus" em qualquer computador (a segunda linha acima). Mas o "funil" (<code>uniform_int_distribution</code>) é escrito por cada biblioteca do seu jeito. O g++ (biblioteca libstdc++) dá 38 com a semente 42; o editor do guia usa o Clang com outra biblioteca, e pode sortear outro número com a mesma semente. Por isso as missões a partir daqui não dependem de qual número sai: a entrada da missão chuta 1, 2, 3, … até 100, todos na mesma linha, e para quando acerta.</p>
+<p>O C++ garante que o <code>mt19937</code> com a mesma semente solta os mesmos números "crus" em qualquer computador (a segunda linha acima). Mas o "funil" (<code>uniform_int_distribution</code>) é escrito por cada biblioteca do seu jeito. O g++ usa a biblioteca libstdc++ e sorteia <code>38 80 96 19 74</code> com a semente 42; o editor do guia usa o Clang com a biblioteca libc++ e, com a mesma semente, sorteia <code>52 93 15 72 61</code>. Os dois estão certos: o C++ só exige que todos os números tenham a mesma chance. Por isso as missões a partir daqui não dependem de qual número sai: a entrada da missão chuta 1, 2, 3, … até 100, todos na mesma linha, e para quando acerta.</p>
+</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode o <code>semente.cpp</code> no editor e compare com a saída do g++ acima. A segunda linha (os números crus) é igual; a primeira, não. Depois troque a semente 42 por outro número e rode de novo.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;random&gt;
+
+int main() {
+    std::mt19937 gerador(42);
+    std::uniform_int_distribution&lt;int&gt; sorteio(1, 100);
+    for (int i = 0; i &lt; 5; ++i) std::cout &lt;&lt; sorteio(gerador) &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+    std::mt19937 g2(42);
+    for (int i = 0; i &lt; 3; ++i) std::cout &lt;&lt; g2() &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+}
+</pre>
 </div>
 
 <div class="cenario">
