@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ for — início, condição e passo numa linha | Guia C++</title>
+<meta name="description" content="O laço for em C++ para quem nunca programou: a anatomia (início; condição; passo), contar, contar de 2 em 2 e para trás, tabuada, média de notas, o erro do 'um a mais' (&lt;= × &lt;) e a variável que só existe dentro do for, com saídas e erros reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">for</span></h1>
+
+<p class="intro">Na aula <a href="while.html">while</a>, todo laço com contador tinha três peças espalhadas: o <strong>início</strong> antes do laço (<code>int i = 1;</code>), a <strong>condição</strong> no <code>while</code> (<code>i &lt;= 5</code>) e o <strong>passo</strong> lá no fim do corpo (<code>i++</code>). O <code>for</code> junta as três numa linha só. Ele é o laço mais usado do C++ quando você <strong>sabe quantas voltas</strong> quer: de 1 a 10, cada uma das 3 provas, os 30 alunos da turma.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A anatomia do <code>for</code>: <code>for (início; condição; passo)</code>, e em que ordem cada parte roda.</li>
+  <li>Como contar para a frente, de 2 em 2 e para trás.</li>
+  <li>Como fazer uma tabuada e a média de notas com <code>for</code>.</li>
+  <li>O erro do "um a mais": quando usar <code>&lt;=</code> e quando usar <code>&lt;</code>.</li>
+  <li>Por que a variável criada no <code>for</code> não existe depois dele (e o erro real do compilador).</li>
+  <li>Quando usar <code>for</code> e quando usar <code>while</code>.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: "dê 10 voltas na quadra"</h2>
+<p>Um professor de educação física diz: <em>"Deem 10 voltas na quadra."</em> Cada aluno faz a mesma coisa sem pensar: começa a contar do 1, a cada volta soma 1 na cabeça e para quando chega ao 10. Três coisas, sempre as mesmas:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Peça</th><th>Na quadra</th><th>No <code>for</code></th></tr>
+<tr><td><strong>Início</strong></td><td>"Começo na volta 1"</td><td><code>int volta = 1</code></td></tr>
+<tr><td><strong>Condição</strong></td><td>"Continuo enquanto não passei da 10"</td><td><code>volta &lt;= 10</code></td></tr>
+<tr><td><strong>Passo</strong></td><td>"Terminei uma, conto mais uma"</td><td><code>volta++</code></td></tr>
+</table>
+</div>
+<p>O <code>for</code> pede exatamente essas três coisas, nessa ordem, separadas por <strong>ponto e vírgula</strong>.</p>
+
+<hr>
+
+<h2>1. Anatomia do <code>for</code></h2>
+
+<pre class="file" data-file="contar.cpp">#include &lt;iostream&gt;
+
+int main() {
+    for (int i = 1; i &lt;= 5; i++) {
+        std::cout &lt;&lt; "Volta " &lt;&lt; i &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "Fim!\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>for</dt><dd>A palavra-chave do laço. Em inglês, "para": <em>para i de 1 até 5…</em></dd>
+  <dt>int i = 1;</dt><dd><strong>Início</strong>: cria o contador e dá o valor inicial. Roda <strong>uma única vez</strong>, antes de tudo.</dd>
+  <dt>i &lt;= 5;</dt><dd><strong>Condição</strong>: testada <strong>antes de cada volta</strong>, como no <code>while</code>. Se for falsa, o laço acaba.</dd>
+  <dt>i++</dt><dd><strong>Passo</strong>: roda no <strong>fim</strong> de cada volta, depois do corpo. Repare que não leva <code>;</code> depois dele: logo vem o <code>)</code>.</dd>
+  <dt>{ … }</dt><dd>O <strong>corpo</strong>: o que se repete. Aqui, só mostra a volta. Não tem <code>i++</code> dentro: ele já está no cabeçalho.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra contar.cpp -o contar
+$ ./contar
+Volta 1
+Volta 2
+Volta 3
+Volta 4
+Volta 5
+Fim!</pre>
+
+<h3>A ordem em que as partes rodam</h3>
+<p>O cabeçalho é lido da esquerda para a direita, mas <strong>não roda nessa ordem</strong>. O passo, que está escrito antes do corpo, roda depois dele:</p>
+
+<ol class="passo">
+  <li><strong>Início</strong> (<code>int i = 1</code>), uma vez só.</li>
+  <li><strong>Condição</strong> (<code>i &lt;= 5</code>)? Se for falsa, pula para depois da <code>}</code> e o laço acaba.</li>
+  <li><strong>Corpo</strong> (mostra <code>Volta i</code>).</li>
+  <li><strong>Passo</strong> (<code>i++</code>).</li>
+  <li>Volta para o passo 2.</li>
+</ol>
+
+<p>Por isso, o <code>for</code> acima é exatamente o mesmo que este <code>while</code>:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Com <code>for</code></th><th>Com <code>while</code></th></tr>
+<tr><td><pre>for (int i = 1; i &lt;= 5; i++) {
+    std::cout &lt;&lt; i;
+}</pre></td><td><pre>int i = 1;
+while (i &lt;= 5) {
+    std::cout &lt;&lt; i;
+    i++;
+}</pre></td></tr>
+</table>
+</div>
+
+<p>A vantagem do <code>for</code> é que as três peças ficam <strong>juntas, à vista</strong>. Fica muito mais difícil esquecer o passo e criar um <a href="while.html#infinito">laço infinito</a>. (Há uma pequena diferença sobre <em>onde</em> o <code>i</code> existe, que você vai ver na seção 5.)</p>
+
+<div class="trycpp" data-goal="out:Volta 10,src:for\s*\(">
+<p class="try-task"><strong>Missão:</strong> faça o <code>for</code> contar de 1 até <strong>10</strong>. Depois troque o texto <code>"Volta "</code> por <code>"Aluno "</code> e veja que só o corpo muda, o cabeçalho continua igual.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    for (int i = 1; i &lt;= 5; i++) {
+        std::cout &lt;&lt; "Volta " &lt;&lt; i &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "Fim!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    for (int i = 1; i &lt;= 10; i++) {
+        std::cout &lt;&lt; "Volta " &lt;&lt; i &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "Fim!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Contar de 2 em 2 e para trás</h2>
+<p>Basta mudar o <strong>passo</strong> (e, às vezes, o início e a condição). Para os números pares de 0 a 10, o passo é <code>i += 2</code> ("some 2 em <code>i</code>", veja <a href="operadores-atribuicao.html">Operadores de Atribuição</a>):</p>
+
+<pre class="file" data-file="pares.cpp">#include &lt;iostream&gt;
+
+int main() {
+    for (int i = 0; i &lt;= 10; i += 2) {
+        std::cout &lt;&lt; i &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra pares.cpp -o pares
+$ ./pares
+0 2 4 6 8 10 </pre>
+
+<p>Os números saem na mesma linha porque o corpo mostra um espaço (<code>' '</code>) em vez de pular linha. O <code>'\n'</code> <strong>depois</strong> do laço termina a linha uma vez só.</p>
+
+<p>Para trás, comece do maior, use <code>i--</code> e troque a condição para "maior ou igual a 1":</p>
+
+<pre class="file" data-file="regressiva.cpp">#include &lt;iostream&gt;
+
+int main() {
+    for (int i = 10; i &gt;= 1; i--) {
+        std::cout &lt;&lt; i &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; "Já!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra regressiva.cpp -o regressiva
+$ ./regressiva
+10 9 8 7 6 5 4 3 2 1 Já!</pre>
+
+<div class="warning">
+<strong>A condição precisa combinar com a direção do passo</strong>
+<p>Se o contador <strong>sobe</strong> (<code>i++</code>), a condição é do tipo <code>i &lt;= fim</code>. Se ele <strong>desce</strong> (<code>i--</code>), é do tipo <code>i &gt;= fim</code>. Misturar os dois (<code>for (int i = 10; i &gt;= 1; i++)</code>) faz o <code>i</code> subir para sempre, sem nunca ficar menor que 1: o laço não termina até o número "estourar" o limite do <code>int</code>, o que já é <a href="comportamento-indefinido.html">comportamento indefinido</a>.</p>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Quero…</th><th>Cabeçalho</th><th>Resultado</th></tr>
+<tr><td>1 a 10</td><td><code>for (int i = 1; i &lt;= 10; i++)</code></td><td>1 2 3 … 10</td></tr>
+<tr><td>0 a 9 (10 voltas)</td><td><code>for (int i = 0; i &lt; 10; i++)</code></td><td>0 1 2 … 9</td></tr>
+<tr><td>Pares de 0 a 10</td><td><code>for (int i = 0; i &lt;= 10; i += 2)</code></td><td>0 2 4 6 8 10</td></tr>
+<tr><td>Ímpares de 1 a 9</td><td><code>for (int i = 1; i &lt; 10; i += 2)</code></td><td>1 3 5 7 9</td></tr>
+<tr><td>De 5 em 5 até 50</td><td><code>for (int i = 5; i &lt;= 50; i += 5)</code></td><td>5 10 15 … 50</td></tr>
+<tr><td>10 até 1</td><td><code>for (int i = 10; i &gt;= 1; i--)</code></td><td>10 9 8 … 1</td></tr>
+</table>
+</div>
+
+<div class="trycpp" data-goal="out:0 3 6 9 12 15 18 21 24 27 30,src:for\s*\(">
+<p class="try-task"><strong>Missão:</strong> mostre os múltiplos de 3 de <code>0</code> até <code>30</code>, na mesma linha, separados por espaço: <code>0 3 6 9 12 15 18 21 24 27 30</code>. Mude só o cabeçalho do <code>for</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    for (int i = 0; i &lt;= 10; i += 2) {
+        std::cout &lt;&lt; i &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    for (int i = 0; i &lt;= 30; i += 3) {
+        std::cout &lt;&lt; i &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Tabuada</h2>
+<p>Um clássico: a pessoa escolhe o número e o programa mostra a tabuada de 1 a 10. O contador <code>i</code> não serve só para contar: ele entra na conta (<code>n * i</code>).</p>
+
+<pre class="file" data-file="tabuada.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int n = 0;
+    std::cout &lt;&lt; "Tabuada de qual número? ";
+    std::cin &gt;&gt; n;
+    for (int i = 1; i &lt;= 10; i++) {
+        std::cout &lt;&lt; n &lt;&lt; " x " &lt;&lt; i &lt;&lt; " = " &lt;&lt; n * i &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tabuada.cpp -o tabuada
+$ ./tabuada
+Tabuada de qual número? 7
+7 x 1 = 7
+7 x 2 = 14
+7 x 3 = 21
+7 x 4 = 28
+7 x 5 = 35
+7 x 6 = 42
+7 x 7 = 49
+7 x 8 = 56
+7 x 9 = 63
+7 x 10 = 70</pre>
+
+<p>Repare: <code>n</code> fica igual o tempo todo (7), e <code>i</code> muda a cada volta (1, 2, 3…). A tabuada <strong>completa</strong>, do 1 ao 10, precisa de um <code>for</code> dentro de outro: isso é a aula <a href="lacos-aninhados.html">Laços Aninhados</a>.</p>
+
+<h3>Repetir uma leitura N vezes: a média das provas</h3>
+<p>O <code>for</code> também serve para "faça isto 3 vezes". A Ana fez 3 provas e quer a média:</p>
+
+<pre class="file" data-file="media.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double soma = 0.0;
+    for (int prova = 1; prova &lt;= 3; prova++) {
+        double nota = 0.0;
+        std::cout &lt;&lt; "Nota da prova " &lt;&lt; prova &lt;&lt; ": ";
+        std::cin &gt;&gt; nota;
+        soma += nota;
+    }
+    std::cout &lt;&lt; "Média: " &lt;&lt; soma / 3 &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra media.cpp -o media
+$ ./media
+Nota da prova 1: 7.5
+Nota da prova 2: 9
+Nota da prova 3: 6
+Média: 7.5</pre>
+
+<ul>
+  <li>O contador se chama <code>prova</code>: um nome que diz o que ele conta deixa o código mais fácil de ler que <code>i</code>.</li>
+  <li><code>nota</code> nasce <strong>dentro</strong> do corpo, porque só é usada naquela volta; <code>soma</code> nasce <strong>fora</strong>, porque precisa sobreviver às 3 voltas (o acumulador da aula <a href="while.html">while</a>).</li>
+  <li><code>soma</code> é <code>double</code>, então <code>soma / 3</code> é uma divisão com vírgula (veja <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>).</li>
+</ul>
+
+<hr>
+
+<h2 id="um-a-mais">4. O erro do "um a mais": <code>&lt;=</code> × <code>&lt;</code></h2>
+<p>O erro mais famoso dos laços tem até nome em inglês: <em>off-by-one</em>, "errar por um". O laço dá <strong>uma volta a mais</strong> (ou a menos) do que você queria. Quase sempre o culpado é a troca entre <code>&lt;=</code> e <code>&lt;</code>:</p>
+
+<pre class="file" data-file="umamais.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Com &lt;= : ";
+    for (int i = 0; i &lt;= 5; i++) {
+        std::cout &lt;&lt; i &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+
+    std::cout &lt;&lt; "Com &lt;  : ";
+    for (int i = 0; i &lt; 5; i++) {
+        std::cout &lt;&lt; i &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra umamais.cpp -o umamais
+$ ./umamais
+Com &lt;= : 0 1 2 3 4 5
+Com &lt;  : 0 1 2 3 4 </pre>
+
+<p>Começando do <strong>0</strong>, <code>i &lt;= 5</code> dá <strong>6</strong> voltas (0 a 5), e <code>i &lt; 5</code> dá <strong>5</strong> voltas (0 a 4). Para não se confundir, escolha um dos dois "jeitos" e use sempre:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Jeito</th><th>Cabeçalho para N voltas</th><th>Valores de <code>i</code></th><th>Quando usar</th></tr>
+<tr><td>Contar como gente</td><td><code>for (int i = 1; i &lt;= N; i++)</code></td><td>1, 2, …, N</td><td>Quando o número aparece na tela: "Prova 1", "7 x 1"</td></tr>
+<tr><td>Contar como o C++</td><td><code>for (int i = 0; i &lt; N; i++)</code></td><td>0, 1, …, N−1</td><td><strong>Para percorrer listas</strong>, cujas posições começam do 0</td></tr>
+</table>
+</div>
+
+<p>O segundo jeito, <strong>começar do 0 e usar <code>&lt;</code></strong>, é o mais comum em C++, e você vai entender o porquê em <a href="arrays.html">Arrays</a>: as posições de uma lista de 5 itens são 0, 1, 2, 3 e 4. Ali, o erro do "um a mais" deixa de ser só um número a mais na tela: o programa tenta ler uma <strong>posição que não existe</strong>, o que é um erro grave.</p>
+
+<div class="tip">
+<strong>Teste rápido: conte as voltas</strong>
+<p>Em <code>for (int i = A; i &lt; B; i++)</code>, o número de voltas é <code>B − A</code>. Em <code>for (int i = A; i &lt;= B; i++)</code>, é <code>B − A + 1</code>. Quer 10 voltas a partir do 0? <code>i &lt; 10</code>. A partir do 1? <code>i &lt;= 10</code>.</p>
+</div>
+
+<hr>
+
+<h2 id="escopo">5. A variável do <code>for</code> só existe dentro dele</h2>
+<p>Quando você cria o contador no cabeçalho (<code>for (int i = 1; …)</code>), ele pertence ao laço: nasce no início e <strong>desaparece</strong> quando o laço termina. Tentar usá-lo depois dá erro de compilação:</p>
+
+<pre class="file" data-file="escopo.cpp">#include &lt;iostream&gt;
+
+int main() {
+    for (int i = 1; i &lt;= 3; i++) {
+        std::cout &lt;&lt; i &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "No fim, i vale " &lt;&lt; i &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra escopo.cpp -o escopo
+escopo.cpp: In function ‘int main()’:
+escopo.cpp:7:39: error: ‘i’ was not declared in this scope
+    7 |     std::cout &lt;&lt; "No fim, i vale " &lt;&lt; i &lt;&lt; '\n';
+      |                                       ^</pre>
+
+<p>"<code>i</code> não foi declarada neste escopo". O <strong>escopo</strong> de uma variável é o trecho do código onde ela existe (veja <a href="escopo.html">Escopo</a>). O escopo do <code>i</code> criado no <code>for</code> é o próprio <code>for</code>: o cabeçalho e o corpo. A linha 7 já está fora dele. No editor do guia, o Clang diz <code>error: use of undeclared identifier 'i'</code>.</p>
+
+<p>Isso é uma <strong>vantagem</strong>: você pode ter vários <code>for</code> seguidos, todos com <code>i</code>, sem um atrapalhar o outro (como no programa <code>umamais.cpp</code> acima). Se você <strong>precisa</strong> do valor depois do laço, crie a variável antes e deixe o início do <code>for</code> vazio:</p>
+
+<pre class="file" data-file="escopo2.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int i = 1;
+    for (; i &lt;= 3; i++) {
+        std::cout &lt;&lt; i &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "No fim, i vale " &lt;&lt; i &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra escopo2.cpp -o escopo2
+$ ./escopo2
+1
+2
+3
+No fim, i vale 4</pre>
+
+<p>O <code>;</code> logo depois do <code>(</code> continua obrigatório: ele marca que o início está vazio. Quando o <code>for</code> fica assim, muita gente prefere usar um <code>while</code>, que expressa a mesma coisa de um jeito mais natural.</p>
+
+<div class="trycpp" data-goal="erro:/was not declared|undeclared identifier/">
+<p class="try-task"><strong>Missão (provoque o erro):</strong> depois do laço, acrescente uma linha que mostra o valor de <code>volta</code>, por exemplo <code>std::cout &lt;&lt; volta &lt;&lt; '\n';</code>. Rode e leia a mensagem do compilador. Depois conserte, criando <code>volta</code> antes do <code>for</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    for (int volta = 1; volta &lt;= 3; volta++) {
+        std::cout &lt;&lt; "Volta " &lt;&lt; volta &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    for (int volta = 1; volta &lt;= 3; volta++) {
+        std::cout &lt;&lt; "Volta " &lt;&lt; volta &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; volta &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Formas diferentes de escrever</h2>
+
+<h3>Partes vazias e o <code>for (;;)</code></h3>
+<p>Qualquer uma das três partes pode ficar vazia; os dois <code>;</code> continuam. Sem condição, ela é considerada sempre verdadeira, e <code>for (;;)</code> vira um laço infinito, igual a <code>while (true)</code>. Ele precisa de um <code>break</code> lá dentro para terminar (veja <a href="break-continue.html">break e continue</a>).</p>
+
+<h3>Duas variáveis no mesmo <code>for</code></h3>
+<p>No início e no passo, uma <strong>vírgula</strong> separa várias coisas do mesmo tipo. Aqui, <code>i</code> sobe e <code>j</code> desce até se encontrarem:</p>
+
+<pre class="file" data-file="dois.cpp">#include &lt;iostream&gt;
+
+int main() {
+    for (int i = 1, j = 10; i &lt; j; i++, j--) {
+        std::cout &lt;&lt; i &lt;&lt; " e " &lt;&lt; j &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra dois.cpp -o dois
+$ ./dois
+1 e 10
+2 e 9
+3 e 8
+4 e 7
+5 e 6</pre>
+
+<p>É útil de vez em quando, mas deixa o cabeçalho pesado. Na dúvida, prefira um contador só.</p>
+
+<h3><code>i++</code> ou <code>++i</code>?</h3>
+<p>No passo do <code>for</code>, tanto faz: o valor que o <code>++</code> devolve é jogado fora, só importa que <code>i</code> aumentou. Você vai ver muito <code>++i</code> em código C++ profissional, um costume que vem dos <a href="iteradores.html">iteradores</a>. Para números, use o que achar mais legível (a diferença está em <a href="incremento.html">++ e --</a>).</p>
+
+<h3><code>for</code> ou <code>while</code>?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th></tr>
+<tr><td>Sei o número de voltas, ou ele está numa variável (<code>n</code>, o tamanho da lista)</td><td><code>for</code></td></tr>
+<tr><td>Tenho um contador com início, fim e passo claros</td><td><code>for</code></td></tr>
+<tr><td>Repito até algo acontecer (usuário digitar 0, saldo dobrar)</td><td><a href="while.html">while</a></td></tr>
+<tr><td>O corpo precisa rodar ao menos uma vez</td><td><a href="do-while.html">do-while</a></td></tr>
+<tr><td>Passar por todos os itens de uma lista, sem precisar da posição</td><td><a href="for-range.html">for de intervalo</a></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Vírgulas no lugar dos pontos e vírgulas</strong>
+<pre class="file" data-file="virgula.cpp">#include &lt;iostream&gt;
+
+int main() {
+    for (int i = 0, i &lt; 3, i++) {
+        std::cout &lt;&lt; i &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra virgula.cpp -o virgula
+virgula.cpp: In function ‘int main()’:
+virgula.cpp:4:22: error: expected ‘;’ before ‘&lt;’ token
+    4 |     for (int i = 0, i &lt; 3, i++) {
+      |                      ^~
+      |                      ;
+virgula.cpp:4:23: error: expected primary-expression before ‘&lt;’ token
+    4 |     for (int i = 0, i &lt; 3, i++) {
+      |                       ^
+virgula.cpp:4:31: error: expected ‘;’ before ‘)’ token
+    4 |     for (int i = 0, i &lt; 3, i++) {
+      |                               ^
+      |                               ;</pre>
+<p><strong>O que significa:</strong> "esperava <code>;</code> antes do <code>&lt;</code>". Depois de <code>int i = 0,</code> o compilador achou que você ia criar <strong>outra</strong> variável (como em <code>int i = 0, j = 10</code>) e se perdeu no <code>&lt;</code>. Os erros seguintes são consequência do primeiro: conserte sempre o <strong>primeiro</strong> erro e compile de novo (veja <a href="erros-compilacao.html">Lendo Erros do Compilador</a>).</p>
+<p><strong>Como consertar:</strong> as três partes são separadas por <strong>ponto e vírgula</strong>: <code>for (int i = 0; i &lt; 3; i++)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O corpo roda uma vez só (ponto e vírgula depois do <code>)</code>)</strong>
+<pre class="file" data-file="pontovirgula.cpp">#include &lt;iostream&gt;
+
+int main() {
+    for (int i = 1; i &lt;= 3; i++); {
+        std::cout &lt;&lt; "Olá\n";
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra pontovirgula.cpp -o pontovirgula
+pontovirgula.cpp: In function ‘int main()’:
+pontovirgula.cpp:4:5: warning: this ‘for’ clause does not guard... [-Wmisleading-indentation]
+    4 |     for (int i = 1; i &lt;= 3; i++); {
+      |     ^~~
+pontovirgula.cpp:4:35: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the ‘for’
+    4 |     for (int i = 1; i &lt;= 3; i++); {
+      |                                   ^
+$ ./pontovirgula
+Olá</pre>
+<p><strong>O que significa:</strong> o <code>;</code> logo depois do <code>)</code> é um corpo vazio. O laço deu suas 3 voltas sem fazer nada, e o bloco <code>{ … }</code> de baixo rodou uma vez, depois do laço. No <code>while</code>, o mesmo erro trava o programa; no <code>for</code>, como o passo está no cabeçalho, o laço termina, e o erro passa despercebido se você não ler o aviso. O Clang do editor avisa: <code>warning: for loop has empty body [-Wempty-body]</code>.</p>
+<p><strong>Como consertar:</strong> apague o <code>;</code> entre o <code>)</code> e a <code>{</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"‘i’ was not declared in this scope" depois do laço</strong>
+<p><strong>O que aconteceu:</strong> a variável criada no cabeçalho do <code>for</code> só existe dentro dele (<a href="#escopo">seção 5</a>).</p>
+<p><strong>Como consertar:</strong> se precisar do valor depois do laço, crie a variável antes do <code>for</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Uma volta a mais ou a menos</strong>
+<p><strong>O que aconteceu:</strong> a combinação de início e condição não dá o número de voltas que você queria (<a href="#um-a-mais">seção 4</a>). O compilador não tem como saber o que você queria, então não avisa.</p>
+<p><strong>Como investigar:</strong> mostre o <code>i</code> em cada volta e confira o primeiro e o último valor. Use a regra: do 0 com <code>&lt; N</code>, ou do 1 com <code>&lt;= N</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que faz</th></tr>
+<tr><td><code>for (início; condição; passo) { … }</code></td><td>Início uma vez; depois: testa, corpo, passo, testa…</td></tr>
+<tr><td><code>for (int i = 0; i &lt; n; i++)</code></td><td><code>n</code> voltas, <code>i</code> de 0 a <code>n−1</code> (o padrão para listas).</td></tr>
+<tr><td><code>for (int i = 1; i &lt;= n; i++)</code></td><td><code>n</code> voltas, <code>i</code> de 1 a <code>n</code>.</td></tr>
+<tr><td><code>for (int i = n; i &gt;= 1; i--)</code></td><td>Para trás, de <code>n</code> a 1.</td></tr>
+<tr><td><code>for (int i = 0; i &lt;= 10; i += 2)</code></td><td>De 2 em 2.</td></tr>
+<tr><td><code>for (; cond; passo)</code></td><td>Sem início (a variável foi criada antes).</td></tr>
+<tr><td><code>for (;;)</code></td><td>Infinito; sai com <code>break</code>.</td></tr>
+<tr><td><code>for (int i = 0, j = 9; i &lt; j; i++, j--)</code></td><td>Duas variáveis.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Complete o cabeçalho</h3>
+<p>Complete para mostrar de 1 a 20:</p>
+<div class="ex-code">for (int i = 1; <input data-answer="i &lt;= 20|i&lt;=20|i &lt; 21|i&lt;21" aria-label="condição">; i++)</div>
+</div>
+
+<div class="exercise">
+<h3>2. O passo</h3>
+<p>Complete o passo para mostrar <code>0 5 10 15 20</code>:</p>
+<div class="ex-code">for (int i = 0; i &lt;= 20; <input data-answer="i += 5|i+=5|i = i + 5|i=i+5" aria-label="passo">)</div>
+</div>
+
+<div class="exercise">
+<h3>3. Quantas voltas?</h3>
+<p>Quantas vezes o corpo de <code>for (int i = 0; i &lt;= 10; i++)</code> roda?</p>
+<div class="ex-code"><input data-answer="11|onze" aria-label="número de voltas"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Em que ordem as partes de <code>for (A; B; C) { D }</code> rodam?</p>
+<label><input type="radio" name="q4"> A, B, C, D, A, B, C, D…</label>
+<label><input type="radio" name="q4"> A, C, B, D, C, B, D…</label>
+<label><input type="radio" name="q4"> A, B, D, C, B, D, C…</label>
+<label><input type="radio" name="q4"> B, A, D, C, B, A, D, C…</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Qual cabeçalho mostra <code>5 4 3 2 1</code>?</p>
+<label><input type="radio" name="q5"> <code>for (int i = 5; i &lt;= 1; i--)</code></label>
+<label><input type="radio" name="q5"> <code>for (int i = 5; i &gt;= 1; i--)</code></label>
+<label><input type="radio" name="q5"> <code>for (int i = 5; i &gt;= 1; i++)</code></label>
+<label><input type="radio" name="q5"> <code>for (int i = 1; i &lt;= 5; i++)</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Depois de <code>for (int i = 0; i &lt; 3; i++) { }</code>, a linha <code>std::cout &lt;&lt; i;</code>…</p>
+<label><input type="radio" name="q6"> não compila: <code>i</code> só existe dentro do <code>for</code>.</label>
+<label><input type="radio" name="q6"> mostra 3.</label>
+<label><input type="radio" name="q6"> mostra 2.</label>
+<label><input type="radio" name="q6"> mostra 0.</label>
+</div>
+
+<h3>Missão final: a tabuada do 9</h3>
+<div class="trycpp" data-goal="out:9 x 1 = 9,out:9 x 10 = 90,src:for\s*\(">
+<p class="try-task"><strong>Missão:</strong> com um <code>for</code>, mostre a tabuada do 9, de <code>9 x 1 = 9</code> até <code>9 x 10 = 90</code>, uma conta por linha, no mesmo formato da tabuada da aula.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int n = 9;
+    // escreva o for aqui
+
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int n = 9;
+    for (int i = 1; i &lt;= 10; i++) {
+        std::cout &lt;&lt; n &lt;&lt; " x " &lt;&lt; i &lt;&lt; " = " &lt;&lt; n * i &lt;&lt; '\n';
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>for (início; condição; passo) { corpo }</code> junta as três peças de um laço com contador numa linha.</li>
+  <li>Ordem: início (uma vez) → condição → corpo → passo → condição → …</li>
+  <li>O passo pode ser <code>i++</code>, <code>i--</code>, <code>i += 2</code>…; a condição tem de combinar com a direção.</li>
+  <li><strong>"Um a mais":</strong> do 0 com <code>&lt; N</code> ou do 1 com <code>&lt;= N</code> dão N voltas. Para listas, use do 0 com <code>&lt;</code>.</li>
+  <li>A variável criada no cabeçalho só existe dentro do <code>for</code>; usá-la depois dá <code>‘i’ was not declared in this scope</code>.</li>
+  <li>Separe as partes com <code>;</code> (não vírgula) e não ponha <code>;</code> depois do <code>)</code>.</li>
+  <li>Sabe quantas voltas? <code>for</code>. Repete até algo acontecer? <code>while</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
