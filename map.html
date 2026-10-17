@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ std::map — guardar valores por nome (chave → valor) | Guia C++</title>
+<meta name="description" content="std::map em C++ para quem nunca programou: o estoque da lojinha com std::map&lt;std::string, int&gt;, inserir com [], insert e emplace, ler com [] (que cria chaves sem querer), at (std::out_of_range real), find e contains (C++20), percorrer em ordem com structured bindings, apagar e contar palavras, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">std::map</span></h1>
+
+<p class="intro">A Ana quer controlar o estoque da lojinha: 12 maçãs, 30 bananas, 8 peras. Com um <code>vector</code>, ela teria que guardar os nomes num vetor, as quantidades em outro, e procurar "pera" item por item. O <code>std::map</code> resolve isso: ele guarda <strong>pares</strong> "chave → valor" (<code>"pera"</code> → <code>8</code>) e acha o valor pela chave, direto, como um dicionário acha a definição pela palavra. E ainda mantém tudo em <strong>ordem alfabética</strong>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um <code>std::map</code> e como criar um: <code>std::map&lt;std::string, int&gt;</code>.</li>
+  <li>Três jeitos de inserir: <code>[]</code>, <code>insert</code> e <code>emplace</code>, e a diferença entre eles.</li>
+  <li>Três jeitos de ler: <code>[]</code> (que <strong>cria a chave sem querer</strong>), <code>at</code> (que lança <code>std::out_of_range</code>) e <code>find</code>/<code>contains</code>.</li>
+  <li>Como percorrer em ordem com <code>for (const auto&amp; [nome, qtd] : estoque)</code>.</li>
+  <li>Como apagar com <code>erase</code>.</li>
+  <li>O clássico: contar quantas vezes cada palavra aparece num texto.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp/map</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. É bom conhecer <a href="stl.html">O que é a STL</a> e <a href="iteradores.html">Iteradores</a>.</p>
+
+<hr>
+
+<h2>A ideia: o caderno de estoque</h2>
+<p>A Ana tem um caderno com uma linha por produto, em ordem alfabética: "banana ... 30", "maçã ... 12", "pera ... 8". Para saber quantas peras tem, ela não lê o caderno inteiro: vai direto na letra P. Cada produto aparece <strong>uma vez só</strong>; se chegam mais peras, ela corrige o número da linha "pera", não escreve outra linha.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No caderno</th><th>No <code>std::map</code></th><th>Exemplo</th></tr>
+<tr><td>O nome do produto</td><td>A <strong>chave</strong> (<em>key</em>): única, não se repete</td><td><code>"pera"</code></td></tr>
+<tr><td>A quantidade</td><td>O <strong>valor</strong> (<em>value</em>)</td><td><code>8</code></td></tr>
+<tr><td>Uma linha do caderno</td><td>Um <strong>par</strong> chave-valor</td><td><code>{"pera", 8}</code></td></tr>
+<tr><td>A ordem alfabética</td><td>O <code>map</code> mantém as chaves <strong>sempre ordenadas</strong></td><td>banana, maçã, pera</td></tr>
+</table>
+</div>
+
+<p>Em outras linguagens isso se chama "dicionário" (Python), "array associativo" (PHP) ou "objeto" (JavaScript). <code>map</code> quer dizer "mapa", no sentido de "mapear": ligar cada chave a um valor.</p>
+
+<hr>
+
+<h2>1. Criar e usar com <code>[]</code></h2>
+
+<pre class="file" data-file="estoque.cpp">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::map&lt;std::string, int&gt; estoque{
+        {"maçã", 12},
+        {"banana", 30},
+    };
+
+    estoque["pera"] = 8;
+    estoque["maçã"] = 15;
+
+    std::cout &lt;&lt; "Maçãs: " &lt;&lt; estoque["maçã"] &lt;&lt; '\n';
+    std::cout &lt;&lt; "Peras: " &lt;&lt; estoque["pera"] &lt;&lt; '\n';
+    std::cout &lt;&lt; "Produtos diferentes: " &lt;&lt; estoque.size() &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;map&gt;</dt><dd>O cabeçalho do <code>std::map</code>.</dd>
+  <dt>std::map&lt;std::string, int&gt;</dt><dd>Um <a href="templates-classe.html">template</a> com <strong>dois</strong> tipos: o da chave (<code>std::string</code>, o nome) e o do valor (<code>int</code>, a quantidade).</dd>
+  <dt>{{"maçã", 12}, {"banana", 30},}</dt><dd>Já cria com dois pares. Cada par vai entre chaves: <code>{chave, valor}</code>. A vírgula depois do último é permitida.</dd>
+  <dt>estoque["pera"] = 8;</dt><dd>Se a chave <code>"pera"</code> não existe, ela é <strong>criada</strong> com o valor 8.</dd>
+  <dt>estoque["maçã"] = 15;</dt><dd>Se a chave já existe, o valor é <strong>trocado</strong>: a maçã passa de 12 para 15. Não aparece uma segunda "maçã".</dd>
+  <dt>estoque["maçã"]</dt><dd>Lê o valor da chave.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/map">$ g++ -std=c++23 -Wall -Wextra estoque.cpp -o estoque
+$ ./estoque
+Maçãs: 15
+Peras: 8
+Produtos diferentes: 3</pre>
+
+<p>Três produtos: maçã, banana, pera. As chaves não se repetem, então <code>size()</code> é o número de produtos diferentes.</p>
+
+<div class="trycpp" data-goal="out:Bananas: 25,out:Kiwis: 6,out:Produtos: 3">
+<p class="try-task"><strong>Missão:</strong> a Ana vendeu 5 bananas e recebeu um produto novo, 6 kiwis. Use <code>[]</code> para tirar 5 das bananas (dica: <code>estoque["banana"] -= 5;</code>) e criar <code>"kiwi"</code> com 6. A saída deve ser <code>Bananas: 25</code>, <code>Kiwis: 6</code> e <code>Produtos: 3</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::map&lt;std::string, int&gt; estoque{{"maçã", 12}, {"banana", 30}};
+
+    // venda 5 bananas e cadastre 6 kiwis aqui
+
+    std::cout &lt;&lt; "Bananas: " &lt;&lt; estoque["banana"] &lt;&lt; '\n';
+    std::cout &lt;&lt; "Kiwis: " &lt;&lt; estoque["kiwi"] &lt;&lt; '\n';
+    std::cout &lt;&lt; "Produtos: " &lt;&lt; estoque.size() &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::map&lt;std::string, int&gt; estoque{{"maçã", 12}, {"banana", 30}};
+
+    estoque["banana"] -= 5;
+    estoque["kiwi"] = 6;
+
+    std::cout &lt;&lt; "Bananas: " &lt;&lt; estoque["banana"] &lt;&lt; '\n';
+    std::cout &lt;&lt; "Kiwis: " &lt;&lt; estoque["kiwi"] &lt;&lt; '\n';
+    std::cout &lt;&lt; "Produtos: " &lt;&lt; estoque.size() &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<p>Rode também o código inicial, sem mudar nada: aparece <code>Kiwis: 0</code> e <code>Produtos: 3</code>, mesmo sem kiwi nenhum. Por quê? É o assunto da seção 3.</p>
+
+<hr>
+
+<h2>2. Outras formas de inserir: <code>insert</code> e <code>emplace</code></h2>
+
+<pre class="file" data-file="inserir.cpp">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::map&lt;std::string, int&gt; estoque{{"maçã", 12}};
+
+    estoque.insert({"uva", 40});
+    estoque.emplace("kiwi", 5);
+
+    auto [pos, inseriu] = estoque.insert({"maçã", 99});
+    std::cout &lt;&lt; std::boolalpha &lt;&lt; "inseriu? " &lt;&lt; inseriu &lt;&lt; '\n';
+    std::cout &lt;&lt; "maçã continua com " &lt;&lt; pos-&gt;second &lt;&lt; '\n';
+
+    estoque.insert_or_assign("maçã", 99);
+    std::cout &lt;&lt; "agora maçã tem " &lt;&lt; estoque["maçã"] &lt;&lt; '\n';
+
+    for (const auto&amp; [nome, qtd] : estoque) {
+        std::cout &lt;&lt; nome &lt;&lt; ": " &lt;&lt; qtd &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/map">$ g++ -std=c++23 -Wall -Wextra inserir.cpp -o inserir
+$ ./inserir
+inseriu? false
+maçã continua com 12      « o insert NÃO troca um valor que já existe
+agora maçã tem 99
+kiwi: 5                   « em ordem alfabética, não na ordem em que entraram
+maçã: 99
+uva: 40</pre>
+
+<dl class="anatomy">
+  <dt>estoque.insert({"uva", 40});</dt><dd>Insere o par <strong>só se a chave ainda não existe</strong>.</dd>
+  <dt>estoque.emplace("kiwi", 5);</dt><dd>O mesmo que o <code>insert</code>, mas você passa a chave e o valor soltos, e o par é construído direto dentro do <code>map</code>, sem cópia intermediária.</dd>
+  <dt>auto [pos, inseriu] = estoque.insert(…);</dt><dd>O <code>insert</code> devolve <strong>duas</strong> coisas: um iterador para o par (o novo ou o que já estava lá) e um <code>bool</code> dizendo se inseriu. Os colchetes desmontam essa dupla em duas variáveis (veja a seção 4).</dd>
+  <dt>pos-&gt;second</dt><dd>O iterador aponta um par. <code>-&gt;first</code> é a chave e <code>-&gt;second</code> é o valor. A setinha é o mesmo que <code>(*pos).second</code>.</dd>
+  <dt>insert_or_assign</dt><dd>"Insere ou atribui" <span class="versao">C++17</span>: insere se não existe, troca se existe. Faz o mesmo que <code>estoque["maçã"] = 99</code>, mas diz a intenção no nome.</dd>
+</dl>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Chave nova</th><th>Chave que já existe</th><th>Quando usar</th></tr>
+<tr><td><code>m[chave] = valor;</code></td><td>Cria</td><td><strong>Troca</strong> o valor</td><td>O jeito do dia a dia: "o estoque de pera agora é 8".</td></tr>
+<tr><td><code>m.insert({chave, valor});</code></td><td>Cria</td><td><strong>Não mexe</strong> (devolve <code>false</code>)</td><td>Quando o valor antigo deve ser preservado: "cadastre se ainda não existir".</td></tr>
+<tr><td><code>m.emplace(chave, valor);</code></td><td>Cria</td><td>Não mexe</td><td>Igual ao <code>insert</code>, um pouco mais eficiente com valores grandes.</td></tr>
+<tr><td><code>m.insert_or_assign(chave, valor);</code></td><td>Cria</td><td>Troca</td><td>Igual ao <code>[]</code>, mas explícito; funciona também com valores que não têm construtor vazio.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>3. Ler com <code>[]</code>: a chave criada sem querer</h2>
+<p>O <code>[]</code> tem uma regra que pega todo mundo: <strong>se a chave não existe, ele a cria</strong>, com o valor "vazio" do tipo (<code>0</code> para <code>int</code>, <code>""</code> para <code>std::string</code>). Isso vale até quando você só queria <strong>olhar</strong>:</p>
+
+<pre class="file" data-file="criar-sem-querer.cpp">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::map&lt;std::string, int&gt; estoque{{"maçã", 12}, {"pera", 8}};
+
+    std::cout &lt;&lt; "Produtos: " &lt;&lt; estoque.size() &lt;&lt; '\n';
+
+    if (estoque["uva"] &gt; 0) {
+        std::cout &lt;&lt; "Tem uva!\n";
+    }
+
+    std::cout &lt;&lt; "Produtos: " &lt;&lt; estoque.size() &lt;&lt; '\n';
+    for (const auto&amp; [nome, qtd] : estoque) {
+        std::cout &lt;&lt; nome &lt;&lt; ": " &lt;&lt; qtd &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/map">$ g++ -std=c++23 -Wall -Wextra criar-sem-querer.cpp -o criar-sem-querer
+$ ./criar-sem-querer
+Produtos: 2
+Produtos: 3                « a pergunta "tem uva?" cadastrou a uva!
+maçã: 12
+pera: 8
+uva: 0</pre>
+
+<p>A Ana só perguntou se havia uva, e o estoque ganhou um produto "uva" com quantidade 0. Num relatório, isso aparece como um produto que a loja nunca vendeu. É por isso que o <code>[]</code> é ótimo para <strong>escrever</strong> e perigoso para <strong>ler</strong>. Para ler, use <code>at</code> ou <code>find</code>/<code>contains</code>.</p>
+
+<p>Pelo mesmo motivo, o <code>[]</code> não funciona num <code>map</code> <code>const</code>: como ele pode criar chaves, ele <strong>muda</strong> o <code>map</code>, e um <code>map</code> constante não pode mudar. Veja em "Quando dá errado".</p>
+
+<hr>
+
+<h2>4. Ler com segurança: <code>at</code>, <code>find</code> e <code>contains</code></h2>
+
+<h3><code>at</code>: lê ou lança uma exceção</h3>
+<pre class="file" data-file="at.cpp">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::map&lt;std::string, int&gt; estoque{{"maçã", 12}, {"pera", 8}};
+
+    std::cout &lt;&lt; "Maçãs: " &lt;&lt; estoque.at("maçã") &lt;&lt; '\n';
+    std::cout &lt;&lt; "Uvas: " &lt;&lt; estoque.at("uva") &lt;&lt; '\n';
+    std::cout &lt;&lt; "fim\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/map">$ g++ -std=c++23 -Wall -Wextra at.cpp -o at
+$ ./at
+Maçãs: 12
+terminate called after throwing an instance of 'std::out_of_range'
+  what():  map::at
+Abortado                   (imagem do núcleo gravada) ./at
+$ echo $?
+134</pre>
+
+<dl class="anatomy">
+  <dt>terminate called after throwing an instance of 'std::out_of_range'</dt><dd>"O programa foi encerrado depois de lançar um <code>std::out_of_range</code>" ("fora do intervalo"). O <code>at</code> não achou a chave <code>"uva"</code> e, em vez de criá-la, lançou uma <a href="excecoes.html">exceção</a>. Ninguém a pegou, então o programa foi abortado.</dd>
+  <dt>what():  map::at</dt><dd>A mensagem da exceção: veio do <code>map::at</code>. Repare que ela não diz <strong>qual</strong> chave faltou.</dd>
+  <dt>Abortado … / 134</dt><dd>O sistema matou o programa (128 + 6, o sinal de "abortar"). O <code>fim</code> nunca apareceu.</dd>
+</dl>
+
+<p>O <code>at</code> é a escolha quando a chave <strong>tem</strong> que existir: se não existe, é um erro, e é melhor parar do que seguir com um 0 inventado. Se quiser tratar o erro, use <code>try</code>/<code>catch</code>:</p>
+
+<pre class="file" data-file="at-try.cpp">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::map&lt;std::string, int&gt; estoque{{"maçã", 12}, {"pera", 8}};
+
+    try {
+        std::cout &lt;&lt; "Uvas: " &lt;&lt; estoque.at("uva") &lt;&lt; '\n';
+    } catch (const std::out_of_range&amp; e) {
+        std::cout &lt;&lt; "Erro: " &lt;&lt; e.what() &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "Produtos: " &lt;&lt; estoque.size() &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/map">$ g++ -std=c++23 -Wall -Wextra at-try.cpp -o at-try
+$ ./at-try
+Uvas: Erro: map::at          « o "Uvas: " já tinha saído quando o at falhou
+Produtos: 2                  « o at não criou a uva</pre>
+
+<h3><code>find</code> e <code>contains</code>: perguntar antes</h3>
+<pre class="file" data-file="procurar.cpp">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::map&lt;std::string, int&gt; estoque{{"maçã", 12}, {"pera", 8}};
+
+    if (estoque.contains("pera")) {
+        std::cout &lt;&lt; "Tem pera\n";
+    }
+    if (!estoque.contains("uva")) {
+        std::cout &lt;&lt; "Não tem uva\n";
+    }
+
+    auto it = estoque.find("maçã");
+    if (it != estoque.end()) {
+        std::cout &lt;&lt; it-&gt;first &lt;&lt; ": " &lt;&lt; it-&gt;second &lt;&lt; '\n';
+    }
+
+    std::cout &lt;&lt; "count(\"pera\") = " &lt;&lt; estoque.count("pera") &lt;&lt; '\n';
+    std::cout &lt;&lt; "count(\"uva\") = " &lt;&lt; estoque.count("uva") &lt;&lt; '\n';
+    std::cout &lt;&lt; "Produtos: " &lt;&lt; estoque.size() &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/map">$ g++ -std=c++23 -Wall -Wextra procurar.cpp -o procurar
+$ ./procurar
+Tem pera
+Não tem uva
+maçã: 12
+count("pera") = 1
+count("uva") = 0
+Produtos: 2                  « nenhuma dessas perguntas criou chave</pre>
+
+<dl class="anatomy">
+  <dt>contains("pera")</dt><dd><span class="versao">C++20</span> "Contém?": <code>true</code> ou <code>false</code>. A forma mais legível de perguntar.</dd>
+  <dt>find("maçã")</dt><dd>Devolve um iterador para o par, ou <code>end()</code> se não achou. Use quando, além de saber se existe, você quer <strong>usar</strong> o valor: assim procura uma vez só.</dd>
+  <dt>it-&gt;first, it-&gt;second</dt><dd>A chave e o valor do par apontado.</dd>
+  <dt>count("pera")</dt><dd>Quantas vezes a chave aparece: num <code>map</code>, só pode ser 0 ou 1. Era o jeito de perguntar "existe?" antes do C++20.</dd>
+</dl>
+
+<p>Com <code>-std=c++17</code>, o <code>contains</code> não existe:</p>
+<pre class="term" data-cwd="~/cpp/map">$ g++ -std=c++17 -Wall -Wextra procurar.cpp -o procurar
+procurar.cpp: In function ‘int main()’:
+procurar.cpp:8:17: error: ‘class std::map&lt;std::__cxx11::basic_string&lt;char&gt;, int&gt;’ has no member named ‘contains’
+    8 |     if (estoque.contains("pera")) {
+      |                 ^~~~~~~~
+procurar.cpp:11:18: error: ‘class std::map&lt;std::__cxx11::basic_string&lt;char&gt;, int&gt;’ has no member named ‘contains’
+   11 |     if (!estoque.contains("uva")) {
+      |                  ^~~~~~~~</pre>
+<p>Em código antigo, troque por <code>estoque.count("pera") &gt; 0</code> ou <code>estoque.find("pera") != estoque.end()</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Para ler</th><th>Chave existe</th><th>Chave não existe</th><th>Quando usar</th></tr>
+<tr><td><code>m[chave]</code></td><td>O valor</td><td><strong>Cria</strong> a chave com 0 e devolve 0</td><td>Quando criar é o que você quer (contar, somar). Nunca para "só olhar".</td></tr>
+<tr><td><code>m.at(chave)</code></td><td>O valor</td><td>Lança <code>std::out_of_range</code></td><td>Quando a chave <strong>tem</strong> que existir.</td></tr>
+<tr><td><code>m.contains(chave)</code> <span class="versao">C++20</span></td><td><code>true</code></td><td><code>false</code></td><td>Só para saber se existe.</td></tr>
+<tr><td><code>m.find(chave)</code></td><td>Iterador para o par</td><td><code>m.end()</code></td><td>Para saber se existe <strong>e</strong> usar o valor.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>5. Percorrer em ordem: <code>for (const auto&amp; [nome, qtd] : estoque)</code></h2>
+<p>Cada item de um <code>map</code> é um <strong>par</strong> (<code>std::pair</code>), com <code>.first</code> (a chave) e <code>.second</code> (o valor). Há duas formas de percorrer:</p>
+
+<pre class="file" data-file="trecho">// forma 1: structured bindings (C++17)
+for (const auto&amp; [nome, qtd] : estoque) {
+    std::cout &lt;&lt; nome &lt;&lt; ": " &lt;&lt; qtd &lt;&lt; '\n';
+}
+
+// forma 2: o par inteiro
+for (const auto&amp; par : estoque) {
+    std::cout &lt;&lt; par.first &lt;&lt; ": " &lt;&lt; par.second &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>[nome, qtd]</dt><dd><strong>Structured bindings</strong> ("ligações estruturadas") <span class="versao">C++17</span>: desmonta o par em duas variáveis com nomes que <strong>você</strong> escolhe. Muito mais legível que <code>.first</code>/<code>.second</code>. A aula <a href="pair-tuple.html">pair, tuple e Desestruturação</a> conta mais.</dd>
+  <dt>const auto&amp;</dt><dd>Sem cópia e sem mudar. Se quiser <strong>mudar</strong> as quantidades no laço, use <code>auto&amp; [nome, qtd]</code> e escreva em <code>qtd</code>. A chave nunca pode ser mudada (ela é <code>const</code> dentro do par), senão a ordem se quebraria.</dd>
+</dl>
+
+<p>A ordem é <strong>sempre a das chaves</strong>, do menor para o maior: para textos, a ordem alfabética (com um detalhe: maiúsculas vêm antes das minúsculas, e letras acentuadas no começo, como em "água", vão para o fim, porque o <code>map</code> compara os bytes do texto; veja <a href="acentos-utf8.html">Acentos e UTF-8</a>). Para números, a ordem crescente. Se a ordem não importa, existe o <a href="unordered-map.html">std::unordered_map</a>.</p>
+
+<hr>
+
+<h2>6. Apagar com <code>erase</code></h2>
+
+<pre class="file" data-file="apagar.cpp">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::map&lt;std::string, int&gt; estoque{{"maçã", 12}, {"pera", 0}, {"uva", 40}};
+
+    auto apagados = estoque.erase("pera");
+    std::cout &lt;&lt; "apagados: " &lt;&lt; apagados &lt;&lt; '\n';
+    std::cout &lt;&lt; "apagados: " &lt;&lt; estoque.erase("melão") &lt;&lt; '\n';
+
+    for (auto it = estoque.begin(); it != estoque.end(); ++it) {
+        std::cout &lt;&lt; it-&gt;first &lt;&lt; " = " &lt;&lt; it-&gt;second &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/map">$ g++ -std=c++23 -Wall -Wextra apagar.cpp -o apagar
+$ ./apagar
+apagados: 1
+apagados: 0                « apagar uma chave que não existe não é erro
+maçã = 12
+uva = 40</pre>
+
+<p><code>erase(chave)</code> devolve quantos itens apagou (0 ou 1). Também existe <code>erase(iterador)</code>, que, como no <code>vector</code>, devolve o iterador do próximo (aula <a href="iteradores.html">Iteradores</a>), e <code>std::erase_if(estoque, …)</code> <span class="versao">C++20</span> para apagar todos os que cumprem uma condição. No <code>map</code>, apagar um item só invalida o iterador <strong>dele</strong>.</p>
+
+<hr>
+
+<h2>7. O clássico: contar palavras</h2>
+<p>O <code>[]</code> que cria chaves com 0 é perfeito para contar: <code>++contagem[palavra]</code> funciona tanto na primeira vez (cria com 0 e soma 1) quanto nas seguintes (soma 1).</p>
+
+<pre class="file" data-file="contar.cpp">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::map&lt;std::string, int&gt; contagem;
+    std::string palavra;
+
+    while (std::cin &gt;&gt; palavra) {
+        ++contagem[palavra];
+    }
+
+    for (const auto&amp; [p, vezes] : contagem) {
+        std::cout &lt;&lt; p &lt;&lt; ": " &lt;&lt; vezes &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/map">$ g++ -std=c++23 -Wall -Wextra contar.cpp -o contar
+$ echo "o gato e o rato e o queijo" | ./contar
+e: 2
+gato: 1
+o: 3
+queijo: 1
+rato: 1</pre>
+
+<dl class="anatomy">
+  <dt>while (std::cin &gt;&gt; palavra)</dt><dd>Lê uma palavra por vez (o <code>&gt;&gt;</code> separa nos espaços) até a entrada acabar (aula <a href="entrada-cin.html">Entrada com cin</a>).</dd>
+  <dt>++contagem[palavra];</dt><dd>Se a palavra é nova, o <code>[]</code> cria com 0 e o <code>++</code> deixa 1. Se já existe, só soma 1.</dd>
+  <dt>echo "…" | ./contar</dt><dd>No terminal, o <code>|</code> manda o texto do <code>echo</code> para a entrada do programa.</dd>
+</dl>
+
+<p>Em quatro linhas de lógica: cada palavra uma vez só, com a contagem, em ordem alfabética. Esse é o tipo de problema em que o <code>map</code> brilha.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Apareceram produtos com quantidade 0 que ninguém cadastrou</strong>
+<p><strong>O que significa:</strong> algum lugar do programa leu com <code>m[chave]</code> uma chave que não existia, e o <code>[]</code> a criou.</p>
+<p><strong>Como consertar:</strong> para ler, use <code>contains</code>, <code>find</code> ou <code>at</code>. Deixe o <code>[]</code> para escrever.</p>
+</div>
+
+<div class="cenario">
+<strong><code>terminate called after throwing an instance of 'std::out_of_range'</code> / <code>what(): map::at</code></strong>
+<p><strong>O que significa:</strong> um <code>at(chave)</code> não achou a chave, e ninguém pegou a exceção.</p>
+<p><strong>Como consertar:</strong> confira antes com <code>contains</code>, ou envolva com <code>try</code>/<code>catch (const std::out_of_range&amp;)</code>. Se a chave deveria existir, o erro está em quem esqueceu de cadastrá-la.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: passing ‘const std::map&lt;…&gt;’ as ‘this’ argument discards qualifiers</code></strong>
+<pre class="term" data-cwd="~/cpp/map">$ g++ -std=c++23 -Wall -Wextra const-map.cpp -o const-map
+const-map.cpp: In function ‘void mostrar(const std::map&lt;std::__cxx11::basic_string&lt;char&gt;, int&gt;&amp;)’:
+const-map.cpp:6:45: error: passing ‘const std::map&lt;std::__cxx11::basic_string&lt;char&gt;, int&gt;’ as ‘this’ argument discards qualifiers [-fpermissive]
+    6 |     std::cout &lt;&lt; "Maçãs: " &lt;&lt; estoque["maçã"] &lt;&lt; '\n';
+      |                                             ^
+In file included from /usr/include/c++/15/map:65,
+                 from const-map.cpp:2:
+/usr/include/c++/15/bits/stl_map.h:547:7: note:   in call to ‘std::map&lt;_Key, _Tp, _Compare, _Alloc&gt;::mapped_type&amp; std::map&lt;_Key, _Tp, _Compare, _Alloc&gt;::operator[](key_type&amp;&amp;) [with _Key = std::__cxx11::basic_string&lt;char&gt;; _Tp = int; _Compare = std::less&lt;std::__cxx11::basic_string&lt;char&gt; &gt;; _Alloc = std::allocator&lt;std::pair&lt;const std::__cxx11::basic_string&lt;char&gt;, int&gt; &gt;; mapped_type = int; key_type = std::__cxx11::basic_string&lt;char&gt;]’
+  547 |       operator[](key_type&amp;&amp; __k)
+      |       ^~~~~~~~</pre>
+<p><strong>O que significa:</strong> a função recebeu o <code>map</code> como <code>const std::map&lt;…&gt;&amp;</code> (só leitura) e usou <code>[]</code>, que pode criar chaves, ou seja, mudar o <code>map</code>. "Passar um <code>map</code> constante como <code>this</code> descarta o <code>const</code>": o <code>[]</code> não é um <a href="metodos-const.html">método const</a>. No Clang: <code>no viable overloaded operator[] for type 'const std::map&lt;std::string, int&gt;'</code>.</p>
+<p><strong>Como consertar:</strong> dentro da função, leia com <code>estoque.at("maçã")</code> ou com <code>find</code>. Não tire o <code>const</code> do parâmetro só para o <code>[]</code> funcionar.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: ‘class std::map&lt;…&gt;’ has no member named ‘contains’</code></strong>
+<p><strong>O que significa:</strong> compilou com um padrão anterior ao C++20.</p>
+<p><strong>Como consertar:</strong> <code>-std=c++23</code>, ou <code>m.count(chave) &gt; 0</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>std::map&lt;K, V&gt; m;</code></td><td>Cria um <code>map</code> vazio de chave <code>K</code> e valor <code>V</code> (<code>&lt;map&gt;</code>)</td></tr>
+<tr><td><code>m[k] = v;</code></td><td>Cria ou troca</td></tr>
+<tr><td><code>m.insert({k, v})</code> / <code>m.emplace(k, v)</code></td><td>Cria só se não existe; devolve <code>{iterador, inseriu}</code></td></tr>
+<tr><td><code>m.insert_or_assign(k, v)</code></td><td>Cria ou troca <span class="versao">C++17</span></td></tr>
+<tr><td><code>m[k]</code> (lendo)</td><td>O valor; <strong>cria</strong> a chave se não existe</td></tr>
+<tr><td><code>m.at(k)</code></td><td>O valor; lança <code>std::out_of_range</code> se não existe</td></tr>
+<tr><td><code>m.contains(k)</code></td><td><code>true</code>/<code>false</code> <span class="versao">C++20</span></td></tr>
+<tr><td><code>m.find(k)</code></td><td>Iterador para o par, ou <code>m.end()</code></td></tr>
+<tr><td><code>m.count(k)</code></td><td>0 ou 1</td></tr>
+<tr><td><code>m.erase(k)</code></td><td>Apaga; devolve 0 ou 1</td></tr>
+<tr><td><code>m.size()</code>, <code>m.empty()</code>, <code>m.clear()</code></td><td>Quantos pares, se está vazio, apagar tudo</td></tr>
+<tr><td><code>for (const auto&amp; [k, v] : m)</code></td><td>Percorre em ordem de chave</td></tr>
+<tr><td><code>it-&gt;first</code>, <code>it-&gt;second</code></td><td>Chave e valor do par apontado</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O tipo</h3>
+<p>Complete o tipo de um <code>map</code> que liga o nome de um aluno (texto) à nota (com vírgula):</p>
+<div class="ex-code">std::map&lt;std::string, <input data-answer="double" aria-label="tipo">&gt; notas;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Perguntar sem criar</h3>
+<p>Complete para perguntar se existe a chave <code>"kiwi"</code>, sem criá-la (C++20):</p>
+<div class="ex-code">if (estoque.<input data-answer="contains" aria-label="método">("kiwi")) { … }</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. O <code>map</code> tem <code>{{"pera", 8}}</code>. Depois de <code>std::cout &lt;&lt; estoque["uva"];</code>, quanto vale <code>estoque.size()</code>?</p>
+<label><input type="radio" name="q3"> 1</label>
+<label><input type="radio" name="q3"> Dá erro de compilação</label>
+<label><input type="radio" name="q3"> 2: o <code>[]</code> criou a chave <code>"uva"</code> com 0</label>
+<label><input type="radio" name="q3"> O programa lança <code>std::out_of_range</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O <code>map</code> tem <code>{{"maçã", 12}}</code>. O que faz <code>estoque.insert({"maçã", 50});</code>?</p>
+<label><input type="radio" name="q4"> Troca 12 por 50</label>
+<label><input type="radio" name="q4"> Nada: a chave já existe, e o <code>insert</code> não troca</label>
+<label><input type="radio" name="q4"> Cria uma segunda "maçã"</label>
+<label><input type="radio" name="q4"> Soma: fica 62</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Em que ordem o <code>for</code> percorre um <code>std::map&lt;std::string, int&gt;</code>?</p>
+<label><input type="radio" name="q5"> Em ordem crescente das chaves</label>
+<label><input type="radio" name="q5"> Na ordem em que os pares foram inseridos</label>
+<label><input type="radio" name="q5"> Em ordem crescente dos valores</label>
+<label><input type="radio" name="q5"> Numa ordem sem regra</label>
+</div>
+
+<h3>Missão final: contar as frutas vendidas</h3>
+
+<div class="trycpp" data-stdin="banana maçã banana pera maçã banana" data-goal="out:banana: 3,out:maçã: 2,out:pera: 1,src:std::map">
+<p class="try-task"><strong>Missão:</strong> a entrada (já preenchida) tem uma fruta por venda: <code>banana maçã banana pera maçã banana</code>. Use um <code>std::map&lt;std::string, int&gt;</code> para contar as vendas de cada fruta e mostre <code>fruta: vendas</code>, em ordem alfabética:</p>
+<pre class="out">banana: 3
+maçã: 2
+pera: 1</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string fruta;
+
+    while (std::cin &gt;&gt; fruta) {
+        // conte a fruta aqui
+    }
+
+    // mostre a contagem aqui
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::map&lt;std::string, int&gt; vendas;
+    std::string fruta;
+
+    while (std::cin &gt;&gt; fruta) {
+        ++vendas[fruta];
+    }
+
+    for (const auto&amp; [nome, qtd] : vendas) {
+        std::cout &lt;&lt; nome &lt;&lt; ": " &lt;&lt; qtd &lt;&lt; '\n';
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>std::map&lt;Chave, Valor&gt;</code> guarda pares chave → valor, com chaves únicas, <strong>sempre em ordem</strong> de chave.</li>
+  <li>Escrever: <code>m[k] = v</code> (cria ou troca), <code>insert</code>/<code>emplace</code> (só cria), <code>insert_or_assign</code> (cria ou troca).</li>
+  <li>Ler: <code>m[k]</code> <strong>cria a chave</strong> se ela não existe; <code>at</code> lança <code>std::out_of_range</code>; <code>contains</code> <span class="versao">C++20</span> e <code>find</code> só perguntam.</li>
+  <li>Percorrer: <code>for (const auto&amp; [nome, qtd] : m)</code>.</li>
+  <li>Apagar: <code>m.erase(k)</code>, que devolve 0 ou 1.</li>
+  <li>Contar: <code>++contagem[palavra]</code>.</li>
+  <li>Próximo passo: a versão sem ordem e mais rápida, <a href="unordered-map.html">std::unordered_map</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
