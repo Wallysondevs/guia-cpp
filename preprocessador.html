@@ -1,0 +1,684 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Pré-processador — #include, #define, #ifdef e g++ -E | Guia C++</title>
+<meta name="description" content="O pré-processador do C++ para quem nunca programou: o que roda antes do compilador, #include com &lt;&gt; e com aspas, #define para constantes e macros (e o bug clássico do DOBRO(1+2)), #ifdef, #ifndef, #if, #pragma once, -D na linha de comando, __FILE__ e __LINE__, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">O Pré-processador</span></h1>
+
+<p class="intro">Desde o primeiro programa você escreve <code>#include &lt;iostream&gt;</code> no topo do arquivo. Essa linha começa com <code>#</code> e não termina com <code>;</code>, e isso tem um motivo: ela <strong>não é C++</strong>. É uma ordem para um programa que trabalha <strong>antes</strong> do compilador, o <strong>pré-processador</strong>. Nesta aula você vai ver o que ele faz com o seu arquivo, aprender as ordens que ele entende (<code>#include</code>, <code>#define</code>, <code>#ifdef</code>…) e conhecer as armadilhas que fizeram os programadores de C++ moderno usarem o pré-processador o mínimo possível.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é o pré-processador e em que momento ele roda.</li>
+  <li>A diferença entre <code>#include &lt;iostream&gt;</code> e <code>#include "meu.h"</code>.</li>
+  <li>Como criar constantes e macros com <code>#define</code>, e por que <code>DOBRO(1+2)</code> pode dar 5.</li>
+  <li>Como ligar e desligar pedaços do código com <code>#ifdef</code>, <code>#ifndef</code> e <code>#if</code>.</li>
+  <li>Como definir um nome na hora de compilar, com <code>g++ -D</code>.</li>
+  <li>Como ver o arquivo que o compilador recebe de verdade, com <code>g++ -E</code>.</li>
+  <li>Para que servem <code>__FILE__</code>, <code>__LINE__</code> e <code>#pragma once</code>.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp/prepro</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code> (veja <a href="compilar.html">Compilar com g++</a>). Nas caixas "Experimente", o editor do guia compila de verdade, com o Clang.</p>
+
+<hr>
+
+<h2>A ideia: o assistente que prepara a receita</h2>
+<p>Imagine uma cozinheira (o <strong>compilador</strong>) que só sabe seguir receitas escritas por inteiro. Antes de a receita chegar até ela, um <strong>assistente</strong> passa pelo papel e faz trocas mecânicas:</p>
+<ul>
+  <li>onde está escrito "<em>cole aqui a receita do molho</em>", ele cola o texto inteiro da receita do molho;</li>
+  <li>onde está escrito "<em>XÍCARA</em>", ele troca por "<em>240 ml</em>", porque alguém avisou lá em cima que XÍCARA quer dizer 240 ml;</li>
+  <li>os trechos marcados "<em>só se for para festa</em>" ele recorta fora, se não for festa.</li>
+</ul>
+<p>O assistente <strong>não sabe cozinhar</strong>. Ele não entende o que está escrito; ele só cola, troca e recorta texto. Esse assistente é o pré-processador. As ordens para ele são as linhas que começam com <code>#</code>, chamadas <strong>diretivas</strong> (do inglês <em>directive</em>, "instrução").</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Etapa</th><th>Quem faz</th><th>O que recebe</th><th>O que entrega</th></tr>
+<tr><td>1. Pré-processamento</td><td>o pré-processador</td><td>o seu <code>.cpp</code>, com as linhas <code>#</code></td><td>um texto C++ sem nenhuma linha <code>#</code> (as diretivas já foram cumpridas)</td></tr>
+<tr><td>2. Compilação</td><td>o compilador</td><td>esse texto</td><td>código de máquina (um arquivo <code>.o</code>)</td></tr>
+<tr><td>3. Ligação</td><td>o ligador (<em>linker</em>)</td><td>os <code>.o</code> e as bibliotecas</td><td>o programa pronto</td></tr>
+</table>
+</div>
+
+<p>Quando você digita <code>g++ arquivo.cpp -o programa</code>, as três etapas rodam em sequência, sem você ver. A aula <a href="como-funciona.html">Como o C++ Vira Programa</a> mostra o caminho todo; aqui vamos olhar só a primeira etapa.</p>
+
+<hr>
+
+<h2>1. A regra de ouro: só troca de texto</h2>
+<p>Comece pelo exemplo mais famoso. A Ana quer uma "função" que dobra um número e escreve, usando o pré-processador:</p>
+
+<pre class="file" data-file="dobro.cpp">#include &lt;iostream&gt;
+
+#define DOBRO(x) x*2
+
+int main() {
+    std::cout &lt;&lt; "DOBRO(4) = " &lt;&lt; DOBRO(4) &lt;&lt; '\n';
+    std::cout &lt;&lt; "DOBRO(1+2) = " &lt;&lt; DOBRO(1+2) &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#define</dt><dd>"Defina": cria um nome que o pré-processador vai trocar por outro texto. Um nome assim se chama <strong>macro</strong>.</dd>
+  <dt>DOBRO(x)</dt><dd>O nome da macro, com um <strong>parâmetro</strong> <code>x</code>. Por costume, macros são escritas EM MAIÚSCULAS, para chamar a atenção.</dd>
+  <dt>x*2</dt><dd>O texto que vai entrar no lugar de <code>DOBRO(…)</code>, com o <code>x</code> trocado pelo que estiver entre os parênteses.</dd>
+  <dt>(sem ;)</dt><dd>Diretivas não terminam com ponto e vírgula. A linha acaba e a diretiva acaba junto.</dd>
+</dl>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra dobro.cpp -o dobro
+$ ./dobro
+DOBRO(4) = 8
+DOBRO(1+2) = 5          « 1+2 é 3, e o dobro de 3 é 6, não 5!</pre>
+
+<p>Nenhum erro, nenhum aviso, e uma resposta errada. Para entender, peça ao g++ para fazer <strong>só</strong> o pré-processamento e mostrar o resultado. A opção é <code>-E</code>. Num arquivo pequeno, sem <code>#include</code>, dá para ler tudo:</p>
+
+<pre class="file" data-file="mini.cpp">#define PRECO 10
+#define DOBRO(x) x*2
+
+int main() {
+    int a = PRECO;
+    int b = DOBRO(1+2);
+    return a + b;
+}
+</pre>
+
+<pre class="term">$ g++ -E mini.cpp
+# 0 "mini.cpp"
+# 0 "&lt;built-in&gt;"
+# 0 "&lt;command-line&gt;"
+# 1 "/usr/include/stdc-predef.h" 1 3 4
+# 0 "&lt;command-line&gt;" 2
+# 1 "mini.cpp"
+
+
+
+int main() {
+    int a = 10;
+    int b = 1+2*2;          « o texto "1+2" entrou no lugar do x
+    return a + b;
+}</pre>
+
+<p>Aí está o problema. O pré-processador não calculou nada: trocou <code>x</code> pelo <strong>texto</strong> <code>1+2</code> e entregou <code>1+2*2</code> ao compilador. Como a multiplicação vem antes da soma (veja <a href="precedencia.html">Precedência</a>), o resultado é <code>1 + 4 = 5</code>.</p>
+
+<dl class="anatomy">
+  <dt>-E</dt><dd>"Pare depois do pré-processamento" (<em>E</em> de <em>expand</em>, expandir). O resultado sai na tela, ou num arquivo com <code>-o</code>. Nada é compilado.</dd>
+  <dt>linhas <code># 1 "mini.cpp"</code></dt><dd>Marcas que o pré-processador deixa para o compilador saber de que arquivo e de que linha veio cada pedaço. É assim que as mensagens de erro conseguem dizer <code>mini.cpp:6</code>.</dd>
+  <dt>linhas vazias</dt><dd>Onde estavam os <code>#define</code>. A diretiva foi cumprida e sumiu.</dd>
+</dl>
+
+<p>Para ver só o código, sem as marcas, acrescente <code>-P</code>:</p>
+
+<pre class="term">$ g++ -E -P mini.cpp
+int main() {
+    int a = 10;
+    int b = 1+2*2;
+    return a + b;
+}</pre>
+
+<h3>O conserto: parênteses em tudo</h3>
+<p>Quem escreve macros aprende a cercar <strong>cada parâmetro</strong> e <strong>a macro inteira</strong> de parênteses:</p>
+<pre class="file" data-file="trecho">#define DOBRO(x) ((x) * 2)</pre>
+<p>Agora <code>DOBRO(1+2)</code> vira <code>((1+2) * 2)</code>, que dá 6. Os parênteses de fora protegem contra outro tropeço: com <code>#define DOBRO(x) (x)*2</code>, a conta <code>100 / DOBRO(5)</code> vira <code>100 / (5)*2</code>, que o C++ faz da esquerda para a direita: <code>20 * 2 = 40</code>, e não <code>100 / 10 = 10</code>.</p>
+
+<div class="tip">
+<strong>Em C++ moderno, prefira uma função</strong>
+<p>Uma função de verdade recebe o <strong>valor</strong> já calculado, não o texto, e não tem esse problema:</p>
+<pre class="file" data-file="trecho">constexpr int dobro(int x) { return x * 2; }   // dobro(1+2) dá 6</pre>
+<p>Ela é tão rápida quanto a macro, o compilador confere os tipos e ela aparece com o nome certo no depurador. Você vai ver funções em <a href="funcoes.html">Funções</a> e o <code>constexpr</code> em <a href="constexpr.html">constexpr e consteval</a>.</p>
+</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode e veja o <code>5</code> errado. Depois troque a definição por <code>#define DOBRO(x) ((x) * 2)</code> e rode de novo. Para comparar, a função <code>dobro</code> já está pronta embaixo.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+#define DOBRO(x) x*2
+
+constexpr int dobro(int x) { return x * 2; }
+
+int main() {
+    std::cout &lt;&lt; "macro:  DOBRO(1+2) = " &lt;&lt; DOBRO(1+2) &lt;&lt; '\n';
+    std::cout &lt;&lt; "função: dobro(1+2) = " &lt;&lt; dobro(1+2) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. <code>#include</code>: colar outro arquivo aqui</h2>
+<p><code>#include</code> quer dizer "inclua". O pré-processador abre o arquivo indicado e cola o conteúdo <strong>inteiro</strong> no lugar da linha. Veja o tamanho da colagem num "Olá" de cinco linhas:</p>
+
+<pre class="file" data-file="ola.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá!\n";
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -E ola.cpp -o ola.ii
+$ wc -l ola.ii
+68846 ola.ii             « 68 mil linhas!
+$ tail -5 ola.ii
+
+# 3 "ola.cpp"
+int main() {
+    std::cout &lt;&lt; "Olá!\n";
+}</pre>
+
+<p>O seu programa de 5 linhas virou um arquivo de quase 69 mil linhas: o <code>&lt;iostream&gt;</code> inclui outros arquivos, que incluem outros, e tudo é colado. Só no final aparece o seu <code>main</code>. (O <code>.ii</code> é a extensão costumeira para "C++ já pré-processado"; <code>wc -l</code> conta linhas.) É por isso que compilar C++ pode demorar, e é um dos motivos dos <a href="modulos.html">Módulos do C++20</a>.</p>
+
+<h3>Com <code>&lt; &gt;</code> ou com <code>" "</code>?</h3>
+<p>As duas formas fazem a mesma colagem. A diferença é <strong>onde</strong> o pré-processador procura o arquivo:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Onde procura</th><th>Use para</th></tr>
+<tr><td><code>#include &lt;iostream&gt;</code></td><td>só nas pastas do sistema (as da biblioteca padrão e das bibliotecas instaladas)</td><td>biblioteca padrão e bibliotecas de terceiros</td></tr>
+<tr><td><code>#include "calculos.h"</code></td><td><strong>primeiro na pasta do arquivo que está incluindo</strong>; se não achar, nas pastas do sistema</td><td>os arquivos do seu próprio projeto</td></tr>
+</table>
+</div>
+
+<p>Dá para ver a lista de pastas pedindo ao g++ que conte o que está fazendo (<code>-v</code>, de <em>verbose</em>, "falante"). O comando é comprido porque pré-processa um arquivo vazio só para mostrar a lista:</p>
+
+<pre class="term">$ echo | g++ -std=c++23 -x c++ -E -v - 2&gt;&amp;1 | sed -n '/search starts here/,/End of search/p'
+#include "..." search starts here:
+#include &lt;...&gt; search starts here:
+ /usr/include/c++/15                  « aqui mora o arquivo iostream
+ /usr/include/x86_64-linux-gnu/c++/15
+ /usr/include/c++/15/backward
+ /usr/lib/gcc/x86_64-linux-gnu/15/include
+ /usr/local/include
+ /usr/include
+End of search list.</pre>
+
+<p>A lista das aspas está vazia porque, para elas, a primeira pasta é sempre a do próprio arquivo, e só depois vem a lista de baixo. O <code>&lt;iostream&gt;</code> é o arquivo <code>/usr/include/c++/15/iostream</code> (sem extensão mesmo).</p>
+
+<div class="cenario">
+<strong>"fatal error: …: Arquivo ou diretório inexistente"</strong>
+<p>A Ana criou um arquivo <code>precos.h</code> na mesma pasta e o incluiu com sinais de menor e maior:</p>
+<pre class="file" data-file="loja.cpp">#include &lt;iostream&gt;
+#include &lt;precos.h&gt;
+
+int main() {
+    std::cout &lt;&lt; "Pão: R$ " &lt;&lt; PRECO_PAO &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra loja.cpp -o loja
+loja.cpp:2:10: fatal error: precos.h: Arquivo ou diretório inexistente
+    2 | #include &lt;precos.h&gt;
+      |          ^~~~~~~~~~
+compilation terminated.</pre>
+<p><strong>O que significa:</strong> <em>fatal error</em> é um erro que faz o g++ desistir na hora (<em>compilation terminated</em>, "compilação encerrada"). Com <code>&lt; &gt;</code>, ele procurou <code>precos.h</code> só nas pastas do sistema e não achou. A parte "Arquivo ou diretório inexistente" vem em português porque é o sistema que diz que o arquivo não existe; o resto da mensagem é do g++, em inglês.</p>
+<p><strong>Como resolver:</strong> para arquivos seus, use aspas: <code>#include "precos.h"</code>. Outra saída é acrescentar uma pasta à lista do sistema com <code>-I</code> (de <em>include</em>): <code>-I.</code> quer dizer "procure também na pasta atual".</p>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra -I. loja.cpp -o loja
+$ ./loja
+Pão: R$ 0.75</pre>
+<p>O mesmo erro aparece se o nome estiver errado (<code>"preco.h"</code> no lugar de <code>"precos.h"</code>) ou se o arquivo estiver em outra pasta. Confira com <code>ls</code>.</p>
+</div>
+
+<p>Como separar um programa em arquivos <code>.h</code> e <code>.cpp</code> é o assunto da próxima aula, <a href="headers.html">Arquivos .h e .cpp</a>.</p>
+
+<hr>
+
+<h2>3. <code>#define</code> para constantes</h2>
+<p>A forma mais simples do <code>#define</code> não tem parâmetros: só troca um nome por um valor. Você vai encontrá-la em muito código antigo e em código C:</p>
+
+<pre class="file" data-file="trecho">#define PRECO 10        // onde aparecer PRECO, escreva 10
+#define PI 3.14159
+#define LOJA "Lojinha da Ana"</pre>
+
+<p>Em C++, existe um jeito melhor de criar constantes, que você já viu em <a href="constantes.html">Constantes (const e constexpr)</a>:</p>
+
+<pre class="file" data-file="trecho">constexpr int PRECO = 10;
+constexpr double PI = 3.14159;</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>#define PRECO 10</code></th><th><code>constexpr int PRECO = 10;</code></th></tr>
+<tr><td>Tem tipo?</td><td>não, é só texto</td><td>sim, <code>int</code></td></tr>
+<tr><td>Respeita escopo (<a href="escopo.html">chaves</a>, <a href="namespaces.html">namespaces</a>)?</td><td>não: vale do <code>#define</code> até o fim do arquivo, em todo lugar</td><td>sim</td></tr>
+<tr><td>Aparece nas mensagens de erro e no depurador?</td><td>não, o compilador só vê <code>10</code></td><td>sim, pelo nome</td></tr>
+<tr><td>Termina com <code>;</code>?</td><td><strong>não</strong> (veja o cenário abaixo)</td><td>sim</td></tr>
+</table>
+</div>
+
+<p><strong>Qual usar:</strong> <code>constexpr</code> (ou <code>const</code>) para constantes. Deixe o <code>#define</code> para o que só o pré-processador consegue fazer, como as compilações condicionais da próxima seção.</p>
+
+<div class="cenario">
+<strong>Um <code>;</code> a mais no <code>#define</code></strong>
+<pre class="file" data-file="ponto.cpp">#include &lt;iostream&gt;
+
+#define PRECO 10;
+
+int main() {
+    int total = PRECO * 3;
+    std::cout &lt;&lt; total &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra ponto.cpp -o ponto
+ponto.cpp: In function ‘int main()’:
+ponto.cpp:6:23: error: invalid type argument of unary ‘*’ (have ‘int’)
+    6 |     int total = PRECO * 3;
+      |                       ^~~</pre>
+<p><strong>O que aconteceu:</strong> o <code>;</code> faz parte do texto da macro. A linha 6 virou <code>int total = 10; * 3;</code>. O compilador lê <code>int total = 10;</code> e depois <code>* 3;</code> sozinho, e reclama que o <code>*</code> "de um operando só" (<em>unary</em>) não serve para um <code>int</code>. A mensagem fala de <code>*</code> e não de <code>PRECO</code>, porque o compilador nunca viu a palavra <code>PRECO</code>: esse é o pior defeito das macros, o erro aparece longe da causa.</p>
+<p><strong>Como resolver:</strong> tire o <code>;</code> do <code>#define</code>. Melhor ainda: troque por <code>constexpr int PRECO = 10;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"warning: ‘DESCONTO’ redefined"</strong>
+<pre class="file" data-file="redef.cpp">#include &lt;iostream&gt;
+
+#define DESCONTO 10
+#define DESCONTO 15
+
+int main() {
+    std::cout &lt;&lt; DESCONTO &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra redef.cpp -o redef
+redef.cpp:4:9: warning: ‘DESCONTO’ redefined
+    4 | #define DESCONTO 15
+      |         ^~~~~~~~
+redef.cpp:3:9: note: this is the location of the previous definition
+    3 | #define DESCONTO 10
+      |         ^~~~~~~~
+$ ./redef
+15</pre>
+<p><strong>O que significa:</strong> "‘DESCONTO’ foi redefinido". A segunda definição venceu, e a nota (<em>note</em>) mostra onde estava a primeira. Em programas grandes, isso costuma acontecer quando dois arquivos incluídos usam o mesmo nome de macro, e é um ótimo motivo para preferir <code>constexpr</code>, que daria um erro claro.</p>
+<p><strong>Como resolver:</strong> apague uma das definições. Se você quer mesmo trocar o valor, desfaça a primeira antes com <code>#undef DESCONTO</code> ("desdefina").</p>
+</div>
+
+<hr>
+
+<h2>4. Ligar e desligar código: <code>#ifdef</code>, <code>#ifndef</code> e <code>#if</code></h2>
+<p>Aqui o pré-processador faz algo que o C++ comum não faz: <strong>recortar</strong> pedaços do código antes de compilar. O uso mais comum é deixar mensagens de depuração no programa e ligá-las só quando precisar:</p>
+
+<pre class="file" data-file="debug.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int total = 42;
+#ifdef DEBUG
+    std::cout &lt;&lt; "[debug] total vale " &lt;&lt; total &lt;&lt; '\n';
+#endif
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#ifdef DEBUG</dt><dd>"Se <code>DEBUG</code> estiver definido" (<em>if defined</em>). Só pergunta se o nome existe; o valor não importa.</dd>
+  <dt>a linha do meio</dt><dd>Fica no código só se a resposta for sim. Se for não, o pré-processador a apaga e o compilador nem fica sabendo que ela existiu.</dd>
+  <dt>#endif</dt><dd>"Fim do se". Todo <code>#ifdef</code>, <code>#ifndef</code> e <code>#if</code> precisa do seu.</dd>
+</dl>
+
+<p>E onde se define <code>DEBUG</code>? Pode ser com <code>#define DEBUG</code> no topo do arquivo, mas o jeito prático é <strong>na linha de comando</strong>, com <code>-D</code> (de <em>define</em>), sem mexer no código:</p>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra debug.cpp -o debug
+$ ./debug
+Total: 42
+$ g++ -std=c++23 -Wall -Wextra -DDEBUG debug.cpp -o debug
+$ ./debug
+[debug] total vale 42
+Total: 42</pre>
+
+<p><code>-DDEBUG</code> (tudo junto) é o mesmo que escrever <code>#define DEBUG</code> na primeira linha do arquivo. Para dar um valor, use <code>=</code>: <code>-DTAXA=8</code> equivale a <code>#define TAXA 8</code>.</p>
+
+<h3><code>#ifndef</code>: um valor padrão que a linha de comando pode trocar</h3>
+<p><code>#ifndef</code> é o contrário: "se <strong>não</strong> estiver definido" (<em>if not defined</em>). Junto com <code>#if</code>, que testa uma conta, e <code>#elif</code>/<code>#else</code>, que funcionam como o <a href="else-if.html">else if</a> e o <a href="if-else.html">else</a>:</p>
+
+<pre class="file" data-file="taxa.cpp">#include &lt;iostream&gt;
+
+#ifndef TAXA
+#define TAXA 5
+#endif
+
+#define NIVEL 2
+
+int main() {
+    std::cout &lt;&lt; "Taxa: " &lt;&lt; TAXA &lt;&lt; "%\n";
+#if NIVEL &gt;= 2
+    std::cout &lt;&lt; "Mostrando detalhes (nível " &lt;&lt; NIVEL &lt;&lt; ")\n";
+#elif NIVEL == 1
+    std::cout &lt;&lt; "Só o resumo\n";
+#else
+    std::cout &lt;&lt; "Silêncio\n";
+#endif
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra taxa.cpp -o taxa
+$ ./taxa
+Taxa: 5%
+Mostrando detalhes (nível 2)
+$ g++ -std=c++23 -Wall -Wextra -DTAXA=8 taxa.cpp -o taxa
+$ ./taxa
+Taxa: 8%                « o -D chegou primeiro, e o #ifndef não trocou
+Mostrando detalhes (nível 2)</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Diretiva</th><th>Pergunta</th><th>Exemplo</th></tr>
+<tr><td><code>#ifdef X</code></td><td>X está definido?</td><td><code>#ifdef DEBUG</code></td></tr>
+<tr><td><code>#ifndef X</code></td><td>X <strong>não</strong> está definido?</td><td><code>#ifndef TAXA</code></td></tr>
+<tr><td><code>#if conta</code></td><td>a conta (só com números inteiros e macros) dá diferente de zero?</td><td><code>#if NIVEL &gt;= 2</code></td></tr>
+<tr><td><code>#if defined(X)</code></td><td>o mesmo que <code>#ifdef</code>, mas pode ser combinado</td><td><code>#if defined(DEBUG) &amp;&amp; NIVEL &gt; 1</code></td></tr>
+<tr><td><code>#elif</code> / <code>#else</code></td><td>senão, se… / senão</td><td></td></tr>
+<tr><td><code>#endif</code></td><td>fim do bloco</td><td></td></tr>
+</table>
+</div>
+
+<div class="warning">
+<strong>Não use <code>#if</code> no lugar do <code>if</code></strong>
+<p>O <code>#if</code> decide <strong>na hora de compilar</strong>, olhando só macros e números escritos no código. Ele não enxerga variáveis: <code>#if idade &gt;= 18</code> não funciona, porque a variável <code>idade</code> só ganha valor quando o programa roda. Para decisões do programa, use o <a href="if-else.html"><code>if</code></a> normal.</p>
+</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode como está. Depois apague (ou comente com <code>//</code>) a linha <code>#define DEBUG</code> e rode de novo: as linhas <code>[debug]</code> somem. Por último, troque <code>#define NIVEL 2</code> por <code>1</code> e por <code>0</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+#define DEBUG
+#define NIVEL 2
+
+int main() {
+    int itens = 3;
+    double total = 27.5;
+#ifdef DEBUG
+    std::cout &lt;&lt; "[debug] itens = " &lt;&lt; itens &lt;&lt; '\n';
+    std::cout &lt;&lt; "[debug] total = " &lt;&lt; total &lt;&lt; '\n';
+#endif
+#if NIVEL &gt;= 2
+    std::cout &lt;&lt; "Compra com " &lt;&lt; itens &lt;&lt; " itens: R$ " &lt;&lt; total &lt;&lt; '\n';
+#elif NIVEL == 1
+    std::cout &lt;&lt; "R$ " &lt;&lt; total &lt;&lt; '\n';
+#else
+    std::cout &lt;&lt; "(modo silencioso)\n";
+#endif
+}
+</pre>
+</div>
+
+<h3><code>#error</code>: parar a compilação com uma explicação</h3>
+<p>O compilador também define macros sozinho. Uma delas, <code>__cplusplus</code>, diz qual versão do C++ está valendo: <code>202302</code> com <code>-std=c++23</code> e <code>201703</code> (C++17) se você não pedir nenhuma, no g++ 15. Junto com <code>#error</code>, dá para avisar quem esqueceu a opção:</p>
+
+<pre class="file" data-file="versao.cpp">#include &lt;iostream&gt;
+
+#if __cplusplus &lt; 202302L
+#error "Este programa precisa de C++23: compile com -std=c++23"
+#endif
+
+int main() {
+    std::cout &lt;&lt; "Ok, C++23!\n";
+}
+</pre>
+
+<pre class="term">$ g++ -Wall -Wextra versao.cpp -o versao
+versao.cpp:4:2: error: #error "Este programa precisa de C++23: compile com -std=c++23"
+    4 | #error "Este programa precisa de C++23: compile com -std=c++23"
+      |  ^~~~~
+$ g++ -std=c++23 -Wall -Wextra versao.cpp -o versao &amp;&amp; ./versao
+Ok, C++23!</pre>
+
+<p>O <code>L</code> no fim de <code>202302L</code> marca o número como <code>long</code>; é assim que o padrão escreve esses valores (veja <a href="versoes.html">Versões do C++</a>).</p>
+
+<hr>
+
+<h2>5. Onde estou? <code>__FILE__</code> e <code>__LINE__</code></h2>
+<p>Algumas macros já vêm prontas e mudam de valor conforme o lugar onde aparecem. São úteis em mensagens de erro e de depuração:</p>
+
+<pre class="file" data-file="onde.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Arquivo: " &lt;&lt; __FILE__ &lt;&lt; '\n';
+    std::cout &lt;&lt; "Linha: " &lt;&lt; __LINE__ &lt;&lt; '\n';
+    std::cout &lt;&lt; "Função: " &lt;&lt; __func__ &lt;&lt; '\n';
+    std::cout &lt;&lt; "Compilado em: " &lt;&lt; __DATE__ &lt;&lt; '\n';
+    std::cout &lt;&lt; "__cplusplus = " &lt;&lt; __cplusplus &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra onde.cpp -o onde
+$ ./onde
+Arquivo: onde.cpp
+Linha: 5
+Função: main
+Compilado em: Oct 16 2026
+__cplusplus = 202302</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Nome</th><th>Vira</th><th>Observação</th></tr>
+<tr><td><code>__FILE__</code></td><td>o nome do arquivo, como texto</td><td>do jeito que foi passado ao g++</td></tr>
+<tr><td><code>__LINE__</code></td><td>o número da linha onde está escrito</td><td>um número inteiro</td></tr>
+<tr><td><code>__func__</code></td><td>o nome da função atual</td><td>não é macro (é uma variável que o compilador cria), mas é usado junto</td></tr>
+<tr><td><code>__DATE__</code> / <code>__TIME__</code></td><td>data e hora da compilação</td><td>data em inglês: <code>Oct</code> = outubro</td></tr>
+<tr><td><code>__cplusplus</code></td><td>a versão do C++</td><td><code>201703</code>, <code>202002</code>, <code>202302</code>…</td></tr>
+</table>
+</div>
+
+<p>Os dois sublinhados no começo e no fim são uma convenção: nomes assim são <strong>reservados</strong> para o compilador e a biblioteca. Não crie nomes seus com <code>__</code>.</p>
+
+<div class="note">
+<strong>Uma alternativa moderna</strong> <span class="versao">C++20</span>
+<p>O cabeçalho <code>&lt;source_location&gt;</code> traz <code>std::source_location::current()</code>, que guarda arquivo, linha e função sem macros: <code>loc.file_name()</code>, <code>loc.line()</code>, <code>loc.function_name()</code>. Você vai vê-lo em código novo; as macros continuam por toda parte em código antigo e em bibliotecas.</p>
+</div>
+
+<hr>
+
+<h2>6. <code>#pragma once</code>: "inclua só uma vez"</h2>
+<p><code>#pragma</code> é uma diretiva de "pedidos especiais" ao compilador. A mais usada de longe é <code>#pragma once</code> ("uma vez só"), escrita na primeira linha de um arquivo <code>.h</code>: se o mesmo arquivo for incluído duas vezes, o pré-processador cola o conteúdo só na primeira.</p>
+<pre class="file" data-file="precos.h">#pragma once
+
+constexpr double PRECO_PAO = 0.75;
+</pre>
+<p>Por que um arquivo seria incluído duas vezes, o que dá errado quando isso acontece e qual é a alternativa clássica (os <em>include guards</em>, feitos com <code>#ifndef</code>/<code>#define</code>/<code>#endif</code>) são assuntos da aula <a href="headers.html">Arquivos .h e .cpp</a>.</p>
+
+<hr>
+
+<h2>Mais armadilhas das macros</h2>
+<p>Mesmo com todos os parênteses, uma macro pode avaliar o parâmetro <strong>duas vezes</strong>, porque o texto é copiado duas vezes:</p>
+
+<pre class="file" data-file="quadrado.cpp">#include &lt;iostream&gt;
+
+#define QUADRADO(x) ((x) * (x))
+
+int main() {
+    int i = 3;
+    int q = QUADRADO(i++);
+    std::cout &lt;&lt; "q = " &lt;&lt; q &lt;&lt; ", i = " &lt;&lt; i &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra quadrado.cpp -o quadrado
+quadrado.cpp: In function ‘int main()’:
+quadrado.cpp:7:23: warning: operation on ‘i’ may be undefined [-Wsequence-point]
+    7 |     int q = QUADRADO(i++);
+      |                       ^
+quadrado.cpp:3:23: note: in definition of macro ‘QUADRADO’
+    3 | #define QUADRADO(x) ((x) * (x))
+      |                       ^
+$ ./quadrado
+q = 12, i = 5</pre>
+
+<p>A linha virou <code>((i++) * (i++))</code>: o <code>i</code> foi aumentado duas vezes e o resultado (<code>12</code>) não é nem 9 nem 16. O aviso diz "a operação sobre ‘i’ pode ser indefinida": mexer duas vezes na mesma variável numa só conta é <a href="comportamento-indefinido.html">comportamento indefinido</a>, e outro compilador pode dar outro número. A nota mostra que o problema nasceu dentro da macro. Com uma função (<code>constexpr int quadrado(int x)</code>), o <code>i++</code> rodaria uma vez só.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Para…</th><th>Evite</th><th>Prefira</th></tr>
+<tr><td>uma constante</td><td><code>#define PRECO 10</code></td><td><code>constexpr int PRECO = 10;</code></td></tr>
+<tr><td>uma "função" pequena</td><td><code>#define DOBRO(x) ((x) * 2)</code></td><td><code>constexpr int dobro(int x) { return x * 2; }</code></td></tr>
+<tr><td>colar um cabeçalho</td><td></td><td><code>#include</code> (não há outro jeito, fora os <a href="modulos.html">módulos</a>)</td></tr>
+<tr><td>código só de depuração, ou só para um sistema</td><td></td><td><code>#ifdef</code> / <code>#if</code> + <code>-D</code></td></tr>
+<tr><td>proteger um <code>.h</code></td><td></td><td><code>#pragma once</code> ou <em>include guards</em></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Diretiva ou opção</th><th>O que faz</th></tr>
+<tr><td><code>#include &lt;arq&gt;</code></td><td>cola o arquivo, procurando nas pastas do sistema</td></tr>
+<tr><td><code>#include "arq"</code></td><td>cola o arquivo, procurando primeiro na pasta do arquivo atual</td></tr>
+<tr><td><code>#define NOME texto</code></td><td>troca <code>NOME</code> por <code>texto</code> daqui até o fim do arquivo</td></tr>
+<tr><td><code>#define F(x) ((x) * 2)</code></td><td>macro com parâmetro</td></tr>
+<tr><td><code>#undef NOME</code></td><td>esquece a macro</td></tr>
+<tr><td><code>#ifdef</code> / <code>#ifndef</code> / <code>#if</code> / <code>#elif</code> / <code>#else</code> / <code>#endif</code></td><td>mantém ou recorta trechos do código</td></tr>
+<tr><td><code>#error "texto"</code></td><td>para a compilação com a mensagem</td></tr>
+<tr><td><code>#pragma once</code></td><td>inclui este arquivo só uma vez</td></tr>
+<tr><td><code>g++ -E arq.cpp</code></td><td>só pré-processa e mostra o resultado (<code>-P</code> tira as marcas <code>#</code>)</td></tr>
+<tr><td><code>g++ -DNOME</code> / <code>-DNOME=valor</code></td><td>define uma macro na linha de comando</td></tr>
+<tr><td><code>g++ -I pasta</code></td><td>acrescenta uma pasta à busca do <code>#include</code></td></tr>
+<tr><td><code>__FILE__</code>, <code>__LINE__</code>, <code>__DATE__</code>, <code>__cplusplus</code></td><td>macros prontas</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Ver o que o compilador recebe</h3>
+<p>Complete o comando que mostra o arquivo <code>mini.cpp</code> já pré-processado, sem compilar:</p>
+<div class="ex-code">g++ <input data-answer="-E|-E -P|-P -E" aria-label="opção"> mini.cpp</div>
+</div>
+
+<div class="exercise">
+<h3>2. Ligar a depuração sem mexer no código</h3>
+<p>Complete para compilar <code>debug.cpp</code> com a macro <code>DEBUG</code> definida:</p>
+<div class="ex-code">g++ -std=c++23 -Wall -Wextra <input data-answer="-DDEBUG|-D DEBUG" aria-label="opção"> debug.cpp -o debug</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Com <code>#define TRIPLO(x) x*3</code>, quanto vale <code>TRIPLO(2+1)</code>?</p>
+<label><input type="radio" name="q3"> 9</label>
+<label><input type="radio" name="q3"> 6</label>
+<label><input type="radio" name="q3"> 5</label>
+<label><input type="radio" name="q3"> o código não compila</label>
+</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="2">
+<p class="mc-q">4. A Ana escreveu <code>#include &lt;estoque.h&gt;</code> para um arquivo que está na mesma pasta do <code>main.cpp</code> e recebeu <code>fatal error: estoque.h: Arquivo ou diretório inexistente</code>. Qual é o conserto mais simples?</p>
+<label><input type="radio" name="q4"> Trocar para <code>#include estoque.h</code>, sem nada em volta.</label>
+<label><input type="radio" name="q4"> Trocar para <code>#include "estoque.h"</code>.</label>
+<label><input type="radio" name="q4"> Acrescentar <code>;</code> no fim da linha.</label>
+<label><input type="radio" name="q4"> Compilar com <code>-DESTOQUE</code>.</label>
+</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Qual destas tarefas <strong>só</strong> o pré-processador consegue fazer?</p>
+<label><input type="radio" name="q5"> Deixar um trecho de código de fora da compilação, conforme uma opção <code>-D</code>.</label>
+<label><input type="radio" name="q5"> Criar uma constante com nome.</label>
+<label><input type="radio" name="q5"> Dobrar um número.</label>
+<label><input type="radio" name="q5"> Decidir algo com base na idade digitada pelo usuário.</label>
+</div>
+</div>
+
+<h3>Missão final: conserte as macros da lojinha</h3>
+
+<div class="trycpp" data-goal="out:DOBRO(1+2) = 6,out:100 / DOBRO(5) = 10,out:Preço com taxa: 110">
+<p class="try-task"><strong>Missão:</strong> o programa abaixo mostra três números errados por causa das macros. Conserte <strong>só as linhas <code>#define</code></strong> (faltam parênteses) para que a saída fique assim:</p>
+<pre class="out">DOBRO(1+2) = 6
+100 / DOBRO(5) = 10
+Preço com taxa: 110</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+#define DOBRO(x) x*2
+#define COM_TAXA(p) p + p / 10
+
+int main() {
+    std::cout &lt;&lt; "DOBRO(1+2) = " &lt;&lt; DOBRO(1+2) &lt;&lt; '\n';
+    std::cout &lt;&lt; "100 / DOBRO(5) = " &lt;&lt; 100 / DOBRO(5) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Preço com taxa: " &lt;&lt; COM_TAXA(50) * 2 &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+#define DOBRO(x) ((x) * 2)
+#define COM_TAXA(p) ((p) + (p) / 10)
+
+int main() {
+    std::cout &lt;&lt; "DOBRO(1+2) = " &lt;&lt; DOBRO(1+2) &lt;&lt; '\n';
+    std::cout &lt;&lt; "100 / DOBRO(5) = " &lt;&lt; 100 / DOBRO(5) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Preço com taxa: " &lt;&lt; COM_TAXA(50) * 2 &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<div class="trycpp" data-goal="out:Modo: teste,out:Taxa: 8">
+<p class="try-task"><strong>Missão bônus:</strong> sem mexer em nada dentro do <code>main</code>, acrescente linhas <code>#define</code> no topo para que o programa mostre <code>Modo: teste</code> e <code>Taxa: 8</code>. Dica: o <code>#ifndef TAXA</code> só põe 5 se ninguém tiver definido <code>TAXA</code> antes dele.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+// escreva os seus #define aqui
+
+#ifndef TAXA
+#define TAXA 5
+#endif
+
+int main() {
+#ifdef MODO_TESTE
+    std::cout &lt;&lt; "Modo: teste\n";
+#else
+    std::cout &lt;&lt; "Modo: normal\n";
+#endif
+    std::cout &lt;&lt; "Taxa: " &lt;&lt; TAXA &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+#define MODO_TESTE
+#define TAXA 8
+
+#ifndef TAXA
+#define TAXA 5
+#endif
+
+int main() {
+#ifdef MODO_TESTE
+    std::cout &lt;&lt; "Modo: teste\n";
+#else
+    std::cout &lt;&lt; "Modo: normal\n";
+#endif
+    std::cout &lt;&lt; "Taxa: " &lt;&lt; TAXA &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>O pré-processador roda <strong>antes</strong> do compilador e só mexe em texto: cola arquivos, troca nomes, recorta trechos. As ordens para ele começam com <code>#</code> e não têm <code>;</code>.</li>
+  <li><code>#include &lt;x&gt;</code> procura nas pastas do sistema; <code>#include "x"</code> procura primeiro na pasta do arquivo. Use aspas para os seus arquivos.</li>
+  <li><code>#define</code> troca texto, sem entender C++: <code>DOBRO(1+2)</code> com <code>x*2</code> vira <code>1+2*2 = 5</code>. Em macros, parênteses em cada parâmetro e em volta de tudo.</li>
+  <li>Para constantes e "funções", prefira <code>constexpr</code>: tem tipo, respeita escopo e dá erros claros.</li>
+  <li><code>#ifdef</code>, <code>#ifndef</code>, <code>#if</code>… <code>#endif</code> ligam e desligam código na hora de compilar; <code>g++ -DNOME</code> define o nome sem mexer no arquivo.</li>
+  <li><code>g++ -E</code> (com <code>-P</code>) mostra o que o compilador recebe de verdade: é o raio-x de qualquer problema com macros.</li>
+  <li><code>__FILE__</code> e <code>__LINE__</code> dizem onde você está; <code>#pragma once</code> protege um <code>.h</code> de ser colado duas vezes.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
