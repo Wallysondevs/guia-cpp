@@ -1,0 +1,751 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Arquivos — ler e escrever com fstream | Guia C++</title>
+<meta name="description" content="Ler e escrever arquivos em C++ para quem nunca programou: std::ofstream para gravar (e std::ios::app para acrescentar), std::ifstream para ler linha a linha com getline ou palavra a palavra com &gt;&gt;, conferir se o arquivo abriu, quando ele é fechado, ler um CSV e o básico de std::filesystem, com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Ler e Escrever Arquivos</span></h1>
+
+<p class="intro">Tudo o que um programa guarda em variáveis some quando ele termina. A lista de compras, as notas da turma, o placar do jogo: fechou o programa, perdeu. Para guardar de verdade, o programa precisa <strong>escrever num arquivo</strong>, e da próxima vez, <strong>ler o arquivo</strong>. Em C++ isso é feito com a biblioteca <code>&lt;fstream&gt;</code>, e a boa notícia é que você já sabe usá-la: ela funciona igualzinho ao <code>cout</code> e ao <code>cin</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como gravar texto num arquivo com <code>std::ofstream</code> e <code>&lt;&lt;</code>.</li>
+  <li>A diferença entre <strong>sobrescrever</strong> e <strong>acrescentar</strong> (<code>std::ios::app</code>).</li>
+  <li>Como ler um arquivo linha a linha com <code>std::getline</code>, e palavra a palavra ou número a número com <code>&gt;&gt;</code>.</li>
+  <li>Como conferir se o arquivo abriu (<code>if (!arq)</code>), e o que acontece quando você não confere.</li>
+  <li>Quando o arquivo é fechado, e a armadilha de ler um arquivo que ainda está aberto para escrita.</li>
+  <li>Como ler a planilha <code>alunos.csv</code> da Ana, separando os campos pela vírgula.</li>
+  <li>O básico de <code>std::filesystem</code>: o arquivo existe? Qual o tamanho?</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp/arquivos</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Para ver o conteúdo dos arquivos, usamos o comando <code>cat</code> do terminal. No editor do guia, os arquivos de dados aparecem como abas ao lado do código.</p>
+
+<hr>
+
+<h2>A ideia: o arquivo é outro "terminal"</h2>
+<p>Você já conhece dois "canos" de texto: o <code>std::cout</code>, que leva texto do programa para a tela, e o <code>std::cin</code>, que traz texto do teclado para o programa. Em C++, esses canos se chamam <strong>streams</strong> ("fluxos"). Um arquivo é só mais um cano, com a ponta ligada no disco em vez da tela ou do teclado:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Direção</th><th>Tela / teclado</th><th>Arquivo</th><th>Como usar</th></tr>
+<tr><td>Programa → fora (escrever)</td><td><code>std::cout</code></td><td><code>std::ofstream</code></td><td><code>&lt;&lt;</code></td></tr>
+<tr><td>Fora → programa (ler)</td><td><code>std::cin</code></td><td><code>std::ifstream</code></td><td><code>&gt;&gt;</code> e <code>std::getline</code></td></tr>
+</table>
+</div>
+
+<p>Os nomes se leem assim: <code>ofstream</code> = <em>output file stream</em>, "fluxo de saída para arquivo"; <code>ifstream</code> = <em>input file stream</em>, "fluxo de entrada de arquivo". Os dois moram no cabeçalho <code>&lt;fstream&gt;</code>.</p>
+
+<hr>
+
+<h2>1. Escrever: <code>std::ofstream</code></h2>
+
+<pre class="file" data-file="escrever.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::ofstream arq("compras.txt");
+    arq &lt;&lt; "arroz\n";
+    arq &lt;&lt; "feijão\n";
+    arq &lt;&lt; "café " &lt;&lt; 2 &lt;&lt; " pacotes\n";
+    std::cout &lt;&lt; "Lista gravada.\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;fstream&gt;</dt><dd>Traz o <code>ofstream</code> e o <code>ifstream</code>.</dd>
+  <dt>std::ofstream arq("compras.txt");</dt><dd>Cria uma variável <code>arq</code> ligada ao arquivo <code>compras.txt</code>, aberto para escrita. Se o arquivo não existe, ele é criado; se existe, é <strong>esvaziado</strong>. O nome é procurado na pasta em que o programa está rodando.</dd>
+  <dt>arq &lt;&lt; "arroz\n";</dt><dd>Escreve no arquivo, exatamente como o <code>cout</code> escreveria na tela. O <code>\n</code> pula a linha dentro do arquivo.</dd>
+  <dt>arq &lt;&lt; "café " &lt;&lt; 2 &lt;&lt; " pacotes\n";</dt><dd>Números, variáveis e encadeamentos funcionam igual ao <code>cout</code>.</dd>
+  <dt>}</dt><dd>No fim do <code>main</code>, o <code>arq</code> deixa de existir e o arquivo é <strong>fechado sozinho</strong> (seção 4).</dd>
+</dl>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra escrever.cpp -o escrever
+$ ./escrever
+Lista gravada.                « só esta linha foi para a tela
+$ cat compras.txt
+arroz
+feijão
+café 2 pacotes
+$ ./escrever
+Lista gravada.
+$ cat compras.txt
+arroz                         « rodou duas vezes, mas a lista não duplicou
+feijão
+café 2 pacotes</pre>
+
+<p>Repare na segunda execução: o <code>ofstream</code> apagou o conteúdo antigo e escreveu tudo de novo. Esse é o comportamento padrão, chamado <strong>sobrescrever</strong>. Cuidado: abrir um arquivo importante com <code>ofstream</code> por engano apaga o que estava nele.</p>
+
+<h3>Acrescentar no fim: <code>std::ios::app</code></h3>
+<p>Para um diário, um registro de vendas ou um placar, você quer o contrário: manter o que já existe e acrescentar no fim. Para isso, passe um segundo argumento, <code>std::ios::app</code> (de <em>append</em>, "anexar"):</p>
+
+<pre class="file" data-file="diario.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string texto;
+    std::cout &lt;&lt; "O que você fez hoje? ";
+    std::getline(std::cin, texto);
+
+    std::ofstream arq("diario.txt", std::ios::app);
+    arq &lt;&lt; "- " &lt;&lt; texto &lt;&lt; '\n';
+    std::cout &lt;&lt; "Anotado no diário.\n";
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra diario.cpp -o diario
+$ echo "Estudei C++" | ./diario
+O que você fez hoje? Anotado no diário.
+$ echo "Fiz um bolo" | ./diario
+O que você fez hoje? Anotado no diário.
+$ cat diario.txt
+- Estudei C++
+- Fiz um bolo                 « a segunda execução acrescentou, não apagou</pre>
+
+<p>O <code>echo "…" |</code> entrega o texto ao programa como se você o digitasse (por isso a resposta não aparece na tela). Se o <code>diario.txt</code> não existir, o <code>std::ios::app</code> o cria, como o modo normal.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Abertura</th><th>Arquivo não existe</th><th>Arquivo já existe</th></tr>
+<tr><td><code>std::ofstream arq("x.txt");</code></td><td>Cria</td><td>Apaga tudo e escreve do zero</td></tr>
+<tr><td><code>std::ofstream arq("x.txt", std::ios::app);</code></td><td>Cria</td><td>Mantém e escreve no fim</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>2. Ler: <code>std::ifstream</code></h2>
+
+<h3>Linha a linha, com <code>std::getline</code></h3>
+<p>A forma mais comum de ler um arquivo de texto é uma linha por vez, com o mesmo <code>std::getline</code> que você usou com o teclado (veja <a href="getline.html">Ler uma Linha</a>):</p>
+
+<pre class="file" data-file="ler.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::ifstream arq("compras.txt");
+    std::string linha;
+    int numero = 1;
+    while (std::getline(arq, linha)) {
+        std::cout &lt;&lt; numero &lt;&lt; ": " &lt;&lt; linha &lt;&lt; '\n';
+        ++numero;
+    }
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra ler.cpp -o ler
+$ ./ler
+1: arroz
+2: feijão
+3: café 2 pacotes</pre>
+
+<dl class="anatomy">
+  <dt>std::ifstream arq("compras.txt");</dt><dd>Abre o arquivo para leitura. O arquivo não é alterado.</dd>
+  <dt>std::getline(arq, linha)</dt><dd>Lê uma linha inteira do arquivo (sem o <code>\n</code> do fim) e guarda em <code>linha</code>. Igual ao <code>std::getline(std::cin, linha)</code>, trocando o teclado pelo arquivo.</dd>
+  <dt>while (std::getline(arq, linha))</dt><dd>O <code>getline</code> devolve o próprio <code>arq</code>, que vale "verdadeiro" enquanto a leitura dá certo. Quando o arquivo acaba, a leitura falha e o laço para. Essa é a forma correta de ler "até o fim".</dd>
+</dl>
+
+<div class="warning">
+<strong>Não use <code>while (!arq.eof())</code></strong>
+<p>Você vai ver em código antigo um laço <code>while (!arq.eof())</code> (<em>end of file</em>, "fim do arquivo") com o <code>getline</code> dentro. O mesmo <code>ler.cpp</code> escrito assim (<code>eof.cpp</code>) mostra uma linha a mais, vazia:</p>
+<pre class="term">$ ./eof
+1: arroz
+2: feijão
+3: café 2 pacotes
+4:                   « linha fantasma</pre>
+<p>O <code>eof()</code> só fica verdadeiro <strong>depois</strong> que uma leitura bate no fim do arquivo. Na volta 4, o <code>getline</code> falhou, mas o corpo do laço rodou assim mesmo. Coloque a própria leitura na condição do <code>while</code>, como no <code>ler.cpp</code>.</p>
+</div>
+
+<div class="trycpp" data-goal="out:A lista tem 5 itens,src:getline">
+<p class="try-task"><strong>Missão:</strong> o arquivo <code>compras.txt</code> está na outra aba. Complete o programa para ler o arquivo linha a linha com <code>std::getline</code> e contar quantos itens a lista tem. A saída deve ser <code>A lista tem 5 itens</code>.</p>
+<pre class="script" data-file="contar.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::ifstream arq("compras.txt");
+    if (!arq) {
+        std::cerr &lt;&lt; "Erro: não consegui abrir compras.txt\n";
+        return 1;
+    }
+    std::string linha;
+    int itens = 0;
+    // leia o arquivo linha a linha, contando os itens
+
+    std::cout &lt;&lt; "A lista tem " &lt;&lt; itens &lt;&lt; " itens\n";
+}
+</pre>
+<pre class="script" data-file="compras.txt">arroz
+feijão
+café
+leite
+banana
+</pre>
+<pre class="solucao" data-file="contar.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::ifstream arq("compras.txt");
+    if (!arq) {
+        std::cerr &lt;&lt; "Erro: não consegui abrir compras.txt\n";
+        return 1;
+    }
+    std::string linha;
+    int itens = 0;
+    while (std::getline(arq, linha)) {
+        ++itens;
+    }
+    std::cout &lt;&lt; "A lista tem " &lt;&lt; itens &lt;&lt; " itens\n";
+}
+</pre>
+</div>
+
+<h3>Palavra a palavra ou número a número, com <code>&gt;&gt;</code></h3>
+<p>O <code>&gt;&gt;</code> funciona no arquivo como no <code>cin</code> (veja <a href="entrada-cin.html">Entrada com cin</a>): pula espaços e quebras de linha e lê <strong>um pedaço</strong> por vez. Com um <code>std::string</code>, cada pedaço é uma palavra:</p>
+
+<pre class="file" data-file="palavras.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::ifstream arq("compras.txt");
+    std::string palavra;
+    int total = 0;
+    while (arq &gt;&gt; palavra) {
+        std::cout &lt;&lt; '[' &lt;&lt; palavra &lt;&lt; ']';
+        ++total;
+    }
+    std::cout &lt;&lt; '\n' &lt;&lt; total &lt;&lt; " palavras\n";
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra palavras.cpp -o palavras
+$ ./palavras
+[arroz][feijão][café][2][pacotes]
+5 palavras</pre>
+
+<p>Com um <code>double</code>, cada pedaço é um número, e não importa como eles estão distribuídos nas linhas. O arquivo <code>notas.txt</code> tem duas notas na primeira linha e uma em cada uma das outras:</p>
+
+<pre class="term">$ cat notas.txt
+8.5 6.0
+9.5
+7</pre>
+
+<pre class="file" data-file="numeros.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::ifstream arq("notas.txt");
+    double nota = 0.0;
+    double soma = 0.0;
+    int quantas = 0;
+    while (arq &gt;&gt; nota) {
+        soma += nota;
+        ++quantas;
+    }
+    std::cout &lt;&lt; quantas &lt;&lt; " notas, média " &lt;&lt; soma / quantas &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra numeros.cpp -o numeros
+$ ./numeros
+4 notas, média 7.75</pre>
+
+<p>O <code>while (arq &gt;&gt; nota)</code> para quando o arquivo acaba <strong>ou</strong> quando aparece algo que não é número. Se o <code>notas.txt</code> tivesse a palavra <code>falta</code> no meio, a leitura pararia ali, sem aviso.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Para ler…</th><th>Use</th><th>Exemplo</th></tr>
+<tr><td>Linhas inteiras (com espaços)</td><td><code>std::getline(arq, linha)</code></td><td>Lista de compras, frases, CSV</td></tr>
+<tr><td>Palavras soltas</td><td><code>arq &gt;&gt; palavra</code></td><td>Contar palavras de um texto</td></tr>
+<tr><td>Números separados por espaço ou linha</td><td><code>arq &gt;&gt; numero</code></td><td>Uma lista de notas ou medidas</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>3. O arquivo abriu? Sempre confira</h2>
+<p>Abrir um arquivo pode falhar: o nome está errado, o arquivo está em outra pasta, você não tem permissão. E o C++ <strong>não avisa sozinho</strong>. Veja o mesmo programa das notas, com o nome digitado errado (<code>nota.txt</code> em vez de <code>notas.txt</code>):</p>
+
+<pre class="file" data-file="semchecar.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::ifstream arq("nota.txt");
+    double nota = 0.0;
+    double soma = 0.0;
+    int quantas = 0;
+    while (arq &gt;&gt; nota) {
+        soma += nota;
+        ++quantas;
+    }
+    std::cout &lt;&lt; quantas &lt;&lt; " notas, média " &lt;&lt; soma / quantas &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra semchecar.cpp -o semchecar
+$ ./semchecar
+0 notas, média -nan
+$ echo $?
+0                     « para o sistema, deu tudo certo</pre>
+
+<p>Nenhuma mensagem de erro. O <code>ifstream</code> não conseguiu abrir, a primeira leitura falhou, o laço não rodou nenhuma vez e a conta <code>0.0 / 0</code> deu <code>-nan</code> (<em>not a number</em>, "não é um número"; veja <a href="ponto-flutuante.html">float e double</a>). Num programa maior, esse silêncio vira um relatório errado que ninguém percebe.</p>
+
+<p>A solução é testar a variável logo depois de abrir. <code>if (!arq)</code> se lê "se o arquivo não está bom":</p>
+
+<pre class="file" data-file="checar.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::ifstream arq("nota.txt");
+    if (!arq) {
+        std::cerr &lt;&lt; "Erro: não consegui abrir nota.txt\n";
+        return 1;
+    }
+    double nota = 0.0;
+    double soma = 0.0;
+    int quantas = 0;
+    while (arq &gt;&gt; nota) {
+        soma += nota;
+        ++quantas;
+    }
+    std::cout &lt;&lt; quantas &lt;&lt; " notas, média " &lt;&lt; soma / quantas &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra checar.cpp -o checar
+$ ./checar
+Erro: não consegui abrir nota.txt
+$ echo $?
+1                     « código de erro: quem chamou o programa fica sabendo</pre>
+
+<dl class="anatomy">
+  <dt>if (!arq)</dt><dd>Um stream "vale falso" quando está com problema: não abriu, ou a última leitura falhou. Também existe a forma por extenso, <code>if (!arq.is_open())</code> ("não está aberto?").</dd>
+  <dt>std::cerr</dt><dd>A saída de <strong>erros</strong> (<em>character error</em>). Aparece na tela como o <code>cout</code>, mas é um cano separado: se alguém mandar a saída normal do programa para um arquivo, as mensagens de erro continuam na tela.</dd>
+  <dt>return 1;</dt><dd>Termina o <code>main</code> com o código 1, que no Linux quer dizer "deu errado" (o <code>0</code> é sucesso). Scripts e outros programas usam esse código para saber se você teve sucesso.</dd>
+</dl>
+
+<p>Escrever também pode falhar. O <code>ofstream</code> cria o arquivo, mas <strong>não cria pastas</strong>: se a pasta <code>relatorios</code> não existe, a abertura falha.</p>
+
+<pre class="file" data-file="gravarpasta.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::ofstream arq("relatorios/maio.txt");
+    if (!arq) {
+        std::cerr &lt;&lt; "Erro: não consegui criar relatorios/maio.txt\n";
+        return 1;
+    }
+    arq &lt;&lt; "Vendas: 42\n";
+}
+</pre>
+<pre class="term">$ ./gravarpasta
+Erro: não consegui criar relatorios/maio.txt
+$ echo $?
+1</pre>
+
+<p><strong>Regra:</strong> todo <code>ifstream</code> e todo <code>ofstream</code> são seguidos de um <code>if (!arq)</code>. O C++ também pode avisar com uma exceção em vez de exigir o <code>if</code>; você vai conhecer exceções na <a href="excecoes.html">próxima aula</a>.</p>
+
+<hr>
+
+<h2>4. Fechar o arquivo</h2>
+<p>Você não precisa fechar o arquivo à mão. Quando a variável <code>arq</code> deixa de existir (no fim do bloco <code>{ }</code> em que ela foi criada; veja <a href="escopo.html">Escopo</a>), o arquivo é fechado sozinho. Esse jeito de amarrar um recurso a uma variável tem até nome, <strong>RAII</strong>, e você vai estudá-lo em <a href="destrutores-raii.html">Destrutores e RAII</a>.</p>
+
+<p>Existe o <code>arq.close()</code>, que fecha na hora. Ele é útil num caso específico: quando você escreveu e quer ler o mesmo arquivo <strong>na mesma função</strong>. Veja a armadilha:</p>
+
+<pre class="file" data-file="fechar.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::ofstream saida("recado.txt");
+    saida &lt;&lt; "Volto às 15h\n";
+
+    std::ifstream entrada("recado.txt");
+    std::string linha;
+    if (std::getline(entrada, linha)) {
+        std::cout &lt;&lt; "Li: " &lt;&lt; linha &lt;&lt; '\n';
+    } else {
+        std::cout &lt;&lt; "O arquivo estava vazio!\n";
+    }
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra fechar.cpp -o fechar
+$ ./fechar
+O arquivo estava vazio!</pre>
+
+<p>Mas o programa escreveu "Volto às 15h"! O que aconteceu: para ser rápido, o <code>ofstream</code> junta o texto numa área da memória chamada <strong>buffer</strong> ("reservatório") e só manda tudo para o disco de vez em quando, ou quando é fechado. Na hora da leitura, o <code>saida</code> ainda estava aberto e o texto ainda estava no buffer. A correção é fechar o arquivo antes de ler. Um jeito elegante é colocar a escrita num bloco próprio:</p>
+
+<pre class="file" data-file="fechar2.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    {
+        std::ofstream saida("recado.txt");
+        saida &lt;&lt; "Volto às 15h\n";
+    }   // aqui o saida é fechado, e o texto vai para o disco
+
+    std::ifstream entrada("recado.txt");
+    std::string linha;
+    if (std::getline(entrada, linha)) {
+        std::cout &lt;&lt; "Li: " &lt;&lt; linha &lt;&lt; '\n';
+    } else {
+        std::cout &lt;&lt; "O arquivo estava vazio!\n";
+    }
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra fechar2.cpp -o fechar2
+$ ./fechar2
+Li: Volto às 15h</pre>
+
+<p>Escrever <code>saida.close();</code> antes de abrir o <code>entrada</code> também resolve. As duas formas funcionam; o bloco tem a vantagem de que o <code>saida</code> nem existe mais depois, então não dá para usá-lo fechado por engano.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> este programa escreve e lê o mesmo arquivo. Tire as chaves do bloco (as duas linhas com <code>{</code> e <code>}</code> sozinhas) e rode de novo para ver a armadilha do buffer. Depois coloque <code>saida.close();</code> antes do <code>ifstream</code> e confira que volta a funcionar.</p>
+<pre class="script">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    {
+        std::ofstream saida("recado.txt");
+        saida &lt;&lt; "Volto às 15h\n";
+    }   // aqui o saida é fechado, e o texto vai para o disco
+
+    std::ifstream entrada("recado.txt");
+    std::string linha;
+    if (std::getline(entrada, linha)) {
+        std::cout &lt;&lt; "Li: " &lt;&lt; linha &lt;&lt; '\n';
+    } else {
+        std::cout &lt;&lt; "O arquivo estava vazio!\n";
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>5. Ler um CSV: a planilha da Ana</h2>
+<p>CSV (<em>comma-separated values</em>, "valores separados por vírgula") é o formato de planilha mais simples que existe: cada linha é um registro e os campos são separados por vírgulas. Qualquer planilha (LibreOffice Calc, Excel, Google Planilhas) salva e abre CSV. A Ana tem um na pasta <code>Documentos</code>:</p>
+
+<pre class="term">$ cp ~/Documentos/alunos.csv .
+$ cat alunos.csv
+nome,idade,cidade,nota
+Ana,29,Recife,9.5
+Bruno,34,Curitiba,7.0
+Carla,22,Salvador,8.5
+Diego,41,Manaus,6.0
+Elisa,27,Porto Alegre,10.0</pre>
+
+<p>A primeira linha é o <strong>cabeçalho</strong> (os nomes das colunas). Para ler, o programa faz duas etapas: pega cada <strong>linha</strong> do arquivo com <code>getline</code>, e depois separa a linha nos <strong>campos</strong>, de vírgula em vírgula. Cada aluno vira uma <a href="structs.html">struct</a>:</p>
+
+<pre class="file" data-file="csv.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Aluno {
+    std::string nome;
+    int idade = 0;
+    std::string cidade;
+    double nota = 0.0;
+};
+
+int main() {
+    std::ifstream arq("alunos.csv");
+    if (!arq) {
+        std::cerr &lt;&lt; "Erro: não consegui abrir alunos.csv\n";
+        return 1;
+    }
+
+    std::vector&lt;Aluno&gt; turma;
+    std::string linha;
+    std::getline(arq, linha);  // pula o cabeçalho
+
+    while (std::getline(arq, linha)) {
+        std::stringstream partes(linha);
+        std::string idade, nota;
+        Aluno a;
+        std::getline(partes, a.nome, ',');
+        std::getline(partes, idade, ',');
+        std::getline(partes, a.cidade, ',');
+        std::getline(partes, nota, ',');
+        a.idade = std::stoi(idade);
+        a.nota = std::stod(nota);
+        turma.push_back(a);
+    }
+
+    double soma = 0.0;
+    for (const auto&amp; a : turma) {
+        std::cout &lt;&lt; a.nome &lt;&lt; " (" &lt;&lt; a.cidade &lt;&lt; "): " &lt;&lt; a.nota &lt;&lt; '\n';
+        soma += a.nota;
+    }
+    std::cout &lt;&lt; "Média: " &lt;&lt; soma / turma.size() &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra csv.cpp -o csv
+$ ./csv
+Ana (Recife): 9.5
+Bruno (Curitiba): 7
+Carla (Salvador): 8.5
+Diego (Manaus): 6
+Elisa (Porto Alegre): 10
+Média: 8.2</pre>
+
+<dl class="anatomy">
+  <dt>std::getline(arq, linha);  // pula o cabeçalho</dt><dd>Lê a primeira linha e não faz nada com ela. Sem isso, o programa tentaria transformar <code>"idade"</code> em número.</dd>
+  <dt>std::stringstream partes(linha);</dt><dd>Um <strong>stream de texto</strong> (do cabeçalho <code>&lt;sstream&gt;</code>): transforma a linha num "arquivo de mentirinha", de onde dá para ler com <code>getline</code> e <code>&gt;&gt;</code> como de um arquivo de verdade.</dd>
+  <dt>std::getline(partes, a.nome, ',');</dt><dd>O terceiro argumento muda o separador: em vez de ler até o fim da linha, o <code>getline</code> lê até a próxima <strong>vírgula</strong>. Cada chamada pega um campo.</dd>
+  <dt>std::stoi(idade) / std::stod(nota)</dt><dd>Os campos chegam como texto. <code>std::stoi</code> converte para <code>int</code> e <code>std::stod</code> para <code>double</code> (veja <a href="string-numero.html">Texto ↔ Número</a>).</dd>
+</dl>
+
+<p>Repare que a cidade <code>Porto Alegre</code>, com espaço, chegou inteira: o separador agora é a vírgula, não o espaço. Esse é o motivo de usar <code>getline</code> com <code>','</code> em vez de <code>&gt;&gt;</code>.</p>
+
+<div class="warning">
+<strong>CSV de verdade pode ser mais complicado</strong>
+<p>Este programa funciona para CSVs simples, como o da Ana. Planilhas exportadas às vezes trazem campos entre aspas com vírgulas dentro (<code>"Silva, Ana"</code>), ou usam ponto e vírgula como separador (comum em português, porque a vírgula é o separador decimal). Para esses casos, troque o separador (<code>';'</code>) ou use uma biblioteca de CSV (veja <a href="bibliotecas.html">Usar Bibliotecas Externas</a>). E se uma linha tiver um número estragado, o <code>std::stod</code> lança uma exceção: tratar isso é assunto da <a href="excecoes.html">próxima aula</a>.</p>
+</div>
+
+<hr>
+
+<h2>6. <code>std::filesystem</code>: perguntas sobre arquivos <span class="versao">C++17</span></h2>
+<p>Às vezes você não quer ler o arquivo, só saber coisas sobre ele: existe? Qual o tamanho? Para isso existe a biblioteca <code>&lt;filesystem&gt;</code> ("sistema de arquivos"), do C++17. O nome é comprido, então é costume criar um apelido curto para ele, <code>fs</code>:</p>
+
+<pre class="file" data-file="fs.cpp">#include &lt;filesystem&gt;
+#include &lt;iostream&gt;
+
+namespace fs = std::filesystem;
+
+int main() {
+    for (const char* nome : {"alunos.csv", "compras.txt", "nota.txt"}) {
+        if (fs::exists(nome)) {
+            std::cout &lt;&lt; nome &lt;&lt; ": " &lt;&lt; fs::file_size(nome) &lt;&lt; " bytes\n";
+        } else {
+            std::cout &lt;&lt; nome &lt;&lt; ": não existe\n";
+        }
+    }
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra fs.cpp -o fs
+$ ./fs
+alunos.csv: 132 bytes
+compras.txt: 30 bytes
+nota.txt: não existe</pre>
+
+<dl class="anatomy">
+  <dt>namespace fs = std::filesystem;</dt><dd>Um apelido para o <strong>namespace</strong> (a "família de nomes", veja <a href="namespaces.html">Namespaces</a>): <code>fs::exists</code> é o mesmo que <code>std::filesystem::exists</code>. É parecido com o <a href="using-typedef.html">using</a> para tipos.</dd>
+  <dt>fs::exists(nome)</dt><dd>Verdadeiro se o arquivo (ou pasta) existe.</dd>
+  <dt>fs::file_size(nome)</dt><dd>O tamanho em bytes. A <code>compras.txt</code> tem 28 caracteres (contando as 3 quebras de linha), mas 30 bytes: o <code>ã</code> e o <code>é</code> ocupam 2 bytes cada em UTF-8 (veja <a href="acentos-utf8.html">Acentos e UTF-8</a>).</dd>
+</dl>
+
+<p>Pergunte <code>exists</code> antes de <code>file_size</code>. Pedir o tamanho de um arquivo que não existe derruba o programa:</p>
+
+<pre class="term">$ ./fserro
+terminate called after throwing an instance of 'std::filesystem::__cxx11::filesystem_error'
+  what():  filesystem error: cannot get file size: No such file or directory [nota.txt]
+Abortado                   (imagem do núcleo gravada) ./fserro
+$ echo $?
+134</pre>
+
+<p>O <code>file_size</code> lançou uma <strong>exceção</strong> (<em>No such file or directory</em> = "arquivo ou diretório inexistente"), ninguém a tratou e o programa foi abortado. Você vai aprender a ler e a evitar essa mensagem na aula de <a href="excecoes.html">Exceções</a>.</p>
+
+<p>A biblioteca faz muito mais (criar pastas com <code>fs::create_directories</code>, listar arquivos de uma pasta, copiar, apagar, renomear), mas isso foge do básico. Por enquanto, guarde <code>exists</code> e <code>file_size</code>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>O programa leu "nada", sem mensagem de erro</strong>
+<p><strong>O que aconteceu:</strong> o arquivo não abriu (nome errado, pasta errada) e você não conferiu. Laços de leitura simplesmente não rodam.</p>
+<p><strong>Como confirmar:</strong> acrescente <code>if (!arq) { std::cerr &lt;&lt; "não abriu\n"; return 1; }</code> logo depois de abrir. Confira em que pasta você está rodando o programa (<code>pwd</code>, no terminal): o nome é procurado ali, não na pasta do <code>.cpp</code>.</p>
+<p><strong>Como resolver:</strong> corrija o nome ou use o caminho completo, como <code>"/home/ana/Documentos/alunos.csv"</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Meu arquivo foi apagado!"</strong>
+<p><strong>O que aconteceu:</strong> você abriu com <code>std::ofstream arq("dados.txt")</code>, que esvazia o arquivo na hora de abrir, mesmo que você não escreva nada.</p>
+<p><strong>Como resolver:</strong> para acrescentar, use <code>std::ios::app</code>. Para só ler, use <code>std::ifstream</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Escrevi, mas na hora de ler o arquivo estava vazio</strong>
+<p><strong>O que aconteceu:</strong> o <code>ofstream</code> ainda estava aberto, e o texto ainda estava no buffer (seção 4).</p>
+<p><strong>Como resolver:</strong> feche antes de ler (<code>saida.close();</code>) ou coloque a escrita num bloco <code>{ }</code> próprio.</p>
+</div>
+
+<div class="cenario">
+<strong>Uma linha vazia a mais, ou o último número contado duas vezes</strong>
+<p><strong>O que aconteceu:</strong> o laço foi escrito com <code>while (!arq.eof())</code>. Com <code>getline</code>, aparece uma linha vazia no fim; com <code>&gt;&gt;</code>, a leitura que falha deixa a variável como estava, e o último número entra duas vezes na conta. O <code>numeros.cpp</code> escrito assim deu <code>5 notas, média 7.6</code> em vez de <code>4 notas, média 7.75</code>.</p>
+<p><strong>Como resolver:</strong> coloque a leitura na condição: <code>while (std::getline(arq, linha))</code> ou <code>while (arq &gt;&gt; x)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"terminate called after throwing an instance of 'std::invalid_argument'" ao ler um CSV</strong>
+<p><strong>O que aconteceu:</strong> um campo que deveria ser número não era (o cabeçalho que você esqueceu de pular, um campo vazio, uma vírgula a mais). O <code>std::stoi</code>/<code>std::stod</code> não conseguiu converter e lançou uma exceção.</p>
+<p><strong>Como resolver:</strong> pule o cabeçalho com um <code>getline</code> antes do laço e trate o erro com <code>try</code>/<code>catch</code> (veja <a href="excecoes.html">Exceções</a>).</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Significado</th></tr>
+<tr><td><code>#include &lt;fstream&gt;</code></td><td>Traz <code>std::ofstream</code> e <code>std::ifstream</code>.</td></tr>
+<tr><td><code>std::ofstream arq("x.txt");</code></td><td>Abre para escrever, apagando o conteúdo antigo.</td></tr>
+<tr><td><code>std::ofstream arq("x.txt", std::ios::app);</code></td><td>Abre para escrever no fim, mantendo o conteúdo.</td></tr>
+<tr><td><code>arq &lt;&lt; texto &lt;&lt; '\n';</code></td><td>Escreve, como o <code>cout</code>.</td></tr>
+<tr><td><code>std::ifstream arq("x.txt");</code></td><td>Abre para ler.</td></tr>
+<tr><td><code>if (!arq) { … }</code></td><td>Não abriu (ou a última leitura falhou).</td></tr>
+<tr><td><code>while (std::getline(arq, linha))</code></td><td>Lê linha a linha até o fim.</td></tr>
+<tr><td><code>while (arq &gt;&gt; x)</code></td><td>Lê palavra a palavra ou número a número.</td></tr>
+<tr><td><code>std::getline(partes, campo, ',')</code></td><td>Lê até a próxima vírgula (com <code>std::stringstream</code>, de <code>&lt;sstream&gt;</code>).</td></tr>
+<tr><td><code>arq.close();</code></td><td>Fecha na hora (normalmente o fim do bloco já fecha).</td></tr>
+<tr><td><code>std::filesystem::exists("x.txt")</code></td><td>O arquivo existe? (C++17, <code>&lt;filesystem&gt;</code>)</td></tr>
+<tr><td><code>std::filesystem::file_size("x.txt")</code></td><td>Tamanho em bytes (exceção se não existir).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Abrir para acrescentar</h3>
+<p>Complete para abrir <code>vendas.txt</code> sem apagar o que já está nele:</p>
+<div class="ex-code">std::ofstream arq("vendas.txt", <input data-answer="std::ios::app" aria-label="modo de abertura">);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Conferir a abertura</h3>
+<p>Complete a condição que detecta que o arquivo não abriu:</p>
+<div class="ex-code">std::ifstream arq("dados.txt");<br>if (<input data-answer="!arq|!arq.is_open()" aria-label="condição">) { std::cerr &lt;&lt; "Erro\n"; return 1; }</div>
+</div>
+
+<div class="exercise">
+<h3>3. Separar por ponto e vírgula</h3>
+<p>Um CSV usa <code>;</code> como separador. Complete para ler o primeiro campo da linha:</p>
+<div class="ex-code">std::getline(partes, nome, <input data-answer="';'" aria-label="separador">);</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O arquivo <code>placar.txt</code> tem 10 linhas. O que sobra nele depois de <code>std::ofstream arq("placar.txt"); arq &lt;&lt; "fim\n";</code>?</p>
+<label><input type="radio" name="q4"> As 10 linhas e, no fim, <code>fim</code>.</label>
+<label><input type="radio" name="q4"> Só a linha <code>fim</code>.</label>
+<label><input type="radio" name="q4"> <code>fim</code> e, embaixo, as 10 linhas.</label>
+<label><input type="radio" name="q4"> Nada: dá erro, porque o arquivo já existe.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. O <code>ifstream</code> não encontrou o arquivo e o programa não conferiu. O que acontece no <code>while (std::getline(arq, linha))</code>?</p>
+<label><input type="radio" name="q5"> O programa para com uma mensagem de erro.</label>
+<label><input type="radio" name="q5"> O laço roda para sempre.</label>
+<label><input type="radio" name="q5"> O laço não roda nenhuma vez, em silêncio.</label>
+<label><input type="radio" name="q5"> O compilador avisa que o arquivo não existe.</label>
+</div>
+
+<h3>Missão final: quem passou?</h3>
+<div class="trycpp" data-goal="out:Elisa,out:Aprovados: 4,src:stod">
+<p class="try-task"><strong>Missão:</strong> o programa já abre o <code>alunos.csv</code> (na outra aba), pula o cabeçalho e lê o nome de cada aluno. Separe os outros três campos (idade, cidade e nota) com <code>std::getline(partes, …, ',')</code>, converta a nota com <code>std::stod</code> e, se ela for <code>7.0</code> ou mais, mostre o nome e conte o aluno. No fim deve aparecer <code>Aprovados: 4</code>.</p>
+<pre class="script" data-file="aprovados.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::ifstream arq("alunos.csv");
+    if (!arq) {
+        std::cerr &lt;&lt; "Erro: não consegui abrir alunos.csv\n";
+        return 1;
+    }
+    std::string linha;
+    std::getline(arq, linha);  // pula o cabeçalho
+
+    int aprovados = 0;
+    while (std::getline(arq, linha)) {
+        std::stringstream partes(linha);
+        std::string nome, idade, cidade, nota;
+        std::getline(partes, nome, ',');
+        // separe os outros três campos e, se a nota for 7 ou mais,
+        // mostre o nome e conte mais um aprovado
+    }
+    std::cout &lt;&lt; "Aprovados: " &lt;&lt; aprovados &lt;&lt; '\n';
+}
+</pre>
+<pre class="script" data-file="alunos.csv">nome,idade,cidade,nota
+Ana,29,Recife,9.5
+Bruno,34,Curitiba,7.0
+Carla,22,Salvador,8.5
+Diego,41,Manaus,6.0
+Elisa,27,Porto Alegre,10.0
+</pre>
+<pre class="solucao" data-file="aprovados.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::ifstream arq("alunos.csv");
+    if (!arq) {
+        std::cerr &lt;&lt; "Erro: não consegui abrir alunos.csv\n";
+        return 1;
+    }
+    std::string linha;
+    std::getline(arq, linha);  // pula o cabeçalho
+
+    int aprovados = 0;
+    while (std::getline(arq, linha)) {
+        std::stringstream partes(linha);
+        std::string nome, idade, cidade, nota;
+        std::getline(partes, nome, ',');
+        std::getline(partes, idade, ',');
+        std::getline(partes, cidade, ',');
+        std::getline(partes, nota, ',');
+        if (std::stod(nota) &gt;= 7.0) {
+            std::cout &lt;&lt; nome &lt;&lt; '\n';
+            ++aprovados;
+        }
+    }
+    std::cout &lt;&lt; "Aprovados: " &lt;&lt; aprovados &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Arquivos são streams, como <code>cout</code> e <code>cin</code>: <code>std::ofstream</code> + <code>&lt;&lt;</code> para escrever, <code>std::ifstream</code> + <code>getline</code>/<code>&gt;&gt;</code> para ler. Tudo em <code>&lt;fstream&gt;</code>.</li>
+  <li><code>std::ofstream</code> apaga o conteúdo antigo; com <code>std::ios::app</code>, acrescenta no fim.</li>
+  <li>Leia até o fim com a leitura na condição: <code>while (std::getline(arq, linha))</code>. Nada de <code>eof()</code>.</li>
+  <li>Sempre confira se abriu: <code>if (!arq)</code>. Sem isso, o erro passa em silêncio.</li>
+  <li>O arquivo fecha sozinho no fim do bloco. Para ler o que acabou de escrever, feche antes (<code>close()</code> ou um bloco).</li>
+  <li>CSV: <code>getline</code> pega a linha; <code>std::stringstream</code> + <code>getline(…, ',')</code> separa os campos; <code>stoi</code>/<code>stod</code> convertem.</li>
+  <li><code>std::filesystem::exists</code> e <code>file_size</code> respondem perguntas sobre o arquivo sem abri-lo.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
