@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Arquivos .h e .cpp — declarações, definições e include guards | Guia C++</title>
+<meta name="description" content="Separar um programa C++ em arquivos .h e .cpp para quem nunca programou: declaração × definição, um calculos.h + calculos.cpp + main.cpp, include guards × #pragma once, o erro redefinition, o erro de ligação múltiplas definições (multiple definition of) e o inline, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Arquivos .h e .cpp</span></h1>
+
+<p class="intro">Enquanto o programa tem 50 linhas, um arquivo só dá conta. Mas o programa da lojinha da Ana cresceu: tem funções de cálculo, de estoque, de relatório… e rolar um arquivo de mil linhas para achar uma função é cansativo. Em C++, a solução é dividir o código em vários arquivos, e cada parte ganha <strong>dois</strong>: um <code>.h</code>, que diz <strong>o que existe</strong>, e um <code>.cpp</code>, que diz <strong>como funciona</strong>. Nesta aula você vai montar essa divisão, entender por que ela é assim e conhecer os dois erros que todo mundo encontra no caminho.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A diferença entre <strong>declarar</strong> e <strong>definir</strong> uma função.</li>
+  <li>O que vai no arquivo <code>.h</code> (cabeçalho) e o que vai no <code>.cpp</code>.</li>
+  <li>Como montar um projeto com <code>calculos.h</code>, <code>calculos.cpp</code> e <code>main.cpp</code>.</li>
+  <li>Por que um <code>.h</code> incluído duas vezes dá <code>redefinition</code>, e como os <em>include guards</em> e o <code>#pragma once</code> resolvem.</li>
+  <li>Por que uma função <strong>definida</strong> no <code>.h</code> dá "múltiplas definições" (<code>multiple definition of</code>), e como o <code>inline</code> resolve.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), com o comando padrão do guia (<code>-std=c++23 -Wall -Wextra</code>). Você precisa conhecer <a href="funcoes.html">Funções</a> e o <a href="preprocessador.html"><code>#include</code></a>.</p>
+
+<hr>
+
+<h2>A ideia: o cardápio e a cozinha</h2>
+<p>Num restaurante, o <strong>cardápio</strong> diz o que existe: "Lasanha — R$ 30". Não diz como a lasanha é feita. A <strong>receita</strong> fica na cozinha. O cliente só precisa do cardápio para pedir; o cozinheiro só precisa da receita para preparar.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No restaurante</th><th>No C++</th><th>Arquivo</th><th>Exemplo</th></tr>
+<tr><td>Cardápio: o nome do prato e o preço</td><td><strong>declaração</strong>: nome, parâmetros e tipo de retorno</td><td><code>calculos.h</code> (<em>header</em>, cabeçalho)</td><td><code>double calcularTotal(double preco, int quantidade);</code></td></tr>
+<tr><td>Receita: o passo a passo</td><td><strong>definição</strong>: a declaração <strong>com o corpo</strong> <code>{ … }</code></td><td><code>calculos.cpp</code></td><td><code>double calcularTotal(…) { return preco * quantidade; }</code></td></tr>
+<tr><td>Cliente que lê o cardápio</td><td>quem chama a função</td><td><code>main.cpp</code> (faz <code>#include "calculos.h"</code>)</td><td><code>calcularTotal(2.50, 4)</code></td></tr>
+</table>
+</div>
+
+<p>O <code>.h</code> vem de <em>header</em> ("cabeçalho"), porque ele é incluído no topo dos outros arquivos. Você também vai ver <code>.hpp</code> (um "h de C++"); funciona igual, é só costume do projeto.</p>
+
+<hr>
+
+<h2>1. Declarar × definir</h2>
+<p>Você viu em <a href="funcoes.html">Funções</a> que o compilador lê o arquivo de cima para baixo e só aceita chamar uma função que ele <strong>já conhece</strong>. Ele não precisa do corpo para isso: basta saber o nome, o que entra e o que sai. Essa linha sem corpo, terminada em <code>;</code>, é a <strong>declaração</strong> (também chamada de <strong>protótipo</strong>):</p>
+
+<pre class="file" data-file="trecho">double calcularTotal(double preco, int quantidade);      // declaração: "existe"
+
+double calcularTotal(double preco, int quantidade) {     // definição: "é assim"
+    return preco * quantidade;
+}</pre>
+
+<dl class="anatomy">
+  <dt>declaração</dt><dd>Termina com <code>;</code>. Pode ser repetida quantas vezes quiser, em quantos arquivos quiser: é só um aviso de que a função existe em algum lugar.</dd>
+  <dt>definição</dt><dd>Tem o corpo <code>{ … }</code>. Cada função comum precisa ter <strong>exatamente uma</strong> definição no programa inteiro. Essa é a regra mais importante desta aula (o nome oficial é <strong>regra da definição única</strong>, ODR, de <em>One Definition Rule</em>).</dd>
+</dl>
+
+<p>Com isso, dá para entender a divisão: o <code>.h</code> guarda as <strong>declarações</strong> (que podem aparecer em vários arquivos), e o <code>.cpp</code> guarda as <strong>definições</strong> (que precisam existir uma vez só).</p>
+
+<hr>
+
+<h2>2. Um projeto em três arquivos</h2>
+<p>A Ana vai tirar as contas da lojinha do <code>main.cpp</code>. Ela cria uma pasta <code>~/cpp/loja</code> com três arquivos.</p>
+
+<h3>O cabeçalho: <code>calculos.h</code></h3>
+<pre class="file" data-file="calculos.h">#pragma once
+
+// Declarações: o "cardápio" do que existe em calculos.cpp
+double calcularTotal(double preco, int quantidade);
+double aplicarDesconto(double valor, double porcento);
+</pre>
+
+<dl class="anatomy">
+  <dt>#pragma once</dt><dd>"Inclua este arquivo uma vez só". Toda <code>.h</code> deve começar com ele (ou com os <em>include guards</em> da seção 3).</dd>
+  <dt>as duas linhas de baixo</dt><dd>Só declarações, com <code>;</code> e sem corpo. É tudo o que quem usa a lojinha precisa saber.</dd>
+</dl>
+
+<h3>A implementação: <code>calculos.cpp</code></h3>
+<pre class="file" data-file="calculos.cpp">#include "calculos.h"
+
+// Definições: o corpo de cada função
+double calcularTotal(double preco, int quantidade) {
+    return preco * quantidade;
+}
+
+double aplicarDesconto(double valor, double porcento) {
+    return valor - valor * porcento / 100;
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include "calculos.h"</dt><dd>O <code>.cpp</code> inclui o <strong>próprio</strong> cabeçalho. Assim, se a declaração e a definição ficarem diferentes (um <code>int</code> num lugar e <code>double</code> no outro), o compilador tem a chance de perceber. É costume que essa seja a primeira linha.</dd>
+  <dt>as funções</dt><dd>As mesmas da declaração, agora com o corpo.</dd>
+</dl>
+
+<h3>Quem usa: <code>main.cpp</code></h3>
+<pre class="file" data-file="main.cpp">#include &lt;iostream&gt;
+#include "calculos.h"
+
+int main() {
+    double total = calcularTotal(2.50, 4);
+    std::cout &lt;&lt; "Total: R$ " &lt;&lt; total &lt;&lt; '\n';
+    std::cout &lt;&lt; "Com 10% de desconto: R$ " &lt;&lt; aplicarDesconto(total, 10) &lt;&lt; '\n';
+}
+</pre>
+
+<p>O <code>main.cpp</code> não sabe <strong>como</strong> o total é calculado, e nem precisa: o <code>#include "calculos.h"</code> cola as declarações no topo, e isso basta para o compilador aceitar as chamadas. Na hora de compilar, você passa os <strong>dois</strong> <code>.cpp</code> para o g++ (o <code>.h</code> não entra no comando, porque ele já é colado pelo <code>#include</code>):</p>
+
+<pre class="term">$ cd ~/cpp/loja
+$ g++ -std=c++23 -Wall -Wextra main.cpp calculos.cpp -o loja
+$ ./loja
+Total: R$ 10
+Com 10% de desconto: R$ 9</pre>
+
+<p>Os detalhes desse comando, e como compilar cada <code>.cpp</code> separado, ficam para a próxima aula, <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>. Aqui o foco é o que vai dentro de cada arquivo.</p>
+
+<p>Para ver o que o compilador recebeu ao compilar o <code>main.cpp</code>, use o raio-x da aula do pré-processador (<code>-E -P</code>) e olhe o final:</p>
+
+<pre class="term">$ g++ -std=c++23 -E -P main.cpp | tail -8
+
+double calcularTotal(double preco, int quantidade);      « veio do calculos.h
+double aplicarDesconto(double valor, double porcento);
+int main() {
+    double total = calcularTotal(2.50, 4);
+    std::cout &lt;&lt; "Total: R$ " &lt;&lt; total &lt;&lt; '\n';
+    std::cout &lt;&lt; "Com 10% de desconto: R$ " &lt;&lt; aplicarDesconto(total, 10) &lt;&lt; '\n';
+}</pre>
+
+<p>Só as declarações chegaram; os corpos ficaram no <code>calculos.cpp</code>, que é compilado à parte.</p>
+
+<div class="cenario">
+<strong>"‘calcularTotal’ was not declared in this scope"</strong>
+<p>A Ana esqueceu o <code>#include "calculos.h"</code> num arquivo novo:</p>
+<pre class="file" data-file="sem-include.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double total = calcularTotal(2.50, 4);
+    std::cout &lt;&lt; "Total: R$ " &lt;&lt; total &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra sem-include.cpp calculos.cpp -o loja2
+sem-include.cpp: In function ‘int main()’:
+sem-include.cpp:4:20: error: ‘calcularTotal’ was not declared in this scope
+    4 |     double total = calcularTotal(2.50, 4);
+      |                    ^~~~~~~~~~~~~</pre>
+<p><strong>O que significa:</strong> "‘calcularTotal’ não foi declarada neste escopo". O compilador lê cada <code>.cpp</code> <strong>sozinho</strong>, sem olhar os outros. Passar o <code>calculos.cpp</code> no mesmo comando não ajuda: ao compilar o <code>sem-include.cpp</code>, ninguém contou a ele que a função existe. (No editor do guia, o Clang diz <code>use of undeclared identifier 'calcularTotal'</code>, "uso de nome não declarado".)</p>
+<p><strong>Como resolver:</strong> acrescente <code>#include "calculos.h"</code> no topo do arquivo que chama a função.</p>
+</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> as abas abaixo são os três arquivos da lojinha, e o editor compila todos os <code>.cpp</code> juntos. Rode. Depois acrescente uma função <code>double calcularTroco(double pago, double total)</code>: a declaração no <code>calculos.h</code>, a definição no <code>calculos.cpp</code> e uma chamada no <code>main.cpp</code>, por exemplo <code>calcularTroco(20, total)</code>. Teste também o que acontece se você esquecer a declaração no <code>.h</code>.</p>
+<pre class="script" data-file="main.cpp">#include &lt;iostream&gt;
+#include "calculos.h"
+
+int main() {
+    double total = calcularTotal(2.50, 4);
+    std::cout &lt;&lt; "Total: R$ " &lt;&lt; total &lt;&lt; '\n';
+    std::cout &lt;&lt; "Com 10% de desconto: R$ " &lt;&lt; aplicarDesconto(total, 10) &lt;&lt; '\n';
+}
+</pre>
+<pre class="script" data-file="calculos.h">#pragma once
+
+double calcularTotal(double preco, int quantidade);
+double aplicarDesconto(double valor, double porcento);
+</pre>
+<pre class="script" data-file="calculos.cpp">#include "calculos.h"
+
+double calcularTotal(double preco, int quantidade) {
+    return preco * quantidade;
+}
+
+double aplicarDesconto(double valor, double porcento) {
+    return valor - valor * porcento / 100;
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. O mesmo <code>.h</code> incluído duas vezes</h2>
+<p>Num projeto de verdade, um cabeçalho inclui outro. A Ana criou um <code>produto.h</code> com o tipo <code>Produto</code> (uma <a href="structs.html">struct</a>) e um <code>estoque.h</code> que também precisa dele. Repare: os dois arquivos estão <strong>sem</strong> <code>#pragma once</code>.</p>
+
+<pre class="file" data-file="produto.h">#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco;
+};
+</pre>
+
+<pre class="file" data-file="estoque.h">#include "produto.h"
+
+int contarEmFalta(const Produto produtos[], int quantos);
+</pre>
+
+<pre class="file" data-file="main.cpp">#include &lt;iostream&gt;
+#include "produto.h"
+#include "estoque.h"
+
+int main() {
+    Produto p{"Pão", 0.75};
+    std::cout &lt;&lt; p.nome &lt;&lt; ": R$ " &lt;&lt; p.preco &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra main.cpp -o main
+In file included from estoque.h:1,
+                 from main.cpp:3:
+produto.h:3:8: error: redefinition of ‘struct Produto’
+    3 | struct Produto {
+      |        ^~~~~~~
+In file included from main.cpp:2:
+produto.h:3:8: note: previous definition of ‘struct Produto’
+    3 | struct Produto {
+      |        ^~~~~~~</pre>
+
+<p>Leia a mensagem de cima para baixo:</p>
+<dl class="anatomy">
+  <dt>In file included from estoque.h:1, from main.cpp:3:</dt><dd>"No arquivo incluído a partir de…": o caminho da colagem. O <code>main.cpp</code> (linha 3) incluiu o <code>estoque.h</code>, que (linha 1) incluiu o <code>produto.h</code>.</dd>
+  <dt>error: redefinition of ‘struct Produto’</dt><dd>"Redefinição da struct Produto": é a segunda vez que ela aparece.</dd>
+  <dt>note: previous definition</dt><dd>A primeira vez foi quando o <code>main.cpp</code> (linha 2) incluiu o <code>produto.h</code> diretamente.</dd>
+</dl>
+
+<p>O <code>produto.h</code> foi colado duas vezes no <code>main.cpp</code>, e uma struct só pode ser definida uma vez em cada <code>.cpp</code>. Ninguém fez nada de errado: é natural o <code>main.cpp</code> incluir o que usa. Quem precisa se proteger é o cabeçalho.</p>
+<p>No editor do guia, o Clang diz <code>redefinition of 'Produto'</code> e ainda dá a dica: <code>unguarded header; consider using #ifdef guards or #pragma once</code> ("cabeçalho sem guarda; considere usar guardas com #ifdef ou #pragma once"). É exatamente o conserto.</p>
+
+<h3>Proteção 1: <em>include guards</em></h3>
+<p>A proteção clássica usa o <code>#ifndef</code> que você viu em <a href="preprocessador.html">O Pré-processador</a>. O nome em inglês é <em>include guard</em>, "guarda do include":</p>
+
+<pre class="file" data-file="produto.h">#ifndef PRODUTO_H
+#define PRODUTO_H
+
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco;
+};
+
+#endif
+</pre>
+
+<dl class="anatomy">
+  <dt>#ifndef PRODUTO_H</dt><dd>"Se <code>PRODUTO_H</code> <strong>ainda não</strong> foi definido…". Na primeira colagem, não foi: o conteúdo entra.</dd>
+  <dt>#define PRODUTO_H</dt><dd>…então defina agora. É uma marca de "já passei por aqui".</dd>
+  <dt>o meio</dt><dd>O conteúdo de verdade do cabeçalho.</dd>
+  <dt>#endif</dt><dd>Fim do bloco. Na segunda colagem, <code>PRODUTO_H</code> já existe, e o pré-processador pula tudo até aqui.</dd>
+</dl>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra main.cpp -o main &amp;&amp; ./main
+Pão: R$ 0.75</pre>
+
+<p>O nome da marca é livre, mas precisa ser <strong>único no projeto</strong>: o costume é o nome do arquivo em maiúsculas, com <code>_</code> no lugar do ponto (<code>PRODUTO_H</code>, <code>CALCULOS_H</code>). Se dois arquivos usarem a mesma marca, o segundo some sem aviso nenhum.</p>
+
+<h3>Proteção 2: <code>#pragma once</code></h3>
+<p>A forma curta é uma linha só no topo:</p>
+
+<pre class="file" data-file="produto.h">#pragma once
+
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco;
+};
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><em>Include guards</em></th><th><code>#pragma once</code></th></tr>
+<tr><td>Linhas</td><td>três (<code>#ifndef</code>, <code>#define</code>, <code>#endif</code>)</td><td>uma</td></tr>
+<tr><td>Está no padrão do C++?</td><td>sim, funciona em qualquer compilador</td><td>não oficialmente, mas g++, Clang e Visual C++ aceitam todos</td></tr>
+<tr><td>Risco</td><td>dois arquivos com a mesma marca (copiar e colar um <code>.h</code> e esquecer de trocar)</td><td>casos raros com o mesmo arquivo em dois caminhos (cópias, links)</td></tr>
+<tr><td>Onde você vai ver</td><td>código antigo, bibliotecas que rodam em todo lugar</td><td>a maioria dos projetos novos</td></tr>
+</table>
+</div>
+
+<p><strong>Qual usar:</strong> num projeto seu, <code>#pragma once</code>. Se o projeto já usa <em>include guards</em>, siga o projeto. O importante é que <strong>todo</strong> <code>.h</code> tenha uma das duas.</p>
+
+<hr>
+
+<h2>4. O que <strong>não</strong> pode ir no <code>.h</code></h2>
+<p>A Ana pensou: "para que dois arquivos? Vou pôr a função inteira no <code>.h</code>". E fez assim, com <code>#pragma once</code> e tudo:</p>
+
+<pre class="file" data-file="calculos.h">#pragma once
+
+double calcularTotal(double preco, int quantidade) {
+    return preco * quantidade;
+}
+</pre>
+
+<p>Enquanto só o <code>main.cpp</code> incluía o <code>calculos.h</code>, funcionou. Aí ela criou um <code>relatorio.cpp</code> que também usa a função:</p>
+
+<pre class="file" data-file="relatorio.cpp">#include &lt;iostream&gt;
+#include "calculos.h"
+
+void relatorio() {
+    std::cout &lt;&lt; "Relatório: R$ " &lt;&lt; calcularTotal(3.0, 2) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="file" data-file="main.cpp">#include &lt;iostream&gt;
+#include "calculos.h"
+
+void relatorio();
+
+int main() {
+    std::cout &lt;&lt; "Total: R$ " &lt;&lt; calcularTotal(2.50, 4) &lt;&lt; '\n';
+    relatorio();
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra main.cpp relatorio.cpp -o loja
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/cc4cmEdH.o: na função "calcularTotal(double, int)":
+relatorio.cpp:(.text+0x0): múltiplas definições de "calcularTotal(double, int)"; /tmp/ccXMYQZb.o:main.cpp:(.text+0x0): definido primeiro aqui
+collect2: error: ld returned 1 exit status
+$ echo $?
+1</pre>
+
+<p>Esse erro é diferente de todos os que você viu até agora. Ele não tem <code>arquivo:linha:coluna</code>, porque <strong>não vem do compilador</strong>: os dois <code>.cpp</code> compilaram sem problema. Quem reclamou foi o <strong>ligador</strong> (<em>linker</em>), o programa <code>ld</code>, que junta as partes no final:</p>
+
+<dl class="anatomy">
+  <dt>/usr/bin/x86_64-linux-gnu-ld.bfd</dt><dd>O ligador do Linux (o <code>ld</code>). Quando a primeira palavra de uma mensagem é ele, o problema está em <strong>juntar</strong> as partes, não no código de um arquivo.</dd>
+  <dt>/tmp/cc4cmEdH.o</dt><dd>Um arquivo temporário: o <code>relatorio.cpp</code> já compilado (código de máquina). O nome muda a cada compilação.</dd>
+  <dt>múltiplas definições de "calcularTotal(double, int)"</dt><dd>A função tem corpo em <strong>dois</strong> lugares: no <code>relatorio.cpp</code> e no <code>main.cpp</code> (<em>definido primeiro aqui</em>). Isso quebra a regra da definição única.</dd>
+  <dt>collect2: error: ld returned 1 exit status</dt><dd>"O ld terminou com o código 1", ou seja, falhou. O <code>collect2</code> é o ajudante do g++ que chama o ligador.</dd>
+</dl>
+
+<div class="note">
+<strong>Por que esta mensagem está em português?</strong>
+<p>O <code>ld</code> vem de outro pacote (o <em>binutils</em>), que tem tradução instalada no Ubuntu, e o sistema da Ana está em português. As mensagens do próprio g++ continuam em inglês. Em tutoriais e fóruns você vai encontrar a versão em inglês, que é esta (com <code>LANG=C</code> na frente, o comando roda em inglês):</p>
+<pre class="term">$ LANG=C g++ -std=c++23 -Wall -Wextra main.cpp relatorio.cpp -o loja
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccg015ih.o: in function `calcularTotal(double, int)':
+relatorio.cpp:(.text+0x0): multiple definition of `calcularTotal(double, int)'; /tmp/cc5RroGG.o:main.cpp:(.text+0x0): first defined here
+collect2: error: ld returned 1 exit status</pre>
+<p>No editor do guia, que usa o Clang e o ligador <code>wasm-ld</code>, a mesma situação aparece como <code>duplicate symbol</code> ("símbolo duplicado").</p>
+</div>
+
+<h3>"Mas eu pus o <code>#pragma once</code>!"</h3>
+<p>Essa é a parte que confunde. O <code>#pragma once</code> e os <em>include guards</em> protegem contra colar o <code>.h</code> duas vezes <strong>dentro do mesmo <code>.cpp</code></strong>. Cada <code>.cpp</code> é compilado sozinho, do zero, sem lembrar dos outros:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Arquivo compilado</th><th>Colou o <code>calculos.h</code>?</th><th>Resultado</th></tr>
+<tr><td><code>main.cpp</code></td><td>sim, uma vez</td><td>uma definição de <code>calcularTotal</code> no <code>main.o</code></td></tr>
+<tr><td><code>relatorio.cpp</code></td><td>sim, uma vez (para ele, é a primeira)</td><td>outra definição no <code>relatorio.o</code></td></tr>
+<tr><td>Ligação</td><td></td><td><strong>duas</strong> definições: erro</td></tr>
+</table>
+</div>
+
+<h3>Solução 1: declaração no <code>.h</code>, definição no <code>.cpp</code></h3>
+<p>É a divisão da seção 2: o <code>calculos.h</code> fica só com <code>double calcularTotal(double preco, int quantidade);</code>, e o corpo vai para um <code>calculos.cpp</code>. Cada <code>.cpp</code> que inclui o cabeçalho recebe só a declaração, e o corpo existe uma vez. É o jeito normal para a maioria das funções.</p>
+
+<h3>Solução 2: <code>inline</code></h3>
+<p>Para funções pequenas, que você quer deixar inteiras no <code>.h</code>, escreva <code>inline</code> na frente:</p>
+
+<pre class="file" data-file="calculos.h">#pragma once
+
+inline double calcularTotal(double preco, int quantidade) {
+    return preco * quantidade;
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra main.cpp relatorio.cpp -o loja &amp;&amp; ./loja
+Total: R$ 10
+Relatório: R$ 6</pre>
+
+<p><code>inline</code> quer dizer, em C++ moderno: "esta definição vai aparecer em vários <code>.cpp</code>; são todas iguais, guarde uma só". O ligador então aceita as cópias. (O nome vem de uma ideia antiga, "copie o corpo no lugar da chamada", que hoje o compilador decide sozinho, com ou sem a palavra.)</p>
+
+<div class="warning">
+<strong>Variáveis globais no <code>.h</code> têm o mesmo problema</strong>
+<p>Um <code>int visitas = 0;</code> num cabeçalho incluído por dois <code>.cpp</code> dá o mesmo erro do ligador:</p>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra main.cpp a.cpp -o visitas
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/cc4flNA3.o:(.bss+0x0): múltiplas definições de "visitas"; /tmp/cczPoZPn.o:(.bss+0x0): definido primeiro aqui
+collect2: error: ld returned 1 exit status</pre>
+<p>A solução é a mesma: <code>inline int visitas = 0;</code> <span class="versao">C++17</span>. Melhor ainda é evitar variáveis globais que mudam de valor; passe os dados por <a href="parametros.html">parâmetros</a>. Constantes como <code>constexpr double TAXA = 0.1;</code> podem ir no <code>.h</code> sem problema.</p>
+</div>
+
+<hr>
+
+<h2>5. O que vai em cada arquivo</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Coisa</th><th>No <code>.h</code></th><th>No <code>.cpp</code></th></tr>
+<tr><td>Declaração de função (<code>double f(int);</code>)</td><td>sim</td><td>pode, mas costuma vir do <code>.h</code></td></tr>
+<tr><td>Definição de função comum (<code>double f(int x) { … }</code>)</td><td><strong>não</strong> (múltiplas definições)</td><td>sim, em um só</td></tr>
+<tr><td>Função <code>inline</code> ou <code>constexpr</code> com corpo</td><td>sim</td><td>se só aquele arquivo usa</td></tr>
+<tr><td><code>struct</code>, <code>class</code>, <code>enum class</code></td><td>sim (protegido por <code>#pragma once</code>)</td><td>se só aquele arquivo usa</td></tr>
+<tr><td>Constantes (<code>constexpr</code>, <code>const</code>)</td><td>sim</td><td>sim</td></tr>
+<tr><td>Variável global comum (<code>int x = 0;</code>)</td><td><strong>não</strong> (use <code>inline</code>)</td><td>sim</td></tr>
+<tr><td><a href="templates-funcao.html">Templates</a></td><td>sim (o corpo inteiro)</td><td>raramente</td></tr>
+<tr><td><code>using namespace std;</code></td><td><strong>não</strong> (vazaria para todos que incluem; veja <a href="namespaces.html">Namespaces</a>)</td><td>se quiser, depois dos <code>#include</code></td></tr>
+</table>
+</div>
+
+<h3>Boas práticas</h3>
+<ul>
+  <li><strong>Todo <code>.h</code> com <code>#pragma once</code></strong> (ou <em>include guards</em>) na primeira linha.</li>
+  <li><strong>Um par por assunto:</strong> <code>calculos.h</code> + <code>calculos.cpp</code>, <code>estoque.h</code> + <code>estoque.cpp</code>. O nome igual ajuda a achar as coisas.</li>
+  <li><strong>O <code>.cpp</code> inclui o próprio <code>.h</code> primeiro.</strong> Se o cabeçalho esquecer algum <code>#include</code> de que precisa (como o <code>&lt;string&gt;</code> do <code>produto.h</code>), o erro aparece logo.</li>
+  <li><strong>Cada <code>.h</code> inclui o que ele mesmo usa.</strong> O <code>produto.h</code> usa <code>std::string</code>, então inclui <code>&lt;string&gt;</code>, sem contar que quem o incluir já tenha feito isso.</li>
+  <li><strong>Nunca inclua um <code>.cpp</code></strong> (<code>#include "calculos.cpp"</code>). Funciona por acaso com um arquivo só e dá "múltiplas definições" assim que o projeto cresce.</li>
+</ul>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem</th><th>Quem diz</th><th>Causa</th><th>Conserto</th></tr>
+<tr><td><code>‘f’ was not declared in this scope</code></td><td>compilador</td><td>o <code>.cpp</code> chama <code>f</code> sem incluir o <code>.h</code> que a declara</td><td><code>#include "f.h"</code></td></tr>
+<tr><td><code>redefinition of ‘struct X’</code></td><td>compilador</td><td>o mesmo <code>.h</code> colado duas vezes no mesmo <code>.cpp</code></td><td><code>#pragma once</code> ou <em>include guards</em></td></tr>
+<tr><td><code>múltiplas definições de</code> / <code>multiple definition of</code></td><td>ligador (<code>ld</code>)</td><td>corpo de função (ou variável global) num <code>.h</code> incluído por vários <code>.cpp</code></td><td>mover o corpo para o <code>.cpp</code> ou usar <code>inline</code></td></tr>
+<tr><td><code>referência não definida para</code> / <code>undefined reference to</code></td><td>ligador</td><td>a declaração existe, mas o <code>.cpp</code> com o corpo não foi compilado junto</td><td>veja <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A declaração</h3>
+<p>Complete a <strong>declaração</strong> (para o <code>.h</code>) da função <code>double media(double a, double b)</code>:</p>
+<div class="ex-code">double media(double a, double b)<input data-answer=";" aria-label="o que falta" size="3"></div>
+</div>
+
+<div class="exercise">
+<h3>2. A guarda</h3>
+<p>Complete a primeira linha do <em>include guard</em> do arquivo <code>estoque.h</code>:</p>
+<div class="ex-code">#<input data-answer="ifndef ESTOQUE_H" aria-label="primeira linha"><br>#define ESTOQUE_H<br>…<br>#endif</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Um <code>.h</code> com <code>#pragma once</code> tem o corpo de uma função comum (sem <code>inline</code>) e é incluído por <code>main.cpp</code> e <code>loja.cpp</code>. O que acontece ao compilar os dois juntos?</p>
+<label><input type="radio" name="q3"> Funciona, porque o <code>#pragma once</code> evita a cópia.</label>
+<label><input type="radio" name="q3"> O ligador reclama de múltiplas definições.</label>
+<label><input type="radio" name="q3"> O compilador dá <code>redefinition</code>.</label>
+<label><input type="radio" name="q3"> O programa roda a função duas vezes.</label>
+</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Qual destas linhas <strong>não</strong> deve ir num <code>.h</code> incluído por vários <code>.cpp</code>?</p>
+<label><input type="radio" name="q4"> <code>double preco(int codigo);</code></label>
+<label><input type="radio" name="q4"> <code>constexpr int MAX_ITENS = 50;</code></label>
+<label><input type="radio" name="q4"> <code>int totalVendas = 0;</code></label>
+<label><input type="radio" name="q4"> <code>inline int dobro(int x) { return x * 2; }</code></label>
+</div>
+</div>
+
+<h3>Missão: conserte a lojinha que não liga</h3>
+
+<div class="trycpp" data-goal="compila,out:Total: R$ 10,out:Relatório: R$ 6">
+<p class="try-task"><strong>Missão:</strong> a Ana pôs o corpo de <code>calcularTotal</code> no <code>calculos.h</code>, e os dois <code>.cpp</code> o incluem. Rode e veja o erro do ligador. Conserte de um dos dois jeitos da aula (o <code>inline</code>, ou mover o corpo para um arquivo novo… mas aqui só existem estas abas, então o caminho mais curto é o <code>inline</code>). A saída deve ser:</p>
+<pre class="out">Total: R$ 10
+Relatório: R$ 6</pre>
+<pre class="script" data-file="main.cpp">#include &lt;iostream&gt;
+#include "calculos.h"
+
+void relatorio();
+
+int main() {
+    std::cout &lt;&lt; "Total: R$ " &lt;&lt; calcularTotal(2.50, 4) &lt;&lt; '\n';
+    relatorio();
+}
+</pre>
+<pre class="script" data-file="calculos.h">#pragma once
+
+double calcularTotal(double preco, int quantidade) {
+    return preco * quantidade;
+}
+</pre>
+<pre class="script" data-file="relatorio.cpp">#include &lt;iostream&gt;
+#include "calculos.h"
+
+void relatorio() {
+    std::cout &lt;&lt; "Relatório: R$ " &lt;&lt; calcularTotal(3.0, 2) &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao" data-file="calculos.h">#pragma once
+
+inline double calcularTotal(double preco, int quantidade) {
+    return preco * quantidade;
+}
+</pre>
+</div>
+
+<h3>Missão final: proteja o cabeçalho</h3>
+
+<div class="trycpp" data-goal="compila,out:Pão: R$ 0.75,out:Em falta: 1">
+<p class="try-task"><strong>Missão:</strong> o <code>produto.h</code> está sem proteção e chega duas vezes ao <code>main.cpp</code> (uma direta, outra pelo <code>estoque.h</code>). Rode e leia o <code>redefinition</code>. Depois proteja o <code>produto.h</code> com <strong>include guards</strong> (<code>#ifndef</code>/<code>#define</code>/<code>#endif</code>), sem mexer nas outras abas. A saída deve ser:</p>
+<pre class="out">Pão: R$ 0.75
+Em falta: 1</pre>
+<pre class="script" data-file="main.cpp">#include &lt;iostream&gt;
+#include "produto.h"
+#include "estoque.h"
+
+int main() {
+    Produto p{"Pão", 0.75, 10};
+    std::cout &lt;&lt; p.nome &lt;&lt; ": R$ " &lt;&lt; p.preco &lt;&lt; '\n';
+
+    Produto lista[] = {{"Leite", 4.5, 0}, {"Café", 12.9, 3}};
+    std::cout &lt;&lt; "Em falta: " &lt;&lt; contarEmFalta(lista, 2) &lt;&lt; '\n';
+}
+</pre>
+<pre class="script" data-file="produto.h">#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco;
+    int quantidade;
+};
+</pre>
+<pre class="script" data-file="estoque.h">#pragma once
+#include "produto.h"
+
+int contarEmFalta(const Produto produtos[], int quantos);
+</pre>
+<pre class="script" data-file="estoque.cpp">#include "estoque.h"
+
+int contarEmFalta(const Produto produtos[], int quantos) {
+    int falta = 0;
+    for (int i = 0; i &lt; quantos; ++i) {
+        if (produtos[i].quantidade == 0) {
+            ++falta;
+        }
+    }
+    return falta;
+}
+</pre>
+<pre class="solucao" data-file="produto.h">#ifndef PRODUTO_H
+#define PRODUTO_H
+
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco;
+    int quantidade;
+};
+
+#endif
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>Declaração</strong> (sem corpo, com <code>;</code>) diz que algo existe e pode se repetir. <strong>Definição</strong> (com corpo) diz como funciona e deve existir <strong>uma vez</strong> no programa.</li>
+  <li>O <code>.h</code> é o cardápio (declarações, structs, constantes); o <code>.cpp</code> é a cozinha (as definições). Quem usa faz <code>#include "x.h"</code>.</li>
+  <li>Compile todos os <code>.cpp</code> juntos; o <code>.h</code> não entra no comando.</li>
+  <li>Todo <code>.h</code> começa com <code>#pragma once</code> ou com <em>include guards</em>, senão um <code>.h</code> colado duas vezes no mesmo <code>.cpp</code> dá <code>redefinition</code>.</li>
+  <li>Essas proteções valem dentro de <strong>um</strong> <code>.cpp</code>. Corpo de função comum no <code>.h</code>, incluído por vários <code>.cpp</code>, dá "múltiplas definições" (<code>multiple definition of</code>) no ligador. Mova o corpo para o <code>.cpp</code> ou use <code>inline</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
