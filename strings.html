@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Strings — std::string, size, empty e texto entre aspas | Guia C++</title>
+<meta name="description" content="Strings em C++ para quem nunca programou: guardar texto em std::string, criar, imprimir, trocar o valor, medir com size e length (e por que maçã tem 6), testar se está vazia com empty e a diferença entre std::string e o texto entre aspas, com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Strings</span></h1>
+
+<p class="intro">Quase todo programa trabalha com <strong>texto</strong>: o nome de quem está comprando, o item da lista de compras, a mensagem "Senha incorreta". Até aqui você mostrou texto com <code>std::cout</code>, mas não conseguia <strong>guardar</strong> um texto para usar depois. Nesta aula você vai conhecer o <code>std::string</code>, o tipo do C++ feito para guardar texto: criar, mostrar, trocar o valor, medir o tamanho e saber se está vazio.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma string e por que ela precisa do <code>#include &lt;string&gt;</code>.</li>
+  <li>As formas de criar uma string: <code>= "Ana"</code>, <code>("Ana")</code>, <code>{"Ana"}</code>, vazia e "repetida".</li>
+  <li>Como trocar o valor de uma string e o que acontece com uma cópia.</li>
+  <li>Como medir o tamanho com <code>.size()</code> e <code>.length()</code>, e por que <code>"maçã"</code> dá <strong>6</strong>.</li>
+  <li>Como perguntar "está vazia?" com <code>.empty()</code>.</li>
+  <li>A diferença entre um <code>std::string</code> e o texto entre aspas <code>"…"</code> escrito direto no código.</li>
+  <li>As mensagens de erro mais comuns de quem começa com strings.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code> (cada opção é explicada em <a href="compilar.html">Compilar com g++</a>). Você pode repetir cada um no editor do guia, que compila C++ de verdade no navegador.</p>
+
+<hr>
+
+<h2>A ideia: um colar de letras</h2>
+<p>Pense num colar de contas, daqueles em que cada conta tem uma letra gravada. Para escrever <code>Ana</code>, você enfia três contas no fio: <code>A</code>, <code>n</code>, <code>a</code>. O colar inteiro é o texto; cada conta é um caractere.</p>
+
+<p>É daí que vem o nome: em inglês, <em>string</em> quer dizer "fio, cordão". Uma <strong>string</strong> é um cordão de caracteres, um atrás do outro, em ordem. Espaços, vírgulas e pontos também são contas do colar:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Texto</th><th>As "contas" do colar</th><th>Quantas</th></tr>
+<tr><td><code>"Ana"</code></td><td><code>A</code> <code>n</code> <code>a</code></td><td>3</td></tr>
+<tr><td><code>"Oi, Bia!"</code></td><td><code>O</code> <code>i</code> <code>,</code> <code>␣</code> <code>B</code> <code>i</code> <code>a</code> <code>!</code></td><td>8 (o <code>␣</code> é o espaço)</td></tr>
+<tr><td><code>""</code></td><td>nenhuma</td><td>0 (string vazia)</td></tr>
+</table>
+</div>
+
+<p>Você já conhece o tipo que guarda <strong>uma</strong> conta: o <code>char</code>, com aspas simples (<code>'A'</code>, veja <a href="char.html">Caracteres (char)</a>). A string guarda <strong>o colar inteiro</strong>, com aspas duplas (<code>"Ana"</code>), e pode ter qualquer tamanho: zero, três ou um milhão de caracteres.</p>
+
+<hr>
+
+<h2>1. A primeira string</h2>
+<p>Uma string é uma variável como as que você criou em <a href="variaveis.html">Variáveis</a>: tem um tipo, um nome e um valor. O tipo é <code>std::string</code>.</p>
+
+<pre class="file" data-file="nome.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana";
+    std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "!\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;string&gt;</dt><dd>Traz para o seu programa a parte da biblioteca padrão que define o <code>std::string</code>. Sem ele, o C++ "puro" não conhece strings. É um <code>#include</code> como o do <code>&lt;iostream&gt;</code>, que traz o <code>std::cout</code>.</dd>
+  <dt>std::string</dt><dd>O <strong>tipo</strong> da variável: "texto". O <code>std::</code> diz que ele vem da biblioteca padrão (<em>standard</em>, em inglês), a mesma "família" do <code>std::cout</code>.</dd>
+  <dt>nome</dt><dd>O nome da variável, escolhido por você.</dd>
+  <dt>= "Ana"</dt><dd>O valor inicial. Texto em C++ vai sempre entre <strong>aspas duplas</strong>. As aspas não fazem parte do texto: elas só marcam onde ele começa e termina.</dd>
+  <dt>std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "!\n";</dt><dd>Mostra três pedaços seguidos: o texto <code>Olá, </code>, o <strong>valor</strong> da variável <code>nome</code> (sem aspas: é o nome da caixa, não um texto) e <code>!</code> com uma quebra de linha (<code>\n</code>, veja <a href="novas-linhas.html">Novas Linhas</a>).</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra nome.cpp -o nome
+$ ./nome
+Olá, Ana!</pre>
+
+<p>Repare na diferença entre <code>"nome"</code> e <code>nome</code>. Com aspas, é o texto de quatro letras <code>nome</code>. Sem aspas, é a variável, e o <code>std::cout</code> mostra o que está guardado nela: <code>Ana</code>.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> troque <code>"Ana"</code> pelo seu nome e clique em <strong>Rodar</strong>. Depois crie uma segunda string, <code>cidade</code>, e faça o programa mostrar também <code>Você mora em …</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana";
+    std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Formas de criar uma string</h2>
+<p>O C++ aceita várias formas de dar o valor inicial. Todas criam um <code>std::string</code> de verdade; muda só a escrita.</p>
+
+<pre class="file" data-file="criar.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string fruta = "maçã";      // com =
+    std::string cor("vermelha");     // com parênteses
+    std::string cidade{"Recife"};    // com chaves
+    std::string vazia;               // sem valor: começa vazia
+    std::string linha(10, '-');      // 10 vezes o caractere '-'
+
+    std::cout &lt;&lt; fruta &lt;&lt; '\n';
+    std::cout &lt;&lt; cor &lt;&lt; '\n';
+    std::cout &lt;&lt; cidade &lt;&lt; '\n';
+    std::cout &lt;&lt; "[" &lt;&lt; vazia &lt;&lt; "]\n";
+    std::cout &lt;&lt; linha &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra criar.cpp -o criar
+$ ./criar
+maçã
+vermelha
+Recife
+[]                « a string vazia não mostra nada entre os colchetes
+----------</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que cria</th><th>Quando usar</th></tr>
+<tr><td><code>std::string s = "Ana";</code></td><td>Uma string com <code>Ana</code></td><td>A mais comum e a mais fácil de ler. É a que o guia usa.</td></tr>
+<tr><td><code>std::string s("Ana");</code></td><td>A mesma coisa</td><td>Você vai ver muito em código antigo.</td></tr>
+<tr><td><code>std::string s{"Ana"};</code></td><td>A mesma coisa</td><td>A "inicialização com chaves" do C++ moderno (veja <a href="variaveis.html">Variáveis</a>).</td></tr>
+<tr><td><code>std::string s;</code></td><td>Uma string vazia, <code>""</code></td><td>Quando o valor só chega depois (do teclado, de uma conta).</td></tr>
+<tr><td><code>std::string s(10, '-');</code></td><td><code>----------</code></td><td>Linhas, molduras, enfeites. Atenção: <strong>parênteses</strong>, um número e um <code>char</code> com aspas simples.</td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>A string vazia já começa "pronta"</strong>
+<p>Na aula <a href="variaveis.html">Variáveis</a> você aprendeu que um <code>int x;</code> sem valor guarda lixo. Com <code>std::string</code> isso não acontece: <code>std::string s;</code> sempre começa como texto vazio, com tamanho 0. É uma das vantagens de usar <code>std::string</code>.</p>
+</div>
+
+<hr>
+
+<h2>3. Trocar o valor e copiar</h2>
+<p>Uma string é uma variável: você pode trocar o texto quantas vezes quiser, com <code>=</code>. O texto novo pode ser maior ou menor que o antigo: a string cresce e encolhe sozinha.</p>
+
+<pre class="file" data-file="trocar.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string produto = "arroz";
+    std::cout &lt;&lt; "Antes: " &lt;&lt; produto &lt;&lt; '\n';
+
+    produto = "feijão preto";
+    std::cout &lt;&lt; "Depois: " &lt;&lt; produto &lt;&lt; '\n';
+
+    std::string copia = produto;
+    produto = "café";
+    std::cout &lt;&lt; "produto: " &lt;&lt; produto &lt;&lt; '\n';
+    std::cout &lt;&lt; "copia: " &lt;&lt; copia &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra trocar.cpp -o trocar
+$ ./trocar
+Antes: arroz
+Depois: feijão preto
+produto: café
+copia: feijão preto        « a cópia não mudou</pre>
+
+<dl class="anatomy">
+  <dt>produto = "feijão preto";</dt><dd>Joga fora o texto antigo (<code>arroz</code>) e guarda o novo. Sem <code>std::string</code> na frente: a variável já existe, você só está trocando o valor.</dd>
+  <dt>std::string copia = produto;</dt><dd>Cria uma <strong>nova</strong> string com uma <strong>cópia</strong> do texto de <code>produto</code>. São dois colares separados, cada um com as suas contas.</dd>
+  <dt>produto = "café";</dt><dd>Muda só o <code>produto</code>. A <code>copia</code> continua com <code>feijão preto</code>.</dd>
+</dl>
+
+<p>Para <strong>juntar</strong> textos (por exemplo, acrescentar <code>" preto"</code> ao fim de <code>"feijão"</code> em vez de reescrever tudo), existem o <code>+</code> e o <code>+=</code>, assunto da próxima aula: <a href="concatenacao.html">Juntar Strings</a>.</p>
+
+<hr>
+
+<h2>4. O tamanho: <code>.size()</code> e <code>.length()</code></h2>
+<p>Uma string sabe o próprio tamanho. Para perguntar, escreva o nome da variável, um <strong>ponto</strong> e <code>size()</code>:</p>
+
+<pre class="file" data-file="tamanho.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana";
+    std::string frase = "Bom dia, Bruno!";
+    std::cout &lt;&lt; nome &lt;&lt; " tem " &lt;&lt; nome.size() &lt;&lt; " caracteres\n";
+    std::cout &lt;&lt; frase &lt;&lt; " tem " &lt;&lt; frase.length() &lt;&lt; " caracteres\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tamanho.cpp -o tamanho
+$ ./tamanho
+Ana tem 3 caracteres
+Bom dia, Bruno! tem 15 caracteres</pre>
+
+<dl class="anatomy">
+  <dt>nome</dt><dd>A string que você quer medir.</dd>
+  <dt>.</dt><dd>O ponto quer dizer "peça para esta string fazer algo". O que vem depois do ponto é uma <strong>função-membro</strong> (um "comando" que pertence à string). Você vai ver muitas delas em <a href="funcoes-string.html">Funções de String</a>.</dd>
+  <dt>size()</dt><dd>"Tamanho". Devolve quantos caracteres a string tem. Os parênteses vazios são obrigatórios: sem eles, o C++ não "chama" a função.</dd>
+  <dt>length()</dt><dd>"Comprimento". Faz <strong>exatamente</strong> a mesma coisa que <code>size()</code>. Existe com dois nomes por motivos históricos.</dd>
+</dl>
+
+<p>Em <code>"Bom dia, Bruno!"</code>, conte com o dedo: 3 letras de <code>Bom</code>, um espaço, 3 de <code>dia</code>, a vírgula, outro espaço, 5 de <code>Bruno</code> e o <code>!</code>. Dá 15. <strong>Espaços e pontuação contam.</strong></p>
+
+<div class="tip">
+<strong><code>size()</code> ou <code>length()</code>?</strong>
+<p>Tanto faz para strings. Prefira <code>size()</code>: é o nome que todos os outros "recipientes" do C++ usam (como o <code>std::vector</code>, em <a href="vector.html">std::vector</a>), então você aprende um nome só.</p>
+</div>
+
+<h3>O "problema" dos acentos: <code>"maçã"</code> tem 6</h3>
+<p>Agora meça duas palavras quase iguais:</p>
+
+<pre class="file" data-file="maca.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string a = "maca";
+    std::string b = "maçã";
+    std::cout &lt;&lt; a &lt;&lt; ": " &lt;&lt; a.size() &lt;&lt; '\n';
+    std::cout &lt;&lt; b &lt;&lt; ": " &lt;&lt; b.size() &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra maca.cpp -o maca
+$ ./maca
+maca: 4
+maçã: 6            « 4 letras, mas 6!</pre>
+
+<p>Não é erro do programa. O <code>.size()</code> não conta letras: ele conta <strong>bytes</strong>, os "tijolinhos" de memória onde o texto fica guardado. Letras sem acento ocupam 1 byte cada. Letras como <code>ç</code>, <code>ã</code>, <code>é</code> ocupam <strong>2 bytes</strong> no formato usado pelo Linux, pelo macOS e pela web, chamado <strong>UTF-8</strong>. Então: <code>m</code> (1) + <code>a</code> (1) + <code>ç</code> (2) + <code>ã</code> (2) = 6.</p>
+
+<p>Para textos sem acento, "bytes" e "letras" dão o mesmo número, e você pode pensar em <code>size()</code> como "quantas letras". Para textos em português, guarde a regra: <strong><code>size()</code> conta bytes</strong>. A aula <a href="acentos-utf8.html">Acentos e UTF-8</a> mostra os bytes um por um e ensina a contar as letras de verdade.</p>
+
+<div class="trycpp" data-goal="out:Natal tem 5 letras,src:\.(size|length)\s*\(\s*\)">
+<p class="try-task"><strong>Missão:</strong> o programa abaixo mostra o tamanho errado (alguém escreveu o número na mão). Faça ele mostrar <code>Natal tem 5 letras</code> usando <code>.size()</code> ou <code>.length()</code> no lugar do <code>4</code>, e não o número digitado. Depois, só para ver, troque a cidade por <code>"Maceió"</code>: quanto dá?</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string cidade = "Natal";
+    std::cout &lt;&lt; cidade &lt;&lt; " tem " &lt;&lt; 4 &lt;&lt; " letras\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string cidade = "Natal";
+    std::cout &lt;&lt; cidade &lt;&lt; " tem " &lt;&lt; cidade.size() &lt;&lt; " letras\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>5. String vazia: <code>.empty()</code></h2>
+<p>Uma string pode não ter nenhum caractere: é a <strong>string vazia</strong>, escrita <code>""</code> (aspas abrindo e fechando, sem nada no meio). Ela aparece o tempo todo: o usuário apertou <kbd>Enter</kbd> sem digitar nada, o campo "apelido" não foi preenchido, uma linha do arquivo está em branco. Para perguntar "está vazia?", use <code>.empty()</code> ("vazio", em inglês):</p>
+
+<pre class="file" data-file="vazia.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string apelido;
+    std::string nome = "Ana";
+
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "apelido vazio? " &lt;&lt; apelido.empty() &lt;&lt; '\n';
+    std::cout &lt;&lt; "nome vazio? " &lt;&lt; nome.empty() &lt;&lt; '\n';
+    std::cout &lt;&lt; "tamanho do apelido: " &lt;&lt; apelido.size() &lt;&lt; '\n';
+
+    apelido = "Aninha";
+    std::cout &lt;&lt; "apelido vazio agora? " &lt;&lt; apelido.empty() &lt;&lt; '\n';
+
+    nome = "";
+    std::cout &lt;&lt; "nome vazio agora? " &lt;&lt; nome.empty() &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra vazia.cpp -o vazia
+$ ./vazia
+apelido vazio? true
+nome vazio? false
+tamanho do apelido: 0
+apelido vazio agora? false
+nome vazio agora? true</pre>
+
+<dl class="anatomy">
+  <dt>std::string apelido;</dt><dd>Criada sem valor: começa vazia.</dd>
+  <dt>std::cout &lt;&lt; std::boolalpha;</dt><dd>Faz o <code>std::cout</code> mostrar respostas sim/não como <code>true</code>/<code>false</code> em vez de <code>1</code>/<code>0</code> (veja <a href="bool.html">Booleanos</a>).</dd>
+  <dt>apelido.empty()</dt><dd>Devolve <code>true</code> ("verdadeiro") se a string não tem nenhum caractere e <code>false</code> se tem pelo menos um. Ela só <strong>pergunta</strong>: não apaga nada.</dd>
+  <dt>nome = "";</dt><dd>Esvazia a string trocando o valor por um texto vazio. (Outra forma é <code>nome.clear();</code>, "limpar".)</dd>
+</dl>
+
+<p>Três jeitos de fazer a mesma pergunta:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Funciona?</th><th>Comentário</th></tr>
+<tr><td><code>s.empty()</code></td><td>Sim</td><td><strong>A recomendada</strong>: diz exatamente o que você quer saber.</td></tr>
+<tr><td><code>s.size() == 0</code></td><td>Sim</td><td>Correta, mas mais longa.</td></tr>
+<tr><td><code>s == ""</code></td><td>Sim</td><td>Correta, mas compara textos para descobrir algo que a string já sabe.</td></tr>
+</table>
+</div>
+
+<div class="warning">
+<strong>Uma string com um espaço <em>não</em> está vazia</strong>
+<p><code>" "</code> tem um caractere, o espaço, e <code>.empty()</code> devolve <code>false</code>. Para o computador, espaço é uma conta do colar como qualquer outra. Na hora de validar um nome digitado pelo usuário, lembre disso (veja <a href="validar-entrada.html">Validar a Entrada</a>).</p>
+</div>
+
+<p>Você vai usar <code>.empty()</code> junto com o <code>if</code> ("se estiver vazia, faça isto"), na aula <a href="if-else.html">if e else</a>.</p>
+
+<hr>
+
+<h2>6. <code>std::string</code> × o texto entre aspas</h2>
+<p>Aqui está uma surpresa: o texto que você escreve entre aspas no código, como <code>"Ana"</code>, <strong>não</strong> é um <code>std::string</code>. Ele se chama <strong>string literal</strong> (literal = "escrito ao pé da letra no código") e é uma coisa mais simples, herdada da linguagem C: uma fileira fixa de caracteres na memória, terminada por um caractere invisível, o <code>'\0'</code> (o "caractere nulo", que marca o fim).</p>
+
+<pre class="file" data-file="literal2.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana";       // std::string: tem .size(), cresce, muda
+    const char* apelido = "Aninha"; // ponteiro para um texto fixo
+    std::cout &lt;&lt; nome &lt;&lt; " " &lt;&lt; nome.size() &lt;&lt; '\n';
+    std::cout &lt;&lt; apelido &lt;&lt; '\n';
+    std::cout &lt;&lt; sizeof("Ana") &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra literal2.cpp -o literal2
+$ ./literal2
+Ana 3
+Aninha
+4                  « o literal "Ana" ocupa 4 bytes: A, n, a e o '\0' escondido</pre>
+
+<dl class="anatomy">
+  <dt>std::string nome = "Ana";</dt><dd>O literal <code>"Ana"</code> é <strong>copiado</strong> para dentro de um <code>std::string</code>. Daí em diante, <code>nome</code> é uma string "de verdade": sabe o tamanho, pode mudar, crescer, juntar.</dd>
+  <dt>const char* apelido = "Aninha";</dt><dd>O jeito da linguagem C: <code>apelido</code> não guarda o texto, guarda <strong>o endereço</strong> onde o texto fixo está na memória (um <strong>ponteiro</strong>, assunto do Nível 2: <a href="ponteiros.html">Ponteiros</a>). <code>const char*</code> se lê "ponteiro para caracteres constantes". Só reconheça: você vai encontrar isso em código antigo e em mensagens de erro.</dd>
+  <dt>sizeof("Ana")</dt><dd>Mostra quantos bytes o literal ocupa: 4, contando o <code>'\0'</code> do fim. Já <code>nome.size()</code> dá 3, as letras que interessam.</dd>
+</dl>
+
+<p>Na prática, a diferença aparece quando você tenta usar no literal algo que só o <code>std::string</code> tem:</p>
+
+<pre class="file" data-file="literal.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::cout &lt;&lt; "Ana".size() &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra literal.cpp -o literal
+literal.cpp: In function ‘int main()’:
+literal.cpp:5:24: error: request for member ‘size’ in ‘"Ana"’, which is of non-class type ‘const char [4]’
+    5 |     std::cout &lt;&lt; "Ana".size() &lt;&lt; '\n';
+      |                        ^~~~</pre>
+
+<p>Traduzindo: "pedido do membro <code>size</code> em <code>"Ana"</code>, que é do tipo <code>const char [4]</code>, que não é uma classe". Ou seja: o literal é uma fileira de 4 <code>char</code> constantes e não tem <code>.size()</code>. O mesmo vai acontecer quando você tentar juntar dois literais com <code>+</code> (veja <a href="concatenacao.html">Juntar Strings</a>).</p>
+
+<div class="tip">
+<strong>A regra prática</strong>
+<p>Escreva o texto entre aspas à vontade, mas <strong>guarde</strong> sempre em <code>std::string</code>. Ela cuida da memória sozinha, sabe o próprio tamanho e não deixa você escrever além do fim, como acontecia com os textos da linguagem C (uma fonte clássica de falhas de segurança). Para quem só precisa "olhar" um texto sem copiá-lo, existe o <code>std::string_view</code>, do Nível 3 (<a href="string-view.html">string_view</a>).</p>
+</div>
+
+<hr>
+
+<h2>7. Por que <code>#include &lt;string&gt;</code> e <code>std::</code>?</h2>
+<p>Experimente apagar o <code>#include &lt;string&gt;</code>:</p>
+
+<pre class="file" data-file="seminclude.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::string nome = "Ana";
+    std::cout &lt;&lt; nome &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra seminclude.cpp -o seminclude
+$ ./seminclude
+Ana                « funcionou, mas por sorte</pre>
+
+<p>Funcionou porque, no g++ 15, o <code>&lt;iostream&gt;</code> inclui o <code>&lt;string&gt;</code> "por dentro". Isso é um detalhe da biblioteca, não uma regra da linguagem: em outro compilador, ou em outra versão, o mesmo programa pode dar erro. <strong>Inclua sempre o cabeçalho do que você usa</strong>: usou <code>std::string</code>, escreva <code>#include &lt;string&gt;</code>.</p>
+
+<p>Já o <code>std::</code> não pode faltar. O <code>std</code> é um <strong>namespace</strong> ("espaço de nomes"), uma espécie de sobrenome que todas as coisas da biblioteca padrão têm. Sem ele, o compilador procura um <code>string</code> "solto" e não acha (a mensagem completa está em <a href="#errado">Quando dá errado</a>). Você vai ver código com <code>using namespace std;</code> no começo, que dispensa o <code>std::</code>; o guia não usa esse atalho, e a aula <a href="namespaces.html">Namespaces</a> explica por quê.</p>
+
+<hr>
+
+<h2 id="errado">Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: ‘string’ was not declared in this scope</code></strong>
+<pre class="file" data-file="semstd.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    string nome = "Ana";
+    std::cout &lt;&lt; nome &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semstd.cpp -o semstd
+semstd.cpp: In function ‘int main()’:
+semstd.cpp:5:5: error: ‘string’ was not declared in this scope
+    5 |     string nome = "Ana";
+      |     ^~~~~~
+semstd.cpp:5:5: note: suggested alternatives:
+In file included from /usr/include/c++/15/iosfwd:43,
+                 from /usr/include/c++/15/ios:42,
+                 from /usr/include/c++/15/bits/ostream.h:43,
+                 from /usr/include/c++/15/ostream:42,
+                 from /usr/include/c++/15/iostream:43,
+                 from semstd.cpp:1:
+/usr/include/c++/15/bits/stringfwd.h:79:33: note:   ‘std::string’
+   79 |   typedef basic_string&lt;char&gt;    string;
+      |                                 ^~~~~~
+In file included from /usr/include/c++/15/ostream:44:
+/usr/include/c++/15/format:5121:5: note:   ‘std::range_format::string’
+ 5121 |     string,
+      |     ^~~~~~
+In file included from /usr/include/c++/15/bits/locale_classes.h:42,
+                 from /usr/include/c++/15/bits/ios_base.h:43,
+                 from /usr/include/c++/15/ios:46:
+/usr/include/c++/15/string:80:11: note:   ‘std::pmr::string’
+   80 |     using string    = basic_string&lt;char&gt;;
+      |           ^~~~~~
+semstd.cpp:6:18: error: ‘nome’ was not declared in this scope
+    6 |     std::cout &lt;&lt; nome &lt;&lt; '\n';
+      |                  ^~~~</pre>
+<p><strong>O que significa:</strong> "<code>string</code> não foi declarado neste escopo": o compilador não conhece nenhum <code>string</code> sem sobrenome. A mensagem é comprida, mas só tem <strong>dois erros</strong> (as linhas com <code>error:</code>). O resto são <code>note:</code> (notas), sugestões: "você quis dizer <code>‘std::string’</code>?". O segundo erro (<code>‘nome’ was not declared</code>) é consequência do primeiro: como a linha 5 falhou, a variável <code>nome</code> nunca foi criada.</p>
+<p><strong>Como consertar:</strong> escreva <code>std::string</code>. Regra geral, ensinada em <a href="erros-compilacao.html">Lendo Erros do Compilador</a>: <strong>conserte o primeiro erro e compile de novo</strong>; muitos dos seguintes desaparecem sozinhos.</p>
+</div>
+
+<div class="cenario">
+<strong><code>warning: multi-character character constant</code> + <code>error: conversion from ‘int’ to non-scalar type ‘std::string’</code></strong>
+<pre class="file" data-file="simples.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = 'Ana';
+    std::cout &lt;&lt; nome &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra simples.cpp -o simples
+simples.cpp:5:24: warning: multi-character character constant [-Wmultichar]
+    5 |     std::string nome = 'Ana';
+      |                        ^~~~~
+simples.cpp: In function ‘int main()’:
+simples.cpp:5:24: error: conversion from ‘int’ to non-scalar type ‘std::string’ {aka ‘std::__cxx11::basic_string&lt;char&gt;’} requested</pre>
+<p><strong>O que significa:</strong> aspas <strong>simples</strong> são para <strong>um</strong> caractere (<code>'A'</code>). Com várias letras dentro, o C++ cria uma "constante de vários caracteres", que é um número <code>int</code> esquisito (o aviso). E um <code>int</code> não pode virar <code>std::string</code> (o erro). O <code>{aka …}</code> é o "nome completo" interno do <code>std::string</code>; pode ignorar.</p>
+<p><strong>Como consertar:</strong> texto vai entre <strong>aspas duplas</strong>: <code>"Ana"</code>. Quem vem do Python ou do JavaScript, onde as duas aspas valem, cai muito nesse.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: conversion from ‘int’ to non-scalar type ‘std::string’</code> com um número</strong>
+<pre class="file" data-file="numero.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string idade = 30;
+    std::cout &lt;&lt; idade &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra numero.cpp -o numero
+numero.cpp: In function ‘int main()’:
+numero.cpp:5:25: error: conversion from ‘int’ to non-scalar type ‘std::string’ {aka ‘std::__cxx11::basic_string&lt;char&gt;’} requested
+    5 |     std::string idade = 30;
+      |                         ^~</pre>
+<p><strong>O que significa:</strong> <code>30</code> é um número, não um texto, e o C++ não converte número em string sozinho.</p>
+<p><strong>Como consertar:</strong> se é uma idade, guarde num <code>int</code> (<code>int idade = 30;</code>). Se você precisa mesmo do texto <code>"30"</code>, escreva <code>"30"</code> ou converta com <code>std::to_string(30)</code> (aula <a href="string-numero.html">Texto ↔ Número</a>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: request for member ‘size’ in ‘"Ana"’, which is of non-class type ‘const char [4]’</code></strong>
+<p><strong>O que significa:</strong> você chamou <code>.size()</code> (ou outra função de string) num <strong>literal</strong>, que não é um <code>std::string</code> (veja a seção 6).</p>
+<p><strong>Como consertar:</strong> guarde o texto numa variável <code>std::string</code> primeiro e chame a função nela.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th><th>Exemplo</th></tr>
+<tr><td><code>#include &lt;string&gt;</code></td><td>Traz o <code>std::string</code></td><td>No topo do arquivo</td></tr>
+<tr><td><code>std::string s = "texto";</code></td><td>Cria uma string</td><td><code>std::string nome = "Ana";</code></td></tr>
+<tr><td><code>std::string s;</code></td><td>Cria uma string vazia</td><td><code>std::string apelido;</code></td></tr>
+<tr><td><code>std::string s(n, 'c');</code></td><td>Repete um caractere <code>n</code> vezes</td><td><code>std::string(5, '*')</code> → <code>*****</code></td></tr>
+<tr><td><code>s = "outro";</code></td><td>Troca o valor</td><td><code>nome = "Bia";</code></td></tr>
+<tr><td><code>std::cout &lt;&lt; s</code></td><td>Mostra o texto</td><td><code>std::cout &lt;&lt; nome &lt;&lt; '\n';</code></td></tr>
+<tr><td><code>s.size()</code> / <code>s.length()</code></td><td>Tamanho em <strong>bytes</strong></td><td><code>"Ana"</code> → 3, <code>"maçã"</code> → 6</td></tr>
+<tr><td><code>s.empty()</code></td><td><code>true</code> se não tem nenhum caractere</td><td><code>std::string{}.empty()</code> → <code>true</code></td></tr>
+<tr><td><code>s.clear()</code></td><td>Esvazia a string</td><td><code>nome.clear();</code></td></tr>
+<tr><td><code>"…"</code></td><td>String literal (<code>const char[N]</code>), não é <code>std::string</code></td><td><code>sizeof("Ana")</code> → 4</td></tr>
+</table>
+</div>
+<p>A lista completa de tudo o que um <code>std::string</code> faz está na referência <a href="ref-string.html">std::string</a>.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O cabeçalho</h3>
+<p>Complete a linha que traz o <code>std::string</code> para o programa:</p>
+<div class="ex-code">#include <input data-answer="&lt;string&gt;" aria-label="cabeçalho"></div>
+</div>
+
+<div class="exercise">
+<h3>2. O tamanho</h3>
+<p>Complete para mostrar quantos caracteres tem a string <code>produto</code>:</p>
+<div class="ex-code">std::cout &lt;&lt; produto.<input data-answer="size()|length()" aria-label="função"> &lt;&lt; '\n';</div>
+</div>
+
+<div class="exercise">
+<h3>3. Está vazia?</h3>
+<p>Complete para perguntar se a string <code>apelido</code> não tem nenhum caractere:</p>
+<div class="ex-code">std::cout &lt;&lt; apelido.<input data-answer="empty()" aria-label="função"> &lt;&lt; '\n';</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O que <code>std::string s = "pão"; std::cout &lt;&lt; s.size();</code> mostra?</p>
+<label><input type="radio" name="q4"> <code>3</code></label>
+<label><input type="radio" name="q4"> <code>5</code></label>
+<label><input type="radio" name="q4"> <code>4</code>, porque o <code>ã</code> ocupa 2 bytes</label>
+<label><input type="radio" name="q4"> Dá erro de compilação por causa do acento</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Depois de <code>std::string a = "sol"; std::string b = a; a = "lua";</code>, quanto vale <code>b</code>?</p>
+<label><input type="radio" name="q5"> <code>lua</code></label>
+<label><input type="radio" name="q5"> <code>sol</code></label>
+<label><input type="radio" name="q5"> Vazia</label>
+<label><input type="radio" name="q5"> <code>sollua</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Qual linha cria corretamente uma string com o texto Bia?</p>
+<label><input type="radio" name="q6"> <code>std::string nome = "Bia";</code></label>
+<label><input type="radio" name="q6"> <code>std::string nome = 'Bia';</code></label>
+<label><input type="radio" name="q6"> <code>string nome = "Bia";</code> (sem <code>using</code>)</label>
+<label><input type="radio" name="q6"> <code>std::string = "Bia";</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">7. Quanto vale <code>std::string s = " "; s.empty()</code>?</p>
+<label><input type="radio" name="q7"> <code>true</code>, porque espaço não conta</label>
+<label><input type="radio" name="q7"> Dá erro: string não pode ter só espaço</label>
+<label><input type="radio" name="q7"> <code>0</code></label>
+<label><input type="radio" name="q7"> <code>false</code>, porque o espaço é um caractere</label>
+</div>
+
+<h3>Missão final: a ficha do cliente</h3>
+
+<div class="trycpp" data-goal="out:Cliente: Bruno,out:Letras no nome: 5,out:Tem apelido? false,out:==========,src:\.size\s*\(|\.length\s*\(,src:\.empty\s*\(">
+<p class="try-task"><strong>Missão:</strong> complete o programa para mostrar exatamente a ficha abaixo. Use uma string <code>moldura</code> criada com <code>std::string(10, '=')</code>, a string <code>cliente</code> com <code>"Bruno"</code>, <code>.size()</code> para o número de letras (nada de digitar 5) e <code>.empty()</code> na string <code>apelido</code>, que deve continuar vazia.</p>
+<pre class="out">==========
+Cliente: Bruno
+Letras no nome: 5
+Tem apelido? false
+==========</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::cout &lt;&lt; std::boolalpha;
+    // crie moldura, cliente e apelido aqui
+
+    // e mostre as cinco linhas aqui
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::cout &lt;&lt; std::boolalpha;
+    std::string moldura(10, '=');
+    std::string cliente = "Bruno";
+    std::string apelido;
+
+    std::cout &lt;&lt; moldura &lt;&lt; '\n';
+    std::cout &lt;&lt; "Cliente: " &lt;&lt; cliente &lt;&lt; '\n';
+    std::cout &lt;&lt; "Letras no nome: " &lt;&lt; cliente.size() &lt;&lt; '\n';
+    std::cout &lt;&lt; "Tem apelido? " &lt;&lt; !apelido.empty() &lt;&lt; '\n';
+    std::cout &lt;&lt; moldura &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma <strong>string</strong> é um "colar" de caracteres. Em C++, o tipo é <code>std::string</code>, com <code>#include &lt;string&gt;</code>.</li>
+  <li>Crie com <code>std::string s = "texto";</code>. Sem valor, ela começa vazia (nunca com lixo). <code>std::string(10, '-')</code> repete um caractere.</li>
+  <li>Texto vai entre <strong>aspas duplas</strong>; aspas simples são para um único <code>char</code>.</li>
+  <li><code>=</code> troca o valor; <code>b = a</code> faz uma <strong>cópia</strong> independente.</li>
+  <li><code>.size()</code> (ou <code>.length()</code>) conta <strong>bytes</strong>: <code>"maçã"</code> tem 6. Espaços e pontuação contam.</li>
+  <li><code>.empty()</code> pergunta se está vazia. <code>" "</code> não está vazia.</li>
+  <li>O texto entre aspas no código é um <strong>literal</strong> (<code>const char[N]</code>), não um <code>std::string</code>: não tem <code>.size()</code>. Guarde texto em <code>std::string</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
