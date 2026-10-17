@@ -848,3 +848,79 @@ figure { margin: 18px 0; }
 figure img { display: block; max-width: 100%; height: auto; border: 1px solid var(--border); border-radius: 8px; }
 figcaption { margin-top: 8px; font-size: .92rem; color: var(--muted); line-height: 1.5; }
 
+
+/* ---------------- Guia C++: editor .trycpp (assets/cppsim.js) ---------------- */
+.trycpp {
+  margin: 22px 0;
+  padding: 4px 18px 14px;
+  border: 2px dashed var(--accent);
+  border-radius: 10px;
+  min-width: 0;
+}
+.trycpp .sim { max-width: 100%; }
+.tc .ts-code { tab-size: 4; }
+.tc-tabs { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.tc-tab {
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: var(--muted);
+  font: 600 13.5px "Ubuntu Mono", ui-monospace, monospace;
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tc-tab::before { content: "📄 "; }
+.tc-tab:hover { color: var(--accent); border-color: var(--accent); }
+.tc-tab.on { background: var(--code-bg); color: var(--text); border-color: var(--accent); }
+.tc-entrada-l { display: flex; align-items: flex-start; gap: 6px; flex: 1; min-width: 0; font-size: 14px; }
+.tc-entrada {
+  flex: 1; min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.4 "Ubuntu Mono", ui-monospace, monospace;
+  resize: vertical;
+}
+.tc-carga {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--note-bg);
+  font-size: 14px;
+}
+.tc-carga[hidden] { display: none; }
+.tc-carga-txt { flex: 1 1 220px; min-width: 0; }
+.tc-barra { flex: 1 1 140px; height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; }
+.tc-barra i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+.tc .ts-saida { margin-top: 8px; }
+.tc .sim-screen { max-height: 420px; }
+.tc .sim-screen .sim-err { color: #ff8a80; }
+.tc .sim-digitado { color: #ffffff; font-weight: 700; }
+.tc .ts-campo { width: auto; min-width: 12ch; max-width: 100%; }
+.tc .sim-out > div { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
+.tc .tc-diag { color: #d3d7cf; }
+.tc .tc-compilando { animation: tc-pisca 1.2s ease-in-out infinite; }
+@keyframes tc-pisca { 50% { opacity: .45; } }
+/* cores ANSI (diagnósticos do Clang e programas coloridos), no terminal escuro */
+.tc .c-n { font-weight: 700; }
+.tc .c-r { color: #ff6b6b; }
+.tc .c-g { color: #8ae234; }
+.tc .c-y { color: #fce94f; }
+.tc .c-b { color: #82aaff; }
+.tc .c-m { color: #f78cf2; }
+.tc .c-c { color: #34e2e2; }
+.tc .c-w { color: #ffffff; }
+.tc .c-k { color: #a9a9b2; }
+.tc-nota { margin: 8px 0 0; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+@media (max-width: 600px) {
+  .trycpp { padding: 4px 10px 12px; }
+  .tc-tab { font-size: 12.5px; padding: 3px 7px; }
+  .tc .ts-run { flex-direction: column; align-items: stretch; }
+}

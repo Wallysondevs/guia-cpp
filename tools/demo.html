@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demonstração do Experimente | Guia C++</title>
+<link rel="stylesheet" href="../assets/style.css">
+<style>body { max-width: 860px; margin: 0 auto; padding: 16px; background: var(--bg); color: var(--text); font: 17px/1.6 system-ui, sans-serif; }</style>
+</head>
+<body>
+<h1>Demonstração do <span class="hl">Experimente</span> (C++ de verdade)</h1>
+<p>Página de teste das caixas <code>.trycpp</code> (não faz parte do menu). Sirva a raiz do site e abra <code>/tools/demo.html</code>.</p>
+
+<h2>Missão simples</h2>
+<div class="trycpp" data-goal="out:Olá, Ana!">
+<p class="try-task"><strong>Missão:</strong> troque "mundo" por "Ana" e clique em Rodar.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, Ana!\n";
+}
+</pre>
+</div>
+
+<h2>Erro de compilação (missão "provoque o erro")</h2>
+<div class="trycpp" data-goal="erro:/undeclared identifier|was not declared/">
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 29;
+    std::cout &lt;&lt; idade &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 29;
+    std::cout &lt;&lt; idadee &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<h2>Entrada digitada (sem data-stdin) e argumentos</h2>
+<div class="trycpp" data-args="um 'dois três'">
+<pre class="script" data-file="pergunta.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main(int argc, char* argv[]) {
+    std::string nome;
+    int idade = 0;
+    std::cout &lt;&lt; "Qual é o seu nome? ";
+    std::getline(std::cin, nome);
+    std::cout &lt;&lt; "Idade: ";
+    std::cin &gt;&gt; idade;
+    std::cout &lt;&lt; "Oi, " &lt;&lt; nome &lt;&lt; "! Daqui a 10 anos você terá " &lt;&lt; idade + 10 &lt;&lt; ".\n";
+    std::cout &lt;&lt; "Você passou " &lt;&lt; argc - 1 &lt;&lt; " argumentos.\n";
+    return 3;
+}
+</pre>
+</div>
+
+<h2>Entrada fixa (data-stdin), várias abas e arquivo de dados</h2>
+<div class="trycpp" data-stdin="Ana\n29">
+<pre class="script" data-file="main.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include "pessoa.h"
+
+int main() {
+    Pessoa p;
+    std::cout &lt;&lt; "Nome: ";
+    std::getline(std::cin, p.nome);
+    std::cout &lt;&lt; "Idade: ";
+    std::cin &gt;&gt; p.idade;
+    std::cout &lt;&lt; descrever(p) &lt;&lt; '\n';
+    std::ifstream arq("compras.txt");
+    std::string item;
+    while (std::getline(arq, item)) std::cout &lt;&lt; "- " &lt;&lt; item &lt;&lt; '\n';
+}
+</pre>
+<pre class="script" data-file="pessoa.h">#pragma once
+#include &lt;string&gt;
+
+struct Pessoa {
+    std::string nome;
+    int idade = 0;
+};
+
+std::string descrever(const Pessoa&amp; p);
+</pre>
+<pre class="script" data-file="pessoa.cpp">#include "pessoa.h"
+
+std::string descrever(const Pessoa&amp; p) {
+    return p.nome + " tem " + std::to_string(p.idade) + " anos";
+}
+</pre>
+<pre class="script" data-file="compras.txt">arroz
+feijão
+café
+</pre>
+</div>
+
+<h2>Exceções e C++23 (std::println)</h2>
+<div class="trycpp">
+<pre class="script">#include &lt;print&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+
+int main() {
+    try {
+        int n = std::stoi("abc");
+        std::println("{}", n);
+    } catch (const std::invalid_argument&amp; e) {
+        std::println("Não é número: {}", e.what());
+    }
+    std::println("Agora sem try...");
+    int x = std::stoi("xyz");
+    std::println("{}", x);
+}
+</pre>
+</div>
+
+<h2>Laço infinito (use Parar)</h2>
+<div class="trycpp">
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    long long i = 0;
+    while (true) {
+        if (++i % 100000000 == 0) std::cout &lt;&lt; "volta " &lt;&lt; i &lt;&lt; std::endl;
+    }
+}
+</pre>
+</div>
+<script src="../assets/cppsim.js"></script>
+</body>
+</html>

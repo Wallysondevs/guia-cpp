@@ -125,9 +125,13 @@ function garantir(dados) {
 }
 
 /* ---------- saída em lotes (na ordem em que o programa escreveu) ---------- */
-let pendente = [], pendenteBytes = 0, idAtual = null, agendado = false;
+// O programa roda de forma síncrona (o laço de eventos do worker fica parado),
+// então o setTimeout só dispara no fim: por isso a saída também é enviada
+// direto quando passa um tempinho desde o último envio.
+let pendente = [], pendenteBytes = 0, idAtual = null, agendado = false, ultimoEnvio = 0;
 function despejar() {
   agendado = false;
+  ultimoEnvio = Date.now();
   if (!pendente.length) return;
   const partes = [];
   for (const p of pendente) {
@@ -144,7 +148,7 @@ function despejar() {
 }
 function aoSaida(t, b) {
   pendente.push({ t, b }); pendenteBytes += b.length;
-  if (pendenteBytes > 32768) despejar();
+  if (pendenteBytes > 32768 || Date.now() - ultimoEnvio > 40) despejar();
   else if (!agendado) { agendado = true; setTimeout(despejar, 0); }
 }
 
