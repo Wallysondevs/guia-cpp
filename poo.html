@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ O que é POO — classes, objetos e os quatro pilares | Guia C++</title>
+<meta name="description" content="Programação Orientada a Objetos em C++ para quem já sabe funções e structs: molde × objeto com a lojinha da Ana, por que usar, os quatro pilares (encapsulamento, herança, polimorfismo, abstração) e as diferenças da POO em C++ para Java e Python, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">O que é POO</span></h1>
+
+<p class="intro">Até agora, nos seus programas, os <strong>dados</strong> ficavam de um lado (variáveis, <a href="structs.html">structs</a>) e as <strong>ações</strong> ficavam do outro (<a href="funcoes.html">funções</a>). Funciona, mas, quando o programa cresce, fica difícil saber qual função mexe em qual dado. A <strong>Programação Orientada a Objetos</strong> (POO) junta as duas coisas: cada "coisa" do programa carrega os seus dados <em>e</em> as ações que sabe fazer. Esta aula é a porta de entrada do Nível 3. Ela explica a ideia, sem pressa, antes de você escrever a sua primeira classe na próxima aula.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma <strong>classe</strong> (o molde) e o que é um <strong>objeto</strong> (a coisa feita com o molde).</li>
+  <li>Como o mesmo programa da lojinha da Ana fica escrito sem POO e com POO.</li>
+  <li>Por que tanta gente organiza programas assim.</li>
+  <li>A ideia dos quatro pilares: encapsulamento, herança, polimorfismo e abstração.</li>
+  <li>O que muda na POO do C++ em relação a Java e Python: objetos na pilha, cópias de verdade e nada de coletor de lixo.</li>
+  <li>Dois erros de quem está começando: usar o molde como se fosse objeto e escrever <code>new</code> como em Java.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados e executados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp/poo</code>, com o <strong>g++ 15.2</strong> e o comando padrão do guia, <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code> (veja <a href="compilar.html">Compilar com g++</a>).</p>
+
+<hr>
+
+<h2>A ideia: a ficha de cadastro da lojinha</h2>
+<p>A Ana tem uma lojinha de papelaria. Para não se perder, ela imprimiu uma <strong>ficha de cadastro de produto</strong>, com três campos em branco: <em>Nome</em>, <em>Preço</em> e <em>Estoque</em>. No verso, a ficha traz as instruções do que se pode fazer com um produto: "mostrar na vitrine", "vender", "repor".</p>
+
+<p>A ficha em branco não é um produto. Ninguém compra uma ficha em branco. Ela é só o <strong>molde</strong>: diz quais informações todo produto tem e o que todo produto sabe fazer. Quando a Ana preenche uma cópia da ficha com "caneta, R$ 3, 50 unidades", aí sim ela tem um produto de verdade. Outra cópia, preenchida com "caderno, R$ 12, 8 unidades", é outro produto.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na lojinha</th><th>Em POO</th><th>Em C++</th></tr>
+<tr><td>A ficha em branco (o molde)</td><td><strong>classe</strong></td><td><code>class Produto { … };</code></td></tr>
+<tr><td>Uma ficha preenchida (a caneta, o caderno)</td><td><strong>objeto</strong> (ou <strong>instância</strong>)</td><td><code>Produto caneta{…};</code></td></tr>
+<tr><td>Os campos: nome, preço, estoque</td><td><strong>atributos</strong> (dados do objeto)</td><td>variáveis dentro da classe, os <em>membros de dados</em></td></tr>
+<tr><td>As instruções do verso: mostrar, vender</td><td><strong>métodos</strong> (ações do objeto)</td><td>funções dentro da classe, as <em>funções-membro</em></td></tr>
+</table>
+</div>
+
+<p>Guarde a frase: <strong>a classe é o molde; o objeto é a coisa feita com o molde</strong>. Uma classe, muitos objetos. Outra comparação que ajuda: a receita de bolo (classe) e os bolos que saem do forno (objetos). A receita diz "tem farinha, ovos e açúcar, e vai ao forno"; cada bolo tem a sua própria farinha, e comer um bolo não some com o outro.</p>
+
+<p>"Instância" é só outro nome para objeto: "a caneta é uma <em>instância</em> da classe <code>Produto</code>" quer dizer "a caneta é um objeto feito com o molde <code>Produto</code>". Você vai encontrar as duas palavras em livros e mensagens de erro.</p>
+
+<hr>
+
+<h2>1. O jeito que você já conhece: dados de um lado, funções do outro</h2>
+<p>Na aula de <a href="structs.html">Structs</a>, você aprendeu a juntar dados num tipo só. Um produto da lojinha, escrito assim, fica com os dados numa <code>struct</code> e as ações em funções soltas, que recebem o produto como parâmetro:</p>
+
+<pre class="file" data-file="solto.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    int preco;
+    int estoque;
+};
+
+void mostrar(const Produto&amp; p) {
+    std::cout &lt;&lt; p.nome &lt;&lt; ": R$ " &lt;&lt; p.preco &lt;&lt; " (" &lt;&lt; p.estoque &lt;&lt; " no estoque)\n";
+}
+
+void vender(Produto&amp; p, int quantidade) {
+    p.estoque -= quantidade;
+}
+
+int main() {
+    Produto caneta{"caneta", 3, 50};
+    vender(caneta, 2);
+    mostrar(caneta);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/poo">$ g++ -std=c++23 -Wall -Wextra solto.cpp -o solto
+$ ./solto
+caneta: R$ 3 (48 no estoque)</pre>
+
+<p>Nada de novo aqui: a <code>struct</code> guarda os dados, <code>mostrar</code> recebe o produto por <a href="passagem-referencia.html">referência constante</a> (só lê) e <code>vender</code> recebe por referência (para poder mudar o estoque). Os preços desta parte do guia são em reais inteiros, para não desviar a atenção com casas decimais.</p>
+
+<p>O problema aparece quando o programa cresce. Numa loja de verdade haveria <code>mostrar</code>, <code>vender</code>, <code>repor</code>, <code>aplicarDesconto</code>, <code>mudarPreco</code>… todas soltas, espalhadas pelos arquivos, e nada liga essas funções ao <code>Produto</code> além do parâmetro. Pior: <strong>qualquer</strong> parte do programa pode mexer em <code>p.estoque</code> diretamente, inclusive deixando o estoque negativo.</p>
+
+<h2>2. O mesmo programa com POO</h2>
+<p>Agora o mesmo produto, escrito como uma <strong>classe</strong>. Não se preocupe em decorar a sintaxe: a próxima aula, <a href="classes-objetos.html">Classes e Objetos</a>, explica cada pedaço. Aqui, repare só em <strong>onde</strong> as coisas estão.</p>
+
+<pre class="file" data-file="loja.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; " (" &lt;&lt; estoque &lt;&lt; " no estoque)\n";
+    }
+
+    void vender(int quantidade) {
+        estoque -= quantidade;
+    }
+};
+
+int main() {
+    Produto caneta{"caneta", 3, 50};
+    Produto caderno{"caderno", 12, 8};
+
+    caneta.vender(2);
+    caderno.vender(1);
+
+    caneta.mostrar();
+    caderno.mostrar();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/poo">$ g++ -std=c++23 -Wall -Wextra loja.cpp -o loja
+$ ./loja
+caneta: R$ 3 (48 no estoque)
+caderno: R$ 12 (7 no estoque)</pre>
+
+<dl class="anatomy">
+  <dt>class Produto { … };</dt><dd>A <strong>classe</strong>: o molde. Diz que todo produto tem nome, preço e estoque e sabe se mostrar e ser vendido. Ela sozinha não cria produto nenhum.</dd>
+  <dt>public:</dt><dd>"O que vem a seguir pode ser usado de fora da classe." A aula <a href="encapsulamento.html">public e private</a> explica por que às vezes queremos o contrário.</dd>
+  <dt>std::string nome; int preco; int estoque;</dt><dd>Os <strong>atributos</strong>: os campos da ficha. Cada objeto tem os seus.</dd>
+  <dt>void mostrar() { … }</dt><dd>Um <strong>método</strong>: uma função que mora dentro da classe. Repare que ela <strong>não recebe o produto como parâmetro</strong>: usa <code>nome</code>, <code>preco</code> e <code>estoque</code> direto, porque sempre trabalha sobre o objeto que a chamou.</dd>
+  <dt>Produto caneta{"caneta", 3, 50};</dt><dd>Cria um <strong>objeto</strong>: uma ficha preenchida, chamada <code>caneta</code>.</dd>
+  <dt>caneta.vender(2);</dt><dd>Pede à caneta: "venda 2 de você". O ponto (<code>.</code>) liga o objeto à ação. Compare com <code>vender(caneta, 2)</code> da versão sem POO.</dd>
+</dl>
+
+<p>A grande mudança está na última linha da tabela: em vez de <em>"função, faça isto com este produto"</em>, você diz <em>"produto, faça isto"</em>. O objeto vem primeiro, e a ação pertence a ele. E <code>caneta.vender(2)</code> mexeu só no estoque da caneta: o caderno continua com o dele. Cada objeto tem os próprios dados.</p>
+
+<div class="note"><strong>Nada mudou na saída.</strong> POO não deixa o programa mais rápido nem faz coisas que o C++ "sem POO" não faria. Ela é uma forma de <strong>organizar</strong> o código. A diferença aparece quando o programa tem 50 arquivos e 10 pessoas mexendo nele.</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> crie um terceiro produto, <code>borracha</code>, que custa R$ 2 e tem 30 unidades. Venda 5 borrachas e mostre. Depois tente vender mais borrachas do que existem e veja o que acontece com o estoque.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; " (" &lt;&lt; estoque &lt;&lt; " no estoque)\n";
+    }
+
+    void vender(int quantidade) {
+        estoque -= quantidade;
+    }
+};
+
+int main() {
+    Produto caneta{"caneta", 3, 50};
+    Produto caderno{"caderno", 12, 8};
+
+    caneta.vender(2);
+    caderno.vender(1);
+
+    caneta.mostrar();
+    caderno.mostrar();
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Por que usar POO</h2>
+<p>Ninguém é obrigado a usar POO em C++. Mas ela resolve problemas reais que aparecem quando o programa cresce:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Problema</th><th>Como a POO ajuda</th></tr>
+<tr><td>"Onde está a função que mexe no estoque?"</td><td>Tudo o que é de <code>Produto</code> está <strong>dentro</strong> de <code>Produto</code>. Para entender um produto, você lê uma classe.</td></tr>
+<tr><td>Alguém deixou o estoque negativo</td><td>A classe pode <strong>proibir</strong> que mexam nos dados direto e obrigar todo mundo a passar pelos métodos, que conferem as regras.</td></tr>
+<tr><td>A loja agora vende livros, que têm autor</td><td>Uma classe nova pode <strong>reaproveitar</strong> o <code>Produto</code> e acrescentar só o que falta.</td></tr>
+<tr><td>Mostrar uma lista misturada de livros e canetas, cada um do seu jeito</td><td>Objetos diferentes podem responder à <strong>mesma ordem</strong> (<code>mostrar()</code>), cada um à sua maneira.</td></tr>
+<tr><td>O programa ficou grande demais para caber na cabeça</td><td>Cada classe vira uma "caixa preta": você usa <code>caneta.vender(2)</code> sem pensar em como ela funciona por dentro.</td></tr>
+</table>
+</div>
+
+<p>Veja o segundo problema acontecendo. Com os dados abertos, nada impede isto (a classe <code>Produto</code> é a mesma de <code>loja.cpp</code>; mostramos só o <code>main</code>):</p>
+
+<pre class="file" data-file="furo.cpp">int main() {
+    Produto caneta{"caneta", 3, 50};
+    caneta.estoque -= 60;   // vendeu mais do que tinha!
+    caneta.preco = -3;      // preço negativo?!
+    caneta.mostrar();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/poo">$ g++ -std=c++23 -Wall -Wextra furo.cpp -o furo
+$ ./furo
+caneta: R$ -3 (-10 no estoque)</pre>
+
+<p>O compilador não reclamou de nada, e o programa obedeceu: estoque −10, preço −3. Para o C++, são só números. Quem sabe que estoque negativo não existe é você, e a POO dá as ferramentas para colocar essa regra <strong>dentro</strong> da classe. É o primeiro pilar.</p>
+
+<hr>
+
+<h2>4. Os quatro pilares (só a ideia)</h2>
+<p>Livros e entrevistas de emprego falam dos "quatro pilares da POO". São quatro ideias. Cada uma tem a sua própria aula mais adiante; aqui você só precisa reconhecer o nome e o que ele quer dizer.</p>
+
+<h3>Encapsulamento: proteger os dados</h3>
+<p>A classe <strong>esconde</strong> os seus dados e só deixa mexer neles pelos métodos. Quem quer mudar o preço chama <code>caneta.mudarPreco(4)</code>, e o método recusa preço negativo. É o que teria evitado o "R$ −3" acima. É como o caixa da loja: o cliente não abre a gaveta do dinheiro, ele pede ao caixa. Em C++, isso se faz com <code>private</code> e <code>public</code>. Aula: <a href="encapsulamento.html">public e private</a>.</p>
+
+<h3>Herança: aproveitar um molde para fazer outro</h3>
+<p>A Ana passou a vender livros. Um livro é um produto (tem nome, preço e estoque) <strong>e mais</strong> um autor. Em vez de copiar tudo, a classe <code>Livro</code> <strong>herda</strong> de <code>Produto</code> e acrescenta só o autor. Diz-se que "<code>Livro</code> é um <code>Produto</code>". Aula: <a href="heranca.html">Herança</a>.</p>
+
+<h3>Polimorfismo: a mesma ordem, respostas diferentes</h3>
+<p>"Poli" = muitas, "morfo" = formas. A Ana tem uma lista com canetas e livros e manda cada um se <code>mostrar()</code>. A caneta mostra nome e preço; o livro mostra também o autor. Quem chama não precisa saber o que cada um é: dá a mesma ordem e cada objeto responde do seu jeito. Em C++, isso usa a palavra <code>virtual</code>. Aula: <a href="polimorfismo.html">Polimorfismo (virtual)</a>.</p>
+
+<h3>Abstração: mostrar só o que importa</h3>
+<p>Quem vende uma caneta não precisa saber como o estoque é guardado: precisa de "vender" e "repor". Abstrair é pensar no <strong>que</strong> uma coisa faz, deixando o <strong>como</strong> escondido. Em C++, isso chega ao extremo nas <em>classes abstratas</em>: moldes que só dizem "todo produto sabe calcular o frete", sem dizer como, deixando cada tipo de produto completar. Aula: <a href="classes-abstratas.html">Classes Abstratas</a>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pilar</th><th>Em uma frase</th><th>Ferramenta em C++</th><th>Aula</th></tr>
+<tr><td>Encapsulamento</td><td>Os dados ficam protegidos; só os métodos mexem neles.</td><td><code>private</code>, <code>public</code></td><td><a href="encapsulamento.html">public e private</a></td></tr>
+<tr><td>Herança</td><td>Uma classe nova aproveita outra e acrescenta coisas.</td><td><code>class Livro : public Produto</code></td><td><a href="heranca.html">Herança</a></td></tr>
+<tr><td>Polimorfismo</td><td>A mesma chamada faz coisas diferentes conforme o objeto.</td><td><code>virtual</code>, <code>override</code></td><td><a href="polimorfismo.html">Polimorfismo</a></td></tr>
+<tr><td>Abstração</td><td>Mostrar o que o objeto faz, esconder como faz.</td><td>classes e métodos abstratos (<code>= 0</code>)</td><td><a href="classes-abstratas.html">Classes Abstratas</a></td></tr>
+</table>
+</div>
+
+<div class="tip"><strong>Não precisa usar os quatro sempre.</strong> A maioria das classes do dia a dia usa só encapsulamento. Herança e polimorfismo são ferramentas para quando você tem <em>famílias</em> de coisas parecidas. Usar herança "porque é POO" deixa o código mais complicado, não melhor.</div>
+
+<hr>
+
+<h2>5. POO em C++ × Java e Python</h2>
+<p>Se você já ouviu falar de POO em Java ou Python, algumas coisas em C++ vão parecer estranhas. Se nunca ouviu, esta seção também vale: são as características que tornam o C++ diferente.</p>
+
+<h3>Objetos nascem na pilha, sem <code>new</code></h3>
+<p>Em Java, todo objeto é criado com <code>new</code>. Em C++, o jeito normal é declarar o objeto como uma variável comum: <code>Produto caneta{"caneta", 3, 50};</code>. Ele fica na <strong>pilha</strong> (<em>stack</em>), a mesma região de memória das variáveis locais (aula <a href="memoria.html">Como a Memória Funciona</a>), nasce na linha da declaração e some sozinho no fim do bloco <code>{ }</code>, igual a um <code>int</code>.</p>
+
+<p>O <code>new</code> existe em C++, mas faz outra coisa: cria o objeto em outra região (o <em>heap</em>) e devolve um <strong>ponteiro</strong> para ele (aula <a href="new-delete.html">new e delete</a>). Por isso, o hábito de Java dá erro. Veja na seção <a href="#errado">Quando dá errado</a>.</p>
+
+<h3>Não existe coletor de lixo</h3>
+<p>Java, Python, C# e JavaScript têm um <strong>coletor de lixo</strong> (<em>garbage collector</em>): de tempos em tempos, um programa auxiliar procura objetos que ninguém usa mais e libera a memória deles. Você não sabe exatamente <em>quando</em> isso acontece.</p>
+
+<p>O C++ não tem coletor de lixo. Em compensação, ele sabe <strong>exatamente</strong> quando cada objeto morre: um objeto na pilha morre no <code>}</code> que fecha o bloco dele. Nesse momento, o C++ chama uma função especial da classe, o <strong>destrutor</strong>, que pode fechar arquivos, devolver memória e fazer qualquer limpeza. Essa garantia é a base de uma técnica muito importante do C++, o RAII, que você vai ver em <a href="destrutores-raii.html">Destrutores e RAII</a>. Para objetos criados com <code>new</code>, quem libera é você, ou melhor, um <a href="smart-pointers.html">ponteiro inteligente</a>.</p>
+
+<h3><code>b = a</code> faz uma cópia de verdade</h3>
+<p>Esta é a diferença que mais surpreende quem vem de outras linguagens. Em C++, um objeto se comporta como um <code>int</code>: atribuir copia. (A classe é a mesma de <code>loja.cpp</code>, só com o método <code>mostrar</code>.)</p>
+
+<pre class="file" data-file="copia.cpp">int main() {
+    Produto a{"caneta", 3, 50};
+    Produto b = a;          // b é uma CÓPIA de a
+    b.nome = "caneta azul";
+    b.preco = 4;
+
+    a.mostrar();
+    b.mostrar();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/poo">$ g++ -std=c++23 -Wall -Wextra copia.cpp -o copia
+$ ./copia
+caneta: R$ 3 (50 no estoque)
+caneta azul: R$ 4 (50 no estoque)</pre>
+
+<p>Mudar <code>b</code> não mexeu em <code>a</code>: são duas fichas, cada uma com os seus dados. Em Python (e em Java), a mesma ideia dá outro resultado, porque <code>b = a</code> não copia o objeto: só cria <strong>outro nome</strong> para o <strong>mesmo</strong> objeto.</p>
+
+<pre class="file" data-file="copia.py">class Produto:
+    def __init__(self, nome, preco):
+        self.nome = nome
+        self.preco = preco
+
+a = Produto("caneta", 3)
+b = a                   # b é OUTRO NOME para o mesmo objeto
+b.nome = "caneta azul"
+print(a.nome)
+</pre>
+
+<pre class="term" data-cwd="~/cpp/poo">$ python3 copia.py
+caneta azul          « mudou o b, e o a mudou junto: é o mesmo objeto</pre>
+
+<p>Em C++, quando você quer "outro nome para o mesmo objeto", usa uma <a href="referencias.html">referência</a> (<code>Produto&amp; b = a;</code>) ou um <a href="ponteiros.html">ponteiro</a>, e isso fica escrito no código, à vista. Como as cópias podem ser caras (copiar um objeto grande copia tudo o que está dentro), o C++ tem regras próprias para copiar e mover objetos: aula <a href="copia-movimento.html">Cópia e Movimento</a>.</p>
+
+<h3>Nem tudo precisa estar numa classe</h3>
+<p>Em Java, todo código mora dentro de uma classe, até o <code>main</code>. Em C++, não: o <code>main</code> é uma função solta, e você pode misturar classes, funções soltas e templates à vontade. O C++ é uma linguagem <strong>multiparadigma</strong>: a POO é uma das ferramentas, não a única.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Assunto</th><th>C++</th><th>Java / Python</th></tr>
+<tr><td>Onde o objeto nasce</td><td>Normalmente na pilha: <code>Produto p{…};</code></td><td>Sempre no heap (Java: <code>new Produto(…)</code>; Python: <code>Produto(…)</code>)</td></tr>
+<tr><td>Quem libera a memória</td><td>O próprio C++, no fim do bloco (destrutor); com <code>new</code>, você ou um ponteiro inteligente</td><td>O coletor de lixo, quando ele quiser</td></tr>
+<tr><td><code>b = a</code></td><td>Copia o objeto inteiro</td><td>Os dois nomes apontam para o mesmo objeto</td></tr>
+<tr><td>Código fora de classes</td><td>Pode (o <code>main</code> é solto)</td><td>Java: não; Python: pode</td></tr>
+<tr><td>Proteção dos dados</td><td><code>private</code> conferido pelo compilador</td><td>Java: <code>private</code>; Python: só por convenção (<code>_nome</code>)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2 id="errado">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Usar o molde como se fosse um objeto</strong>
+<pre class="file" data-file="molde.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+};
+
+int main() {
+    Produto.preco = 5;
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/poo">$ g++ -std=c++23 -Wall -Wextra molde.cpp -o molde
+molde.cpp: In function ‘int main()’:
+molde.cpp:12:12: error: expected unqualified-id before ‘.’ token
+   12 |     Produto.preco = 5;
+      |            ^</pre>
+<p><strong>O que aconteceu:</strong> <code>Produto</code> é a classe, a ficha em branco. Não existe "o preço da ficha em branco": existe o preço <em>desta</em> caneta, <em>daquele</em> caderno. O g++ diz que, antes do ponto, esperava o nome de um objeto (um <em>unqualified-id</em>, um nome simples), não de um tipo. O Clang, compilador do editor do guia, é mais direto: <code>error: cannot use dot operator on a type</code> ("não dá para usar o operador ponto num tipo").</p>
+<p><strong>Como resolver:</strong> crie um objeto e use o ponto nele: <code>Produto caneta{"caneta", 3, 50};</code> e depois <code>caneta.preco = 5;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Criar o objeto com <code>new</code>, como em Java</strong>
+<pre class="file" data-file="novo.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+};
+
+int main() {
+    Produto caneta = new Produto();
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/poo">$ g++ -std=c++23 -Wall -Wextra novo.cpp -o novo
+novo.cpp: In function ‘int main()’:
+novo.cpp:12:22: error: conversion from ‘Produto*’ to non-scalar type ‘Produto’ requested
+   12 |     Produto caneta = new Produto();
+      |                      ^~~~~~~~~~~~~</pre>
+<p><strong>O que aconteceu:</strong> em C++, <code>new Produto()</code> não devolve um <code>Produto</code>: devolve um <code>Produto*</code>, um <a href="ponteiros.html">ponteiro</a> para um produto criado no heap. A mensagem diz: "foi pedida uma conversão de <code>Produto*</code> para o tipo <code>Produto</code>", e essa conversão não existe. O Clang diz o mesmo com outras palavras: <code>no viable conversion from 'Produto *' to 'Produto'</code>.</p>
+<p><strong>Como resolver:</strong> no C++, você quase nunca precisa de <code>new</code>. Escreva só <code>Produto caneta{};</code> (ou com os valores dentro das chaves). Se um dia precisar mesmo do objeto no heap, use <code>std::make_unique&lt;Produto&gt;()</code> (aula <a href="smart-pointers.html">Ponteiros Inteligentes</a>), nunca um <code>new</code> solto.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Termo</th><th>Significado</th><th>Exemplo</th></tr>
+<tr><td>Classe</td><td>O molde: diz que dados e ações um tipo de coisa tem</td><td><code>class Produto { … };</code></td></tr>
+<tr><td>Objeto / instância</td><td>Uma coisa feita com o molde, com os próprios dados</td><td><code>Produto caneta{"caneta", 3, 50};</code></td></tr>
+<tr><td>Atributo (membro de dados)</td><td>Uma variável que cada objeto carrega</td><td><code>int estoque;</code></td></tr>
+<tr><td>Método (função-membro)</td><td>Uma função que trabalha sobre o objeto que a chamou</td><td><code>caneta.vender(2);</code></td></tr>
+<tr><td>Encapsulamento</td><td>Esconder os dados e expor métodos</td><td><code>private:</code> / <code>public:</code></td></tr>
+<tr><td>Herança</td><td>Uma classe aproveita outra</td><td><code>class Livro : public Produto</code></td></tr>
+<tr><td>Polimorfismo</td><td>Mesma chamada, comportamentos diferentes</td><td><code>virtual void mostrar();</code></td></tr>
+<tr><td>Abstração</td><td>O que faz, não como faz</td><td><code>virtual int frete() = 0;</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Molde ou objeto?</h3>
+<p>Na linha <code>Produto lapis{"lápis", 1, 100};</code>, qual palavra é a <strong>classe</strong>?</p>
+<div class="ex-code"><input data-answer="Produto" aria-label="nome da classe"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Quem é o objeto?</h3>
+<p>Na mesma linha, qual é o nome do <strong>objeto</strong> criado?</p>
+<div class="ex-code"><input data-answer="lapis" aria-label="nome do objeto"></div>
+</div>
+
+<div class="exercise">
+<h3>3. Chamar a ação</h3>
+<p>Complete para pedir ao objeto <code>lapis</code> que venda 10 unidades, no estilo POO:</p>
+<div class="ex-code"><input data-answer="lapis.vender(10);|lapis.vender(10)" aria-label="chamada do método"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Qual pilar da POO impediria alguém de escrever <code>caneta.preco = -3;</code>?</p>
+<label><input type="radio" name="q4"> Herança</label>
+<label><input type="radio" name="q4"> Encapsulamento</label>
+<label><input type="radio" name="q4"> Polimorfismo</label>
+<label><input type="radio" name="q4"> Nenhum: o C++ não deixa número negativo em <code>int</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Em C++, depois de <code>Produto b = a;</code> e <code>b.preco = 9;</code>, quanto vale <code>a.preco</code>, se antes valia 3?</p>
+<label><input type="radio" name="q5"> 9, porque <code>a</code> e <code>b</code> são o mesmo objeto</label>
+<label><input type="radio" name="q5"> Dá erro de compilação</label>
+<label><input type="radio" name="q5"> 3, porque <code>b</code> é uma cópia</label>
+<label><input type="radio" name="q5"> 0</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Quando um objeto criado como <code>Produto caneta{…};</code> dentro de uma função deixa de existir?</p>
+<label><input type="radio" name="q6"> No <code>}</code> que fecha o bloco onde ele foi criado</label>
+<label><input type="radio" name="q6"> Quando o coletor de lixo passar</label>
+<label><input type="radio" name="q6"> Só quando o programa termina</label>
+<label><input type="radio" name="q6"> Nunca: é preciso usar <code>delete</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">7. A Ana quer uma classe <code>Livro</code> que tenha tudo de <code>Produto</code> e mais o autor. Que pilar ela vai usar?</p>
+<label><input type="radio" name="q7"> Abstração</label>
+<label><input type="radio" name="q7"> Encapsulamento</label>
+<label><input type="radio" name="q7"> Nenhum: precisa copiar e colar a classe</label>
+<label><input type="radio" name="q7"> Herança</label>
+</div>
+
+<h3>Missão final: o estilo POO</h3>
+
+<div class="trycpp" data-goal="out:mochila: R$ 80 (4 no estoque),out:caneta: R$ 3 (45 no estoque),src:mochila\.vender\(\s*1\s*\),src:caneta\.vender\(\s*5\s*\)">
+<p class="try-task"><strong>Missão:</strong> crie um objeto <code>mochila</code> que custa R$ 80 e tem 5 unidades. Venda 1 mochila e 5 canetas <strong>chamando o método</strong> de cada objeto (<code>objeto.vender(…)</code>) e mostre os dois. A saída deve ter:</p>
+<pre class="out">caneta: R$ 3 (45 no estoque)
+mochila: R$ 80 (4 no estoque)</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; " (" &lt;&lt; estoque &lt;&lt; " no estoque)\n";
+    }
+
+    void vender(int quantidade) {
+        estoque -= quantidade;
+    }
+};
+
+int main() {
+    Produto caneta{"caneta", 3, 50};
+    // crie a mochila aqui
+
+    // venda e mostre aqui
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; " (" &lt;&lt; estoque &lt;&lt; " no estoque)\n";
+    }
+
+    void vender(int quantidade) {
+        estoque -= quantidade;
+    }
+};
+
+int main() {
+    Produto caneta{"caneta", 3, 50};
+    Produto mochila{"mochila", 80, 5};
+
+    caneta.vender(5);
+    mochila.vender(1);
+
+    caneta.mostrar();
+    mochila.mostrar();
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>Classe</strong> é o molde (a ficha em branco); <strong>objeto</strong> (ou instância) é a coisa feita com o molde (a ficha preenchida). Uma classe, muitos objetos, cada um com os próprios dados.</li>
+  <li>Na POO, dados (<strong>atributos</strong>) e ações (<strong>métodos</strong>) moram juntos. Em vez de <code>vender(caneta, 2)</code>, você escreve <code>caneta.vender(2)</code>.</li>
+  <li>POO organiza o código; não deixa o programa mais rápido. Ela ajuda a achar as coisas, proteger os dados e reaproveitar código.</li>
+  <li>Os quatro pilares: <strong>encapsulamento</strong> (proteger os dados), <strong>herança</strong> (aproveitar um molde), <strong>polimorfismo</strong> (mesma ordem, respostas diferentes) e <strong>abstração</strong> (o que faz, não como faz).</li>
+  <li>Em C++, objetos nascem normalmente na pilha, sem <code>new</code>, e morrem no fim do bloco. Não há coletor de lixo: o destrutor roda na hora certa.</li>
+  <li>Em C++, <code>b = a</code> copia o objeto. Para "outro nome do mesmo objeto", use referência ou ponteiro.</li>
+  <li>Próxima aula: escrever a sua primeira classe, em <a href="classes-objetos.html">Classes e Objetos</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

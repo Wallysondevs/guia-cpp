@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Classes e Objetos — criar a classe, criar objetos e usar o ponto | Guia C++</title>
+<meta name="description" content="Classes e objetos em C++ para iniciantes: a sintaxe de class Produto { public: … };, criar objetos na pilha, acessar atributos com o ponto, vários objetos e vector de objetos, class × struct, e os erros reais de membro inexistente e do ponto e vírgula esquecido.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Classes e Objetos</span></h1>
+
+<p class="intro">Na aula anterior, <a href="poo.html">O que é POO</a>, você viu a ideia: a <strong>classe</strong> é o molde e o <strong>objeto</strong> é a coisa feita com o molde. Agora é hora de escrever a sua primeira classe, linha por linha, e criar objetos com ela. Nesta aula a classe só guarda <strong>dados</strong>; as <strong>ações</strong> (os métodos) chegam na próxima aula.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A sintaxe de uma classe: <code>class Produto { public: … };</code>, peça por peça.</li>
+  <li>Como criar um objeto e por que ele nasce na pilha, como uma variável comum.</li>
+  <li>Como ler e mudar os atributos com o ponto (<code>.</code>).</li>
+  <li>Como criar vários objetos e guardá-los num <code>std::vector</code>.</li>
+  <li>A única diferença entre <code>class</code> e <code>struct</code>.</li>
+  <li>Os erros de usar um membro que não existe e de esquecer o <code>;</code> depois da classe.</li>
+</ul>
+</div>
+
+<p>Os programas desta aula foram compilados e executados na máquina fictícia da Ana, na pasta <code>~/cpp/classes</code>, com o <strong>g++ 15.2</strong> e o comando padrão <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: desenhar a ficha antes de preencher</h2>
+<p>Antes de cadastrar a primeira caneta, a Ana precisa <strong>desenhar</strong> a ficha de produto: decidir que campos ela tem. Isso é escrever a classe. Depois, ela tira cópias da ficha e preenche cada uma: isso é criar objetos.</p>
+
+<p>Se você fez a aula de <a href="structs.html">Structs</a>, vai se sentir em casa: uma classe que só tem dados é quase igual a uma struct. A diferença está numa palavra só, e você vai vê-la na seção 5.</p>
+
+<hr>
+
+<h2>1. Escrever a classe</h2>
+
+<pre class="file" data-file="produto.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+};
+
+int main() {
+    Produto caneta;
+    caneta.nome = "caneta";
+    caneta.preco = 3;
+    caneta.estoque = 50;
+
+    std::cout &lt;&lt; "Produto: " &lt;&lt; caneta.nome &lt;&lt; "\n";
+    std::cout &lt;&lt; "Preço: R$ " &lt;&lt; caneta.preco &lt;&lt; "\n";
+    std::cout &lt;&lt; "Estoque: " &lt;&lt; caneta.estoque &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/classes">$ g++ -std=c++23 -Wall -Wextra produto.cpp -o produto
+$ ./produto
+Produto: caneta
+Preço: R$ 3
+Estoque: 50</pre>
+
+<p>Primeiro, a classe (linhas 4 a 9):</p>
+
+<dl class="anatomy">
+  <dt>class</dt><dd>Palavra reservada que diz "vou criar um tipo novo". Depois desta linha, <code>Produto</code> passa a ser um tipo, como <code>int</code> ou <code>std::string</code>.</dd>
+  <dt>Produto</dt><dd>O nome da classe. Por costume, nomes de classe começam com <strong>maiúscula</strong> (<code>Produto</code>, <code>Cliente</code>, <code>ContaBancaria</code>), e nomes de variáveis com minúscula (<code>caneta</code>). O compilador não exige, mas ajuda a bater o olho e saber o que é molde e o que é objeto.</dd>
+  <dt>{ … }</dt><dd>O <strong>corpo</strong> da classe: tudo o que todo produto tem fica entre as chaves.</dd>
+  <dt>public:</dt><dd>Um <strong>especificador de acesso</strong>. Quer dizer "o que vem abaixo pode ser usado de fora da classe", por exemplo pelo <code>main</code>. Termina com dois-pontos, não com ponto e vírgula. Sem ele, o <code>main</code> não conseguiria mexer nos campos (seção 5).</dd>
+  <dt>std::string nome; int preco; int estoque;</dt><dd>Os <strong>atributos</strong> (também chamados de <em>membros de dados</em> ou <em>campos</em>). Cada um é declarado como uma variável comum: tipo e nome. Todo objeto <code>Produto</code> vai ter esses três.</dd>
+  <dt>};</dt><dd>Fecha a classe. <strong>O ponto e vírgula depois da chave é obrigatório</strong>, ao contrário do <code>}</code> de uma função. Esquecer é um dos erros mais comuns (veja em <a href="#errado">Quando dá errado</a>).</dd>
+</dl>
+
+<p>A classe sozinha não cria nada na memória. Ela só ensina ao compilador o que é um <code>Produto</code>. Quem cria é o <code>main</code>:</p>
+
+<dl class="anatomy">
+  <dt>Produto caneta;</dt><dd>Cria um <strong>objeto</strong> do tipo <code>Produto</code> chamado <code>caneta</code>. É igual a <code>int x;</code>: primeiro o tipo, depois o nome.</dd>
+  <dt>caneta.nome = "caneta";</dt><dd>O <strong>ponto</strong> (<code>.</code>) entra no objeto e pega um atributo dele. Leia como "o nome da caneta recebe <code>"caneta"</code>".</dd>
+  <dt>caneta.preco</dt><dd>Usado numa expressão, o ponto <strong>lê</strong> o atributo: "o preço da caneta".</dd>
+</dl>
+
+<div class="note"><strong>Por que <code>public:</code> aqui?</strong> Numa classe, tudo começa <em>escondido</em> (privado). Nesta aula deixamos tudo público para aprender a sintaxe sem tropeçar. Esconder os dados é justamente o que você vai fazer em <a href="encapsulamento.html">public e private</a>, quando a classe tiver métodos para cuidar deles.</div>
+
+<hr>
+
+<h2>2. Onde o objeto vive: na pilha</h2>
+<p>O <code>Produto caneta;</code> criou o objeto do mesmo jeito que <code>int x;</code> cria um inteiro: na <strong>pilha</strong>, a região da memória onde ficam as variáveis locais (aula <a href="memoria.html">Como a Memória Funciona</a>). Isso tem três consequências:</p>
+<ul>
+  <li>Não precisa de <code>new</code>. O objeto existe a partir da linha da declaração.</li>
+  <li>Ele <strong>some sozinho</strong> no <code>}</code> que fecha o bloco onde foi criado, como qualquer variável local (aula <a href="escopo.html">Escopo</a>). Não precisa de <code>delete</code>.</li>
+  <li>Os atributos ficam <strong>dentro</strong> do objeto, um do lado do outro na memória. O <code>preco</code> da caneta é um <code>int</code> que mora dentro da caneta.</li>
+</ul>
+
+<h3>Cuidado: atributo sem valor guarda lixo</h3>
+<p>Ainda como um <code>int</code> comum: um atributo <code>int</code> que ninguém preencheu fica com o que estava naquele pedaço da memória. Veja a borracha, que ganhou nome mas não ganhou preço (a classe é a mesma de <code>produto.cpp</code>; daqui em diante, quando o arquivo repetir a classe, mostramos só o <code>main</code>):</p>
+
+<pre class="file" data-file="lixo.cpp">int main() {
+    Produto borracha;
+    borracha.nome = "borracha";
+    std::cout &lt;&lt; borracha.nome &lt;&lt; ": R$ " &lt;&lt; borracha.preco &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/classes">$ g++ -std=c++23 -Wall -Wextra lixo.cpp -o lixo
+$ ./lixo
+borracha: R$ 1          « ninguém escreveu esse 1: é lixo da memória</pre>
+
+<p>Sem aviso nenhum do compilador, e o número pode mudar de uma máquina para outra (é <a href="comportamento-indefinido.html">comportamento indefinido</a>). O <code>nome</code>, por outro lado, começa vazio, porque <code>std::string</code> sabe se inicializar sozinho. Tipos simples (<code>int</code>, <code>double</code>, <code>bool</code>, ponteiros) não sabem.</p>
+
+<p>A defesa mais simples, por enquanto, é criar o objeto já com valores, usando chaves, como na próxima seção. A defesa definitiva é a classe dar um valor inicial a cada atributo, e isso você vai aprender em <a href="construtores.html">Construtores</a>.</p>
+
+<hr>
+
+<h2>3. Criar o objeto já preenchido, com chaves</h2>
+<p>Preencher campo por campo dá trabalho e é fácil esquecer um. Uma classe simples como esta (só atributos públicos, sem construtores) aceita os valores entre chaves, <strong>na ordem em que os atributos foram declarados</strong>:</p>
+
+<pre class="file" data-file="chaves.cpp">int main() {
+    Produto caderno{"caderno", 12, 8};
+    Produto lapis{"lápis", 1};      // estoque fica 0
+    Produto vazio{};                // tudo zerado
+
+    std::cout &lt;&lt; caderno.nome &lt;&lt; " | " &lt;&lt; caderno.preco &lt;&lt; " | " &lt;&lt; caderno.estoque &lt;&lt; "\n";
+    std::cout &lt;&lt; lapis.nome &lt;&lt; " | " &lt;&lt; lapis.preco &lt;&lt; " | " &lt;&lt; lapis.estoque &lt;&lt; "\n";
+    std::cout &lt;&lt; "[" &lt;&lt; vazio.nome &lt;&lt; "] | " &lt;&lt; vazio.preco &lt;&lt; " | " &lt;&lt; vazio.estoque &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/classes">$ g++ -std=c++23 -Wall -Wextra chaves.cpp -o chaves
+chaves.cpp: In function ‘int main()’:
+chaves.cpp:13:29: warning: missing initializer for member ‘Produto::estoque’ [-Wmissing-field-initializers]
+   13 |     Produto lapis{"lápis", 1};      // estoque fica 0
+      |                             ^
+$ ./chaves
+caderno | 12 | 8
+lápis | 1 | 0
+[] | 0 | 0</pre>
+
+<dl class="anatomy">
+  <dt>caderno{"caderno", 12, 8}</dt><dd>Os três valores vão para <code>nome</code>, <code>preco</code> e <code>estoque</code>, nessa ordem. A ordem é a da declaração dentro da classe, não a dos nomes.</dd>
+  <dt>lapis{"lápis", 1}</dt><dd>Faltou o último valor: o <code>estoque</code> fica <strong>zerado</strong> (não é lixo). Mesmo assim, o <code>-Wextra</code> avisa: <em>"falta o inicializador do membro <code>Produto::estoque</code>"</em>, porque pode ser esquecimento.</dd>
+  <dt>vazio{}</dt><dd>Chaves vazias: todos os atributos começam "zerados": números com 0 e a string vazia (por isso <code>[]</code> na saída). É a forma segura de criar um objeto que você vai preencher depois.</dd>
+</dl>
+
+<div class="tip"><strong>Prefira criar com chaves.</strong> <code>Produto p{};</code> nunca tem lixo; <code>Produto p;</code> pode ter. Quando a classe ganhar <a href="construtores.html">construtores</a>, as chaves continuam sendo o jeito de passar os valores, mas quem decide o que fazer com eles passa a ser a classe.</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> mude a ordem dos valores em <code>caderno{12, "caderno", 8}</code> e rode: o compilador não aceita colocar um número no <code>nome</code>. Depois volte à ordem certa, crie um produto <code>estojo</code> que custa R$ 15 e tem 6 unidades, e mostre os três campos dele.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+};
+
+int main() {
+    Produto caderno{"caderno", 12, 8};
+    std::cout &lt;&lt; caderno.nome &lt;&lt; " | " &lt;&lt; caderno.preco &lt;&lt; " | " &lt;&lt; caderno.estoque &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>4. Vários objetos</h2>
+<p>A classe é uma só; objetos, quantos você quiser. Cada um tem os <strong>seus próprios</strong> atributos: mudar o preço da caneta não mexe no do caderno. E, como <code>Produto</code> é um tipo como outro qualquer, dá para guardar produtos num <a href="vector.html"><code>std::vector</code></a>:</p>
+
+<pre class="file" data-file="varios.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+};
+
+int main() {
+    Produto caneta{"caneta", 3, 50};
+    Produto caderno{"caderno", 12, 8};
+
+    caneta.preco = 4;       // muda só a caneta
+
+    std::cout &lt;&lt; caneta.nome &lt;&lt; ": R$ " &lt;&lt; caneta.preco &lt;&lt; "\n";
+    std::cout &lt;&lt; caderno.nome &lt;&lt; ": R$ " &lt;&lt; caderno.preco &lt;&lt; "\n";
+
+    std::vector&lt;Produto&gt; vitrine{caneta, caderno, {"régua", 5, 20}};
+    vitrine.push_back({"cola", 6, 15});
+
+    int total = 0;
+    for (const Produto&amp; p : vitrine) {
+        std::cout &lt;&lt; "- " &lt;&lt; p.nome &lt;&lt; " (" &lt;&lt; p.estoque &lt;&lt; " un.)\n";
+        total += p.preco * p.estoque;
+    }
+    std::cout &lt;&lt; "Valor do estoque: R$ " &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/classes">$ g++ -std=c++23 -Wall -Wextra varios.cpp -o varios
+$ ./varios
+caneta: R$ 4
+caderno: R$ 12
+- caneta (50 un.)
+- caderno (8 un.)
+- régua (20 un.)
+- cola (15 un.)
+Valor do estoque: R$ 486</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>caneta.preco = 4;</code></td><td>Muda o preço <strong>da caneta</strong>. O caderno continua com R$ 12.</td></tr>
+<tr><td><code>std::vector&lt;Produto&gt; vitrine{…};</code></td><td>Um vetor de produtos. Dentro das chaves vão objetos prontos (<code>caneta</code>, <code>caderno</code>) ou valores para criar um novo (<code>{"régua", 5, 20}</code>). O vetor guarda <strong>cópias</strong>: mudar <code>caneta</code> depois não muda o que está na vitrine.</td></tr>
+<tr><td><code>vitrine.push_back({"cola", 6, 15});</code></td><td>Acrescenta mais um produto no fim, criado ali mesmo com chaves.</td></tr>
+<tr><td><code>for (const Produto&amp; p : vitrine)</code></td><td>Percorre a vitrine (aula <a href="for-range.html">for de Intervalo</a>). O <code>const Produto&amp;</code> faz <code>p</code> ser <strong>outro nome</strong> para cada produto, sem copiar e sem poder mudar (aula <a href="const-ponteiros.html">const com Referências</a>).</td></tr>
+<tr><td><code>p.preco * p.estoque</code></td><td>O ponto funciona do mesmo jeito numa referência: <code>p.preco</code> é o preço do produto da vez.</td></tr>
+</table>
+</div>
+
+<p>Conta do valor do estoque: 4×50 + 12×8 + 5×20 + 6×15 = 200 + 96 + 100 + 90 = 486. Repare que a caneta entrou com R$ 4, porque o preço foi mudado <em>antes</em> de ela ser copiada para a vitrine.</p>
+
+<h3>Objetos em funções</h3>
+<p>Um objeto pode ser passado para uma função como qualquer variável. As regras são as da aula <a href="passagem-referencia.html">Por Valor × Por Referência</a>:</p>
+<ul>
+  <li><code>void mostrar(const Produto&amp; p)</code>: a função só <strong>lê</strong> o produto. É o jeito mais comum: não copia e não deixa mudar.</li>
+  <li><code>void reajustar(Produto&amp; p)</code>: a função <strong>muda</strong> o produto original.</li>
+  <li><code>void f(Produto p)</code>: a função recebe uma <strong>cópia</strong>. Mudanças lá dentro não voltam, e copiar um objeto grande custa tempo.</li>
+</ul>
+<p>Na próxima aula, as funções que trabalham com um produto vão morar <em>dentro</em> da classe, e aí nem vai ser preciso passar o produto como parâmetro: são os <a href="metodos.html">métodos</a>.</p>
+
+<hr>
+
+<h2>5. <code>class</code> × <code>struct</code></h2>
+<p>Em C++, <code>class</code> e <code>struct</code> criam a mesma coisa. Uma struct pode ter métodos, construtores, herança, tudo. A <strong>única</strong> diferença é o acesso padrão, isto é, o que vale quando você não escreve <code>public:</code> nem <code>private:</code>:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>struct</code></th><th><code>class</code></th></tr>
+<tr><td>Membros sem especificador</td><td><strong>públicos</strong> (qualquer um usa)</td><td><strong>privados</strong> (só a própria classe usa)</td></tr>
+<tr><td>Herança sem especificador</td><td>pública</td><td>privada</td></tr>
+<tr><td>Todo o resto</td><td colspan="2">igual</td></tr>
+</table>
+</div>
+
+<p>Veja na prática. Com <code>struct</code> e sem <code>public:</code>, funciona:</p>
+
+<pre class="file" data-file="estrutura.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    int preco;
+    int estoque;
+};
+
+int main() {
+    Produto caneta;
+    caneta.preco = 3;
+    std::cout &lt;&lt; caneta.preco &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/classes">$ g++ -std=c++23 -Wall -Wextra estrutura.cpp -o estrutura
+$ ./estrutura
+3</pre>
+
+<p>Troque só a palavra <code>struct</code> por <code>class</code>, sem pôr <code>public:</code>, e o compilador recusa:</p>
+
+<pre class="file" data-file="privado.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+    std::string nome;
+    int preco;
+    int estoque;
+};
+
+int main() {
+    Produto caneta;
+    caneta.preco = 3;
+    std::cout &lt;&lt; caneta.preco &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/classes">$ g++ -std=c++23 -Wall -Wextra privado.cpp -o privado
+privado.cpp: In function ‘int main()’:
+privado.cpp:12:12: error: ‘int Produto::preco’ is private within this context
+   12 |     caneta.preco = 3;
+      |            ^~~~~
+privado.cpp:6:9: note: declared private here
+    6 |     int preco;
+      |         ^~~~~
+privado.cpp:13:25: error: ‘int Produto::preco’ is private within this context
+   13 |     std::cout &lt;&lt; caneta.preco &lt;&lt; "\n";
+      |                         ^~~~~
+privado.cpp:6:9: note: declared private here
+    6 |     int preco;
+      |         ^~~~~</pre>
+
+<p>"<code>Produto::preco</code> é privado neste contexto": o <code>main</code> está <strong>fora</strong> da classe, e numa <code>class</code> tudo começa privado. A nota <code>declared private here</code> aponta a linha 6, onde o atributo foi declarado. Isso não é defeito: é a ferramenta do encapsulamento, assunto da aula <a href="encapsulamento.html">public e private</a>.</p>
+
+<h3>Qual usar?</h3>
+<p>O compilador não se importa, mas os programadores C++ seguem um costume (está nas <em>C++ Core Guidelines</em>, o guia de boas práticas mantido pelo criador da linguagem):</p>
+<ul>
+  <li><strong><code>struct</code></strong> para um <strong>pacote de dados</strong> sem regras: um ponto <code>{x, y}</code>, uma data, um registro lido de um arquivo. Qualquer combinação de valores é válida.</li>
+  <li><strong><code>class</code></strong> quando o objeto tem <strong>regras</strong> a proteger ("preço nunca negativo", "estoque nunca abaixo de zero") e por isso vai esconder os dados atrás de métodos.</li>
+</ul>
+<p>Nesta aula usamos <code>class</code> com tudo <code>public</code> só para aprender a sintaxe. A partir de <a href="encapsulamento.html">public e private</a>, a classe <code>Produto</code> vai esconder os dados, como deve ser.</p>
+
+<hr>
+
+<h2 id="errado">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Usar um atributo que não existe (ou escrever o nome errado)</strong>
+<p>Nos três casos abaixo, o arquivo começa com a mesma classe <code>Produto</code> (pública) da seção 1; mostramos só o <code>main</code>, e por isso os números de linha das mensagens começam em 11.</p>
+<pre class="file" data-file="cor.cpp">int main() {
+    Produto caneta{"caneta", 3, 50};
+    caneta.cor = "azul";
+    std::cout &lt;&lt; caneta.prco &lt;&lt; "\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/classes">$ g++ -std=c++23 -Wall -Wextra cor.cpp -o cor
+cor.cpp: In function ‘int main()’:
+cor.cpp:13:12: error: ‘class Produto’ has no member named ‘cor’
+   13 |     caneta.cor = "azul";
+      |            ^~~
+cor.cpp:14:25: error: ‘class Produto’ has no member named ‘prco’; did you mean ‘preco’?
+   14 |     std::cout &lt;&lt; caneta.prco &lt;&lt; "\n";
+      |                         ^~~~
+      |                         preco</pre>
+<p><strong>O que aconteceu:</strong> "a classe <code>Produto</code> não tem membro chamado <code>cor</code>". O objeto só tem o que a classe declarou: nome, preço e estoque. Não dá para acrescentar um campo novo num objeto na hora, como em Python ou JavaScript. No segundo erro, o g++ percebeu que <code>prco</code> parece <code>preco</code> e sugeriu: <code>did you mean ‘preco’?</code>, mostrando a correção embaixo. No editor do guia (Clang), a mensagem é <code>no member named 'cor' in 'Produto'</code>.</p>
+<p><strong>Como resolver:</strong> confira o nome na classe (maiúsculas contam: <code>Preco</code> ≠ <code>preco</code>). Se o produto precisa mesmo de uma cor, acrescente <code>std::string cor;</code> <strong>dentro da classe</strong>: aí todos os produtos passam a ter cor.</p>
+</div>
+
+<div class="cenario">
+<strong>Esquecer o <code>;</code> depois da classe</strong>
+<pre class="file" data-file="pontovirgula.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+}
+
+int main() {
+    Produto caneta{"caneta", 3, 50};
+    std::cout &lt;&lt; caneta.nome &lt;&lt; "\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/classes">$ g++ -std=c++23 -Wall -Wextra pontovirgula.cpp -o pontovirgula
+pontovirgula.cpp:9:2: error: expected ‘;’ after class definition
+    9 | }
+      |  ^
+      |  ;</pre>
+<p><strong>O que aconteceu:</strong> "esperava <code>;</code> depois da definição da classe". O <code>}</code> de uma classe não termina a instrução, porque o C++ permite criar objetos ali mesmo (<code>class Produto { … } caneta;</code>, um costume antigo herdado do C). Por isso o ponto e vírgula é obrigatório. O g++ aponta a coluna logo depois do <code>}</code> e até desenha o <code>;</code> que falta. O Clang diz quase igual: <code>expected ';' after class</code>.</p>
+<p><strong>Como resolver:</strong> escreva <code>};</code>. Um truque: sempre que digitar <code>class Nome {</code>, digite logo o <code>};</code> e só depois preencha o meio. Em versões antigas de compiladores, esse erro aparecia em lugares estranhos (às vezes em outro arquivo, quando a classe estava num <code>.h</code>); se aparecer um erro esquisito logo depois de uma classe, confira o <code>;</code> primeiro.</p>
+</div>
+
+<div class="cenario">
+<strong>Comparar dois objetos com <code>==</code></strong>
+<pre class="file" data-file="igual.cpp">int main() {
+    Produto a{"caneta", 3, 50};
+    Produto b{"caneta", 3, 50};
+    if (a == b) {
+        std::cout &lt;&lt; "iguais\n";
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/classes">$ g++ -std=c++23 -Wall -Wextra igual.cpp -o igual
+igual.cpp: In function ‘int main()’:
+igual.cpp:14:11: error: no match for ‘operator==’ (operand types are ‘Produto’ and ‘Produto’)
+   14 |     if (a == b) {
+      |         ~ ^~ ~
+      |         |    |
+      |         |    Produto
+      |         Produto</pre>
+<p><strong>O que aconteceu:</strong> "não há <code>operator==</code> para os tipos <code>Produto</code> e <code>Produto</code>". O C++ não sabe o que "igual" quer dizer para um produto (mesmo nome? mesmo preço? tudo igual?), então não inventa. O desenho embaixo mostra o tipo de cada lado do <code>==</code>.</p>
+<p><strong>Como resolver:</strong> por enquanto, compare os atributos: <code>if (a.nome == b.nome)</code>. Ensinar o <code>==</code> à sua classe é assunto de <a href="sobrecarga-operadores.html">Sobrecarga de Operadores</a>. O mesmo vale para <code>std::cout &lt;&lt; caneta</code>: o C++ também não sabe como mostrar um produto inteiro.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>class Produto { public: int preco; };</code></td><td>Define a classe (o molde). Não esqueça o <code>;</code> final.</td></tr>
+<tr><td><code>Produto p;</code></td><td>Cria um objeto na pilha. Atributos <code>int</code>/<code>double</code> ficam com lixo.</td></tr>
+<tr><td><code>Produto p{};</code></td><td>Cria um objeto com tudo zerado.</td></tr>
+<tr><td><code>Produto p{"caneta", 3, 50};</code></td><td>Cria já preenchido, na ordem dos atributos (classe só com dados públicos).</td></tr>
+<tr><td><code>p.preco = 4;</code></td><td>Muda um atributo do objeto <code>p</code>.</td></tr>
+<tr><td><code>p.preco</code></td><td>Lê um atributo.</td></tr>
+<tr><td><code>std::vector&lt;Produto&gt; v;</code></td><td>Um vetor de objetos (guarda cópias).</td></tr>
+<tr><td><code>void f(const Produto&amp; p)</code></td><td>Função que recebe um objeto só para ler, sem copiar.</td></tr>
+<tr><td><code>struct</code> × <code>class</code></td><td>Iguais, exceto o acesso padrão: <code>struct</code> = público; <code>class</code> = privado.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O ponto</h3>
+<p>Complete para mudar o estoque do objeto <code>caderno</code> para 20:</p>
+<div class="ex-code"><input data-answer="caderno.estoque" aria-label="acesso ao atributo"> = 20;</div>
+</div>
+
+<div class="exercise">
+<h3>2. O detalhe que falta</h3>
+<p>Complete o fim da classe:</p>
+<div class="ex-code">class Cliente { public: std::string nome; <input data-answer="};" aria-label="fim da classe"></div>
+</div>
+
+<div class="exercise">
+<h3>3. Criar com chaves</h3>
+<p>A classe é <code>class Cliente { public: std::string nome; int pontos; };</code>. Complete para criar o cliente <code>bia</code>, de nome <code>"Bia"</code> e 10 pontos:</p>
+<div class="ex-code">Cliente bia<input data-answer="{&quot;Bia&quot;, 10};|{&quot;Bia&quot;,10};|{&quot;Bia&quot;, 10}|{&quot;Bia&quot;,10}" aria-label="valores"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Qual é a diferença entre <code>class</code> e <code>struct</code> em C++?</p>
+<label><input type="radio" name="q4"> <code>struct</code> não pode ter funções dentro</label>
+<label><input type="radio" name="q4"> <code>class</code> cria objetos no heap; <code>struct</code>, na pilha</label>
+<label><input type="radio" name="q4"> Só o acesso padrão: <code>struct</code> começa público; <code>class</code>, privado</label>
+<label><input type="radio" name="q4"> Nenhuma: são exatamente iguais</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Depois de <code>Produto p;</code> (sem chaves) numa classe com <code>int preco;</code>, quanto vale <code>p.preco</code>?</p>
+<label><input type="radio" name="q5"> Sempre 0</label>
+<label><input type="radio" name="q5"> Um valor qualquer (lixo); ler antes de escrever é comportamento indefinido</label>
+<label><input type="radio" name="q5"> Dá erro de compilação</label>
+<label><input type="radio" name="q5"> -1</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. O compilador diz <code>‘class Produto’ has no member named ‘Preco’</code>, mas a classe tem <code>int preco;</code>. Por quê?</p>
+<label><input type="radio" name="q6"> O C++ diferencia maiúsculas: <code>Preco</code> e <code>preco</code> são nomes diferentes</label>
+<label><input type="radio" name="q6"> Faltou o <code>;</code> depois da classe</label>
+<label><input type="radio" name="q6"> O atributo é privado</label>
+<label><input type="radio" name="q6"> Faltou <code>#include &lt;string&gt;</code></label>
+</div>
+
+<h3>Missão final: a classe Cliente</h3>
+
+<div class="trycpp" data-goal="out:Bia: 15 pontos,out:Caio: 3 pontos,src:class\s+Cliente,compila">
+<p class="try-task"><strong>Missão:</strong> escreva a classe <code>Cliente</code>, com os atributos públicos <code>nome</code> (texto) e <code>pontos</code> (inteiro). No <code>main</code>, crie os clientes Bia (10 pontos) e Caio (3 pontos), dê mais 5 pontos à Bia com <code>+=</code> e mostre os dois assim:</p>
+<pre class="out">Bia: 15 pontos
+Caio: 3 pontos</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+// escreva a classe Cliente aqui
+
+int main() {
+    // crie a Bia e o Caio, some 5 pontos à Bia e mostre os dois
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Cliente {
+public:
+    std::string nome;
+    int pontos;
+};
+
+int main() {
+    Cliente bia{"Bia", 10};
+    Cliente caio{"Caio", 3};
+
+    bia.pontos += 5;
+
+    std::cout &lt;&lt; bia.nome &lt;&lt; ": " &lt;&lt; bia.pontos &lt;&lt; " pontos\n";
+    std::cout &lt;&lt; caio.nome &lt;&lt; ": " &lt;&lt; caio.pontos &lt;&lt; " pontos\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma classe se escreve <code>class Nome { public: atributos… };</code>. O <code>;</code> depois da <code>}</code> é obrigatório.</li>
+  <li><code>Produto caneta;</code> cria um objeto na pilha, como uma variável comum: sem <code>new</code>, e ele some no fim do bloco.</li>
+  <li>O ponto acessa os atributos: <code>caneta.preco = 4;</code> muda, <code>caneta.preco</code> lê.</li>
+  <li>Prefira criar com chaves: <code>Produto p{"caneta", 3, 50};</code> ou <code>Produto p{};</code>. Sem chaves, <code>int</code> fica com lixo.</li>
+  <li>Cada objeto tem os próprios atributos. Objetos cabem em <code>std::vector</code> e vão para funções por <code>const&amp;</code> (ler) ou <code>&amp;</code> (mudar).</li>
+  <li><code>class</code> e <code>struct</code> só diferem no acesso padrão: <code>struct</code> = público, <code>class</code> = privado (<code>is private within this context</code>).</li>
+  <li>Membro que não existe: <code>has no member named</code>. Não dá para inventar atributos fora da classe.</li>
+  <li>Próxima aula: colocar funções dentro da classe, os <a href="metodos.html">Métodos</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

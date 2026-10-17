@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Métodos — funções dentro da classe | Guia C++</title>
+<meta name="description" content="Métodos em C++ para iniciantes: funções dentro da classe, chamar com objeto.metodo(), métodos que devolvem valores, que recebem parâmetros e que mudam o objeto, um método chamando outro e definir fora da classe com Produto::metodo, com os erros reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Métodos</span></h1>
+
+<p class="intro">Na aula <a href="classes-objetos.html">Classes e Objetos</a>, a classe <code>Produto</code> só guardava dados, e quem fazia as contas era o <code>main</code>. Agora a classe vai ganhar <strong>ações</strong>: funções que moram dentro dela e trabalham com os dados do objeto. Essas funções se chamam <strong>métodos</strong> (ou <em>funções-membro</em>). Você já sabe escrever <a href="funcoes.html">funções</a>; um método é uma função com um "dono".</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como escrever um método dentro da classe e chamá-lo com <code>objeto.metodo()</code>.</li>
+  <li>Por que o método enxerga os atributos sem receber o objeto como parâmetro.</li>
+  <li>Métodos que devolvem um valor, que recebem parâmetros e que mudam o objeto.</li>
+  <li>Como um método chama outro método do mesmo objeto.</li>
+  <li>Como declarar o método na classe e escrever o corpo do lado de fora, com <code>Produto::</code>.</li>
+  <li>Os erros de esquecer os parênteses, esquecer o <code>Produto::</code> e dar a um método o nome de um atributo.</li>
+</ul>
+</div>
+
+<p>Os programas desta aula foram compilados e executados na máquina fictícia da Ana, na pasta <code>~/cpp/metodos</code>, com o <strong>g++ 15.2</strong> e o comando padrão <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: as instruções no verso da ficha</h2>
+<p>A ficha de produto da Ana tem, na frente, os campos (nome, preço, estoque) e, no verso, as instruções: "para mostrar na vitrine, escreva o nome e o preço"; "para repor, some a quantidade ao estoque". As instruções são <strong>as mesmas</strong> para todo produto, mas cada vez que alguém as segue, segue <strong>numa ficha específica</strong>: repor canetas mexe na ficha da caneta, não na do caderno.</p>
+<p>Métodos são isso: as instruções escritas uma vez, na classe, e executadas sempre sobre um objeto. Quando você escreve <code>caderno.repor(4)</code>, está dizendo "siga a instrução <em>repor</em>, na ficha do <em>caderno</em>, com a quantidade 4".</p>
+
+<hr>
+
+<h2>1. O primeiro método</h2>
+
+<pre class="file" data-file="metodos.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; " (" &lt;&lt; estoque &lt;&lt; " no estoque)\n";
+    }
+
+    int valorEmEstoque() {
+        return preco * estoque;
+    }
+
+    void repor(int quantidade) {
+        estoque += quantidade;
+    }
+};
+
+int main() {
+    Produto caneta{"caneta", 3, 50};
+    Produto caderno{"caderno", 12, 8};
+
+    caneta.mostrar();
+    caderno.mostrar();
+
+    caderno.repor(4);
+    caderno.mostrar();
+
+    std::cout &lt;&lt; "Valor das canetas: R$ " &lt;&lt; caneta.valorEmEstoque() &lt;&lt; "\n";
+    int total = caneta.valorEmEstoque() + caderno.valorEmEstoque();
+    std::cout &lt;&lt; "Valor total: R$ " &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/metodos">$ g++ -std=c++23 -Wall -Wextra metodos.cpp -o metodos
+$ ./metodos
+caneta: R$ 3 (50 no estoque)
+caderno: R$ 12 (8 no estoque)
+caderno: R$ 12 (12 no estoque)
+Valor das canetas: R$ 150
+Valor total: R$ 294</pre>
+
+<p>A classe agora tem três métodos. Veja o primeiro em detalhe:</p>
+
+<dl class="anatomy">
+  <dt>void mostrar() { … }</dt><dd>Uma função comum, com tipo de retorno (<code>void</code>, nada), nome e parênteses, só que escrita <strong>dentro</strong> da classe. Por estar abaixo do <code>public:</code>, o <code>main</code> pode chamá-la.</dd>
+  <dt>nome, preco, estoque</dt><dd>O método usa os atributos <strong>direto</strong>, sem ponto e sem parâmetro. Ele sempre trabalha sobre o objeto que o chamou: em <code>caneta.mostrar()</code>, <code>nome</code> é o nome da caneta; em <code>caderno.mostrar()</code>, o do caderno.</dd>
+  <dt>caneta.mostrar();</dt><dd>A <strong>chamada</strong>: objeto, ponto, nome do método e parênteses. Os parênteses são obrigatórios, mesmo vazios: são eles que dizem "execute".</dd>
+</dl>
+
+<p>Compare com a versão da aula <a href="poo.html">O que é POO</a>, em que <code>mostrar</code> era uma função solta: lá ela precisava receber <code>const Produto&amp; p</code> e escrever <code>p.nome</code>, <code>p.preco</code>. O método não precisa, porque o objeto vai junto <strong>automaticamente</strong>, pelo lado esquerdo do ponto. (Como o C++ faz isso por baixo dos panos é o assunto da aula <a href="this.html">this</a>.)</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Função solta</th><th>Método</th></tr>
+<tr><td>Onde mora</td><td>Fora da classe</td><td>Dentro da classe</td></tr>
+<tr><td>Como recebe o produto</td><td>Por parâmetro: <code>void mostrar(const Produto&amp; p)</code></td><td>Automaticamente: é o objeto antes do ponto</td></tr>
+<tr><td>Como usa os atributos</td><td><code>p.nome</code></td><td><code>nome</code></td></tr>
+<tr><td>Como chama</td><td><code>mostrar(caneta);</code></td><td><code>caneta.mostrar();</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>2. Métodos que devolvem um valor</h2>
+<p>Um método pode ter qualquer tipo de retorno, como uma função (aula <a href="retorno.html">Retorno</a>). O <code>valorEmEstoque</code> devolve um <code>int</code>:</p>
+
+<dl class="anatomy">
+  <dt>int valorEmEstoque()</dt><dd>Devolve um inteiro: quanto dinheiro está parado no estoque deste produto.</dd>
+  <dt>return preco * estoque;</dt><dd>Usa os atributos do objeto que chamou. Para a caneta: 3 × 50 = 150.</dd>
+  <dt>caneta.valorEmEstoque() + caderno.valorEmEstoque()</dt><dd>A chamada vira um valor, e você usa esse valor como qualquer número: soma, guarda numa variável, mostra. 150 + 12 × 12 = 150 + 144 = 294.</dd>
+</dl>
+
+<p>Repare na diferença entre um atributo e um método que devolve valor: <code>caneta.estoque</code> é um dado guardado; <code>caneta.valorEmEstoque()</code> é uma conta feita na hora, sempre atualizada. Não faz sentido guardar o "valor em estoque" num atributo, porque ele ficaria errado assim que o estoque mudasse.</p>
+
+<h2>3. Métodos que recebem parâmetros e mudam o objeto</h2>
+<p>O <code>repor</code> recebe a quantidade como parâmetro, igual a uma função comum, e <strong>muda</strong> um atributo:</p>
+
+<dl class="anatomy">
+  <dt>void repor(int quantidade)</dt><dd>Recebe um <code>int</code>. Na chamada <code>caderno.repor(4)</code>, <code>quantidade</code> vale 4.</dd>
+  <dt>estoque += quantidade;</dt><dd>Muda o estoque <strong>do próprio objeto</strong>. Não precisa de <code>&amp;</code>, nem de devolver nada: o método mexe direto no objeto que o chamou. Por isso o caderno passou de 8 para 12 unidades.</dd>
+</dl>
+
+<p>Na versão com função solta, era preciso passar o produto <a href="passagem-referencia.html">por referência</a> (<code>void repor(Produto&amp; p, int q)</code>), senão a mudança se perdia numa cópia. Com o método, o objeto já vem "por referência": o método trabalha no original.</p>
+
+<div class="note"><strong>Dois tipos de método.</strong> Alguns só <em>olham</em> o objeto (<code>mostrar</code>, <code>valorEmEstoque</code>); outros <em>mudam</em> o objeto (<code>repor</code>). Essa diferença é tão importante que o C++ tem uma forma de marcá-la, a palavra <code>const</code> depois dos parênteses. Você vai vê-la em <a href="metodos-const.html">Métodos const</a>.</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> acrescente à classe um método <code>void reajustar(int reais)</code> que soma <code>reais</code> ao preço. No <code>main</code>, reajuste a caneta em R$ 1 e mostre de novo. O valor das canetas no estoque mudou sozinho?</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; " (" &lt;&lt; estoque &lt;&lt; " no estoque)\n";
+    }
+
+    int valorEmEstoque() {
+        return preco * estoque;
+    }
+
+    void repor(int quantidade) {
+        estoque += quantidade;
+    }
+};
+
+int main() {
+    Produto caneta{"caneta", 3, 50};
+    caneta.mostrar();
+    std::cout &lt;&lt; "Valor das canetas: R$ " &lt;&lt; caneta.valorEmEstoque() &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>4. Um método chamando outro</h2>
+<p>Dentro de um método, você chama os outros métodos do mesmo objeto pelo nome, sem ponto, do mesmo jeito que usa os atributos. Aqui, <code>vender</code> confere o estoque com <code>temEstoque</code> e mostra o resultado com <code>mostrar</code>:</p>
+
+<pre class="file" data-file="vender.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; " (" &lt;&lt; estoque &lt;&lt; " no estoque)\n";
+    }
+
+    bool temEstoque(int quantidade) {
+        return quantidade &lt;= estoque;
+    }
+
+    bool vender(int quantidade) {
+        if (!temEstoque(quantidade)) {
+            std::cout &lt;&lt; "Não há " &lt;&lt; quantidade &lt;&lt; " " &lt;&lt; nome &lt;&lt; "(s). ";
+            mostrar();
+            return false;
+        }
+        estoque -= quantidade;
+        std::cout &lt;&lt; "Vendeu " &lt;&lt; quantidade &lt;&lt; ". ";
+        mostrar();
+        return true;
+    }
+};
+
+int main() {
+    Produto caderno{"caderno", 12, 8};
+
+    caderno.vender(3);
+    caderno.vender(10);
+
+    if (caderno.vender(5)) {
+        std::cout &lt;&lt; "Acabaram os cadernos!\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/metodos">$ g++ -std=c++23 -Wall -Wextra vender.cpp -o vender
+$ ./vender
+Vendeu 3. caderno: R$ 12 (5 no estoque)
+Não há 10 caderno(s). caderno: R$ 12 (5 no estoque)
+Vendeu 5. caderno: R$ 12 (0 no estoque)
+Acabaram os cadernos!</pre>
+
+<dl class="anatomy">
+  <dt>bool temEstoque(int quantidade)</dt><dd>Responde "sim" ou "não" (aula <a href="bool.html">bool</a>): há pelo menos <code>quantidade</code> unidades?</dd>
+  <dt>if (!temEstoque(quantidade))</dt><dd>Chama outro método <strong>do mesmo objeto</strong>, sem ponto. Quando o caderno executa <code>vender</code>, o <code>temEstoque</code> chamado aqui também é o do caderno.</dd>
+  <dt>mostrar();</dt><dd>Mesma coisa: mostra o objeto que está vendendo.</dd>
+  <dt>return false; / return true;</dt><dd>O método avisa a quem chamou se a venda deu certo. O <code>main</code> pode ignorar o resultado (como nas duas primeiras chamadas) ou usá-lo num <code>if</code> (como na terceira).</dd>
+</dl>
+
+<p>Essa é uma vantagem grande dos métodos: a regra "só vende se tiver estoque" ficou num lugar só. Quem usa a classe chama <code>vender</code> e não precisa lembrar de conferir. Na aula <a href="encapsulamento.html">public e private</a>, você vai fechar a última porta: proibir que alguém mexa no <code>estoque</code> sem passar pelo <code>vender</code>.</p>
+
+<hr>
+
+<h2>5. Declarar dentro, definir fora: <code>Produto::metodo</code></h2>
+<p>Quando a classe cresce, os corpos dos métodos ocupam espaço e escondem o que importa: <em>quais</em> métodos existem. Por isso, é comum separar em duas partes:</p>
+<ul>
+  <li>a <strong>declaração</strong>, dentro da classe: só o "cabeçalho" do método, terminado em <code>;</code>;</li>
+  <li>a <strong>definição</strong>, fora da classe: o corpo completo, com o nome da classe e <code>::</code> na frente do nome do método.</li>
+</ul>
+
+<pre class="file" data-file="fora.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    void mostrar();
+    void repor(int quantidade);
+    int valorEmEstoque();
+};
+
+void Produto::mostrar() {
+    std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; " (" &lt;&lt; estoque &lt;&lt; " no estoque)\n";
+}
+
+void Produto::repor(int quantidade) {
+    estoque += quantidade;
+}
+
+int Produto::valorEmEstoque() {
+    return preco * estoque;
+}
+
+int main() {
+    Produto regua{"régua", 5, 20};
+    regua.repor(10);
+    regua.mostrar();
+    std::cout &lt;&lt; "Valor: R$ " &lt;&lt; regua.valorEmEstoque() &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/metodos">$ g++ -std=c++23 -Wall -Wextra fora.cpp -o fora
+$ ./fora
+régua: R$ 5 (30 no estoque)
+Valor: R$ 150</pre>
+
+<dl class="anatomy">
+  <dt>void mostrar();</dt><dd>Dentro da classe, só a <strong>declaração</strong>: "existe um método <code>mostrar</code>, que não recebe nada e não devolve nada". O <code>;</code> no lugar do corpo diz "o corpo está em outro lugar".</dd>
+  <dt>void Produto::mostrar() { … }</dt><dd>A <strong>definição</strong>. O <code>Produto::</code> diz "este é o <code>mostrar</code> que pertence à classe <code>Produto</code>". O <code>::</code> é o <strong>operador de escopo</strong>, o mesmo de <code>std::cout</code> (o <code>cout</code> que pertence a <code>std</code>, aula <a href="namespaces.html">Namespaces</a>).</dd>
+  <dt>nome, preco, estoque</dt><dd>Graças ao <code>Produto::</code>, o corpo continua enxergando os atributos direto, como se estivesse escrito dentro da classe.</dd>
+  <dt>int Produto::valorEmEstoque()</dt><dd>O tipo de retorno vem <strong>antes</strong> de <code>Produto::</code>. O cabeçalho tem de ser igual ao da declaração: mesmo retorno, mesmo nome, mesmos tipos de parâmetro.</dd>
+</dl>
+
+<p>Para o programa, não muda nada: a saída é a mesma. A vantagem é de leitura. Quem abre a classe vê, em poucas linhas, tudo o que um <code>Produto</code> sabe fazer.</p>
+
+<div class="note"><strong>Isso abre a porta para os arquivos <code>.h</code> e <code>.cpp</code>.</strong> Em projetos reais, a classe (com as declarações) vai num arquivo <code>produto.h</code>, e as definições com <code>Produto::</code> vão em <code>produto.cpp</code>. Quem quer usar a classe só inclui o <code>.h</code>. Como fazer essa separação e compilar os arquivos juntos é assunto das aulas <a href="headers.html">Arquivos .h e .cpp</a> e <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>.</div>
+
+<h3>Dentro ou fora: qual usar?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Onde escrever o corpo</th></tr>
+<tr><td>Método de uma ou duas linhas (<code>valorEmEstoque</code>)</td><td>Dentro da classe é comum e fica legível.</td></tr>
+<tr><td>Método longo (<code>vender</code> com várias regras)</td><td>Fora, com <code>Produto::</code>, para a classe continuar curta.</td></tr>
+<tr><td>Classe usada em vários arquivos</td><td>Declaração no <code>.h</code>, definição no <code>.cpp</code> (aula <a href="headers.html">Arquivos .h e .cpp</a>).</td></tr>
+<tr><td>Exemplos curtos deste guia</td><td>Dentro, para caber numa caixa só.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2 id="errado">Quando dá errado</h2>
+<p>Nos casos abaixo, o arquivo começa com a mesma classe <code>Produto</code> pública das seções anteriores; quando ela muda, mostramos o arquivo inteiro.</p>
+
+<div class="cenario">
+<strong>Esquecer os parênteses na chamada</strong>
+<pre class="file" data-file="parenteses.cpp">int main() {
+    Produto regua{"régua", 5, 20};
+    regua.mostrar;
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/metodos">$ g++ -std=c++23 -Wall -Wextra parenteses.cpp -o parenteses
+parenteses.cpp: In function ‘int main()’:
+parenteses.cpp:17:11: error: invalid use of non-static member function ‘void Produto::mostrar()’
+   17 |     regua.mostrar;
+      |     ~~~~~~^~~~~~~
+parenteses.cpp:10:10: note: declared here
+   10 |     void mostrar() {
+      |          ^~~~~~~</pre>
+<p><strong>O que aconteceu:</strong> sem os parênteses, você só <em>nomeou</em> o método, sem mandar executá-lo. O g++ chama isso de "uso inválido de função-membro não estática" (<em>non-static</em>: que pertence a um objeto; o contrário você vê em <a href="membros-static.html">Membros static</a>). O Clang, do editor do guia, é mais claro: <code>reference to non-static member function must be called; did you mean to call it with no arguments?</code> ("…precisa ser chamada; você quis chamá-la sem argumentos?").</p>
+<p><strong>Como resolver:</strong> <code>regua.mostrar();</code>. Os parênteses vão sempre, mesmo sem argumentos.</p>
+</div>
+
+<div class="cenario">
+<strong>Chamar o método sem o objeto</strong>
+<pre class="file" data-file="semobjeto.cpp">int main() {
+    Produto regua{"régua", 5, 20};
+    mostrar();
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/metodos">$ g++ -std=c++23 -Wall -Wextra semobjeto.cpp -o semobjeto
+semobjeto.cpp: In function ‘int main()’:
+semobjeto.cpp:17:5: error: ‘mostrar’ was not declared in this scope
+   17 |     mostrar();
+      |     ^~~~~~~</pre>
+<p><strong>O que aconteceu:</strong> "<code>mostrar</code> não foi declarado neste escopo". Fora da classe, não existe um <code>mostrar</code> solto: existe o <code>mostrar</code> de cada produto. O compilador não tem como adivinhar <em>qual</em> produto você quer mostrar. Só dentro de outro método da classe é que <code>mostrar()</code> sem objeto funciona (seção 4), porque lá o objeto é o que está executando.</p>
+<p><strong>Como resolver:</strong> diga o objeto: <code>regua.mostrar();</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Definir fora e esquecer o <code>Produto::</code></strong>
+<pre class="file" data-file="semclasse.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    void mostrar();
+};
+
+void mostrar() {
+    std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; "\n";
+}
+
+int main() {
+    Produto regua{"régua", 5, 20};
+    regua.mostrar();
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/metodos">$ g++ -std=c++23 -Wall -Wextra semclasse.cpp -o semclasse
+semclasse.cpp: In function ‘void mostrar()’:
+semclasse.cpp:14:18: error: ‘nome’ was not declared in this scope
+   14 |     std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; "\n";
+      |                  ^~~~
+semclasse.cpp:14:37: error: ‘preco’ was not declared in this scope
+   14 |     std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; "\n";
+      |                                     ^~~~~</pre>
+<p><strong>O que aconteceu:</strong> sem <code>Produto::</code>, a linha 13 criou uma <strong>função solta</strong> chamada <code>mostrar</code>, que não tem nada a ver com a classe. Repare na primeira linha da mensagem: <code>In function ‘void mostrar()’</code>, e não <code>Produto::mostrar()</code>. Uma função solta não tem objeto, então <code>nome</code> e <code>preco</code> não existem para ela. O Clang chega a sugerir a causa: <code>use of undeclared identifier 'nome'; did you mean 'Produto::nome'?</code></p>
+<p><strong>Como resolver:</strong> <code>void Produto::mostrar() { … }</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Definir fora um método que a classe não declarou</strong>
+<pre class="file" data-file="naodeclarado.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    void mostrar();
+};
+
+void Produto::mostrar() {
+    std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; "\n";
+}
+
+void Produto::repor(int quantidade) {
+    estoque += quantidade;
+}
+
+int main() {
+    Produto regua{"régua", 5, 20};
+    regua.mostrar();
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/metodos">$ g++ -std=c++23 -Wall -Wextra naodeclarado.cpp -o naodeclarado
+naodeclarado.cpp:17:6: error: no declaration matches ‘void Produto::repor(int)’
+   17 | void Produto::repor(int quantidade) {
+      |      ^~~~~~~
+naodeclarado.cpp:17:6: note: no functions named ‘void Produto::repor(int)’
+naodeclarado.cpp:4:7: note: ‘class Produto’ defined here
+    4 | class Produto {
+      |       ^~~~~~~</pre>
+<p><strong>O que aconteceu:</strong> "nenhuma declaração corresponde a <code>Produto::repor(int)</code>". Todo método precisa estar <strong>declarado dentro</strong> da classe; fora, você só escreve o corpo de algo que já foi anunciado. A nota aponta para a classe, para você conferir. O mesmo erro aparece quando a declaração existe mas o cabeçalho é diferente (por exemplo, <code>void repor(int)</code> dentro e <code>void Produto::repor(double)</code> fora). No Clang: <code>out-of-line definition of 'repor' does not match any declaration in 'Produto'</code>.</p>
+<p><strong>Como resolver:</strong> acrescente <code>void repor(int quantidade);</code> dentro da classe, ou acerte o cabeçalho para ficar igual ao da declaração.</p>
+</div>
+
+<div class="cenario">
+<strong>Declarar e esquecer de definir</strong>
+<pre class="file" data-file="declarasemdefinir.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    void mostrar();
+};
+
+int main() {
+    Produto regua{"régua", 5, 20};
+    regua.mostrar();
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/metodos">$ g++ -std=c++23 -Wall -Wextra declarasemdefinir.cpp -o declarasemdefinir
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccfkcJOb.o: na função "main":
+declarasemdefinir.cpp:(.text+0x7d): referência não definida para "Produto::mostrar()"
+collect2: error: ld returned 1 exit status</pre>
+<p><strong>O que aconteceu:</strong> o compilador aceitou o código (a classe promete que <code>mostrar</code> existe), mas quem reclamou foi o <strong>ligador</strong> (<code>ld</code>, o <em>linker</em>), a última etapa, que junta os pedaços (aula <a href="como-funciona.html">Como o C++ Vira Programa</a>). Ele procurou o corpo de <code>Produto::mostrar()</code> e não achou: "referência não definida". Repare que esta mensagem saiu em português: ela vem do <code>ld</code>, que tem tradução no Ubuntu, e não do g++. Em sistemas em inglês, aparece <code>undefined reference to `Produto::mostrar()'</code>. O nome <code>/tmp/cc….o</code> é um arquivo temporário e muda a cada compilação.</p>
+<p><strong>Como resolver:</strong> escreva a definição <code>void Produto::mostrar() { … }</code>. Num projeto com vários arquivos, confira se o <code>.cpp</code> que tem a definição entrou no comando de compilação (aula <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>Um método com o mesmo nome de um atributo</strong>
+<pre class="file" data-file="mesmonome.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    int preco() {
+        return preco;
+    }
+};
+
+int main() {
+    Produto regua{"régua", 5, 20};
+    std::cout &lt;&lt; regua.preco() &lt;&lt; "\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/metodos">$ g++ -std=c++23 -Wall -Wextra mesmonome.cpp -o mesmonome
+mesmonome.cpp:12:5: error: ‘int Produto::preco()’ conflicts with a previous declaration
+   12 |     }
+      |     ^
+mesmonome.cpp:7:9: note: previous declaration ‘int Produto::preco’
+    7 |     int preco;
+      |         ^~~~~
+mesmonome.cpp: In function ‘int main()’:
+mesmonome.cpp:17:29: error: expression cannot be used as a function
+   17 |     std::cout &lt;&lt; regua.preco() &lt;&lt; "\n";
+      |                  ~~~~~~~~~~~^~</pre>
+<p><strong>O que aconteceu:</strong> numa classe, cada nome só pode ser usado uma vez. O método <code>preco()</code> "conflita com uma declaração anterior", o atributo <code>int preco</code> da linha 7. O segundo erro é consequência do primeiro: para o compilador, <code>regua.preco</code> continua sendo o <code>int</code>, e um <code>int</code> não pode ser chamado como função.</p>
+<p><strong>Como resolver:</strong> dê nomes diferentes. Existem dois costumes, e você vai ver os dois por aí: mudar o método (<code>getPreco()</code>) ou mudar o atributo, com um sinal que o marca como dado interno (<code>preco_</code> ou <code>m_preco</code>). A aula <a href="encapsulamento.html">public e private</a> usa o segundo, que permite o método se chamar simplesmente <code>preco()</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>void mostrar() { … }</code> (dentro da classe)</td><td>Declara e define um método de uma vez.</td></tr>
+<tr><td><code>obj.mostrar();</code></td><td>Chama o método sobre o objeto <code>obj</code>. Parênteses obrigatórios.</td></tr>
+<tr><td><code>int x = obj.valorEmEstoque();</code></td><td>Usa o valor devolvido por um método.</td></tr>
+<tr><td><code>obj.repor(4);</code></td><td>Passa argumentos ao método.</td></tr>
+<tr><td><code>estoque += q;</code> (dentro de um método)</td><td>Muda o atributo do objeto que chamou.</td></tr>
+<tr><td><code>mostrar();</code> (dentro de outro método)</td><td>Chama outro método do mesmo objeto.</td></tr>
+<tr><td><code>void mostrar();</code> (dentro da classe)</td><td>Só declara; o corpo fica fora.</td></tr>
+<tr><td><code>void Produto::mostrar() { … }</code></td><td>Define, fora da classe, o método declarado.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Chamar o método</h3>
+<p>Complete para mandar o objeto <code>cola</code> se mostrar:</p>
+<div class="ex-code"><input data-answer="cola.mostrar();|cola.mostrar()" aria-label="chamada"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Definir fora</h3>
+<p>A classe <code>Produto</code> declara <code>void repor(int quantidade);</code>. Complete o começo da definição fora da classe:</p>
+<div class="ex-code">void <input data-answer="Produto::repor" aria-label="nome completo">(int quantidade) {</div>
+</div>
+
+<div class="exercise">
+<h3>3. Dentro do método</h3>
+<p>Complete o corpo do método <code>int dobroDoPreco()</code> para devolver o dobro do preço do objeto:</p>
+<div class="ex-code">return <input data-answer="preco * 2|2 * preco|preco*2|2*preco|preco + preco|preco+preco" aria-label="expressão">;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Por que o método <code>mostrar()</code> não precisa receber o produto como parâmetro?</p>
+<label><input type="radio" name="q4"> Porque os atributos são globais</label>
+<label><input type="radio" name="q4"> Porque ele sempre trabalha sobre o objeto que o chamou, o que está antes do ponto</label>
+<label><input type="radio" name="q4"> Porque ele só funciona com um produto por programa</label>
+<label><input type="radio" name="q4"> Porque <code>void</code> não recebe parâmetros</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Dentro de <code>vender</code>, a linha <code>mostrar();</code> mostra qual produto?</p>
+<label><input type="radio" name="q5"> O primeiro produto criado no programa</label>
+<label><input type="radio" name="q5"> Nenhum: dá erro, falta o objeto</label>
+<label><input type="radio" name="q5"> Todos os produtos</label>
+<label><input type="radio" name="q5"> O mesmo objeto que está executando o <code>vender</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. O g++ diz <code>In function ‘void mostrar()’: … ‘nome’ was not declared in this scope</code>. O que você provavelmente esqueceu?</p>
+<label><input type="radio" name="q6"> O <code>Produto::</code> antes de <code>mostrar</code> na definição fora da classe</label>
+<label><input type="radio" name="q6"> Os parênteses na chamada</label>
+<label><input type="radio" name="q6"> O <code>#include &lt;string&gt;</code></label>
+<label><input type="radio" name="q6"> O <code>;</code> depois da classe</label>
+</div>
+
+<h3>Missão final: o caixa da lojinha</h3>
+
+<div class="trycpp" data-goal="out:3 cadernos: R$ 36,out:Caderno agora custa R$ 14,src:Produto::reajustar,src:Produto::totalDaVenda">
+<p class="try-task"><strong>Missão:</strong> a classe já declara dois métodos novos. Escreva as definições <strong>fora da classe</strong>, com <code>Produto::</code>: <code>reajustar(int reais)</code> soma <code>reais</code> ao preço; <code>totalDaVenda(int quantidade)</code> devolve <code>preco * quantidade</code>. A saída deve ser:</p>
+<pre class="out">3 cadernos: R$ 36
+Caderno agora custa R$ 14</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    void reajustar(int reais);
+    int totalDaVenda(int quantidade);
+};
+
+// escreva as duas definições aqui
+
+int main() {
+    Produto caderno{"caderno", 12, 8};
+    std::cout &lt;&lt; "3 cadernos: R$ " &lt;&lt; caderno.totalDaVenda(3) &lt;&lt; "\n";
+    caderno.reajustar(2);
+    std::cout &lt;&lt; "Caderno agora custa R$ " &lt;&lt; caderno.preco &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco;
+    int estoque;
+
+    void reajustar(int reais);
+    int totalDaVenda(int quantidade);
+};
+
+void Produto::reajustar(int reais) {
+    preco += reais;
+}
+
+int Produto::totalDaVenda(int quantidade) {
+    return preco * quantidade;
+}
+
+int main() {
+    Produto caderno{"caderno", 12, 8};
+    std::cout &lt;&lt; "3 cadernos: R$ " &lt;&lt; caderno.totalDaVenda(3) &lt;&lt; "\n";
+    caderno.reajustar(2);
+    std::cout &lt;&lt; "Caderno agora custa R$ " &lt;&lt; caderno.preco &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Método = função que mora dentro da classe. Chama-se com <code>objeto.metodo(argumentos)</code>; os parênteses são obrigatórios.</li>
+  <li>O método enxerga os atributos direto (<code>nome</code>, <code>preco</code>), sempre os do objeto que o chamou.</li>
+  <li>Métodos podem devolver valores (<code>int valorEmEstoque()</code>), receber parâmetros (<code>repor(int)</code>) e mudar o objeto, sem precisar de <code>&amp;</code>.</li>
+  <li>Dentro de um método, outro método do mesmo objeto se chama sem ponto: <code>mostrar();</code>.</li>
+  <li>Dá para declarar na classe (<code>void mostrar();</code>) e definir fora (<code>void Produto::mostrar() { … }</code>). Essa é a base dos arquivos <a href="headers.html"><code>.h</code> e <code>.cpp</code></a>.</li>
+  <li>Erros: sem parênteses → <code>invalid use of non-static member function</code>; sem <code>Produto::</code> → <code>‘nome’ was not declared</code>; sem declaração → <code>no declaration matches</code>; sem definição → <code>referência não definida</code> (do ligador); nome repetido → <code>conflicts with a previous declaration</code>.</li>
+  <li>Próxima aula: fazer o objeto já nascer preenchido e válido, com <a href="construtores.html">Construtores</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
