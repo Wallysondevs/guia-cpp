@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ friend — funções e classes amigas que acessam membros privados | Guia C++</title>
+<meta name="description" content="friend em C++ para quem está começando: função amiga e classe amiga, como elas acessam membros private, o uso típico com operator&lt;&lt;, as regras (não é recíproca, não é herdada) e por que usar com moderação, com os erros reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">friend</span></h1>
+
+<p class="intro">Na aula <a href="encapsulamento.html">public e private</a>, você aprendeu que os membros <code>private</code> de uma classe só podem ser usados pela própria classe. É uma regra ótima: protege os dados de mudanças erradas. Mas, de vez em quando, uma função de fora precisa mesmo enxergar o que está lá dentro, como o <code>operator&lt;&lt;</code> que imprime o objeto. Para esses casos, a classe pode abrir uma exceção e declarar alguém como <strong>amigo</strong>: <code>friend</code>. Nesta aula você vai ver como, quando, e por que usar pouco.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma <strong>função amiga</strong> e como declarar uma: <code>friend void auditar(const Conta&amp; c);</code>.</li>
+  <li>Que a função amiga <strong>não é</strong> um método: não tem <code>this</code> e não se chama com ponto.</li>
+  <li>O uso mais comum: <code>operator&lt;&lt;</code> e outros operadores declarados como <code>friend</code> dentro da classe.</li>
+  <li>O que é uma <strong>classe amiga</strong>: <code>friend class Gerente;</code>.</li>
+  <li>As regras: quem concede é a classe; a amizade não é recíproca, não é herdada e não passa adiante.</li>
+  <li>Por que <code>friend</code> deve ser usado com moderação.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados com o <strong>g++ 15</strong> na máquina da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: a chave reserva</h2>
+<p>A casa da Ana é trancada: só ela entra (é o <code>private</code>). Mas ela deixa uma <strong>chave reserva</strong> com a vizinha de confiança, para regar as plantas quando viaja. Repare em três detalhes:</p>
+<ul>
+  <li><strong>Quem decide é a dona da casa.</strong> A vizinha não pode "se declarar" com direito à chave. Em C++, é a <strong>classe</strong> que escreve <code>friend</code>, nunca o amigo.</li>
+  <li><strong>A vizinha não mora lá.</strong> Ela entra, mas não vira parte da família. A função amiga acessa os privados, mas <strong>não</strong> é um método da classe.</li>
+  <li><strong>A chave é pessoal.</strong> O filho da vizinha não ganha a chave, e a Ana não ganha a chave da casa da vizinha. A amizade não é herdada nem recíproca.</li>
+</ul>
+
+<hr>
+
+<h2>1. Função amiga</h2>
+<p>Uma <code>Conta</code> bancária guarda o titular e o saldo como privados. Uma função de auditoria, que não faz parte da conta, precisa ler os dois. Primeiro, sem <code>friend</code>:</p>
+
+<pre class="file" data-file="semamiga.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Conta {
+public:
+    Conta(std::string titular, double saldo) : titular_{titular}, saldo_{saldo} {}
+    void depositar(double valor) { if (valor &gt; 0) saldo_ += valor; }
+
+private:
+    std::string titular_;
+    double saldo_;
+};
+
+void auditar(const Conta&amp; c) {
+    std::cout &lt;&lt; "Auditoria: " &lt;&lt; c.titular_ &lt;&lt; " tem R$ " &lt;&lt; c.saldo_ &lt;&lt; '\n';
+}
+
+int main() {
+    Conta ana{"Ana", 150};
+    ana.depositar(50);
+    auditar(ana);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semamiga.cpp -o semamiga
+semamiga.cpp: In function ‘void auditar(const Conta&amp;)’:
+semamiga.cpp:15:37: error: ‘std::string Conta::titular_’ is private within this context
+   15 |     std::cout &lt;&lt; "Auditoria: " &lt;&lt; c.titular_ &lt;&lt; " tem R$ " &lt;&lt; c.saldo_ &lt;&lt; '\n';
+      |                                     ^~~~~~~~
+semamiga.cpp:10:17: note: declared private here
+   10 |     std::string titular_;
+      |                 ^~~~~~~~
+semamiga.cpp:15:65: error: ‘double Conta::saldo_’ is private within this context
+   15 |     std::cout &lt;&lt; "Auditoria: " &lt;&lt; c.titular_ &lt;&lt; " tem R$ " &lt;&lt; c.saldo_ &lt;&lt; '\n';
+      |                                                                 ^~~~~~
+semamiga.cpp:11:12: note: declared private here
+   11 |     double saldo_;
+      |            ^~~~~~</pre>
+
+<p>Dois erros iguais, um para cada atributo: "<code>Conta::titular_</code> é privado neste contexto". O contexto é a função <code>auditar</code>, que está fora da classe. (Clang: <code>'titular_' is a private member of 'Conta'</code>.) Agora, com uma linha a mais dentro da classe:</p>
+
+<pre class="file" data-file="amiga.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Conta {
+public:
+    Conta(std::string titular, double saldo) : titular_{titular}, saldo_{saldo} {}
+    void depositar(double valor) { if (valor &gt; 0) saldo_ += valor; }
+
+    friend void auditar(const Conta&amp; c);   // auditar é amiga da Conta
+private:
+    std::string titular_;
+    double saldo_;
+};
+
+void auditar(const Conta&amp; c) {
+    std::cout &lt;&lt; "Auditoria: " &lt;&lt; c.titular_ &lt;&lt; " tem R$ " &lt;&lt; c.saldo_ &lt;&lt; '\n';
+}
+
+int main() {
+    Conta ana{"Ana", 150};
+    ana.depositar(50);
+    auditar(ana);
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>friend</dt><dd>"Amigo". Escrito <strong>dentro</strong> da classe que concede o acesso.</dd>
+  <dt>void auditar(const Conta&amp; c)</dt><dd>A assinatura completa da função que vira amiga. Ela tem que bater com a função escrita lá embaixo.</dd>
+  <dt>em qual seção?</dt><dd>Tanto faz: <code>public</code>, <code>private</code> ou <code>protected</code>. A declaração <code>friend</code> não é um membro, então o nível de acesso não se aplica a ela. Muita gente a coloca no fim da parte <code>public</code>, para ficar visível.</dd>
+  <dt>void auditar(const Conta&amp; c) { … }</dt><dd>A função em si, <strong>fora</strong> da classe e sem a palavra <code>friend</code>. Agora ela pode ler <code>c.titular_</code> e <code>c.saldo_</code>.</dd>
+  <dt>auditar(ana);</dt><dd>Chamada como uma função comum, passando o objeto. <strong>Não</strong> é <code>ana.auditar()</code>.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra amiga.cpp -o amiga
+$ ./amiga
+Auditoria: Ana tem R$ 200</pre>
+
+<div class="note">
+<strong>Amiga não é método</strong>
+<p>Um método roda "dentro" de um objeto: tem <code>this</code> e acessa os atributos pelo nome (<code>saldo_</code>). Uma função amiga é uma função comum que só ganhou permissão: ela não tem <code>this</code> e precisa receber o objeto como parâmetro (<code>c.saldo_</code>). Por isso, <code>ana.auditar()</code> dá erro: <code>‘class Conta’ has no member named ‘auditar’</code> ("a classe <code>Conta</code> não tem membro chamado <code>auditar</code>").</p>
+</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode como está. Depois apague a linha do <code>friend</code> e leia os erros. Volte com ela e troque <code>auditar(ana);</code> por <code>ana.auditar();</code>: qual é a mensagem agora?</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Conta {
+public:
+    Conta(std::string titular, double saldo) : titular_{titular}, saldo_{saldo} {}
+    void depositar(double valor) { if (valor &gt; 0) saldo_ += valor; }
+
+    friend void auditar(const Conta&amp; c);
+private:
+    std::string titular_;
+    double saldo_;
+};
+
+void auditar(const Conta&amp; c) {
+    std::cout &lt;&lt; "Auditoria: " &lt;&lt; c.titular_ &lt;&lt; " tem R$ " &lt;&lt; c.saldo_ &lt;&lt; '\n';
+}
+
+int main() {
+    Conta ana{"Ana", 150};
+    ana.depositar(50);
+    auditar(ana);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. O uso típico: operadores amigos</h2>
+<p>Na aula <a href="sobrecarga-operadores.html">Sobrecarga de Operadores</a>, o <code>operator&lt;&lt;</code> do <code>Dinheiro</code> foi escrito fora da classe e usou o método público <code>centavos()</code>. Mas e se a classe não tiver (nem deva ter) métodos públicos para cada atributo? É o caso de uma <code>Fracao</code>: ninguém precisa de <code>numerador()</code> espalhado pelo programa, mas imprimir e multiplicar frações precisa ver o numerador e o denominador. O jeito mais comum é declarar <strong>e escrever</strong> o operador amigo dentro da própria classe:</p>
+
+<pre class="file" data-file="fracao.cpp">#include &lt;iostream&gt;
+
+class Fracao {
+public:
+    Fracao(int numerador, int denominador) : num_{numerador}, den_{denominador} {}
+
+    friend std::ostream&amp; operator&lt;&lt;(std::ostream&amp; saida, const Fracao&amp; f) {
+        return saida &lt;&lt; f.num_ &lt;&lt; '/' &lt;&lt; f.den_;
+    }
+    friend Fracao operator*(const Fracao&amp; a, const Fracao&amp; b) {
+        return Fracao{a.num_ * b.num_, a.den_ * b.den_};
+    }
+private:
+    int num_;
+    int den_;
+};
+
+int main() {
+    Fracao metade{1, 2};
+    Fracao tres_quartos{3, 4};
+    std::cout &lt;&lt; metade &lt;&lt; " de " &lt;&lt; tres_quartos &lt;&lt; " = " &lt;&lt; metade * tres_quartos &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra fracao.cpp -o fracao
+$ ./fracao
+1/2 de 3/4 = 3/8</pre>
+
+<p>Mesmo escritas dentro das chaves da classe, essas duas funções <strong>não são métodos</strong>: o <code>friend</code> na frente faz delas funções livres, com dois parâmetros cada. É por isso que o <code>operator&lt;&lt;</code> aqui é válido, enquanto o mesmo código sem <code>friend</code> dava <code>must have exactly one argument</code> (veja a aula de operadores). Essa forma tem até apelido: <strong>amigo escondido</strong> (<em>hidden friend</em>), porque só é encontrada quando um dos lados é uma <code>Fracao</code>, o que deixa as mensagens de erro de outras classes mais curtas.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Quando usar</th></tr>
+<tr><td>Função livre que usa métodos públicos</td><td>A classe já tem métodos públicos suficientes (como <code>Dinheiro::centavos()</code>). É a forma que mais preserva o encapsulamento.</td></tr>
+<tr><td><code>friend</code> declarado e escrito dentro da classe</td><td>O operador precisa dos privados e faz parte "natural" da classe (<code>&lt;&lt;</code>, <code>==</code>, <code>+</code>). É o uso mais comum de <code>friend</code>.</td></tr>
+<tr><td><code>friend</code> declarado dentro, escrito fora</td><td>Igual ao anterior, quando o corpo é grande ou fica num <code>.cpp</code> separado (aula <a href="headers.html">Arquivos .h e .cpp</a>).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>3. Classe amiga</h2>
+<p>Às vezes, não é uma função, mas uma classe inteira que precisa trabalhar junto. Com <code>friend class</code>, <strong>todos</strong> os métodos da outra classe ganham acesso:</p>
+
+<pre class="file" data-file="cofre.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Cofre {
+public:
+    Cofre(std::string segredo) : segredo_{segredo} {}
+private:
+    std::string segredo_;
+    bool aberto_ = false;
+
+    friend class Gerente;          // Gerente pode tudo no Cofre
+};
+
+class Gerente {
+public:
+    void abrir(Cofre&amp; c) {
+        c.aberto_ = true;
+        std::cout &lt;&lt; "Cofre aberto. Segredo: " &lt;&lt; c.segredo_ &lt;&lt; '\n';
+    }
+    void fechar(Cofre&amp; c) {
+        c.aberto_ = false;
+        std::cout &lt;&lt; "Cofre fechado.\n";
+    }
+};
+
+int main() {
+    Cofre cofre{"receita do bolo da vovó"};
+    Gerente bia;
+    bia.abrir(cofre);
+    bia.fechar(cofre);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra cofre.cpp -o cofre
+$ ./cofre
+Cofre aberto. Segredo: receita do bolo da vovó
+Cofre fechado.</pre>
+
+<p>Os usos reais de classe amiga costumam ser pares muito unidos: uma lista e o seu iterador (aula <a href="iteradores.html">Iteradores</a>), uma classe e a classe que monta objetos dela, uma classe e os seus testes automáticos. Também dá para ser mais econômico e liberar só <strong>um método</strong> de outra classe: <code>friend void Gerente::abrir(Cofre&amp;);</code>. Para isso, a classe <code>Gerente</code> precisa estar completa (definida, com as chaves) antes da <code>Cofre</code>.</p>
+
+<hr>
+
+<h2>4. As regras da amizade</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Regra</th><th>No exemplo</th></tr>
+<tr><td><strong>Quem concede é a classe.</strong> Não existe jeito de uma função ou classe se declarar amiga de outra.</td><td>Só o <code>Cofre</code> pode escrever <code>friend class Gerente;</code>.</td></tr>
+<tr><td><strong>Não é recíproca.</strong></td><td>O <code>Gerente</code> vê os privados do <code>Cofre</code>; o <code>Cofre</code> não vê os do <code>Gerente</code>.</td></tr>
+<tr><td><strong>Não é herdada.</strong></td><td>Uma classe filha de <code>Gerente</code> não é amiga do <code>Cofre</code>.</td></tr>
+<tr><td><strong>Não passa adiante.</strong></td><td>Se o <code>Gerente</code> tem um amigo, esse amigo não ganha acesso ao <code>Cofre</code>.</td></tr>
+</table>
+</div>
+
+<p>Veja a regra da herança na prática. Um <code>Estagiario</code> é filho de <code>Gerente</code>:</p>
+
+<pre class="file" data-file="herdada.cpp">class Estagiario : public Gerente {
+public:
+    void espiar(const Cofre&amp; c) {
+        std::cout &lt;&lt; "Espiando: " &lt;&lt; c.segredo_ &lt;&lt; '\n';
+    }
+};
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra herdada.cpp -o herdada
+herdada.cpp: In member function ‘void Estagiario::espiar(const Cofre&amp;)’:
+herdada.cpp:23:40: error: ‘std::string Cofre::segredo_’ is private within this context
+   23 |         std::cout &lt;&lt; "Espiando: " &lt;&lt; c.segredo_ &lt;&lt; '\n';
+      |                                        ^~~~~~~~
+herdada.cpp:8:17: note: declared private here
+    8 |     std::string segredo_;
+      |                 ^~~~~~~~</pre>
+
+<p>O <code>Estagiario</code> herdou os métodos do <code>Gerente</code> (e pode chamar <code>abrir</code>, que roda como código do <code>Gerente</code>), mas o código escrito <strong>nele</strong> não tem a chave.</p>
+
+<hr>
+
+<h2>5. Por que usar com moderação</h2>
+<p>Cada <code>friend</code> é um furo controlado no encapsulamento. A classe deixa de ser a única responsável pelos próprios dados: se a <code>Conta</code> tem a regra "saldo nunca negativo" e uma função amiga mexe em <code>saldo_</code> direto, a regra só vale se a amiga também a respeitar. E, quando você mudar o nome ou o tipo de um atributo, terá de corrigir todos os amigos.</p>
+
+<div class="warning">
+<strong>Antes de escrever <code>friend</code>, pergunte</strong>
+<ul>
+  <li><strong>Um método público resolve?</strong> Se a função só precisa <em>ler</em> um valor, um método <code>const</code> (como <code>saldo()</code>) é mais simples e seguro.</li>
+  <li><strong>Isso devia ser um método?</strong> Se a função só trabalha com um objeto e não é um operador, provavelmente sim: <code>conta.extrato()</code> em vez de <code>extrato(conta)</code> amiga.</li>
+  <li><strong>É um operador ou um par de classes inseparáveis?</strong> Esses são os bons motivos para <code>friend</code>.</li>
+</ul>
+<p>Uma classe com muitos amigos é um sinal de que os dados estão no lugar errado.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"is private within this context" numa função de fora</strong>
+<p><strong>O que significa:</strong> a função não é membro nem amiga da classe. Confira também se a assinatura da declaração <code>friend</code> é <strong>idêntica</strong> à da função: <code>friend void auditar(Conta&amp; c);</code> (sem <code>const</code>) declara outra função, e a sua continua sem acesso.</p>
+<p><strong>Como consertar:</strong> prefira usar métodos públicos; se for mesmo o caso, acrescente a declaração <code>friend</code> com a assinatura exata.</p>
+</div>
+
+<div class="cenario">
+<strong>"‘class Conta’ has no member named ‘auditar’"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra metodo.cpp -o metodo
+metodo.cpp: In function ‘int main()’:
+metodo.cpp:22:9: error: ‘class Conta’ has no member named ‘auditar’
+   22 |     ana.auditar();
+      |         ^~~~~~~</pre>
+<p><strong>O que significa:</strong> você chamou a função amiga como se fosse um método. Amiga não é membro. (Clang: <code>no member named 'auditar' in 'Conta'</code>.)</p>
+<p><strong>Como consertar:</strong> <code>auditar(ana);</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"invalid use of non-static data member ‘Fracao::num_’"</strong>
+<pre class="file" data-file="semobjeto.cpp">    friend std::ostream&amp; operator&lt;&lt;(std::ostream&amp; saida, const Fracao&amp; f) {
+        return saida &lt;&lt; num_ &lt;&lt; '/' &lt;&lt; den_;
+    }
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semobjeto.cpp -o semobjeto
+semobjeto.cpp: In function ‘std::ostream&amp; operator&lt;&lt;(std::ostream&amp;, const Fracao&amp;)’:
+semobjeto.cpp:8:25: error: invalid use of non-static data member ‘Fracao::num_’
+    8 |         return saida &lt;&lt; num_ &lt;&lt; '/' &lt;&lt; den_;
+      |                         ^~~~
+semobjeto.cpp:11:9: note: declared here
+   11 |     int num_;
+      |         ^~~~
+semobjeto.cpp:8:40: error: invalid use of non-static data member ‘Fracao::den_’
+    8 |         return saida &lt;&lt; num_ &lt;&lt; '/' &lt;&lt; den_;
+      |                                        ^~~~
+semobjeto.cpp:12:9: note: declared here
+   12 |     int den_;
+      |         ^~~~
+semobjeto.cpp:7:72: warning: unused parameter ‘f’ [-Wunused-parameter]
+    7 |     friend std::ostream&amp; operator&lt;&lt;(std::ostream&amp; saida, const Fracao&amp; f) {
+      |                                                          ~~~~~~~~~~~~~~^</pre>
+<p><strong>O que significa:</strong> "uso inválido do atributo <code>num_</code>". A função está escrita dentro da classe, mas, por ser amiga, não tem <code>this</code>: ela não sabe de <strong>qual</strong> fração é o <code>num_</code>. O aviso <code>unused parameter ‘f’</code> é a pista: a fração chegou no parâmetro <code>f</code> e ninguém a usou.</p>
+<p><strong>Como consertar:</strong> <code>f.num_</code> e <code>f.den_</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A filha da classe amiga não tem acesso</strong>
+<p><strong>O que significa:</strong> amizade não é herdada (seção 4).</p>
+<p><strong>Como consertar:</strong> faça a classe base amiga oferecer um método <code>protected</code> que faz o trabalho, ou declare a filha também como amiga, se fizer sentido.</p>
+</div>
+
+<hr>
+
+<h2>Missão</h2>
+
+<div class="trycpp" data-goal="out:1/2 x 3/4 = 3/8,src:friend\s+std::ostream">
+<p class="try-task"><strong>Missão:</strong> a <code>Fracao</code> já sabe multiplicar, mas não sabe se imprimir. Escreva, dentro da classe, um <code>operator&lt;&lt;</code> amigo que mostra <code>numerador/denominador</code>. Depois tire as barras <code>//</code> da linha do <code>main</code>. A saída deve ser <code>1/2 x 3/4 = 3/8</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+class Fracao {
+public:
+    Fracao(int numerador, int denominador) : num_{numerador}, den_{denominador} {}
+
+    friend Fracao operator*(const Fracao&amp; a, const Fracao&amp; b) {
+        return Fracao{a.num_ * b.num_, a.den_ * b.den_};
+    }
+    // escreva o operator&lt;&lt; amigo aqui
+private:
+    int num_;
+    int den_;
+};
+
+int main() {
+    Fracao metade{1, 2};
+    Fracao tres_quartos{3, 4};
+    // std::cout &lt;&lt; metade &lt;&lt; " x " &lt;&lt; tres_quartos &lt;&lt; " = " &lt;&lt; metade * tres_quartos &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+class Fracao {
+public:
+    Fracao(int numerador, int denominador) : num_{numerador}, den_{denominador} {}
+
+    friend Fracao operator*(const Fracao&amp; a, const Fracao&amp; b) {
+        return Fracao{a.num_ * b.num_, a.den_ * b.den_};
+    }
+    friend std::ostream&amp; operator&lt;&lt;(std::ostream&amp; saida, const Fracao&amp; f) {
+        return saida &lt;&lt; f.num_ &lt;&lt; '/' &lt;&lt; f.den_;
+    }
+private:
+    int num_;
+    int den_;
+};
+
+int main() {
+    Fracao metade{1, 2};
+    Fracao tres_quartos{3, 4};
+    std::cout &lt;&lt; metade &lt;&lt; " x " &lt;&lt; tres_quartos &lt;&lt; " = " &lt;&lt; metade * tres_quartos &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<p>A saída da solução no laboratório:</p>
+<pre class="term" data-cwd="~/cpp">$ ./fracao2
+1/2 x 3/4 = 3/8</pre>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código (dentro da classe <code>X</code>)</th><th>O que libera</th></tr>
+<tr><td><code>friend void f(const X&amp; x);</code></td><td>A função livre <code>f</code> acessa os privados de <code>X</code></td></tr>
+<tr><td><code>friend std::ostream&amp; operator&lt;&lt;(std::ostream&amp; s, const X&amp; x) { … }</code></td><td>Operador amigo declarado e escrito na classe (amigo escondido)</td></tr>
+<tr><td><code>friend class Y;</code></td><td>Todos os métodos de <code>Y</code> acessam os privados de <code>X</code></td></tr>
+<tr><td><code>friend void Y::m(X&amp;);</code></td><td>Só o método <code>m</code> de <code>Y</code> (com <code>Y</code> declarada antes)</td></tr>
+<tr><td>Não é membro</td><td>Sem <code>this</code>; chamada como <code>f(x)</code>, nunca <code>x.f()</code></td></tr>
+<tr><td>Não é recíproca, herdada nem transitiva</td><td>Cada acesso é concedido explicitamente pela classe</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A palavra</h3>
+<p>Complete a declaração dentro da classe <code>Aluno</code> para a função <code>boletim</code> poder ler as notas privadas:</p>
+<div class="ex-code"><input data-answer="friend" aria-label="palavra"> void boletim(const Aluno&amp; a);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Classe amiga</h3>
+<p>Complete para a classe <code>Professor</code> acessar tudo da classe <code>Turma</code> (a linha fica dentro da <code>Turma</code>):</p>
+<div class="ex-code">friend <input data-answer="class Professor;|class Professor" aria-label="declaração"></div>
+</div>
+
+<div class="exercise">
+<h3>3. Chamar a amiga</h3>
+<p>A função <code>auditar</code> é amiga da <code>Conta</code>. Complete a chamada para auditar a conta <code>bia</code>:</p>
+<div class="ex-code"><input data-answer="auditar(bia);|auditar(bia)" aria-label="chamada"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. A classe <code>Cofre</code> declarou <code>friend class Gerente;</code>. O que é verdade?</p>
+<label><input type="radio" name="q4"> O <code>Cofre</code> também pode ler os privados do <code>Gerente</code>.</label>
+<label><input type="radio" name="q4"> Os métodos do <code>Gerente</code> podem ler os privados do <code>Cofre</code>, mas as classes filhas do <code>Gerente</code>, não.</label>
+<label><input type="radio" name="q4"> Qualquer classe pode ler os privados do <code>Cofre</code>.</label>
+<label><input type="radio" name="q4"> O <code>Gerente</code> virou uma classe filha do <code>Cofre</code>.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Qual é o uso mais comum e aceito de <code>friend</code>?</p>
+<label><input type="radio" name="q5"> Deixar todos os atributos acessíveis para não escrever métodos.</label>
+<label><input type="radio" name="q5"> Substituir a herança.</label>
+<label><input type="radio" name="q5"> Operadores como <code>operator&lt;&lt;</code> e <code>operator==</code> que precisam dos dados privados.</label>
+<label><input type="radio" name="q5"> Deixar uma função chamar <code>this</code>.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Dentro de um <code>friend std::ostream&amp; operator&lt;&lt;(std::ostream&amp; s, const Fracao&amp; f)</code> escrito na classe, como se lê o numerador?</p>
+<label><input type="radio" name="q6"> <code>f.num_</code></label>
+<label><input type="radio" name="q6"> <code>num_</code></label>
+<label><input type="radio" name="q6"> <code>this-&gt;num_</code></label>
+<label><input type="radio" name="q6"> <code>Fracao::num_</code></label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>friend</code>, escrito dentro de uma classe, dá a uma função ou classe de fora acesso aos membros <code>private</code> e <code>protected</code>.</li>
+  <li>Quem concede é sempre a classe. A seção (<code>public</code>/<code>private</code>) onde o <code>friend</code> aparece não importa.</li>
+  <li>Função amiga não é método: não tem <code>this</code>, recebe o objeto por parâmetro e é chamada como <code>f(obj)</code>.</li>
+  <li>Uso típico: operadores (<code>&lt;&lt;</code>, <code>*</code>, <code>==</code>) declarados e escritos dentro da classe com <code>friend</code>.</li>
+  <li><code>friend class Y;</code> libera todos os métodos de <code>Y</code>.</li>
+  <li>A amizade não é recíproca, não é herdada e não passa adiante.</li>
+  <li>Use com moderação: cada amigo é um furo no encapsulamento. Prefira métodos públicos quando eles resolvem.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
