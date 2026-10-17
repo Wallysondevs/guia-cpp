@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ auto — deixar o compilador deduzir o tipo | Guia C++</title>
+<meta name="description" content="A palavra auto em C++ para quem nunca programou: dedução de tipo (auto x = 5 × 5.0 × &quot;oi&quot;), dois truques reais para descobrir o tipo deduzido (o erro proposital e o typeid com c++filt), o sufixo s de std::string (&quot;oi&quot;s) e quando usar e quando evitar auto, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">auto</span></h1>
+
+<p class="intro">Até agora, toda variável começou pelo tipo: <code>int idade = 29;</code>. Mas, olhando o <code>29</code>, o compilador já sabe que é um <code>int</code>. A palavra <code>auto</code> diz a ele: <strong>"descubra o tipo você mesmo, pelo valor"</strong>. Isso economiza digitação e, mais tarde, nomes de tipo enormes. Mas tem um preço: o tipo que o compilador escolhe nem sempre é o que você imagina. Nesta aula você vai ver o que <code>auto</code> deduz em cada caso, aprender dois truques para <strong>espiar</strong> o tipo escolhido e saber quando usar e quando evitar.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que <code>auto</code> faz e o que ele deduz para <code>5</code>, <code>5.0</code>, <code>'x'</code>, <code>true</code> e <code>"oi"</code>.</li>
+  <li>Dois truques reais para descobrir um tipo: o <strong>erro proposital</strong> e o <code>typeid</code> com <code>c++filt</code>.</li>
+  <li>Por que <code>auto nome = "Ana";</code> não é um <code>std::string</code>, e como o sufixo <code>s</code> (<code>"Ana"s</code>) resolve.</li>
+  <li>As pegadinhas: <code>auto</code> sem valor, <code>auto preco = 10;</code> e <code>auto x = {5};</code>.</li>
+  <li>Quando <code>auto</code> ajuda e quando atrapalha.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: "o mesmo que ele pediu"</h2>
+<p>Num restaurante, a Ana pede "um suco de laranja". O Bruno, ao lado, diz só "o mesmo para mim". O garçom não precisa ouvir a palavra "laranja": ele <strong>deduz</strong> pelo pedido anterior.</p>
+
+<p><code>auto</code> é o "o mesmo para mim" do C++: a variável recebe o tipo do valor que está do lado direito do <code>=</code>. Importante: a dedução acontece <strong>na compilação</strong>, uma vez só. Depois disso, a variável tem um tipo fixo, como qualquer outra. <code>auto</code> não cria uma "caixa que aceita qualquer coisa".</p>
+
+<p><span class="versao">C++11</span> Esse significado de <code>auto</code> chegou no C++11, a grande virada da linguagem (aula <a href="versoes.html">Versões do C++</a>).</p>
+
+<hr>
+
+<h2>1. O que o <code>auto</code> deduz</h2>
+
+<pre class="file" data-file="deduz.cpp">#include &lt;iostream&gt;
+
+int main() {
+    auto idade = 29;
+    auto altura = 1.65;
+    auto inicial = 'A';
+    auto pago = true;
+    auto nome = "Ana";
+    std::cout &lt;&lt; idade &lt;&lt; " " &lt;&lt; altura &lt;&lt; " " &lt;&lt; inicial &lt;&lt; " " &lt;&lt; pago &lt;&lt; " " &lt;&lt; nome &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra deduz.cpp -o deduz
+$ ./deduz
+29 1.65 A 1 Ana</pre>
+
+<p>A saída é igual à de um programa com os tipos escritos à mão. Mas que tipos o compilador escolheu? O <code>cout</code> não conta. Para descobrir, existem dois truques.</p>
+
+<hr>
+
+<h2>2. Truque 1: o erro proposital (o "espião")</h2>
+<p>Quando o compilador dá um erro, ele costuma escrever o tipo das coisas na mensagem. Então vamos <strong>provocar</strong> um erro de propósito, num lugar onde o tipo apareça. A receita tem duas partes:</p>
+
+<pre class="file" data-file="espiao.cpp">template &lt;typename T&gt;
+struct QualTipo;
+
+int main() {
+    auto nome = "Ana";
+    QualTipo&lt;decltype(nome)&gt; espiao;
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>template &lt;typename T&gt; struct QualTipo;</dt><dd>Anuncia um "molde" chamado <code>QualTipo</code> que recebe um tipo <code>T</code>, mas <strong>nunca o define</strong> (não tem chaves <code>{ }</code> com o conteúdo). Templates são do Nível 3 (<a href="templates-classe.html">Templates de Classe</a>); aqui, basta copiar estas duas linhas.</dd>
+  <dt>decltype(nome)</dt><dd>"O tipo declarado de <code>nome</code>" (<em>declared type</em>): a pergunta que queremos responder.</dd>
+  <dt>QualTipo&lt;decltype(nome)&gt; espiao;</dt><dd>Tenta criar uma variável de um tipo que não existe. O compilador vai recusar, e na recusa vai escrever o tipo por extenso.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra espiao.cpp -o espiao
+espiao.cpp: In function ‘int main()’:
+espiao.cpp:6:30: error: aggregate ‘QualTipo&lt;const char*&gt; espiao’ has incomplete type and cannot be defined
+    6 |     QualTipo&lt;decltype(nome)&gt; espiao;
+      |                              ^~~~~~</pre>
+
+<p>O erro (<em>has incomplete type and cannot be defined</em>, "tem tipo incompleto e não pode ser definido") era esperado; o que interessa está entre os sinais <code>&lt; &gt;</code>: <strong><code>QualTipo&lt;const char*&gt;</code></strong>. Então <code>auto nome = "Ana";</code> criou um <code>const char*</code>, e <strong>não</strong> um <code>std::string</code>. A seção 4 explica o que isso significa.</p>
+
+<p>Com vários espiões de uma vez:</p>
+
+<pre class="file" data-file="espiao2.cpp">template &lt;typename T&gt;
+struct QualTipo;
+
+int main() {
+    auto a = 5;
+    auto b = 5.0;
+    auto c = 5.0f;
+    auto d = 5LL;
+    auto e = 'x';
+    QualTipo&lt;decltype(a)&gt; espiaoA;
+    QualTipo&lt;decltype(b)&gt; espiaoB;
+    QualTipo&lt;decltype(c)&gt; espiaoC;
+    QualTipo&lt;decltype(d)&gt; espiaoD;
+    QualTipo&lt;decltype(e)&gt; espiaoE;
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra espiao2.cpp -o espiao2
+espiao2.cpp: In function ‘int main()’:
+espiao2.cpp:10:27: error: aggregate ‘QualTipo&lt;int&gt; espiaoA’ has incomplete type and cannot be defined
+   10 |     QualTipo&lt;decltype(a)&gt; espiaoA;
+      |                           ^~~~~~~
+espiao2.cpp:11:27: error: aggregate ‘QualTipo&lt;double&gt; espiaoB’ has incomplete type and cannot be defined
+   11 |     QualTipo&lt;decltype(b)&gt; espiaoB;
+      |                           ^~~~~~~
+espiao2.cpp:12:27: error: aggregate ‘QualTipo&lt;float&gt; espiaoC’ has incomplete type and cannot be defined
+   12 |     QualTipo&lt;decltype(c)&gt; espiaoC;
+      |                           ^~~~~~~
+espiao2.cpp:13:27: error: aggregate ‘QualTipo&lt;long long int&gt; espiaoD’ has incomplete type and cannot be defined
+   13 |     QualTipo&lt;decltype(d)&gt; espiaoD;
+      |                           ^~~~~~~
+espiao2.cpp:14:27: error: aggregate ‘QualTipo&lt;char&gt; espiaoE’ has incomplete type and cannot be defined
+   14 |     QualTipo&lt;decltype(e)&gt; espiaoE;
+      |                           ^~~~~~~</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Declaração</th><th>Tipo deduzido</th><th>Por quê</th></tr>
+<tr><td><code>auto a = 5;</code></td><td><code>int</code></td><td>Número sem ponto.</td></tr>
+<tr><td><code>auto b = 5.0;</code></td><td><code>double</code></td><td>Número com ponto.</td></tr>
+<tr><td><code>auto c = 5.0f;</code></td><td><code>float</code></td><td>Sufixo <code>f</code>.</td></tr>
+<tr><td><code>auto d = 5LL;</code></td><td><code>long long int</code> (= <code>long long</code>)</td><td>Sufixo <code>LL</code>.</td></tr>
+<tr><td><code>auto e = 'x';</code></td><td><code>char</code></td><td>Aspas simples.</td></tr>
+<tr><td><code>auto f = true;</code></td><td><code>bool</code></td><td>Palavra-chave <code>true</code>.</td></tr>
+<tr><td><code>auto g = "oi";</code></td><td><code>const char*</code></td><td>Texto entre aspas duplas, no estilo da linguagem C.</td></tr>
+</table>
+</div>
+
+<p>Ou seja: com <code>auto</code>, o tipo vem das regras dos <strong>literais</strong>, vistas em <a href="tipos-dados.html">Tipos de Dados</a> e <a href="inteiros.html">Inteiros</a>. Saber essas regras é o que torna o <code>auto</code> previsível.</p>
+
+<div class="trycpp" data-goal="erro:QualTipo&lt;float&gt;">
+<p class="try-task"><strong>Missão:</strong> qual é o tipo de <code>3 * 2.5f</code>? Inteiro vezes <code>float</code>… O molde <code>QualTipo</code> já está declarado; acrescente, depois da linha do <code>total</code>, a linha do espião (<code>QualTipo&lt;decltype(total)&gt; espiao;</code>), rode e leia o tipo na mensagem de erro. (No editor, o Clang escreve <code>implicit instantiation of undefined template 'QualTipo&lt;...&gt;'</code>; o tipo aparece do mesmo jeito.) A missão conta quando a mensagem mostrar <code>QualTipo&lt;float&gt;</code>. Depois, por curiosidade, troque <code>2.5f</code> por <code>2.5</code> e rode de novo.</p>
+<pre class="script">template &lt;typename T&gt;
+struct QualTipo;
+
+int main() {
+    auto total = 3 * 2.5f;
+}
+</pre>
+<pre class="solucao">template &lt;typename T&gt;
+struct QualTipo;
+
+int main() {
+    auto total = 3 * 2.5f;
+    QualTipo&lt;decltype(total)&gt; espiao;
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Truque 2: <code>typeid</code> e <code>c++filt</code></h2>
+<p>O segundo truque descobre o tipo com o programa <strong>rodando</strong>. O operador <code>typeid</code> (de <code>&lt;typeinfo&gt;</code>) devolve informações sobre o tipo de algo, e o <code>.name()</code> devolve o nome dele:</p>
+
+<pre class="file" data-file="typeid.cpp">#include &lt;iostream&gt;
+#include &lt;typeinfo&gt;
+
+int main() {
+    auto a = 5;
+    auto b = 5.0;
+    auto c = 'x';
+    auto d = true;
+    auto e = "oi";
+    std::cout &lt;&lt; typeid(a).name() &lt;&lt; "\n";
+    std::cout &lt;&lt; typeid(b).name() &lt;&lt; "\n";
+    std::cout &lt;&lt; typeid(c).name() &lt;&lt; "\n";
+    std::cout &lt;&lt; typeid(d).name() &lt;&lt; "\n";
+    std::cout &lt;&lt; typeid(e).name() &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra typeid.cpp -o typeid
+$ ./typeid
+i
+d
+c
+b
+PKc</pre>
+
+<p>Os nomes saíram em código: <code>i</code> = <code>int</code>, <code>d</code> = <code>double</code>, <code>c</code> = <code>char</code>, <code>b</code> = <code>bool</code> e <code>PKc</code> = <em>Pointer to Konst char</em>, ponteiro para <code>char</code> constante. É o nome "embaralhado" (<em>mangled</em>) que o g++ usa por dentro. Para traduzir, o Linux tem o programa <code>c++filt</code> (com <code>-t</code>, de "tipo"), que recebe a saída pelo <code>|</code> (o "cano" do terminal):</p>
+
+<pre class="term" data-cwd="~/cpp">$ ./typeid | c++filt -t
+int
+double
+char
+bool
+char const*</pre>
+
+<p><code>char const*</code> é o mesmo que <code>const char*</code>, escrito em outra ordem. O <code>typeid</code> é ótimo para matar curiosidade, mas cada compilador escolhe seus próprios nomes (o Clang no editor pode mostrar outros), e ele esconde alguns detalhes, como o <code>const</code> da própria variável. O espião da seção 2 é mais fiel.</p>
+
+<hr>
+
+<h2>4. <code>auto</code> com texto: <code>"oi"</code> × <code>"oi"s</code></h2>
+<p>Os dois truques concordaram: <code>auto nome = "Ana";</code> <strong>não</strong> cria um <code>std::string</code>. Cria um <code>const char*</code>, o jeito antigo da linguagem C de apontar para um texto. Ele não tem nenhuma das facilidades do <code>std::string</code>:</p>
+
+<pre class="file" data-file="size.cpp">#include &lt;iostream&gt;
+
+int main() {
+    auto nome = "Ana";
+    std::cout &lt;&lt; nome.size() &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra size.cpp -o size
+size.cpp: In function ‘int main()’:
+size.cpp:5:23: error: request for member ‘size’ in ‘nome’, which is of non-class type ‘const char*’
+    5 |     std::cout &lt;&lt; nome.size() &lt;&lt; "\n";
+      |                       ^~~~</pre>
+
+<p><em>Request for member ‘size’ in ‘nome’, which is of non-class type ‘const char*’</em> = "pediu-se o membro <code>size</code> de <code>nome</code>, que é do tipo <code>const char*</code>, que não é uma classe". Traduzindo: um <code>const char*</code> não tem <code>.size()</code>; quem tem é o <code>std::string</code>.</p>
+
+<h3>A solução: o sufixo <code>s</code> <span class="versao">C++14</span></h3>
+<p>Um <code>s</code> logo depois das aspas transforma o texto num <code>std::string</code> de verdade. Ele vem num "pacote de sufixos" da biblioteca, que precisa ser liberado com uma linha <code>using namespace std::literals;</code>:</p>
+
+<pre class="file" data-file="literal-s.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;typeinfo&gt;
+
+using namespace std::literals;
+
+int main() {
+    auto nome = "Ana"s;
+    std::cout &lt;&lt; nome &lt;&lt; " tem " &lt;&lt; nome.size() &lt;&lt; " letras\n";
+    std::cout &lt;&lt; typeid(nome).name() &lt;&lt; "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>using namespace std::literals;</dt><dd>Libera os sufixos da biblioteca padrão (<code>s</code> para textos, e outros para tempo, como <code>5s</code> = 5 segundos, em <a href="chrono.html">chrono</a>). O <code>using namespace</code> é explicado em <a href="namespaces.html">Namespaces</a>.</dd>
+  <dt>"Ana"s</dt><dd>Texto + sufixo <code>s</code> = <code>std::string</code>. Sem espaço entre as aspas e o <code>s</code>.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra literal-s.cpp -o literal-s
+$ ./literal-s
+Ana tem 3 letras
+NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE
+$ ./literal-s | tail -1 | c++filt -t
+std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;</pre>
+
+<p>Agora o <code>.size()</code> funciona (3 letras), e o nome traduzido pelo <code>c++filt</code> é o nome completo do <code>std::string</code> dentro da biblioteca do g++ (<code>basic_string&lt;char&gt;</code> e seus acessórios). O <code>tail -1</code> pega só a última linha da saída.</p>
+
+<div class="tip">
+<strong>Três jeitos de ter um <code>std::string</code></strong>
+<ul>
+  <li><code>std::string nome = "Ana";</code> (tipo escrito: o mais claro para iniciantes);</li>
+  <li><code>auto nome = std::string{"Ana"};</code> (o tipo aparece do lado direito);</li>
+  <li><code>auto nome = "Ana"s;</code> (curto, mas exige o <code>using namespace std::literals;</code>).</li>
+</ul>
+<p>Os três criam exatamente a mesma coisa. Neste guia, o primeiro é o mais usado.</p>
+</div>
+
+<hr>
+
+<h2>5. As pegadinhas do <code>auto</code></h2>
+
+<h3><code>auto</code> precisa de um valor</h3>
+<pre class="term" data-cwd="~/cpp">$ cat semvalor.cpp
+int main() {
+    auto total;
+}
+$ g++ -std=c++23 -Wall -Wextra semvalor.cpp -o semvalor
+semvalor.cpp: In function ‘int main()’:
+semvalor.cpp:2:5: error: declaration of ‘auto total’ has no initializer
+    2 |     auto total;
+      |     ^~~~</pre>
+<p>"A declaração de <code>auto total</code> não tem inicializador": sem valor, não há do que deduzir. Um efeito colateral bom: com <code>auto</code>, é impossível esquecer de inicializar a variável (o "lixo" da aula <a href="variaveis.html">Variáveis</a>).</p>
+
+<h3>O tipo vem do primeiro valor, e não muda</h3>
+<pre class="file" data-file="preco.cpp">#include &lt;iostream&gt;
+
+int main() {
+    auto preco = 10;
+    preco = preco * 1.15;
+    std::cout &lt;&lt; "Preço novo: " &lt;&lt; preco &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra preco.cpp -o preco
+$ ./preco
+Preço novo: 11                « o aumento de 15% deveria dar 11.5</pre>
+
+<p>O <code>10</code> fez o <code>preco</code> nascer <code>int</code>. A conta <code>10 * 1.15</code> dá 11.5, mas guardar 11.5 num <code>int</code> corta a fração (aula <a href="conversao-tipos.html">Conversão de Tipos</a>), sem aviso com <code>-Wall -Wextra</code>. Só o <code>-Wconversion</code> avisa:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -Wconversion preco.cpp -o preco
+preco.cpp: In function ‘int main()’:
+preco.cpp:5:19: warning: conversion from ‘double’ to ‘int’ may change value [-Wfloat-conversion]
+    5 |     preco = preco * 1.15;
+      |             ~~~~~~^~~~~~</pre>
+
+<p>Com <code>auto</code>, <code>10</code> e <code>10.0</code> fazem toda a diferença. A missão final é sobre isso.</p>
+
+<h3><code>auto x{5}</code> × <code>auto x = {5}</code></h3>
+<p>Com chaves, uma diferença de um sinal de igual muda o tipo:</p>
+
+<pre class="file" data-file="chaves.cpp">#include &lt;initializer_list&gt;
+
+template &lt;typename T&gt;
+struct QualTipo;
+
+int main() {
+    auto a{5};
+    auto b = {5};
+    QualTipo&lt;decltype(a)&gt; espiaoA;
+    QualTipo&lt;decltype(b)&gt; espiaoB;
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra chaves.cpp -o chaves
+chaves.cpp: In function ‘int main()’:
+chaves.cpp:9:27: error: aggregate ‘QualTipo&lt;int&gt; espiaoA’ has incomplete type and cannot be defined
+    9 |     QualTipo&lt;decltype(a)&gt; espiaoA;
+      |                           ^~~~~~~
+chaves.cpp:10:27: error: aggregate ‘QualTipo&lt;std::initializer_list&lt;int&gt; &gt; espiaoB’ has incomplete type and cannot be defined
+   10 |     QualTipo&lt;decltype(b)&gt; espiaoB;
+      |                           ^~~~~~~</pre>
+
+<p><code>auto a{5};</code> é um <code>int</code>, como esperado. Já <code>auto b = {5};</code> é uma <code>std::initializer_list&lt;int&gt;</code>: uma <strong>lista</strong> de inteiros com um elemento só (as listas aparecem em <a href="vector.html">std::vector</a>). Sem o <code>#include &lt;initializer_list&gt;</code>, o g++ nem aceita essa linha. Regra: com <code>auto</code>, use <code>=</code> com valor simples (<code>auto x = 5;</code>) ou chaves sem <code>=</code> (<code>auto x{5};</code>), nunca <code>= {5}</code>.</p>
+
+<hr>
+
+<h2>6. Quando usar e quando evitar</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th><code>auto</code>?</th><th>Exemplo</th></tr>
+<tr><td>O tipo já está escrito do lado direito</td><td>Sim: repetir não acrescenta nada</td><td><code>auto nome = std::string{"Ana"};</code></td></tr>
+<tr><td>Nomes de tipo longos (você vai encontrá-los nos iteradores e mapas)</td><td>Sim: é para isso que o <code>auto</code> nasceu</td><td><code>auto it = mapa.begin();</code> (aula <a href="iteradores.html">Iteradores</a>)</td></tr>
+<tr><td>Percorrer uma coleção</td><td>Sim, muito comum</td><td><code>for (auto nota : notas)</code> (aula <a href="for-range.html">for de intervalo</a>)</td></tr>
+<tr><td>Guardar o resultado de uma função cujo tipo você não sabe de cabeça</td><td>Com cuidado: o leitor também não vai saber</td><td><code>auto total = calcula();</code></td></tr>
+<tr><td>Número que vai receber valores com fração depois</td><td>Evite, ou use o literal certo</td><td><code>double preco = 10;</code> ou <code>auto preco = 10.0;</code></td></tr>
+<tr><td>Texto que vai usar <code>.size()</code> e companhia</td><td>Só com o sufixo <code>s</code></td><td><code>std::string nome = "Ana";</code></td></tr>
+<tr><td>Aprendendo a linguagem</td><td>Prefira escrever o tipo</td><td>Escrever <code>int</code> e <code>double</code> treina o olho para os tipos</td></tr>
+</table>
+</div>
+
+<p>Um meio-termo útil: <code>const auto</code> funciona como você imagina (<code>const auto limite = 100;</code> é um <code>const int</code>), e as aulas de <a href="referencias.html">Referências</a> mostram <code>auto&amp;</code>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: declaration of ‘auto x’ has no initializer</code></strong>
+<p><strong>O que significa:</strong> <code>auto</code> sem valor: não há como deduzir o tipo.</p>
+<p><strong>Como consertar:</strong> dê um valor (<code>auto x = 0;</code>) ou escreva o tipo.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: request for member ‘size’ in ‘x’, which is of non-class type ‘const char*’</code></strong>
+<p><strong>O que significa:</strong> <code>auto x = "texto";</code> criou um <code>const char*</code>, que não tem <code>.size()</code>, <code>.length()</code> etc.</p>
+<p><strong>Como consertar:</strong> <code>std::string x = "texto";</code> ou <code>auto x = "texto"s;</code> (com <code>using namespace std::literals;</code>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: unable to find string literal operator ‘operator""s’ with ‘const char [4]’, ‘long unsigned int’ arguments</code></strong>
+<p><strong>O que significa:</strong> você usou <code>"Ana"s</code> sem liberar os sufixos.</p>
+<p><strong>Como consertar:</strong> acrescente <code>using namespace std::literals;</code> (e o <code>#include &lt;string&gt;</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>Uma conta com <code>auto</code> perdeu a fração</strong>
+<p><strong>O que significa:</strong> a variável nasceu <code>int</code> porque o primeiro valor era inteiro (<code>auto x = 10;</code>).</p>
+<p><strong>Como consertar:</strong> use o literal certo (<code>10.0</code>) ou escreva o tipo (<code>double</code>). Na dúvida, rode o espião.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Tipo</th></tr>
+<tr><td><code>auto x = 5;</code> / <code>auto x{5};</code></td><td><code>int</code></td></tr>
+<tr><td><code>auto x = 5.0;</code></td><td><code>double</code></td></tr>
+<tr><td><code>auto x = 5.0f;</code></td><td><code>float</code></td></tr>
+<tr><td><code>auto x = 5LL;</code></td><td><code>long long</code></td></tr>
+<tr><td><code>auto x = 'a';</code> / <code>auto x = true;</code></td><td><code>char</code> / <code>bool</code></td></tr>
+<tr><td><code>auto x = "oi";</code></td><td><code>const char*</code> (não é <code>std::string</code>!)</td></tr>
+<tr><td><code>auto x = "oi"s;</code></td><td><code>std::string</code> (com <code>using namespace std::literals;</code>)</td></tr>
+<tr><td><code>auto x = {5};</code></td><td><code>std::initializer_list&lt;int&gt;</code> (evite)</td></tr>
+<tr><td><code>QualTipo&lt;decltype(x)&gt; espiao;</code></td><td>Truque: o erro mostra o tipo</td></tr>
+<tr><td><code>typeid(x).name()</code> + <code>c++filt -t</code></td><td>Truque: mostra o tipo ao rodar</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Qual tipo?</h3>
+<p>Que tipo o compilador deduz em <code>auto media = 7.5;</code>?</p>
+<div class="ex-code"><input data-answer="double" aria-label="tipo"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Texto de verdade</h3>
+<p>Complete para <code>nome</code> ser um <code>std::string</code>:</p>
+<div class="ex-code">auto nome = "Ana"<input data-answer="s" aria-label="sufixo">;</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Que tipo tem <code>auto cidade = "Recife";</code>?</p>
+<label><input type="radio" name="q3"> <code>std::string</code></label>
+<label><input type="radio" name="q3"> <code>char</code></label>
+<label><input type="radio" name="q3"> <code>const char*</code></label>
+<label><input type="radio" name="q3"> Nenhum: dá erro</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Depois de <code>auto x = 3;</code>, o que <code>x = 3.9;</code> faz?</p>
+<label><input type="radio" name="q4"> Transforma <code>x</code> em <code>double</code>, valendo 3.9</label>
+<label><input type="radio" name="q4"> Guarda 3: <code>x</code> é <code>int</code> e a fração é cortada</label>
+<label><input type="radio" name="q4"> Dá erro de compilação</label>
+<label><input type="radio" name="q4"> Arredonda para 4</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. O que acontece com <code>auto total;</code>?</p>
+<label><input type="radio" name="q5"> <code>total</code> vira <code>int</code> valendo 0</label>
+<label><input type="radio" name="q5"> <code>total</code> fica com lixo</label>
+<label><input type="radio" name="q5"> Só um aviso</label>
+<label><input type="radio" name="q5"> Erro: <code>declaration of ‘auto total’ has no initializer</code></label>
+</div>
+
+<h3>Missão final: o aumento de preço</h3>
+
+<div class="trycpp" data-goal="out:Preço novo: 11.5,src:\bauto\s+preco\b">
+<p class="try-task"><strong>Missão:</strong> o caderno custava 10 e teve aumento de 15%. O programa mostra <code>Preço novo: 11</code>, mas o certo é <code>Preço novo: 11.5</code>. Mantenha o <code>auto</code> e conserte só o valor inicial, para o compilador deduzir o tipo certo.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    auto preco = 10;
+    preco = preco * 1.15;
+    std::cout &lt;&lt; "Preço novo: " &lt;&lt; preco &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    auto preco = 10.0;
+    preco = preco * 1.15;
+    std::cout &lt;&lt; "Preço novo: " &lt;&lt; preco &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>auto</code> deduz o tipo pelo valor, na compilação, uma vez só. Depois, o tipo é fixo.</li>
+  <li>A dedução segue os literais: <code>5</code> → <code>int</code>, <code>5.0</code> → <code>double</code>, <code>5.0f</code> → <code>float</code>, <code>'x'</code> → <code>char</code>, <code>"oi"</code> → <code>const char*</code>.</li>
+  <li>Para espiar um tipo: <code>QualTipo&lt;decltype(x)&gt; espiao;</code> (o erro mostra o tipo) ou <code>typeid(x).name()</code> + <code>c++filt -t</code>.</li>
+  <li><code>auto nome = "Ana";</code> não é <code>std::string</code>; <code>"Ana"s</code> é (com <code>using namespace std::literals;</code>).</li>
+  <li>Pegadinhas: <code>auto</code> exige valor; <code>auto preco = 10;</code> é <code>int</code>; <code>auto x = {5};</code> é uma lista.</li>
+  <li>Use <code>auto</code> quando o tipo é óbvio ou comprido demais; escreva o tipo quando ele ajuda o leitor (e enquanto você está aprendendo).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
