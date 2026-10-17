@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Exceções — throw, try e catch | Guia C++</title>
+<meta name="description" content="Exceções em C++ para quem nunca programou: lançar um erro com throw, pegar com try e catch, std::exception e as filhas runtime_error, invalid_argument e out_of_range, e.what(), pegar por const&amp;, a mensagem real de exceção não tratada (terminate called…, código 134), vários catch, catch (...) e exceções próprias, com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Exceções (try e catch)</span></h1>
+
+<p class="intro">Nem tudo dá certo: o arquivo não existe, o usuário digitou "abc" onde devia ir um número, a conta não tem saldo para o saque. Uma função que encontra um problema desses muitas vezes <strong>não sabe o que fazer</strong> com ele (mostrar uma mensagem? tentar de novo? desistir?), mas quem a chamou sabe. As <strong>exceções</strong> são o jeito de o C++ levar o problema de quem o encontrou até quem sabe tratá-lo. Nesta aula você vai lançar erros com <code>throw</code>, pegá-los com <code>try</code> e <code>catch</code> e ver o que acontece quando ninguém pega.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como lançar um erro: <code>throw std::invalid_argument("…");</code>.</li>
+  <li>Como pegar o erro e continuar: <code>try { … } catch (const std::exception&amp; e) { … }</code>.</li>
+  <li>O que acontece quando ninguém pega: <code>terminate called after throwing an instance of …</code>.</li>
+  <li>A família <code>std::exception</code> e as filhas mais usadas: <code>runtime_error</code>, <code>invalid_argument</code>, <code>out_of_range</code>.</li>
+  <li>Como ler a mensagem com <code>e.what()</code>, e por que pegar por <code>const&amp;</code>.</li>
+  <li>Como usar vários <code>catch</code>, a ordem certa entre eles e o <code>catch (...)</code>.</li>
+  <li>Como criar a sua própria exceção: <code>class SaldoInsuficiente : public std::runtime_error</code>.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Você pode repetir cada um no editor do guia.</p>
+
+<hr>
+
+<h2>A ideia: o alarme de incêndio</h2>
+<p>Num prédio, quem vê fumaça no 7º andar não precisa saber apagar incêndio. A pessoa aperta o <strong>alarme</strong>, e o aviso sobe até quem sabe agir: a brigada, os bombeiros. Enquanto isso, todo mundo para o que estava fazendo.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No prédio</th><th>Em C++</th></tr>
+<tr><td>Ver a fumaça e apertar o alarme</td><td><code>throw</code> ("lançar"): a função encontra o problema e lança uma exceção.</td></tr>
+<tr><td>O aviso que sobe (com o andar e o que está pegando fogo)</td><td>O <strong>objeto exceção</strong>, com uma mensagem dentro.</td></tr>
+<tr><td>A área vigiada pela brigada</td><td><code>try</code> ("tentar"): um bloco de código cujos alarmes você quer atender.</td></tr>
+<tr><td>A brigada que atende</td><td><code>catch</code> ("pegar"): o código que trata o problema.</td></tr>
+<tr><td>Ninguém atende o alarme</td><td>O programa é <strong>abortado</strong>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. <code>throw</code>, <code>try</code> e <code>catch</code></h2>
+
+<pre class="file" data-file="dividir.cpp">#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+
+double dividir(double a, double b) {
+    if (b == 0) {
+        throw std::invalid_argument("divisão por zero");
+    }
+    return a / b;
+}
+
+int main() {
+    try {
+        std::cout &lt;&lt; dividir(10, 4) &lt;&lt; '\n';
+        std::cout &lt;&lt; dividir(10, 0) &lt;&lt; '\n';
+        std::cout &lt;&lt; "Esta linha não aparece.\n";
+    } catch (const std::invalid_argument&amp; e) {
+        std::cout &lt;&lt; "Erro: " &lt;&lt; e.what() &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "O programa continua.\n";
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra dividir.cpp -o dividir
+$ ./dividir
+2.5
+Erro: divisão por zero
+O programa continua.</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;stdexcept&gt;</dt><dd>Traz as exceções padrão (<em>standard exceptions</em>), como <code>std::invalid_argument</code>.</dd>
+  <dt>throw std::invalid_argument("divisão por zero");</dt><dd>Cria uma exceção do tipo <code>std::invalid_argument</code> ("argumento inválido"), com a mensagem entre parênteses, e a <strong>lança</strong>. A função para ali mesmo: o <code>return a / b;</code> não roda.</dd>
+  <dt>try { … }</dt><dd>O bloco vigiado. Se qualquer coisa lá dentro lançar uma exceção, inclusive uma função chamada lá dentro, o resto do bloco é pulado. Por isso <code>Esta linha não aparece.</code> não apareceu.</dd>
+  <dt>catch (const std::invalid_argument&amp; e)</dt><dd>Diz qual tipo de exceção este bloco atende e dá um nome a ela: <code>e</code>. O <code>const&amp;</code> pega a exceção original, sem copiar (seção 4).</dd>
+  <dt>e.what()</dt><dd>Devolve a mensagem que foi colocada na exceção (<em>what</em> = "o quê": "o que aconteceu?").</dd>
+  <dt>O programa continua.</dt><dd>Depois do <code>catch</code>, o programa segue normalmente pela linha de baixo. O erro foi <strong>tratado</strong>.</dd>
+</dl>
+
+<p>Repare na ordem dos acontecimentos: <code>dividir(10, 4)</code> deu certo e mostrou <code>2.5</code>; <code>dividir(10, 0)</code> lançou; o resto do <code>try</code> foi pulado; o <code>catch</code> rodou; o programa seguiu.</p>
+
+<h3>A exceção atravessa funções</h3>
+<p>O grande poder das exceções: a função que lança e o <code>catch</code> que trata podem estar longe um do outro. A exceção "sobe" pelas funções, pulando o resto de cada uma, até achar um <code>try</code>:</p>
+
+<pre class="file" data-file="fluxo.cpp">#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+
+void c() {
+    std::cout &lt;&lt; "c: começou\n";
+    throw std::runtime_error("problema em c");
+    std::cout &lt;&lt; "c: terminou\n";
+}
+
+void b() {
+    std::cout &lt;&lt; "b: começou\n";
+    c();
+    std::cout &lt;&lt; "b: terminou\n";
+}
+
+int main() {
+    try {
+        b();
+    } catch (const std::exception&amp; e) {
+        std::cout &lt;&lt; "main pegou: " &lt;&lt; e.what() &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra fluxo.cpp -o fluxo
+$ ./fluxo
+b: começou
+c: começou
+main pegou: problema em c          « "c: terminou" e "b: terminou" não aparecem</pre>
+
+<p>O <code>main</code> chamou <code>b</code>, que chamou <code>c</code>, que lançou. Nem <code>c</code> nem <code>b</code> tinham <code>try</code>, então as duas foram interrompidas no meio, e a exceção chegou ao <code>main</code>. As variáveis locais das funções interrompidas são destruídas direitinho no caminho: um arquivo aberto em <code>b</code>, por exemplo, seria fechado.</p>
+
+<hr>
+
+<h2>2. Quando ninguém pega a exceção</h2>
+<p>E se não houver <code>try</code> nenhum? O mesmo programa da divisão, sem o <code>try</code>:</p>
+
+<pre class="file" data-file="semtry.cpp">#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+
+double dividir(double a, double b) {
+    if (b == 0) {
+        throw std::invalid_argument("divisão por zero");
+    }
+    return a / b;
+}
+
+int main() {
+    std::cout &lt;&lt; dividir(10, 4) &lt;&lt; '\n';
+    std::cout &lt;&lt; dividir(10, 0) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Fim.\n";
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra semtry.cpp -o semtry
+$ ./semtry
+2.5
+terminate called after throwing an instance of 'std::invalid_argument'
+  what():  divisão por zero
+Abortado                   (imagem do núcleo gravada) ./semtry
+$ echo $?
+134</pre>
+
+<p>Linha por linha:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>Quem escreveu</th><th>O que significa</th></tr>
+<tr><td><code>terminate called after throwing an instance of 'std::invalid_argument'</code></td><td>A biblioteca do C++</td><td>"<code>terminate</code> foi chamado depois do lançamento de uma <code>std::invalid_argument</code>". A exceção subiu até sair do <code>main</code>, e o C++ chamou a função de emergência <code>std::terminate</code>, que encerra o programa.</td></tr>
+<tr><td><code>  what():  divisão por zero</code></td><td>A biblioteca do C++</td><td>A mensagem de dentro da exceção, o mesmo texto que <code>e.what()</code> devolveria. É a pista mais útil.</td></tr>
+<tr><td><code>Abortado (imagem do núcleo gravada) ./semtry</code></td><td>O Bash</td><td>O programa foi <strong>abortado</strong> (morto pelo sinal <code>SIGABRT</code>). "Imagem do núcleo gravada" (<em>core dumped</em>, num sistema em inglês) quer dizer que o sistema pode ter salvo uma cópia da memória do programa para análise.</td></tr>
+<tr><td><code>134</code></td><td>O Bash (<code>echo $?</code>)</td><td>O código de saída: 128 + 6, onde 6 é o número do sinal <code>SIGABRT</code>. Sempre que você vir 134, pense "abortado".</td></tr>
+</table>
+</div>
+
+<p>As duas primeiras linhas saem em inglês em qualquer sistema: são escritas pela biblioteca do C++. A terceira vem do terminal e segue o idioma do sistema.</p>
+
+<div class="note">
+<strong>Linhas de <code>cout</code> podem sumir quando o programa aborta</strong>
+<p>No terminal, o <code>2.5</code> apareceu antes do erro. Mas se a saída do programa for para um arquivo ou outro programa (<code>./semtry &gt; saida.txt</code>), o <code>cout</code> guarda o texto num buffer e o aborto pode impedir que ele seja escrito. Mais um motivo para tratar as exceções.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Turma A: 8,out:Erro: lista vazia,out:Fim.,exit:0">
+<p class="try-task"><strong>Missão:</strong> rode este programa e veja ele abortar na turma B, que está vazia. Coloque as quatro linhas das médias dentro de um <code>try</code> e trate a <code>std::invalid_argument</code> com um <code>catch</code> que mostra <code>Erro: </code> seguido de <code>e.what()</code>. No fim, o programa deve mostrar <code>Fim.</code> e terminar com código 0.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;vector&gt;
+
+double media(const std::vector&lt;double&gt;&amp; notas) {
+    if (notas.empty()) {
+        throw std::invalid_argument("lista vazia");
+    }
+    double soma = 0.0;
+    for (double n : notas) {
+        soma += n;
+    }
+    return soma / notas.size();
+}
+
+int main() {
+    std::vector&lt;double&gt; turma_a = {8.5, 6.0, 9.5};
+    std::vector&lt;double&gt; turma_b = {};
+
+    double a = media(turma_a);
+    std::cout &lt;&lt; "Turma A: " &lt;&lt; a &lt;&lt; '\n';
+    double b = media(turma_b);
+    std::cout &lt;&lt; "Turma B: " &lt;&lt; b &lt;&lt; '\n';
+    std::cout &lt;&lt; "Fim.\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;vector&gt;
+
+double media(const std::vector&lt;double&gt;&amp; notas) {
+    if (notas.empty()) {
+        throw std::invalid_argument("lista vazia");
+    }
+    double soma = 0.0;
+    for (double n : notas) {
+        soma += n;
+    }
+    return soma / notas.size();
+}
+
+int main() {
+    std::vector&lt;double&gt; turma_a = {8.5, 6.0, 9.5};
+    std::vector&lt;double&gt; turma_b = {};
+
+    try {
+        double a = media(turma_a);
+        std::cout &lt;&lt; "Turma A: " &lt;&lt; a &lt;&lt; '\n';
+        double b = media(turma_b);
+        std::cout &lt;&lt; "Turma B: " &lt;&lt; b &lt;&lt; '\n';
+    } catch (const std::invalid_argument&amp; e) {
+        std::cout &lt;&lt; "Erro: " &lt;&lt; e.what() &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "Fim.\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. A família <code>std::exception</code></h2>
+<p>Você não precisa inventar tipos de erro: a biblioteca padrão traz uma família pronta. Todas descendem de <code>std::exception</code>, a "mãe" de todas, e cada filha diz que <strong>tipo</strong> de problema aconteceu:</p>
+
+<pre class="out">std::exception                  « a mãe de todas (&lt;exception&gt;)
+├── std::logic_error            « erro de lógica: o programa pediu algo sem sentido
+│   ├── std::invalid_argument   « argumento inválido: stoi("abc"), divisão por zero
+│   ├── std::out_of_range       « fora da faixa: v.at(10) num vetor de 3, número grande demais
+│   └── std::length_error       « tamanho grande demais para um container
+├── std::runtime_error          « erro "do mundo lá fora", só detectável rodando
+│   └── std::filesystem::filesystem_error   « (neta, via std::system_error) arquivo não existe…
+└── std::bad_alloc              « acabou a memória (new falhou)</pre>
+
+<p>A biblioteca padrão já lança várias delas. Você viu algumas em aulas anteriores:</p>
+
+<pre class="file" data-file="biblioteca.cpp">#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; v = {10, 20, 30};
+
+    try {
+        std::cout &lt;&lt; std::stoi("42") &lt;&lt; '\n';
+        std::cout &lt;&lt; std::stoi("quarenta") &lt;&lt; '\n';
+    } catch (const std::invalid_argument&amp; e) {
+        std::cout &lt;&lt; "invalid_argument: " &lt;&lt; e.what() &lt;&lt; '\n';
+    }
+
+    try {
+        std::cout &lt;&lt; std::stoi("99999999999") &lt;&lt; '\n';
+    } catch (const std::out_of_range&amp; e) {
+        std::cout &lt;&lt; "out_of_range: " &lt;&lt; e.what() &lt;&lt; '\n';
+    }
+
+    try {
+        std::cout &lt;&lt; v.at(10) &lt;&lt; '\n';
+    } catch (const std::out_of_range&amp; e) {
+        std::cout &lt;&lt; "out_of_range: " &lt;&lt; e.what() &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra biblioteca.cpp -o biblioteca
+$ ./biblioteca
+42
+invalid_argument: stoi
+out_of_range: stoi
+out_of_range: vector::_M_range_check: __n (which is 10) &gt;= this-&gt;size() (which is 3)</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Quem lança</th><th>Quando</th><th>Exceção</th><th><code>what()</code> no g++</th></tr>
+<tr><td><code>std::stoi("quarenta")</code></td><td>O texto não começa com número</td><td><code>std::invalid_argument</code></td><td><code>stoi</code></td></tr>
+<tr><td><code>std::stoi("99999999999")</code></td><td>O número não cabe num <code>int</code></td><td><code>std::out_of_range</code></td><td><code>stoi</code></td></tr>
+<tr><td><code>v.at(10)</code></td><td>Posição que não existe (veja <a href="vector.html">std::vector</a>)</td><td><code>std::out_of_range</code></td><td><code>vector::_M_range_check: …</code></td></tr>
+<tr><td><code>std::filesystem::file_size</code></td><td>Arquivo inexistente (veja <a href="arquivos.html">Arquivos</a>)</td><td><code>filesystem_error</code></td><td><code>filesystem error: cannot get file size: …</code></td></tr>
+</table>
+</div>
+
+<p>As mensagens do <code>what()</code> da biblioteca são curtas e técnicas (o <code>stoi</code> só diz o próprio nome). Elas servem para o programador. Para o usuário, mostre uma mensagem sua, em português, como nos exemplos abaixo.</p>
+
+<h3>Qual lançar nas suas funções</h3>
+<ul>
+  <li><code>std::invalid_argument</code>: quem chamou passou um valor que a função não aceita (divisor zero, idade negativa).</li>
+  <li><code>std::out_of_range</code>: um número ou posição fora dos limites permitidos.</li>
+  <li><code>std::runtime_error</code>: algo deu errado "lá fora", e não por culpa de quem chamou (arquivo corrompido, servidor fora do ar). Na dúvida, é esta.</li>
+</ul>
+
+<hr>
+
+<h2>4. Pegar por <code>const&amp;</code></h2>
+<p>Em todo <code>catch</code> desta aula, a exceção é pega por <strong>referência constante</strong>: <code>catch (const std::exception&amp; e)</code>. Os motivos:</p>
+<ul>
+  <li><strong>&amp; (referência)</strong>: você recebe a exceção original, sem cópia, e com o tipo verdadeiro dela. Quem pega uma <code>std::exception</code> por referência e recebe uma <code>runtime_error</code> continua vendo a mensagem certa.</li>
+  <li><strong>const</strong>: tratar o erro não deve alterá-lo.</li>
+</ul>
+
+<p>Veja o que acontece ao pegar <strong>por valor</strong> (sem o <code>&amp;</code>):</p>
+<pre class="file" data-file="porvalor.cpp">#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+
+int main() {
+    try {
+        throw std::runtime_error("o servidor não respondeu");
+    } catch (std::exception e) {
+        std::cout &lt;&lt; e.what() &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra porvalor.cpp -o porvalor
+porvalor.cpp: In function ‘int main()’:
+porvalor.cpp:7:29: warning: catching polymorphic type ‘class std::exception’ by value [-Wcatch-value=]
+    7 |     } catch (std::exception e) {
+      |                             ^
+$ ./porvalor
+std::exception                « a mensagem "o servidor não respondeu" se perdeu!</pre>
+
+<p>O g++ avisou: <em>catching polymorphic type … by value</em> = "pegando um tipo polimórfico por valor". Ao copiar a <code>runtime_error</code> para uma variável do tipo <code>std::exception</code>, só a "parte mãe" foi copiada, e a mensagem ficou para trás. Esse corte tem nome: <strong>fatiamento</strong> (<em>slicing</em>; você vai entendê-lo em <a href="polimorfismo.html">Polimorfismo</a>). Com <code>const std::exception&amp; e</code>, o programa mostraria <code>o servidor não respondeu</code>.</p>
+
+<hr>
+
+<h2>5. Vários <code>catch</code></h2>
+<p>Um <code>try</code> pode ter vários <code>catch</code>, um para cada tipo de problema. O C++ testa de cima para baixo e usa o <strong>primeiro</strong> que servir:</p>
+
+<pre class="file" data-file="varios.cpp">#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+
+int ler_idade(const std::string&amp; texto) {
+    int idade = std::stoi(texto);
+    if (idade &lt; 0 || idade &gt; 130) {
+        throw std::out_of_range("idade fora da faixa: " + texto);
+    }
+    return idade;
+}
+
+int main() {
+    for (std::string texto : {"29", "abc", "200", "99999999999"}) {
+        try {
+            int idade = ler_idade(texto);
+            std::cout &lt;&lt; texto &lt;&lt; " -&gt; ok, " &lt;&lt; idade &lt;&lt; " anos\n";
+        } catch (const std::invalid_argument&amp; e) {
+            std::cout &lt;&lt; texto &lt;&lt; " -&gt; não é número (" &lt;&lt; e.what() &lt;&lt; ")\n";
+        } catch (const std::out_of_range&amp; e) {
+            std::cout &lt;&lt; texto &lt;&lt; " -&gt; fora da faixa (" &lt;&lt; e.what() &lt;&lt; ")\n";
+        }
+    }
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra varios.cpp -o varios
+$ ./varios
+29 -&gt; ok, 29 anos
+abc -&gt; não é número (stoi)
+200 -&gt; fora da faixa (idade fora da faixa: 200)
+99999999999 -&gt; fora da faixa (stoi)</pre>
+
+<p>Repare que o <code>out_of_range</code> veio de dois lugares: do <code>throw</code> da própria <code>ler_idade</code> (idade 200) e de dentro do <code>std::stoi</code> (número enorme). O <code>catch</code> não se importa com quem lançou, só com o tipo.</p>
+
+<h3>Pegar qualquer filha: <code>catch (const std::exception&amp; e)</code></h3>
+<p>Um <code>catch</code> da mãe pega todas as filhas. E <code>catch (...)</code>, com três pontos de verdade, pega <strong>qualquer coisa</strong>, até o que não é exceção da família (em C++ dá para lançar um <code>int</code>, embora você não deva):</p>
+
+<pre class="file" data-file="geral.cpp">#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+void tarefa(int n) {
+    std::vector&lt;int&gt; v = {1, 2, 3};
+    if (n == 1) std::stoi("x");
+    if (n == 2) std::cout &lt;&lt; v.at(5);
+    if (n == 3) throw std::runtime_error("o servidor não respondeu");
+    if (n == 4) throw 42;
+}
+
+int main() {
+    for (int n = 1; n &lt;= 4; ++n) {
+        try {
+            tarefa(n);
+        } catch (const std::exception&amp; e) {
+            std::cout &lt;&lt; n &lt;&lt; ": " &lt;&lt; e.what() &lt;&lt; '\n';
+        } catch (...) {
+            std::cout &lt;&lt; n &lt;&lt; ": erro desconhecido\n";
+        }
+    }
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra geral.cpp -o geral
+$ ./geral
+1: stoi
+2: vector::_M_range_check: __n (which is 5) &gt;= this-&gt;size() (which is 3)
+3: o servidor não respondeu
+4: erro desconhecido          « o throw 42 não é std::exception: caiu no catch (...)</pre>
+
+<p>No <code>catch (...)</code> não existe variável <code>e</code>: você não sabe o que foi lançado, então não há <code>what()</code>. Use-o como última rede de segurança, por exemplo no <code>main</code>, para mostrar uma mensagem amigável em vez de abortar.</p>
+
+<h3>A ordem importa: do mais específico para o mais geral</h3>
+<p>Como vale o primeiro <code>catch</code> que serve, a mãe antes da filha "rouba" tudo:</p>
+<pre class="file" data-file="ordem.cpp">#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+
+int main() {
+    try {
+        throw std::out_of_range("posição 10");
+    } catch (const std::exception&amp; e) {
+        std::cout &lt;&lt; "geral: " &lt;&lt; e.what() &lt;&lt; '\n';
+    } catch (const std::out_of_range&amp; e) {
+        std::cout &lt;&lt; "específico: " &lt;&lt; e.what() &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra ordem.cpp -o ordem
+ordem.cpp: In function ‘int main()’:
+ordem.cpp:9:7: warning: exception of type ‘std::out_of_range’ will be caught by earlier handler [-Wexceptions]
+    9 |     } catch (const std::out_of_range&amp; e) {
+      |       ^~~~~
+ordem.cpp:7:7: note: for type ‘std::exception’
+    7 |     } catch (const std::exception&amp; e) {
+      |       ^~~~~
+$ ./ordem
+geral: posição 10             « o catch específico nunca roda</pre>
+<p><em>will be caught by earlier handler</em> = "será pega por um tratador anterior". Ponha os <code>catch</code> das filhas primeiro e o da mãe (e o <code>...</code>) por último.</p>
+
+<hr>
+
+<h2>6. A sua própria exceção</h2>
+<p>Num programa de banco, "saldo insuficiente" é um erro tão importante que merece um tipo próprio: assim, quem chama pode tratá-lo de um jeito especial e deixar os outros erros para um <code>catch</code> geral. O jeito mais simples de criar uma exceção é fazer uma <strong>filha</strong> de <code>std::runtime_error</code>:</p>
+
+<pre class="file" data-file="saldo.cpp">#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+
+class SaldoInsuficiente : public std::runtime_error {
+public:
+    using std::runtime_error::runtime_error;
+};
+
+struct Conta {
+    std::string dono;
+    double saldo = 0.0;
+};
+
+void sacar(Conta&amp; c, double valor) {
+    if (valor &lt;= 0) {
+        throw std::invalid_argument("valor do saque deve ser positivo");
+    }
+    if (valor &gt; c.saldo) {
+        throw SaldoInsuficiente("saldo de " + c.dono + " não cobre o saque");
+    }
+    c.saldo -= valor;
+}
+
+int main() {
+    Conta ana{"Ana", 100.0};
+    for (double valor : {30.0, 500.0, -5.0, 70.0}) {
+        try {
+            sacar(ana, valor);
+            std::cout &lt;&lt; "Sacou " &lt;&lt; valor &lt;&lt; ", saldo " &lt;&lt; ana.saldo &lt;&lt; '\n';
+        } catch (const SaldoInsuficiente&amp; e) {
+            std::cout &lt;&lt; "Recusado: " &lt;&lt; e.what() &lt;&lt; '\n';
+        } catch (const std::exception&amp; e) {
+            std::cout &lt;&lt; "Erro: " &lt;&lt; e.what() &lt;&lt; '\n';
+        }
+    }
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra saldo.cpp -o saldo
+$ ./saldo
+Sacou 30, saldo 70
+Recusado: saldo de Ana não cobre o saque
+Erro: valor do saque deve ser positivo
+Sacou 70, saldo 0</pre>
+
+<dl class="anatomy">
+  <dt>class SaldoInsuficiente : public std::runtime_error</dt><dd>Cria uma classe nova que <strong>herda</strong> tudo de <code>std::runtime_error</code>: ela é uma <code>runtime_error</code>, e portanto também uma <code>std::exception</code>. Classes e herança são assunto do Nível 3 (<a href="classes-objetos.html">Classes e Objetos</a>, <a href="heranca.html">Herança</a>); por enquanto, copie este modelo.</dd>
+  <dt>public: using std::runtime_error::runtime_error;</dt><dd>"Use os construtores da mãe": é o que permite escrever <code>SaldoInsuficiente("mensagem")</code>, igual a <code>std::runtime_error("mensagem")</code>.</dd>
+  <dt>throw SaldoInsuficiente("saldo de " + c.dono + " não cobre o saque");</dt><dd>Lança como qualquer outra. A mensagem pode ser montada com <code>+</code>.</dd>
+  <dt>catch (const SaldoInsuficiente&amp; e)</dt><dd>Trata só o saldo insuficiente. Os outros erros (como o <code>invalid_argument</code> do valor negativo) caem no <code>catch</code> geral de baixo.</dd>
+</dl>
+
+<hr>
+
+<h2>Exceção ou <code>if</code>?</h2>
+<p>Exceções não substituem o <code>if</code>. Use cada um no seu lugar:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th><th>Por quê</th></tr>
+<tr><td>O problema é esperado e tratado ali mesmo (o usuário digitou uma opção inválida no menu)</td><td><code>if</code></td><td>Mais simples e mais rápido. Veja <a href="validar-entrada.html">Validar a Entrada</a>.</td></tr>
+<tr><td>A função não tem como cumprir o que prometeu, e quem sabe tratar está longe (<code>dividir</code>, <code>sacar</code>, <code>stoi</code>)</td><td><code>throw</code></td><td>A exceção leva o problema até quem sabe agir, e não pode ser ignorada sem querer.</td></tr>
+<tr><td>Um "não achei" comum (procurar um nome na agenda)</td><td>Valor de retorno (<code>bool</code>, <code>std::optional</code>)</td><td>Não é um erro, é uma resposta possível. Veja <a href="optional-variant.html">optional e variant</a>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"terminate called after throwing an instance of …" e código 134</strong>
+<p><strong>O que aconteceu:</strong> uma exceção foi lançada e nenhum <code>catch</code> a pegou. O tipo vem entre aspas (<code>'std::invalid_argument'</code>, <code>'std::out_of_range'</code>…) e a mensagem, depois de <code>what():</code>.</p>
+<p><strong>Como resolver:</strong> descubra quem lança (o <code>what()</code> costuma dizer: <code>stoi</code>, <code>vector::_M_range_check</code>) e coloque a chamada dentro de um <code>try</code> com o <code>catch</code> do tipo mostrado. Para achar a linha exata, use o <a href="depuracao-gdb.html">GDB</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>"catching polymorphic type … by value"</strong>
+<p><strong>O que aconteceu:</strong> o <code>catch</code> não tem <code>&amp;</code>. A exceção é copiada e pode perder a mensagem.</p>
+<p><strong>Como resolver:</strong> <code>catch (const std::exception&amp; e)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"exception of type … will be caught by earlier handler"</strong>
+<p><strong>O que aconteceu:</strong> um <code>catch</code> mais geral (a mãe) está antes de um mais específico (a filha), que nunca vai rodar.</p>
+<p><strong>Como resolver:</strong> inverta a ordem: filhas primeiro, mãe por último.</p>
+</div>
+
+<div class="cenario">
+<strong>"‘invalid_argument’ is not a member of ‘std’"</strong>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra seminclude2.cpp -o seminclude2
+seminclude2.cpp: In function ‘int main()’:
+seminclude2.cpp:2:16: error: ‘invalid_argument’ is not a member of ‘std’
+    2 |     throw std::invalid_argument("teste");
+      |                ^~~~~~~~~~~~~~~~
+seminclude2.cpp:1:1: note: ‘std::invalid_argument’ is defined in header ‘&lt;stdexcept&gt;’; this is probably fixable by adding ‘#include &lt;stdexcept&gt;’
+  +++ |+#include &lt;stdexcept&gt;
+    1 | int main() {</pre>
+<p><strong>O que aconteceu:</strong> faltou o <code>#include &lt;stdexcept&gt;</code>, e o g++ até diz qual (<em>is defined in header ‘&lt;stdexcept&gt;’</em>). Com <code>#include &lt;iostream&gt;</code> no arquivo, o mesmo código compila no g++ 15, porque o <code>&lt;iostream&gt;</code> traz o <code>&lt;stdexcept&gt;</code> "de carona". Não conte com isso: outro compilador, ou outra versão, pode não trazer.</p>
+<p><strong>Como resolver:</strong> inclua <code>&lt;stdexcept&gt;</code> sempre que usar as exceções padrão.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Significado</th></tr>
+<tr><td><code>throw std::runtime_error("msg");</code></td><td>Lança uma exceção; a função para ali.</td></tr>
+<tr><td><code>try { … }</code></td><td>Bloco vigiado.</td></tr>
+<tr><td><code>catch (const std::out_of_range&amp; e) { … }</code></td><td>Trata um tipo específico (e as filhas dele).</td></tr>
+<tr><td><code>catch (const std::exception&amp; e) { … }</code></td><td>Trata qualquer exceção padrão.</td></tr>
+<tr><td><code>catch (...) { … }</code></td><td>Trata qualquer coisa lançada (sem <code>e</code>).</td></tr>
+<tr><td><code>e.what()</code></td><td>A mensagem da exceção.</td></tr>
+<tr><td><code>class X : public std::runtime_error { public: using std::runtime_error::runtime_error; };</code></td><td>Uma exceção própria.</td></tr>
+<tr><td><code>#include &lt;stdexcept&gt;</code></td><td><code>runtime_error</code>, <code>invalid_argument</code>, <code>out_of_range</code>, <code>logic_error</code>…</td></tr>
+<tr><td>Código de saída 134</td><td>O programa foi abortado (por exemplo, exceção não tratada).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Lançar</h3>
+<p>Complete para lançar um "argumento inválido" com a mensagem <code>idade negativa</code>:</p>
+<div class="ex-code">if (idade &lt; 0) { <input data-answer="throw std::invalid_argument(&quot;idade negativa&quot;);" aria-label="lançamento"> }</div>
+</div>
+
+<div class="exercise">
+<h3>2. Pegar qualquer exceção padrão</h3>
+<p>Complete o <code>catch</code> que pega qualquer filha de <code>std::exception</code>, do jeito recomendado, com o nome <code>e</code>:</p>
+<div class="ex-code">catch (<input data-answer="const std::exception&amp; e|const std::exception &amp;e|const std::exception &amp; e|std::exception const&amp; e" aria-label="parâmetro do catch">) { std::cout &lt;&lt; e.what(); }</div>
+</div>
+
+<div class="exercise">
+<h3>3. A mensagem</h3>
+<p>Dentro do <code>catch</code>, qual chamada devolve a mensagem da exceção <code>e</code>?</p>
+<div class="ex-code"><input data-answer="e.what()" aria-label="chamada"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O que mostra este trecho? <code>try { std::cout &lt;&lt; "A"; throw std::runtime_error("x"); std::cout &lt;&lt; "B"; } catch (const std::exception&amp; e) { std::cout &lt;&lt; "C"; } std::cout &lt;&lt; "D";</code></p>
+<label><input type="radio" name="q4"> <code>ABCD</code></label>
+<label><input type="radio" name="q4"> <code>AC</code></label>
+<label><input type="radio" name="q4"> <code>ACD</code></label>
+<label><input type="radio" name="q4"> <code>ABD</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. O programa terminou com <code>terminate called after throwing an instance of 'std::out_of_range'</code> e código 134. O que aconteceu?</p>
+<label><input type="radio" name="q5"> Uma <code>std::out_of_range</code> foi lançada e nenhum <code>catch</code> a pegou.</label>
+<label><input type="radio" name="q5"> O compilador encontrou um erro de sintaxe.</label>
+<label><input type="radio" name="q5"> O programa acabou a memória.</label>
+<label><input type="radio" name="q5"> Um <code>catch</code> pegou a exceção e encerrou o programa de propósito.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">6. Em que ordem devem vir os <code>catch</code>?</p>
+<label><input type="radio" name="q6"> Primeiro <code>catch (...)</code>, depois <code>std::exception</code>, depois as filhas.</label>
+<label><input type="radio" name="q6"> Primeiro as filhas, depois <code>std::exception</code>, por último <code>catch (...)</code>.</label>
+<label><input type="radio" name="q6"> Tanto faz: o C++ escolhe o mais específico.</label>
+<label><input type="radio" name="q6"> Em ordem alfabética.</label>
+</div>
+
+<h3>Missão final: estoque insuficiente</h3>
+<div class="trycpp" data-goal="src:EstoqueInsuficiente\s*:\s*public\s+std::runtime_error,src:throw\s+EstoqueInsuficiente,out:restam 2,out:Não deu: só restam 2">
+<p class="try-task"><strong>Missão:</strong> a lojinha está vendendo cadernos que não tem (rode e veja o estoque ficar negativo). Crie a classe <code>EstoqueInsuficiente</code>, filha de <code>std::runtime_error</code>, e faça <code>vender</code> lançá-la com a mensagem <code>"só restam " + std::to_string(p.estoque)</code> quando a quantidade pedida passar do estoque. A segunda venda deve mostrar <code>Não deu: só restam 2</code>. Se quiser, troque o <code>catch</code> para pegar só a sua exceção.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+
+// crie aqui a classe EstoqueInsuficiente, filha de std::runtime_error
+
+struct Produto {
+    std::string nome;
+    int estoque = 0;
+};
+
+void vender(Produto&amp; p, int qtd) {
+    // se qtd for maior que p.estoque, lance EstoqueInsuficiente
+    p.estoque -= qtd;
+}
+
+int main() {
+    Produto caderno{"caderno", 5};
+    for (int qtd : {3, 10}) {
+        try {
+            vender(caderno, qtd);
+            std::cout &lt;&lt; "Vendidos " &lt;&lt; qtd &lt;&lt; ", restam " &lt;&lt; caderno.estoque &lt;&lt; '\n';
+        } catch (const std::exception&amp; e) {
+            std::cout &lt;&lt; "Não deu: " &lt;&lt; e.what() &lt;&lt; '\n';
+        }
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+
+class EstoqueInsuficiente : public std::runtime_error {
+public:
+    using std::runtime_error::runtime_error;
+};
+
+struct Produto {
+    std::string nome;
+    int estoque = 0;
+};
+
+void vender(Produto&amp; p, int qtd) {
+    if (qtd &gt; p.estoque) {
+        throw EstoqueInsuficiente("só restam " + std::to_string(p.estoque));
+    }
+    p.estoque -= qtd;
+}
+
+int main() {
+    Produto caderno{"caderno", 5};
+    for (int qtd : {3, 10}) {
+        try {
+            vender(caderno, qtd);
+            std::cout &lt;&lt; "Vendidos " &lt;&lt; qtd &lt;&lt; ", restam " &lt;&lt; caderno.estoque &lt;&lt; '\n';
+        } catch (const EstoqueInsuficiente&amp; e) {
+            std::cout &lt;&lt; "Não deu: " &lt;&lt; e.what() &lt;&lt; '\n';
+        }
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>throw</code> lança uma exceção: a função para e o erro "sobe" até um <code>try</code>.</li>
+  <li><code>try { … } catch (const Tipo&amp; e) { … }</code> trata o erro, e o programa continua depois do <code>catch</code>.</li>
+  <li>Sem <code>catch</code>: <code>terminate called after throwing an instance of …</code>, <code>what(): …</code>, "Abortado" e código 134.</li>
+  <li>Família padrão (<code>&lt;stdexcept&gt;</code>): <code>std::exception</code> é a mãe; use <code>invalid_argument</code>, <code>out_of_range</code> e <code>runtime_error</code>.</li>
+  <li>Pegue sempre por <code>const&amp;</code>; leia a mensagem com <code>e.what()</code>.</li>
+  <li>Vários <code>catch</code>: das filhas para a mãe; <code>catch (...)</code> por último.</li>
+  <li>Exceção própria: <code>class X : public std::runtime_error { public: using std::runtime_error::runtime_error; };</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
