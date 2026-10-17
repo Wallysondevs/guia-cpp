@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Acentos e UTF-8 — por que maçã tem 6 bytes | Guia C++</title>
+<meta name="description" content="Por que os acentos quebram strings em C++, para quem nunca programou: UTF-8 byte a byte, size conta bytes, s[2] pega meio caractere, toupper não converte ç e á, inverter uma palavra com acento vira lixo, como contar as letras de verdade, o terminal em UTF-8 e as bibliotecas como a ICU, com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Acentos e UTF-8</span></h1>
+
+<p class="intro">Nas últimas aulas, os acentos apareceram várias vezes como "o problema": <code>"maçã"</code> tem tamanho 6, <code>toupper</code> não transforma o <code>ç</code>, <code>"Olá, "</code> ocupa 7 caixinhas. Nesta aula você vai entender <strong>por quê</strong>, olhando os bytes de verdade, e vai aprender o que é seguro e o que é perigoso fazer com textos em português. Não é um defeito do C++: é o jeito como o computador guarda letras, e todo programador que trabalha com português precisa conhecê-lo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é <strong>UTF-8</strong> e por que <code>"ç"</code> ocupa 2 bytes (mostrando os bytes reais, em hexadecimal).</li>
+  <li>Por que <code>.size()</code> conta bytes e <code>s[2]</code> pode pegar <strong>meio</strong> caractere.</li>
+  <li>Por que <code>toupper</code> não converte <code>ç</code> e <code>á</code>, e por que inverter <code>"maçã"</code> vira lixo.</li>
+  <li>Como contar as letras de verdade, pulando os bytes de continuação.</li>
+  <li>O que fazer para o terminal mostrar os acentos (inclusive no Windows) e quais bibliotecas resolvem o problema por completo.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (com o sistema em <code>pt_BR.UTF-8</code>), na pasta <code>~/cpp</code>, com o comando padrão <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Quando a tela mostra um símbolo estranho, a aula também mostra os bytes exatos com <code>od</code>, para você ver o que o programa realmente escreveu.</p>
+
+<hr>
+
+<h2>A ideia: letras são números, e alguns números são grandes</h2>
+<p>O computador não guarda letras: guarda <strong>números</strong>. Existe uma tabela combinada que diz "o número 97 é a letra <code>a</code>, o 65 é o <code>A</code>". A primeira tabela famosa, a <strong>ASCII</strong> (dos anos 1960, americana), tem só 128 posições: letras sem acento, dígitos, pontuação. Cada uma cabe num <strong>byte</strong>, a "caixinha" de memória que um <code>char</code> ocupa (veja <a href="char.html">Caracteres</a>).</p>
+
+<p>Só que o mundo tem <code>ç</code>, <code>ã</code>, <code>€</code>, letras gregas, japonesas, emojis… Mais de cem mil caracteres. A tabela que dá um número a todos eles se chama <strong>Unicode</strong>. Um número tão grande não cabe num byte. O <strong>UTF-8</strong> é o jeito de guardar esses números usando de <strong>1 a 4 bytes</strong> por caractere:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Caracteres</th><th>Bytes em UTF-8</th><th>Exemplos</th></tr>
+<tr><td>Os 128 da ASCII</td><td>1</td><td><code>a</code>, <code>Z</code>, <code>7</code>, <code>!</code>, espaço</td></tr>
+<tr><td>Letras com acento das línguas europeias</td><td>2</td><td><code>ç</code>, <code>ã</code>, <code>é</code>, <code>Ó</code></td></tr>
+<tr><td>Outros símbolos e escritas</td><td>3</td><td><code>€</code>, <code>✓</code>, letras chinesas</td></tr>
+<tr><td>Emojis e caracteres raros</td><td>4</td><td>😀</td></tr>
+</table>
+</div>
+
+<p>Pense em peças de montar: a maioria das letras é uma peça só, mas o <code>ç</code> é feito de <strong>duas peças encaixadas</strong>. O <code>std::string</code> é um colar de <strong>peças</strong> (bytes), não de letras. Ele não sabe quais peças formam uma letra só. Daí vêm todas as surpresas desta aula.</p>
+
+<hr>
+
+<h2>1. Vendo os bytes de verdade</h2>
+<p>Vamos imprimir cada byte de <code>"maçã"</code> como número, em <strong>hexadecimal</strong> (base 16, com dígitos de <code>0</code> a <code>f</code>, o jeito tradicional de escrever bytes; cada byte vira exatamente dois dígitos):</p>
+
+<pre class="file" data-file="bytes.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string palavra = "maçã";
+    std::cout &lt;&lt; palavra &lt;&lt; " tem " &lt;&lt; palavra.size() &lt;&lt; " bytes:\n";
+    for (char c : palavra) {
+        unsigned char byte = static_cast&lt;unsigned char&gt;(c);
+        std::cout &lt;&lt; std::hex &lt;&lt; static_cast&lt;int&gt;(byte) &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra bytes.cpp -o bytes
+$ ./bytes
+maçã tem 6 bytes:
+6d 61 c3 a7 c3 a3 </pre>
+
+<dl class="anatomy">
+  <dt>for (char c : palavra)</dt><dd>Passa por cada <strong>byte</strong> da string (aula <a href="acessar-caracteres.html">Acessar Caracteres</a>). São 6 voltas, não 4.</dd>
+  <dt>static_cast&lt;unsigned char&gt;(c)</dt><dd>No g++ do Linux, o <code>char</code> tem sinal: os bytes acima de 127 aparecem como números <strong>negativos</strong> (o primeiro byte do <code>ç</code> sairia <code>-61</code>). Convertendo para <code>unsigned char</code>, ele aparece como o valor "de verdade" do byte, de 0 a 255 (veja <a href="conversao-tipos.html">Conversão de Tipos</a>).</dd>
+  <dt>static_cast&lt;int&gt;(byte)</dt><dd>Sem isso, o <code>std::cout</code> mostraria o byte como caractere. Como <code>int</code>, ele mostra o número.</dd>
+  <dt>std::hex</dt><dd>Mostra os números em hexadecimal a partir daqui (<code>std::dec</code> volta para decimal).</dd>
+</dl>
+
+<p>Lendo a saída: <code>6d</code> é o <code>m</code>, <code>61</code> é o <code>a</code> (os mesmos números da ASCII). Depois, <code>c3 a7</code> são as <strong>duas peças</strong> do <code>ç</code>, e <code>c3 a3</code> as duas peças do <code>ã</code>. Quatro letras, seis bytes. Veja mais caracteres:</p>
+
+<pre class="file" data-file="bytes2.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    for (std::string s : {"a", "ç", "ã", "€", "😀"}) {
+        std::cout &lt;&lt; s &lt;&lt; ": " &lt;&lt; s.size() &lt;&lt; " byte(s):";
+        for (char c : s) {
+            std::cout &lt;&lt; ' ' &lt;&lt; std::hex &lt;&lt; static_cast&lt;int&gt;(static_cast&lt;unsigned char&gt;(c));
+        }
+        std::cout &lt;&lt; std::dec &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra bytes2.cpp -o bytes2
+$ ./bytes2
+a: 1 byte(s): 61
+ç: 2 byte(s): c3 a7
+ã: 2 byte(s): c3 a3
+€: 3 byte(s): e2 82 ac
+😀: 4 byte(s): f0 9f 98 80</pre>
+
+<p>Repare num padrão que vai ser útil na seção 5: o <strong>primeiro</strong> byte de um caractere de várias peças começa com <code>c</code>, <code>e</code> ou <code>f</code>; os bytes <strong>seguintes</strong> (as "peças de continuação") ficam sempre entre <code>80</code> e <code>bf</code>.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> troque <code>"maçã"</code> pelo seu nome, pelo nome da sua cidade ou por <code>"Ação!"</code> e veja quantos bytes cada um tem. Quais letras ocupam dois bytes?</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string palavra = "maçã";
+    std::cout &lt;&lt; palavra &lt;&lt; " tem " &lt;&lt; palavra.size() &lt;&lt; " bytes:\n";
+    for (char c : palavra) {
+        unsigned char byte = static_cast&lt;unsigned char&gt;(c);
+        std::cout &lt;&lt; std::hex &lt;&lt; static_cast&lt;int&gt;(byte) &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. <code>.size()</code> conta bytes, e os índices também</h2>
+<p>Agora o "problema" da aula <a href="strings.html">Strings</a> fica claro: <code>.size()</code> devolve quantas <strong>peças</strong> há no colar, e não quantas letras uma pessoa contaria. O mesmo vale para os índices: <code>s[2]</code> é a <strong>terceira peça</strong>, não a terceira letra. Em <code>"maçã"</code>, a terceira peça é a <strong>primeira metade</strong> do <code>ç</code>:</p>
+
+<pre class="file" data-file="meio.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string palavra = "maçã";
+    std::cout &lt;&lt; "[" &lt;&lt; palavra[0] &lt;&lt; "]\n";
+    std::cout &lt;&lt; "[" &lt;&lt; palavra[2] &lt;&lt; "]\n";
+    std::cout &lt;&lt; "[" &lt;&lt; palavra[2] &lt;&lt; palavra[3] &lt;&lt; "]\n";
+    std::cout &lt;&lt; "[" &lt;&lt; palavra.substr(0, 3) &lt;&lt; "]\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra meio.cpp -o meio
+$ ./meio
+[m]
+[�]                « meio ç: o terminal não sabe desenhar
+[ç]                « as duas metades juntas formam o ç
+[ma�]              « substr(0, 3) cortou o ç ao meio
+$ ./meio | od -c
+0000000   [   m   ]  \n   [ 303   ]  \n   [ 303 247   ]  \n   [   m   a
+0000020 303   ]  \n
+0000023</pre>
+
+<p>O <code>�</code> (um losango com interrogação) é o que o terminal desenha quando recebe um pedaço de caractere que não forma nada: o "caractere de substituição". O <code>od -c</code> mostra o que o programa escreveu de fato: o byte <code>303</code> (em octal; é o <code>c3</code> em hexadecimal) sozinho. Junto com o <code>247</code> (<code>a7</code>), vira <code>ç</code>.</p>
+
+<p>O <code>substr(0, 3)</code> é o caso mais traiçoeiro: "os 3 primeiros caracteres" de <code>maçã</code> deveria ser <code>maç</code>, mas são 3 <strong>bytes</strong>, e o <code>ç</code> ficou partido. Truncar nomes para caber numa etiqueta, "os 10 primeiros caracteres do produto", é um lugar clássico desse erro.</p>
+
+<hr>
+
+<h2>3. <code>toupper</code> não converte <code>ç</code> e <code>á</code></h2>
+<p>A receita de maiúsculas da aula <a href="funcoes-string.html">Funções de String</a> trabalha <strong>byte a byte</strong>. Com acentos:</p>
+
+<pre class="file" data-file="upper.cpp">#include &lt;cctype&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string palavra = "maçã é ótima";
+    for (char&amp; c : palavra) {
+        c = std::toupper(static_cast&lt;unsigned char&gt;(c));
+    }
+    std::cout &lt;&lt; palavra &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra upper.cpp -o upper
+$ ./upper
+MAçã é óTIMA
+$ ./upper | od -c
+0000000   M   A 303 247 303 243     303 251     303 263   T   I   M   A
+0000020  \n
+0000021</pre>
+
+<p>As letras sem acento viraram maiúsculas; <code>ç</code>, <code>ã</code>, <code>é</code> e <code>ó</code> ficaram como estavam. O <code>toupper</code> recebe <strong>um byte</strong> de cada vez. Ele vê <code>c3</code>, depois <code>a7</code>, e nenhum dos dois, sozinho, é uma letra que ele conheça. Para virar <code>Ç</code>, seria preciso trocar o <strong>par</strong> <code>c3 a7</code> pelo par <code>c3 87</code>, e o <code>toupper</code> não enxerga pares.</p>
+
+<div class="note">
+<strong>Ainda bem que ele não mexeu</strong>
+<p>Repare que o resultado continua sendo UTF-8 válido: os acentos só não mudaram. É por causa do <code>static_cast&lt;unsigned char&gt;</code> e do locale "C" (o padrão de todo programa): nessa configuração, o <code>toupper</code> só mexe nas letras de <code>a</code> a <code>z</code>. Sem o <code>static_cast</code>, os bytes negativos dariam comportamento indefinido.</p>
+</div>
+
+<hr>
+
+<h2>4. Inverter uma palavra com acento vira lixo</h2>
+
+<pre class="file" data-file="inverter.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string palavra = "maçã";
+    std::reverse(palavra.begin(), palavra.end());
+    std::cout &lt;&lt; palavra &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra inverter.cpp -o inverter
+$ ./inverter
+�ç�am
+$ ./inverter | od -An -tx1
+ a3 c3 a7 c3 61 6d 0a</pre>
+
+<p>O <code>std::reverse</code> inverteu as <strong>peças</strong>: <code>6d 61 c3 a7 c3 a3</code> virou <code>a3 c3 a7 c3 61 6d</code>. Leia da esquerda para a direita, como o terminal leu:</p>
+<ol class="passo">
+  <li><code>a3</code>: uma peça de continuação sem começo. Lixo: <code>�</code>.</li>
+  <li><code>c3 a7</code>: por coincidência, as peças do <code>ç</code> ficaram na ordem certa! <code>ç</code>.</li>
+  <li><code>c3</code> seguido de <code>61</code>: um começo de caractere cuja continuação não veio. <code>�</code>.</li>
+  <li><code>61 6d</code>: <code>a</code> e <code>m</code>.</li>
+</ol>
+<p>O resultado, <code>�ç�am</code>, deveria ser <code>ãçam</code>. Com outras palavras, o lixo muda, mas a causa é sempre a mesma: algoritmos que trabalham peça por peça desmontam as letras de várias peças.</p>
+
+<hr>
+
+<h2>5. Contar as letras de verdade</h2>
+<p>Lembra do padrão da seção 1? No UTF-8, toda peça de <strong>continuação</strong> tem a forma <code>10xxxxxx</code> em binário: os dois primeiros bits são <code>1</code> e <code>0</code> (por isso elas ficam entre <code>80</code> e <code>bf</code> em hexadecimal). Então, para contar letras, basta contar os bytes que <strong>não</strong> são continuação:</p>
+
+<pre class="file" data-file="contar.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string palavra = "maçã";
+    int letras = 0;
+    for (char c : palavra) {
+        if ((static_cast&lt;unsigned char&gt;(c) &amp; 0xC0) != 0x80) {
+            letras++;
+        }
+    }
+    std::cout &lt;&lt; palavra &lt;&lt; ": " &lt;&lt; palavra.size() &lt;&lt; " bytes, " &lt;&lt; letras &lt;&lt; " letras\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra contar.cpp -o contar
+$ ./contar
+maçã: 6 bytes, 4 letras</pre>
+
+<dl class="anatomy">
+  <dt>0xC0</dt><dd>Um número escrito em hexadecimal (o <code>0x</code> na frente avisa). <code>C0</code> é <code>11000000</code> em binário: dois bits <code>1</code> e seis <code>0</code>.</dd>
+  <dt>byte &amp; 0xC0</dt><dd>O <code>&amp;</code> sozinho é o "E bit a bit": ele compara os dois números bit por bit e só mantém os bits que são 1 nos dois. Com <code>C0</code>, funciona como uma <strong>máscara</strong> que esconde os 6 bits da direita e deixa só os 2 primeiros do byte. (Não confunda com o <code>&amp;&amp;</code> da aula <a href="operadores-logicos.html">Operadores Lógicos</a>.)</dd>
+  <dt>!= 0x80</dt><dd><code>80</code> é <code>10000000</code>: os 2 primeiros bits são <code>10</code>, a marca da continuação. Se o resultado da máscara é diferente disso, o byte <strong>começa</strong> um caractere, e conta como uma letra.</dd>
+</dl>
+
+<p>Veja a máscara em ação nos três tipos de byte de <code>maçã</code>: o <code>c3</code> (começo do <code>ç</code>), o <code>a7</code> (continuação) e o <code>61</code> (o <code>a</code>):</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat mascara.cpp
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    int c1 = 0xC3, c2 = 0xA7, c3 = 0x61;
+    std::cout &lt;&lt; (c1 &amp; 0xC0) &lt;&lt; ' ' &lt;&lt; (c2 &amp; 0xC0) &lt;&lt; ' ' &lt;&lt; (c3 &amp; 0xC0) &lt;&lt; '\n';
+    std::cout &lt;&lt; std::hex &lt;&lt; (c1 &amp; 0xC0) &lt;&lt; ' ' &lt;&lt; (c2 &amp; 0xC0) &lt;&lt; ' ' &lt;&lt; (c3 &amp; 0xC0) &lt;&lt; '\n';
+}
+$ g++ -std=c++23 -Wall -Wextra mascara.cpp -o mascara
+$ ./mascara
+192 128 64
+c0 80 40           « só o a7 (continuação) dá 80</pre>
+
+<div class="warning">
+<strong>"Letra" ainda é uma simplificação</strong>
+<p>Esse laço conta <strong>caracteres Unicode</strong> (os "pontos de código"), e isso resolve o português do dia a dia. Mas existem casos em que o que uma pessoa vê como <strong>uma</strong> letra é formado por <strong>dois</strong> caracteres Unicode: um <code>e</code> seguido de um "acento solto" que se encaixa nele, ou emojis compostos (uma família, uma bandeira). Para esses, só uma biblioteca especializada conta certo (seção 7).</p>
+</div>
+
+<hr>
+
+<h2>6. O terminal também precisa falar UTF-8</h2>
+<p>O programa só escreve bytes. Quem transforma <code>c3 a7</code> no desenho do <code>ç</code> é o <strong>terminal</strong>. Para os acentos aparecerem certos, três coisas precisam "falar" UTF-8:</p>
+
+<ol class="passo">
+  <li><strong>O arquivo <code>.cpp</code></strong>: o editor precisa salvá-lo em UTF-8. Todos os editores modernos fazem isso por padrão (veja <a href="editores.html">Editores e IDEs</a>).</li>
+  <li><strong>O compilador</strong>: o g++ e o Clang leem e gravam os textos em UTF-8 por padrão. O compilador da Microsoft (MSVC) precisa da opção <code>/utf-8</code>.</li>
+  <li><strong>O terminal</strong>: no Linux e no macOS, já é UTF-8. No Windows, o terminal antigo (o <code>cmd</code>) usa outra tabela (no Brasil, a "página de código 850"), e o mesmo programa mostra <code>ma├º├ú</code> no lugar de <code>maçã</code>: cada peça é desenhada como uma letra separada. (Esse texto foi obtido decodificando os 6 bytes de <code>maçã</code> com a tabela 850; não é uma captura de tela do Windows.)</li>
+</ol>
+
+<p>No Windows, o comando <code>chcp 65001</code> ("<em>change code page</em>", trocar a tabela de caracteres) muda o terminal para UTF-8 (65001 é o número que o Windows dá ao UTF-8). A sessão abaixo é <strong>ilustrativa</strong>: ela não pôde ser conferida no laboratório, que é um Linux.</p>
+
+<pre class="term">C:\Users\ana\cpp&gt; chcp 65001
+Página de código ativa: 65001       « ilustrativo: mensagem do Windows em português
+C:\Users\ana\cpp&gt; maca.exe          « o programa maca.cpp da aula Strings
+maca: 4
+maçã: 6</pre>
+
+<p>O Windows Terminal (o novo, que vem no Windows 11) já costuma vir em UTF-8. A instalação no Windows é explicada em <a href="instalar-windows-mac.html">Instalar no Windows e macOS</a>.</p>
+
+<hr>
+
+<h2>7. A solução completa: bibliotecas</h2>
+<p>A biblioteca padrão do C++ ainda não tem ferramentas completas para texto Unicode: maiúsculas de qualquer língua, contagem de "letras visíveis", ordem alfabética correta com acentos. Quando o seu programa precisa disso para valer, use uma biblioteca especializada:</p>
+<ul>
+  <li><strong>ICU</strong> (<em>International Components for Unicode</em>): a referência mundial, usada por navegadores e sistemas operacionais. Faz maiúsculas e minúsculas em qualquer língua, conta letras visíveis, ordena alfabeticamente conforme o idioma, formata datas e números. A aula <a href="bibliotecas.html">Usar Bibliotecas Externas</a> mostra como instalar e usar bibliotecas.</li>
+</ul>
+<p>Para a maioria dos programas de quem está aprendendo, as regras da próxima seção bastam.</p>
+
+<hr>
+
+<h2>A regra prática para texto em português</h2>
+<p>Cuidado com <strong>tamanho</strong>, <strong>índices</strong> e <strong>maiúsculas</strong>. Todo o resto funciona.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Funciona normalmente com acentos</th><th>Cuidado com acentos</th></tr>
+<tr><td>Guardar, mostrar, ler com <code>getline</code></td><td><code>.size()</code> como "número de letras": conta bytes</td></tr>
+<tr><td>Juntar com <code>+</code> e <code>+=</code></td><td><code>s[i]</code> e <code>.at(i)</code> com índice fixo: podem pegar meio caractere</td></tr>
+<tr><td>Comparar com <code>==</code></td><td><code>substr(0, n)</code> com <code>n</code> fixo: pode cortar uma letra ao meio</td></tr>
+<tr><td><code>find</code>, <code>replace</code>, <code>contains</code>, <code>starts_with</code> com textos inteiros (<code>find("reação")</code> acha certo)</td><td><code>toupper</code>/<code>tolower</code>: ignoram as letras acentuadas</td></tr>
+<tr><td><code>substr</code> com posições vindas do <code>find</code></td><td><code>std::reverse</code> e outros algoritmos byte a byte: desmontam as letras</td></tr>
+<tr><td>Laços que só copiam ou procuram bytes ASCII (<code>' '</code>, <code>','</code>)</td><td>Ordem com <code>&lt;</code>: <code>"água" &lt; "zebra"</code> dá <code>false</code>, porque o <code>c3</code> do <code>á</code> vem depois de todas as letras sem acento</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Aparece <code>�</code> no meio do texto</strong>
+<p><strong>O que significa:</strong> o programa escreveu um pedaço de caractere: um índice (<code>s[i]</code>) ou um <code>substr</code> com tamanho fixo cortou uma letra acentuada ao meio, ou um <code>std::reverse</code> desmontou as peças.</p>
+<p><strong>Como consertar:</strong> não corte textos com acento em posições fixas; use posições vindas do <code>find</code>, ou ande pelo texto pulando os bytes de continuação (seção 5).</p>
+</div>
+
+<div class="cenario">
+<strong>Aparece <code>maÃ§Ã£</code> ou <code>ma├º├ú</code> no lugar de <code>maçã</code></strong>
+<p><strong>O que significa:</strong> os bytes estão certos, mas o terminal (ou o programa que abriu o arquivo) não está em UTF-8, e desenha cada peça como uma letra separada. <code>ma├º├ú</code> é o que a tabela 850 do <code>cmd</code> brasileiro faz com esses bytes; <code>maÃ§Ã£</code> é o que a tabela "Latin-1", usada por planilhas que abrem arquivos CSV, faz.</p>
+<p><strong>Como consertar:</strong> ponha o terminal em UTF-8 (<code>chcp 65001</code> no Windows) ou escolha "UTF-8" ao abrir o arquivo.</p>
+</div>
+
+<div class="cenario">
+<strong>O tamanho não bate com o que você contou</strong>
+<p><strong>O que significa:</strong> <code>.size()</code> conta bytes. Cada letra acentuada soma 2.</p>
+<p><strong>Como consertar:</strong> se você precisa do número de letras (para validar "nome com no máximo 20 letras", por exemplo), use o laço da seção 5.</p>
+</div>
+
+<div class="cenario">
+<strong>As maiúsculas ficaram pela metade: <code>MAçã</code></strong>
+<p><strong>O que significa:</strong> <code>std::toupper</code> trabalha byte a byte e não conhece letras de dois bytes.</p>
+<p><strong>Como consertar:</strong> para poucos casos, troque os pares à mão com <code>find</code>/<code>replace</code> (<code>"ç"</code> → <code>"Ç"</code>); para valer, use a ICU.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita / conceito</th><th>O que é</th></tr>
+<tr><td>UTF-8</td><td>Formato que guarda cada caractere Unicode em 1 a 4 bytes. ASCII = 1 byte; acentos do português = 2.</td></tr>
+<tr><td><code>s.size()</code></td><td>Número de <strong>bytes</strong></td></tr>
+<tr><td><code>static_cast&lt;unsigned char&gt;(c)</code></td><td>O byte como número de 0 a 255 (sem isso, os bytes de acento são negativos)</td></tr>
+<tr><td><code>std::cout &lt;&lt; std::hex &lt;&lt; static_cast&lt;int&gt;(byte)</code></td><td>Mostra o byte em hexadecimal</td></tr>
+<tr><td><code>(byte &amp; 0xC0) != 0x80</code></td><td>Verdadeiro se o byte <strong>começa</strong> um caractere (não é continuação)</td></tr>
+<tr><td><code>od -c</code>, <code>od -An -tx1</code></td><td>No terminal: mostra os bytes exatos que um programa escreveu</td></tr>
+<tr><td><code>chcp 65001</code></td><td>Windows: põe o terminal em UTF-8</td></tr>
+<tr><td>ICU</td><td>Biblioteca para Unicode completo</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Quantos bytes?</h3>
+<p>Quanto vale <code>std::string("pé").size()</code>?</p>
+<div class="ex-code"><input data-answer="3" aria-label="tamanho"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Continuação</h3>
+<p>Complete a condição que é verdadeira quando o byte <code>b</code> (um <code>unsigned char</code>) <strong>começa</strong> um caractere:</p>
+<div class="ex-code">if ((b &amp; 0xC0) != <input data-answer="0x80|0X80|128" aria-label="valor">)</div>
+</div>
+
+<div class="exercise">
+<h3>3. O byte sem sinal</h3>
+<p>Complete a conversão que transforma o <code>char c</code> num número de 0 a 255:</p>
+<div class="ex-code">static_cast&lt;<input data-answer="unsigned char" aria-label="tipo">&gt;(c)</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Com <code>std::string s = "ação";</code>, o que <code>s[1]</code> contém?</p>
+<label><input type="radio" name="q4"> A letra <code>ç</code></label>
+<label><input type="radio" name="q4"> Só a primeira das duas peças do <code>ç</code></label>
+<label><input type="radio" name="q4"> A letra <code>a</code></label>
+<label><input type="radio" name="q4"> Dá erro de compilação</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. O que a receita com <code>std::toupper</code> faz com <code>"pão"</code>?</p>
+<label><input type="radio" name="q5"> <code>PÃO</code></label>
+<label><input type="radio" name="q5"> Erro de compilação</label>
+<label><input type="radio" name="q5"> <code>pão</code>, sem mudar nada</label>
+<label><input type="radio" name="q5"> <code>PãO</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Qual destas operações é segura com textos acentuados?</p>
+<label><input type="radio" name="q6"> <code>frase.find("reação")</code></label>
+<label><input type="radio" name="q6"> <code>nome.substr(0, 10)</code> para "as 10 primeiras letras"</label>
+<label><input type="radio" name="q6"> <code>std::reverse</code> para inverter a palavra</label>
+<label><input type="radio" name="q6"> <code>nome.size()</code> para "quantas letras tem o nome"</label>
+</div>
+
+<h3>Missão final: contar letras de verdade</h3>
+
+<div class="trycpp" data-goal="out:João: 5 bytes\, 4 letras,out:coração: 9 bytes\, 7 letras,out:pão: 4 bytes\, 3 letras,src:0x[cC]0">
+<p class="try-task"><strong>Missão:</strong> para cada palavra, o programa já mostra os bytes, mas as letras estão sempre 0. Escreva o laço que conta as letras de verdade, pulando os bytes de continuação com <code>&amp; 0xC0</code>, para a saída ficar:</p>
+<pre class="out">João: 5 bytes, 4 letras
+coração: 9 bytes, 7 letras
+pão: 4 bytes, 3 letras</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    for (std::string p : {"João", "coração", "pão"}) {
+        int letras = 0;
+        // conte as letras de p aqui
+
+        std::cout &lt;&lt; p &lt;&lt; ": " &lt;&lt; p.size() &lt;&lt; " bytes, " &lt;&lt; letras &lt;&lt; " letras\n";
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    for (std::string p : {"João", "coração", "pão"}) {
+        int letras = 0;
+        for (char c : p) {
+            if ((static_cast&lt;unsigned char&gt;(c) &amp; 0xC0) != 0x80) {
+                letras++;
+            }
+        }
+        std::cout &lt;&lt; p &lt;&lt; ": " &lt;&lt; p.size() &lt;&lt; " bytes, " &lt;&lt; letras &lt;&lt; " letras\n";
+    }
+}
+</pre>
+</div>
+
+<p>(O <code>for (std::string p : {"João", "coração", "pão"})</code> repete o bloco uma vez para cada palavra da lista entre chaves; veja <a href="for-range.html">for de Intervalo</a>.)</p>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>O computador guarda números. <strong>Unicode</strong> dá um número a cada caractere; <strong>UTF-8</strong> guarda cada um em 1 a 4 bytes. Letras sem acento: 1 byte. <code>ç</code>, <code>ã</code>, <code>é</code>: 2 bytes (<code>c3 a7</code>, <code>c3 a3</code>…).</li>
+  <li>O <code>std::string</code> é um colar de <strong>bytes</strong>: <code>.size()</code> conta bytes, <code>s[i]</code> pega um byte, e com acento isso pode ser meio caractere (<code>�</code> na tela).</li>
+  <li><code>toupper</code> ignora as letras acentuadas (<code>MAçã</code>); <code>std::reverse</code> desmonta as letras de várias peças (<code>�ç�am</code>).</li>
+  <li>Para contar letras: conte os bytes em que <code>(byte &amp; 0xC0) != 0x80</code>.</li>
+  <li>O terminal precisa estar em UTF-8 (no Windows, <code>chcp 65001</code>). Para Unicode completo, use a ICU.</li>
+  <li>Regra para português: <strong>cuidado com tamanho, índices e maiúsculas</strong>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
