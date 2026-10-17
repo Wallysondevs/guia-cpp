@@ -260,10 +260,10 @@ Soma: 42</pre>
 
 <div class="note">
 <strong>No editor do guia, a entrada já vem pronta</strong>
-<p>Nas caixas com entrada pronta, o editor entrega a linha inteira (<code>10 25 7 0</code>) ao <code>std::cin</code> de uma vez, como se alguém tivesse digitado tudo antes da primeira pergunta. A linha aparece depois da primeira pergunta, e as perguntas seguintes saem grudadas umas nas outras, porque o <code>std::cin</code> já tem os próximos números e não precisa esperar. No terminal de verdade, como acima, cada número aparece depois da sua pergunta porque é você quem o digita.</p>
+<p>Nas caixas com entrada pronta, cada número está numa linha própria, como se alguém digitasse um número e apertasse Enter de cada vez: o editor mostra cada linha logo depois da pergunta que a leu, igual ao terminal acima. (Se a entrada fosse uma linha só, <code>10 25 7 0</code>, o <code>std::cin</code> já teria os próximos números guardados e as perguntas seguintes sairiam grudadas, sem esperar — no terminal de verdade também.)</p>
 </div>
 
-<div class="trycpp" data-stdin="10 25 7 0" data-goal="out:Você digitou 3 números.,out:Soma: 42">
+<div class="trycpp" data-stdin="10&#10;25&#10;7&#10;0" data-goal="out:Você digitou 3 números.,out:Soma: 42">
 <p class="try-task"><strong>Missão:</strong> a entrada já traz <code>10 25 7 0</code>. Crie uma segunda variável, <code>quantos</code>, que <strong>conta</strong> quantos números foram somados (sem contar o 0), e mostre no fim <code>Você digitou 3 números.</code> antes da soma.</p>
 <pre class="script">#include &lt;iostream&gt;
 

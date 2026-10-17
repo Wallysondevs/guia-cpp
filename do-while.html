@@ -188,7 +188,7 @@ Nota registrada: 8</pre>
 <p>Este programa só se protege de números fora do intervalo. Se a entrada não for um número, o <code>std::cin</code> entra em estado de falha e é preciso "limpá-lo". Isso tem aula própria: <a href="validar-entrada.html">Validar a Entrada</a>.</p>
 </div>
 
-<div class="trycpp" data-stdin="15 -2 8" data-goal="out:Nota registrada: 8,src:do\s*\{">
+<div class="trycpp" data-stdin="15&#10;-2&#10;8" data-goal="out:Nota registrada: 8,src:do\s*\{">
 <p class="try-task"><strong>Missão:</strong> este programa aceita qualquer nota: com a entrada <code>15 -2 8</code>, ele registra o 15. Coloque a pergunta e o <code>std::cin</code> dentro de um <code>do { … } while ( … );</code> para repetir enquanto a nota for menor que 0 ou maior que 10. O resultado deve ser <code>Nota registrada: 8</code>.</p>
 <pre class="script">#include &lt;iostream&gt;
 
@@ -323,7 +323,7 @@ Até logo!</pre>
   <li>O <code>\n</code> no começo do título deixa uma linha em branco entre um menu e outro, para facilitar a leitura.</li>
 </ul>
 
-<div class="trycpp" data-stdin="1 1 1 2 0">
+<div class="trycpp" data-stdin="1&#10;1&#10;1&#10;2&#10;0">
 <p class="try-task"><strong>Experimente:</strong> a entrada já vem pronta: <code>1 1 1 2 0</code> (três itens, ver o carrinho, sair). Acrescente uma opção <code>3 - Esvaziar o carrinho</code>, que faz <code>itens = 0;</code>, e mude a entrada para testá-la.</p>
 <pre class="script">#include &lt;iostream&gt;
 
@@ -526,7 +526,7 @@ escopo.cpp:8:14: error: ‘opcao’ was not declared in this scope
 </div>
 
 <h3>Missão final: o jogo de adivinhação</h3>
-<div class="trycpp" data-stdin="3 9 7" data-goal="out:Acertou em 3 tentativas!,src:do\s*\{">
+<div class="trycpp" data-stdin="3&#10;9&#10;7" data-goal="out:Acertou em 3 tentativas!,src:do\s*\{">
 <p class="try-task"><strong>Missão:</strong> o número secreto é <code>7</code>. Com um <code>do-while</code>, peça um palpite, conte a tentativa e diga <code>É maior!</code> ou <code>É menor!</code>, repetindo enquanto o palpite for diferente do secreto. No fim, mostre <code>Acertou em N tentativas!</code>. A entrada já traz os palpites <code>3 9 7</code>, então a resposta deve ser <code>Acertou em 3 tentativas!</code>.</p>
 <pre class="script">#include &lt;iostream&gt;
 
