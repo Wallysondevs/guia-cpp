@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Como Funciona — do código ao programa executável | Guia C++</title>
+<meta name="description" content="Como um arquivo .cpp vira um programa: pré-processador, compilador, montador e ligador, cada etapa mostrada de verdade com g++ -E, -S e -c, o arquivo objeto .o, o executável, file e ls -l. Compilado × interpretado, por que o executável roda sem o g++ e por que é preciso recompilar a cada mudança.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Como Funciona</span></h1>
+
+<p class="intro">Você escreve um texto num arquivo <code>ola.cpp</code>, digita um comando, e aparece um programa que roda. O que acontece no meio? Nesta aula você vai abrir a "caixa-preta" do compilador e ver, de verdade, as quatro etapas que transformam o seu texto num programa executável. Você vai olhar o arquivo de cada etapa, entender por que um programa C++ roda sem precisar do compilador, e por que toda mudança no código pede uma nova compilação.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O caminho completo: <strong>pré-processador → compilador → montador → ligador</strong>.</li>
+  <li>Como parar o <code>g++</code> no meio do caminho para ver cada etapa: <code>-E</code>, <code>-S</code> e <code>-c</code>.</li>
+  <li>O que são o arquivo <code>.ii</code>, o <code>.s</code> (assembly), o <code>.o</code> (objeto) e o executável.</li>
+  <li>A diferença prática entre linguagem <strong>compilada</strong> e <strong>interpretada</strong>.</li>
+  <li>Por que o programa pronto roda sem o <code>g++</code>, e por que é preciso compilar de novo depois de cada mudança.</li>
+  <li>Como reconhecer de qual etapa veio uma mensagem de erro.</li>
+</ul>
+</div>
+
+<p>Os comandos desta aula foram executados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o <strong>g++ 15.2</strong>. Não se preocupe em decorar as opções <code>-E</code>, <code>-S</code> e <code>-c</code>: no dia a dia você vai usar um único comando, que faz as quatro etapas de uma vez. Aqui elas servem para você <strong>enxergar</strong> o caminho.</p>
+
+<hr>
+
+<h2>A ideia: publicar um livro traduzido</h2>
+<p>Imagine que a Ana escreveu um livro em português e quer vendê-lo num país que só lê japonês. O livro passa por quatro pessoas, uma depois da outra:</p>
+
+<ol class="passo">
+  <li><strong>A organizadora</strong> junta tudo num manuscrito só. Onde a Ana escreveu "inserir aqui o capítulo de receitas", ela cola o capítulo inteiro. Ela não traduz nada: só junta.</li>
+  <li><strong>O tradutor</strong> lê o manuscrito completo, confere se as frases fazem sentido (se não fizerem, devolve com um bilhete apontando a linha) e escreve a versão em japonês.</li>
+  <li><strong>A gráfica</strong> transforma o texto traduzido em páginas impressas, prontas, mas ainda soltas. Onde o livro diz "veja o mapa no apêndice", fica um espaço em branco: o mapa vem de outro lugar.</li>
+  <li><strong>O encadernador</strong> junta as páginas da Ana com as partes que vêm de fora (o mapa, o índice padrão da editora), preenche os espaços e entrega <strong>o livro pronto</strong>.</li>
+</ol>
+
+<p>Compilar um programa C++ é exatamente isso. Cada pessoa é uma ferramenta, e cada uma produz um arquivo:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Etapa</th><th>Ferramenta</th><th>Recebe</th><th>Produz</th><th>Para parar aqui</th></tr>
+<tr><td>1. Juntar</td><td><strong>Pré-processador</strong></td><td><code>ola.cpp</code> (o seu código)</td><td><code>ola.ii</code>: o código com os <code>#include</code> já colados</td><td><code>g++ -E</code></td></tr>
+<tr><td>2. Traduzir</td><td><strong>Compilador</strong> (propriamente dito)</td><td>o código pré-processado</td><td><code>ola.s</code>: <strong>assembly</strong>, as instruções do processador escritas em texto</td><td><code>g++ -S</code></td></tr>
+<tr><td>3. Montar</td><td><strong>Montador</strong> (<em>assembler</em>)</td><td><code>ola.s</code></td><td><code>ola.o</code>: <strong>arquivo objeto</strong>, código de máquina com "espaços em branco"</td><td><code>g++ -c</code></td></tr>
+<tr><td>4. Ligar</td><td><strong>Ligador</strong> (<em>linker</em>)</td><td><code>ola.o</code> + a biblioteca padrão do C++</td><td><code>ola</code>: o <strong>executável</strong>, pronto para rodar</td><td>(é o final)</td></tr>
+</table>
+</div>
+
+<p>O <code>g++</code> é, na verdade, um "gerente": ele chama uma ferramenta de cada vez e passa o resultado de uma para a outra. Quando você digita <code>g++ ola.cpp -o ola</code>, as quatro etapas acontecem em sequência, e os arquivos intermediários são criados numa pasta temporária e apagados no fim. Vamos fazer uma por uma.</p>
+
+<hr>
+
+<h2>O ponto de partida: o código-fonte</h2>
+<p>O arquivo que você escreve se chama <strong>código-fonte</strong> (<em>source code</em>). É um texto comum, que qualquer editor abre. Este é o programa mais simples que existe:</p>
+
+<pre class="file" data-file="ola.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ ls -l ola.cpp
+-rw-rw-r-- 1 ana ana 71 out 16 21:47 ola.cpp     « 71 bytes: só texto</pre>
+
+<p>São 71 bytes, ou seja, 71 caracteres (o <code>á</code> conta como 2, porque no formato UTF-8 ele ocupa dois bytes). Guarde esse número: vamos ver o que acontece com ele em cada etapa.</p>
+
+<hr>
+
+<h2>Etapa 1: o pré-processador (<code>g++ -E</code>)</h2>
+<p>O pré-processador é a "organizadora" do livro. Ele procura as linhas que começam com <code>#</code>, as chamadas <strong>diretivas</strong>, e as executa. A diretiva <code>#include &lt;iostream&gt;</code> quer dizer: "cole aqui o conteúdo do arquivo <code>iostream</code>". Esse arquivo vem com o compilador e contém tudo o que o C++ precisa saber sobre o <code>std::cout</code>.</p>
+
+<p>A opção <code>-E</code> manda o <code>g++</code> parar logo depois do pré-processador. O <code>-o ola.ii</code> diz em que arquivo guardar o resultado (<code>-o</code> = <em>output</em>, saída; <code>.ii</code> é a extensão tradicional de código C++ pré-processado):</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -E ola.cpp -o ola.ii
+$ wc -l ola.cpp ola.ii                             « conta as linhas de cada arquivo
+     5 ola.cpp
+ 36937 ola.ii                                      « de 5 linhas para quase 37 mil!
+ 36942 total</pre>
+
+<p>As 5 linhas viraram <strong>36.937</strong>. Isso porque o <code>&lt;iostream&gt;</code> inclui outros arquivos, que incluem outros, e o pré-processador colou todos eles. Ninguém lê 37 mil linhas: os comandos <code>head</code> e <code>tail</code> mostram só o começo e o fim do arquivo:</p>
+
+<pre class="term" data-cwd="~/cpp">$ head -5 ola.ii
+# 0 "ola.cpp"
+# 0 "&lt;built-in&gt;"
+# 0 "&lt;command-line&gt;"
+# 1 "/usr/include/stdc-predef.h" 1 3 4
+# 0 "&lt;command-line&gt;" 2
+$ tail -8 ola.ii
+}
+# 2 "ola.cpp" 2
+
+
+# 3 "ola.cpp"
+int main() {                                       « o seu código está lá no final
+    std::cout &lt;&lt; "Olá, mundo!\n";
+}</pre>
+
+<p>As linhas que começam com <code>#</code> e um número são <strong>marcadores</strong>: anotações que o pré-processador deixa para o compilador saber de que arquivo e de que linha veio cada trecho. É graças a elas que, quando há um erro, a mensagem diz <code>ola.cpp:4</code> e não "linha 36936 do arquivo colado".</p>
+
+<p>E onde está o <code>cout</code>? O comando <code>grep</code> procura um texto num arquivo, e o <code>sed -n</code> mostra um intervalo de linhas:</p>
+
+<pre class="term" data-cwd="~/cpp">$ grep -n "extern ostream cout" ola.ii
+36916:  extern ostream cout;                           « linha 36916: veio do arquivo iostream
+$ sed -n "36914,36918p" ola.ii
+# 64 "/usr/include/c++/15/iostream" 3
+  extern istream cin;
+  extern ostream cout;
+  extern ostream cerr;
+  extern ostream clog;</pre>
+
+<p>Repare na primeira linha: o trecho veio de <code>/usr/include/c++/15/iostream</code>, o arquivo de verdade que o g++ 15 traz. A linha <code>extern ostream cout;</code> é uma <strong>declaração</strong>: ela diz ao compilador "existe uma coisa chamada <code>cout</code>, do tipo <code>ostream</code>, mas ela está guardada em <strong>outro lugar</strong>". Lembre-se desse "outro lugar": ele volta na etapa 4.</p>
+
+<div class="tip">
+<strong>O pré-processador não entende C++</strong>
+<p>Ele só mexe em texto: cola arquivos, troca palavras (<code>#define</code>) e liga ou desliga trechos (<code>#if</code>). Ele não sabe se o seu código está certo. A aula <a href="preprocessador.html">O Pré-processador</a> mostra todas as diretivas.</p>
+</div>
+
+<hr>
+
+<h2>Etapa 2: o compilador (<code>g++ -S</code>)</h2>
+<p>Agora vem o "tradutor", a etapa mais difícil e a que dá nome a todo o processo. O <strong>compilador</strong> lê o código pré-processado, confere se ele segue as regras do C++ (a <strong>sintaxe</strong>, os <strong>tipos</strong>) e traduz cada instrução para <strong>assembly</strong> (lê-se "assêmbli"): a língua do processador, escrita em texto, com uma instrução simples por linha.</p>
+
+<p>A opção <code>-S</code> manda o <code>g++</code> parar depois desta etapa:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -S ola.cpp -o ola.s
+$ wc -l ola.s
+50 ola.s                                            « 50 linhas de assembly</pre>
+
+<p>As 36.937 linhas viraram 50. Toda aquela biblioteca colada era só <strong>declarações</strong> ("existe um <code>cout</code>"); o compilador só gera instruções para o que o seu programa <strong>faz</strong>. Veja os trechos que correspondem ao seu programa. Para caber na tela, cortamos algumas linhas técnicas; cada <code>…</code> marca um corte e não faz parte da saída real:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat ola.s
+…
+.LC0:
+	.string	"Ol\303\241, mundo!\n"                       « o seu texto (o á virou dois bytes: \303\241)
+…
+main:                                                « aqui começa a função main
+…
+	leaq	.LC0(%rip), %rdx                             « pega o endereço do texto
+	leaq	_ZSt4cout(%rip), %rax                        « pega o endereço do std::cout
+	movq	%rdx, %rsi
+	movq	%rax, %rdi
+	call	_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc@PLT   « chama o &lt;&lt;
+	movl	$0, %eax                                     « o main devolve 0 ("deu tudo certo")
+	popq	%rbp
+…
+	ret                                                  « fim do main
+…
+	.ident	"GCC: (Ubuntu 15.2.0-16ubuntu1) 15.2.0"</pre>
+
+<p>Você não precisa ler assembly para programar em C++. Mas dá para reconhecer a ideia: a linha <code>std::cout &lt;&lt; "Olá, mundo!\n";</code> virou "pegue o endereço do texto, pegue o endereço do <code>cout</code>, chame a função do <code>&lt;&lt;</code>". O nome esquisito <code>_ZSt4cout</code> é o <code>std::cout</code> "codificado" num formato que o ligador entende (isso se chama <em>name mangling</em>, "embaralhar nomes"). E o <code>movl $0, %eax</code> é o <code>0</code> que o <code>main</code> devolve sozinho quando chega ao fim: é o código de saída que você vê com <code>echo $?</code>.</p>
+
+<p>É nesta etapa que aparecem quase todos os <strong>erros de compilação</strong>: um <code>;</code> esquecido, uma variável com nome errado, um texto onde deveria ir um número. Se o compilador encontra um erro, ele para e não produz nada. A aula <a href="erros-compilacao.html">Lendo Erros do Compilador</a> ensina a ler essas mensagens.</p>
+
+<div class="note">
+<strong>Assembly depende do processador</strong>
+<p>Este assembly é de um processador <strong>x86-64</strong> (Intel e AMD, a maioria dos PCs). Num Mac com chip Apple ou num celular (processadores <strong>ARM</strong>), as instruções são outras. O seu <code>ola.cpp</code> é o mesmo em todos; quem muda é o que o compilador gera. Por isso um programa compilado para Linux num PC não roda num Mac: é preciso compilar de novo lá.</p>
+</div>
+
+<hr>
+
+<h2>Etapa 3: o montador (<code>g++ -c</code>)</h2>
+<p>O <strong>montador</strong> (<em>assembler</em>, o programa <code>as</code>) transforma o assembly, que ainda é texto, em <strong>código de máquina</strong>: os números que o processador executa. O resultado é um <strong>arquivo objeto</strong>, com extensão <code>.o</code>.</p>
+
+<p>A opção <code>-c</code> (de <em>compile</em>, "só compile, não ligue") faz as etapas 1, 2 e 3 e para antes da 4:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -c ola.cpp -o ola.o
+$ file ola.o                                       « o comando file diz que tipo de arquivo é
+ola.o: ELF 64-bit LSB relocatable, x86-64, version 1 (SYSV), not stripped</pre>
+
+<p>O <code>file</code> diz que o <code>ola.o</code> é um arquivo <strong>ELF</strong> (o formato de programas do Linux), de 64 bits, para x86-64, e <strong>relocatable</strong> ("relocável"): um pedaço de programa que ainda vai ser encaixado em outro lugar. Ele não é texto. Se você tentar ver os primeiros bytes com o <code>xxd</code> (que mostra um arquivo como números), aparece a "assinatura" do ELF e muitos zeros:</p>
+
+<pre class="term" data-cwd="~/cpp">$ xxd ola.o | head -2
+00000000: 7f45 4c46 0201 0100 0000 0000 0000 0000  .ELF............   « todo ELF começa com 7f E L F
+00000010: 0100 3e00 0100 0000 0000 0000 0000 0000  ..&gt;.............</pre>
+
+<p>O arquivo objeto <strong>ainda não roda</strong>. Veja o que acontece se a Ana tentar:</p>
+
+<pre class="term" data-cwd="~/cpp">$ ./ola.o
+bash: ./ola.o: Permissão negada                   « não é um programa: nem permissão de execução ele tem</pre>
+
+<p>Por que não está pronto? Porque ele tem <strong>buracos</strong>, os "espaços em branco" da gráfica. O comando <code>nm</code> lista os nomes que um arquivo objeto define e os que ele <strong>usa mas não tem</strong>; a opção <code>-C</code> mostra os nomes em C++ legível:</p>
+
+<pre class="term" data-cwd="~/cpp">$ nm -C ola.o
+0000000000000000 T main                            « T: o main está aqui dentro
+                 U std::ios_base_library_init()   « U: usado, mas está em outro lugar
+                 U std::cout                       « o cout que o iostream prometeu
+                 U std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp; std::operator&lt;&lt; &lt;std::char_traits&lt;char&gt; &gt;(std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp;, char const*)</pre>
+
+<p>O <code>T</code> (de <em>text</em>, o nome tradicional da área de código) marca o que o arquivo <strong>tem</strong>: o seu <code>main</code>. O <code>U</code> (<em>undefined</em>, "não definido") marca o que ele <strong>usa mas não tem</strong>: o <code>std::cout</code> e o operador <code>&lt;&lt;</code> (aquele nome enorme é o <code>&lt;&lt;</code> que escreve um texto). Eles foram só <strong>declarados</strong> pelo <code>iostream</code>, lembra? O código deles de verdade está na <strong>biblioteca padrão do C++</strong>, que já vem compilada no sistema.</p>
+
+<hr>
+
+<h2>Etapa 4: o ligador</h2>
+<p>O <strong>ligador</strong> (<em>linker</em>, o programa <code>ld</code>; também se diz "linkeditor") é o "encadernador". Ele junta o seu arquivo objeto com as bibliotecas de que ele precisa, liga cada <code>U</code> ao endereço certo e escreve o <strong>executável</strong>. Basta passar o <code>.o</code> para o <code>g++</code>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ ola.o -o ola
+$ file ola
+ola: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=4857c0895c68bf346d8c08c2d87be4904a5be0c5, for GNU/Linux 3.2.0, not stripped
+$ ./ola
+Olá, mundo!                                        « finalmente!</pre>
+
+<p>Agora o <code>file</code> diz <strong>executable</strong>, "executável". Ele também diz <strong>dynamically linked</strong> ("ligado dinamicamente"): em vez de copiar a biblioteca padrão inteira para dentro do <code>ola</code>, o ligador anotou "este programa precisa da biblioteca tal", e o sistema a carrega na hora em que o programa abre. O comando <code>ldd</code> mostra essas bibliotecas:</p>
+
+<pre class="term" data-cwd="~/cpp">$ ldd ./ola
+	linux-vdso.so.1 (0x0000708dcce9e000)
+	libstdc++.so.6 =&gt; /usr/lib/x86_64-linux-gnu/libstdc++.so.6 (0x0000708dcca00000)   « a biblioteca padrão do C++: aqui mora o cout
+	libc.so.6 =&gt; /usr/lib/x86_64-linux-gnu/libc.so.6 (0x0000708dcc600000)             « a biblioteca do C
+	libm.so.6 =&gt; /usr/lib/x86_64-linux-gnu/libm.so.6 (0x0000708dccd50000)             « a de matemática
+	/lib64/ld-linux-x86-64.so.2 (0x0000708dccea0000)
+	libgcc_s.so.1 =&gt; /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 (0x0000708dccd22000)</pre>
+
+<p>A <code>libstdc++</code> (<em>standard C++ library</em>, a biblioteca padrão do C++ do GCC) é onde o <code>std::cout</code> de verdade mora. Os números entre parênteses são endereços de memória e mudam a cada execução.</p>
+
+<h3>Todos os arquivos, lado a lado</h3>
+<pre class="term" data-cwd="~/cpp">$ ls -l
+total 932
+-rwxrwxr-x 1 ana ana  16120 out 16 21:47 ola        « o executável: 16 KB (o x = pode ser executado)
+-rw-rw-r-- 1 ana ana     71 out 16 21:47 ola.cpp    « o seu código: 71 bytes
+-rw-rw-r-- 1 ana ana 924092 out 16 21:47 ola.ii     « pré-processado: 924 KB de texto
+-rw-rw-r-- 1 ana ana   1664 out 16 21:47 ola.o      « objeto: 1,6 KB, com buracos
+-rw-rw-r-- 1 ana ana    820 out 16 21:47 ola.s      « assembly: 820 bytes de texto</pre>
+
+<p>Só o <code>ola</code> tem o <code>x</code> nas permissões (<code>-rwxrwxr-x</code>): ele é o único que pode ser executado. Os outros três são passos intermediários, que você normalmente nunca vê.</p>
+
+<h3>Tudo de uma vez</h3>
+<p>No dia a dia, ninguém faz as etapas separadas. Um único comando faz tudo:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ ola.cpp -o ola
+$ ./ola
+Olá, mundo!</pre>
+
+<p>Para ver o <code>g++</code> trabalhando como "gerente", a opção <code>-v</code> (<em>verbose</em>, "falante") mostra cada ferramenta que ele chama. A saída é enorme; filtrando só as três linhas importantes (e cortando o fim de cada uma):</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -v ola.cpp -o ola 2&gt;&amp;1 | grep -E "cc1plus|-as |collect2" | cut -c1-90
+ /usr/libexec/gcc/x86_64-linux-gnu/15/cc1plus -quiet -v -imultiarch x86_64-linux-gnu -D_GN   « etapas 1 e 2: o compilador
+ /usr/bin/x86_64-linux-gnu-as -v --64 -o /tmp/ccgIgiFF.o /tmp/ccwf5DRv.s                     « etapa 3: o montador (as)
+ /usr/libexec/gcc/x86_64-linux-gnu/15/collect2 -plugin /usr/libexec/gcc/x86_64-linux-gnu/1   « etapa 4: o ligador (collect2 chama o ld)</pre>
+
+<p>O <code>cc1plus</code> é o compilador de C++ propriamente dito (ele faz o pré-processamento e a compilação juntos, por eficiência). Repare nos arquivos <code>/tmp/cc….s</code> e <code>/tmp/cc….o</code>: são o assembly e o objeto, criados na pasta temporária e apagados no fim. Se quiser guardá-los, a opção <code>-save-temps</code> deixa todos na pasta atual:</p>
+
+<pre class="term" data-cwd="~/etapas">$ g++ -save-temps ola.cpp -o ola
+$ ls -l
+total 932
+-rwxrwxr-x 1 ana ana  16120 out 16 21:47 ola
+-rw-rw-r-- 1 ana ana     71 out 16 21:47 ola.cpp
+-rw-rw-r-- 1 ana ana 924092 out 16 21:47 ola.ii
+-rw-rw-r-- 1 ana ana   1664 out 16 21:47 ola.o
+-rw-rw-r-- 1 ana ana    820 out 16 21:47 ola.s</pre>
+
+<h3>No editor do guia</h3>
+<p>As caixas Experimente fazem o mesmo caminho, só que dentro do navegador e com o compilador <strong>Clang</strong>: pré-processar, compilar, montar e ligar, e depois rodar. A caixa abaixo tem um programa que <strong>compila</strong>, mas <strong>não liga</strong>: a função <code>dobro</code> foi declarada ("existe uma função <code>dobro</code>"), mas ninguém escreveu o que ela faz. É o mesmo tipo de buraco do <code>U</code> que você viu no <code>nm</code>. Clique em Rodar e procure a palavra <code>undefined</code> ("não definido") na mensagem: ela vem do ligador.</p>
+
+<div class="trycpp" data-goal="out:42">
+<p class="try-task"><strong>Missão:</strong> rode e veja o erro do ligador. Depois tape o buraco: troque a linha <code>int dobro(int x);</code> por <code>int dobro(int x) { return x * 2; }</code>, que diz o que a função faz. Rode de novo: deve aparecer <code>42</code>. (Funções têm a sua própria aula, <a href="funcoes.html">Funções</a>; aqui basta copiar.)</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int dobro(int x);
+
+int main() {
+    std::cout &lt;&lt; dobro(21) &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int dobro(int x) { return x * 2; }
+
+int main() {
+    std::cout &lt;&lt; dobro(21) &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Compilado × interpretado, na prática</h2>
+<p>Na aula <a href="introducao.html">O que é C++</a> você viu a diferença em teoria. Agora dá para ver na prática. Num programa Python, o arquivo <code>.py</code> é o próprio programa: toda vez que ele roda, o interpretador <code>python3</code> lê o texto e executa. No C++, o arquivo <code>.cpp</code> só é lido <strong>uma vez</strong>, na compilação; quem roda depois é o executável.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>C++ (compilado)</th><th>Python (interpretado)</th></tr>
+<tr><td>Para rodar</td><td><code>g++ ola.cpp -o ola</code> uma vez, depois <code>./ola</code> quantas vezes quiser</td><td><code>python3 ola.py</code>, sempre</td></tr>
+<tr><td>Quem lê o código-fonte</td><td>Só o compilador, na hora de compilar</td><td>O interpretador, a cada execução</td></tr>
+<tr><td>O que você entrega para outra pessoa</td><td>O executável (ela não precisa do compilador nem do código)</td><td>O código-fonte (ela precisa do Python instalado)</td></tr>
+<tr><td>Erros de digitação</td><td>Aparecem <strong>antes</strong> de rodar: sem compilar, não há programa</td><td>Muitos só aparecem quando a linha com erro é executada</td></tr>
+<tr><td>Mudou o código?</td><td>Precisa compilar de novo</td><td>É só rodar de novo</td></tr>
+<tr><td>Velocidade</td><td>Muito alta: a tradução já foi feita</td><td>Mais baixa: a tradução acontece enquanto roda</td></tr>
+</table>
+</div>
+
+<h3>O executável roda sem o <code>g++</code></h3>
+<p>Depois de compilado, o programa não precisa mais do compilador. Para provar, a Ana roda o <code>ola</code> com o <code>PATH</code> (a lista de pastas onde o terminal procura programas) apontando para uma pasta que nem existe. Assim, o terminal não consegue achar <code>g++</code> nenhum. E ainda copia o programa para outra pasta, longe do <code>ola.cpp</code>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ env PATH=/pasta-vazia ./ola                      « nenhum programa do sistema ao alcance
+Olá, mundo!
+$ cp ola /tmp/ &amp;&amp; cd /tmp &amp;&amp; ./ola &amp;&amp; cd ~/cpp     « longe do código-fonte
+Olá, mundo!</pre>
+
+<p>Nos dois casos o programa rodou. O executável já contém as instruções de máquina; ele só precisa das bibliotecas do sistema que o <code>ldd</code> mostrou (a <code>libstdc++</code> e a <code>libc</code>), que vêm instaladas em praticamente todo Linux. É assim que os programas que você baixa funcionam: o Chrome, por exemplo, chega pronto, e você não precisa de um compilador para usá-lo.</p>
+
+<h3>Mudou o código? Compile de novo</h3>
+<p>O outro lado da moeda: o executável é uma "fotografia" do código no momento em que foi compilado. A Ana troca <code>mundo</code> por <code>Ana</code> no <code>ola.cpp</code> (o comando <code>sed</code> faz a troca sem abrir um editor) e roda o programa:</p>
+
+<pre class="term" data-cwd="~/cpp">$ sed -i 's/mundo/Ana/' ola.cpp
+$ cat ola.cpp
+#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, Ana!\n";
+}
+$ ./ola
+Olá, mundo!                                        « o programa velho: o .cpp mudou, o executável não
+$ g++ ola.cpp -o ola                               « compila de novo
+$ ./ola
+Olá, Ana!                                          « agora sim</pre>
+
+<p>Esquecer de recompilar é uma das confusões mais comuns de quem começa: "mudei o código e nada mudou!". Lembre-se: <strong>editou, compilou, rodou</strong>. As caixas Experimente fazem isso por você: o botão Rodar sempre compila antes de rodar. Em projetos grandes, compilar tudo de novo demora; por isso existem ferramentas como o <a href="make.html">Make</a>, que recompilam só os arquivos que mudaram.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+<p>Cada etapa tem os seus erros, e saber de qual etapa veio a mensagem já é metade do conserto. O segredo está no começo da mensagem.</p>
+
+<div class="cenario">
+<strong>Erro do pré-processador: <code>fatal error: …: Arquivo ou diretório inexistente</code></strong>
+<pre class="file" data-file="erro1.cpp · erro de propósito">#include &lt;iostrem&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ erro1.cpp -o erro1
+erro1.cpp:1:10: fatal error: iostrem: Arquivo ou diretório inexistente
+    1 | #include &lt;iostrem&gt;
+      |          ^~~~~~~~~
+compilation terminated.</pre>
+<p><strong>O que significa:</strong> "erro fatal: <code>iostrem</code>: arquivo ou diretório inexistente". O pré-processador tentou colar o arquivo <code>iostrem</code> (faltou o <code>a</code>) e não o achou. "Fatal" quer dizer que ele desistiu na hora; <code>compilation terminated</code> = "compilação encerrada". O <code>1:10</code> é linha 1, coluna 10, e o <code>^~~~</code> aponta o nome errado. Essa mensagem mistura inglês (do g++) e português (o "Arquivo ou diretório inexistente" vem do sistema, que está em português).</p>
+<p><strong>Como consertar:</strong> corrija o nome: <code>#include &lt;iostream&gt;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Erro do compilador: <code>error: expected ‘;’ before ‘}’ token</code></strong>
+<p>Quando a mensagem tem <code>arquivo:linha:coluna: error:</code> e fala de regras da linguagem (um <code>;</code> esperado, um nome desconhecido, tipos que não combinam), ela veio da etapa 2. Foi o que você viu na <a href="index.html">página inicial</a> ao apagar o <code>;</code>. Essas mensagens são as mais comuns, e ganham uma aula inteira: <a href="erros-compilacao.html">Lendo Erros do Compilador</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>Erro do ligador: <code>referência não definida para</code> (<em>undefined reference to</em>)</strong>
+<pre class="file" data-file="soma.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int dobro(int x);
+
+int main() {
+    std::cout &lt;&lt; dobro(21) &lt;&lt; "\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ soma.cpp -o soma
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/cch0zKcp.o: na função "main":
+soma.cpp:(.text+0xe): referência não definida para "dobro(int)"
+collect2: error: ld returned 1 exit status</pre>
+<p><strong>Como reconhecer:</strong> a mensagem começa com o nome do ligador (<code>ld</code>), cita um arquivo <code>.o</code> temporário em vez de uma linha do seu código, e termina com <code>collect2: error: ld returned 1 exit status</code> ("o ld terminou com o código 1", ou seja, falhou). No Linux em português, o meio vem traduzido; num sistema em inglês aparece <code>undefined reference to `dobro(int)'</code>.</p>
+<p><strong>O que significa:</strong> o compilador aceitou o código (a declaração <code>int dobro(int x);</code> prometeu que a função existe), mas na hora de ligar ninguém tinha o código da função. É o mesmo <code>U</code> que você viu no <code>nm</code>, só que dessa vez nenhuma biblioteca tinha a peça que faltava.</p>
+<p><strong>Como consertar:</strong> escreva a função (o "corpo" entre chaves), ou, se ela estiver em outro arquivo <code>.cpp</code>, compile os dois juntos (aula <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>Erro do ligador: <code>referência não definida para "main"</code></strong>
+<pre class="file" data-file="semmain.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int mian() {
+    std::cout &lt;&lt; "Olá, mundo!\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ semmain.cpp -o semmain
+semmain.cpp: In function ‘int mian()’:
+semmain.cpp:5:1: warning: no return statement in function returning non-void [-Wreturn-type]
+    5 | }
+      | ^
+/usr/bin/x86_64-linux-gnu-ld.bfd: /usr/lib/gcc/x86_64-linux-gnu/15/../../../x86_64-linux-gnu/Scrt1.o: na função "_start":
+(.text+0x1b): referência não definida para "main"
+collect2: error: ld returned 1 exit status</pre>
+<p><strong>O que significa:</strong> a Ana digitou <code>mian</code> em vez de <code>main</code>. Para o compilador, <code>mian</code> é só uma função qualquer (ele até avisa, com um <code>warning</code>, que ela não devolve nada, porque só o <code>main</code> pode terminar sem <code>return</code>). Mas todo programa precisa de um <code>main</code>: é por ele que o programa começa. O ligador junta o seu código com um pedacinho de partida do sistema (o <code>Scrt1.o</code>, com a função <code>_start</code>), que chama o <code>main</code>, e não achou nenhum.</p>
+<p><strong>Como consertar:</strong> escreva <code>main</code> certinho, em minúsculas.</p>
+</div>
+
+<div class="cenario">
+<strong>Usei <code>gcc</code> em vez de <code>g++</code> e veio uma chuva de "referência não definida"</strong>
+<pre class="term" data-cwd="~/cpp">$ gcc ola.cpp -o ola2
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccHHq7l3.o: aviso: relocalização contra "_ZSt4cout" em secção só de leitura ".text"
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccHHq7l3.o: na função "main":
+ola.cpp:(.text+0x12): referência não definida para "std::cout"
+/usr/bin/x86_64-linux-gnu-ld.bfd: ola.cpp:(.text+0x1d): referência não definida para "std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp; std::operator&lt;&lt; &lt;std::char_traits&lt;char&gt; &gt;(std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp;, char const*)"
+/usr/bin/x86_64-linux-gnu-ld.bfd: aviso: a criar DT_TEXTREL num PIE.
+collect2: error: ld returned 1 exit status</pre>
+<p><strong>O que significa:</strong> o <code>gcc</code> viu a extensão <code>.cpp</code> e compilou como C++ (etapas 1 a 3 deram certo). Mas, na etapa 4, ele liga o programa como se fosse C, <strong>sem</strong> a biblioteca padrão do C++. Resultado: o <code>std::cout</code> e o <code>&lt;&lt;</code> ficaram sem dono, exatamente os dois <code>U</code> do <code>nm</code>.</p>
+<p><strong>Como consertar:</strong> use <code>g++</code> para C++. (<code>gcc</code> e <code>g++</code> são da mesma família, a <strong>GCC</strong>, <em>GNU Compiler Collection</em>; o <code>g++</code> é o "modo C++", que já liga a <code>libstdc++</code>.)</p>
+</div>
+
+<div class="cenario">
+<strong>Na hora de rodar: <code>Permissão negada</code>, <code>comando não encontrado</code> ou <code>Arquivo ou diretório inexistente</code></strong>
+<pre class="term" data-cwd="~/cpp">$ ./ola.o
+bash: ./ola.o: Permissão negada                   « tentou rodar o objeto, não o executável
+$ ola
+bash: ola: comando não encontrado                 « faltou o ./ antes do nome
+$ ./programa
+bash: ./programa: Arquivo ou diretório inexistente   « esse executável não existe (o nome foi outro, ou a compilação falhou)</pre>
+<p><strong>O que significa:</strong> esses erros não são do compilador, são do terminal (o <code>bash</code>). O arquivo <code>.o</code> não é executável. Sem o <code>./</code>, o terminal procura o programa só nas pastas do sistema, não na pasta atual (o <code>./</code> quer dizer "aqui nesta pasta"). E, se a compilação falhou, nenhum executável foi criado.</p>
+<p><strong>Como consertar:</strong> rode o nome que você deu depois do <code>-o</code>, com <code>./</code> na frente. Se a compilação mostrou um <code>error</code>, conserte e compile de novo antes de rodar.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Comando</th><th>Faz até a etapa</th><th>Resultado</th></tr>
+<tr><td><code>g++ -E ola.cpp -o ola.ii</code></td><td>1. pré-processador</td><td>código com os <code>#include</code> colados (texto)</td></tr>
+<tr><td><code>g++ -S ola.cpp -o ola.s</code></td><td>2. compilador</td><td>assembly (texto)</td></tr>
+<tr><td><code>g++ -c ola.cpp -o ola.o</code></td><td>3. montador</td><td>arquivo objeto (binário, com buracos)</td></tr>
+<tr><td><code>g++ ola.o -o ola</code></td><td>4. ligador (a partir do <code>.o</code>)</td><td>executável</td></tr>
+<tr><td><code>g++ ola.cpp -o ola</code></td><td>todas</td><td>executável (os intermediários são apagados)</td></tr>
+<tr><td><code>g++ -save-temps ola.cpp -o ola</code></td><td>todas</td><td>executável, guardando <code>.ii</code>, <code>.s</code> e <code>.o</code></td></tr>
+<tr><td><code>g++ -v …</code></td><td>todas</td><td>mostra cada ferramenta chamada</td></tr>
+</table>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Extensão</th><th>O que é</th><th>Dá para ler?</th></tr>
+<tr><td><code>.cpp</code> (<code>.cc</code>, <code>.cxx</code>)</td><td>Código-fonte C++, escrito por você</td><td>Sim, é texto</td></tr>
+<tr><td><code>.h</code>, <code>.hpp</code></td><td>Arquivo de cabeçalho, feito para ser incluído com <code>#include</code> (aula <a href="headers.html">Arquivos .h e .cpp</a>)</td><td>Sim</td></tr>
+<tr><td><code>.ii</code></td><td>Código pré-processado</td><td>Sim, mas é enorme</td></tr>
+<tr><td><code>.s</code></td><td>Assembly</td><td>Sim, se você souber assembly</td></tr>
+<tr><td><code>.o</code></td><td>Arquivo objeto</td><td>Não, é binário (use <code>nm</code> ou <code>objdump</code>)</td></tr>
+<tr><td>(sem extensão, no Linux e no macOS); <code>.exe</code> no Windows</td><td>Executável</td><td>Não, é binário; você roda</td></tr>
+</table>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>A mensagem começa com…</th><th>Veio de</th></tr>
+<tr><td><code>fatal error: xxx: Arquivo ou diretório inexistente</code> num <code>#include</code></td><td>Pré-processador</td></tr>
+<tr><td><code>arquivo.cpp:linha:coluna: error:</code></td><td>Compilador</td></tr>
+<tr><td><code>…ld…</code>, <code>referência não definida</code> / <code>undefined reference</code>, <code>collect2: error</code></td><td>Ligador</td></tr>
+<tr><td><code>bash: …</code></td><td>O terminal, na hora de rodar</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">1. Qual é a ordem das etapas da compilação?</p>
+<label><input type="radio" name="q1"> Compilador → ligador → pré-processador → montador</label>
+<label><input type="radio" name="q1"> Ligador → montador → compilador → pré-processador</label>
+<label><input type="radio" name="q1"> Pré-processador → compilador → montador → ligador</label>
+<label><input type="radio" name="q1"> Montador → pré-processador → ligador → compilador</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">2. O que o pré-processador faz com <code>#include &lt;iostream&gt;</code>?</p>
+<label><input type="radio" name="q2"> Cola ali o conteúdo do arquivo <code>iostream</code>.</label>
+<label><input type="radio" name="q2"> Traduz o <code>iostream</code> para assembly.</label>
+<label><input type="radio" name="q2"> Baixa o <code>iostream</code> da internet.</label>
+<label><input type="radio" name="q2"> Apaga a linha, porque é um comentário.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">3. A mensagem termina com <code>collect2: error: ld returned 1 exit status</code>. De que etapa veio o erro?</p>
+<label><input type="radio" name="q3"> Do pré-processador</label>
+<label><input type="radio" name="q3"> Do compilador</label>
+<label><input type="radio" name="q3"> Do terminal</label>
+<label><input type="radio" name="q3"> Do ligador</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. A Ana mudou o texto no <code>ola.cpp</code>, rodou <code>./ola</code> e a mensagem antiga apareceu. Por quê?</p>
+<label><input type="radio" name="q4"> O computador está com defeito.</label>
+<label><input type="radio" name="q4"> Ela não compilou de novo: o executável ainda é o da versão antiga.</label>
+<label><input type="radio" name="q4"> O <code>./ola</code> sempre mostra a primeira versão do programa.</label>
+<label><input type="radio" name="q4"> Faltou salvar o executável.</label>
+</div>
+
+<div class="exercise">
+<h3>5. Parar antes de ligar</h3>
+<p>Complete o comando que gera só o arquivo objeto <code>ola.o</code>, sem ligar:</p>
+<div class="ex-code">g++ <input data-answer="-c" aria-label="opção" size="4"> ola.cpp -o ola.o</div>
+</div>
+
+<div class="exercise">
+<h3>6. Ver o assembly</h3>
+<p>Complete o comando que para depois da compilação e gera o assembly:</p>
+<div class="ex-code">g++ <input data-answer="-S" aria-label="opção" size="4"> ola.cpp -o ola.s</div>
+</div>
+
+<h3>Missão final: provoque e conserte um erro de cada etapa</h3>
+
+<div class="trycpp" data-goal="out:Compilou\, ligou e rodou!">
+<p class="try-task"><strong>Missão:</strong> este programa tem <strong>dois</strong> problemas: um nome de arquivo errado no <code>#include</code> (o pré-processador vai reclamar) e um <code>main</code> escrito errado (o ligador vai reclamar). Rode, leia a primeira mensagem, conserte, rode de novo, leia a segunda, conserte. No fim, a saída deve ser <code>Compilou, ligou e rodou!</code></p>
+<pre class="script">#include &lt;iostram&gt;
+
+int Main() {
+    std::cout &lt;&lt; "Compilou, ligou e rodou!\n";
+    return 0;
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Compilou, ligou e rodou!\n";
+    return 0;
+}
+</pre>
+</div>
+
+<p>Repare que você só viu o segundo erro depois de consertar o primeiro: com o <code>#include</code> errado, o processo parou na etapa 1 e nem chegou ao ligador. E <code>Main</code>, com M maiúsculo, não é <code>main</code>: o C++ diferencia maiúsculas de minúsculas.</p>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Quatro etapas: <strong>pré-processador</strong> (cola os <code>#include</code>) → <strong>compilador</strong> (confere as regras e traduz para assembly) → <strong>montador</strong> (gera o arquivo objeto <code>.o</code>) → <strong>ligador</strong> (junta com as bibliotecas e gera o executável).</li>
+  <li><code>g++ -E</code>, <code>-S</code> e <code>-c</code> param depois das etapas 1, 2 e 3; <code>g++ ola.cpp -o ola</code> faz tudo; <code>-save-temps</code> guarda os intermediários.</li>
+  <li>O <code>.o</code> tem "buracos" (<code>U</code> no <code>nm</code>) que o ligador preenche com a biblioteca padrão (<code>libstdc++</code>).</li>
+  <li>O executável roda sozinho, sem o <code>g++</code> e sem o <code>.cpp</code>.</li>
+  <li>Mudou o código? <strong>Compile de novo.</strong> Editou, compilou, rodou.</li>
+  <li>Reconheça a etapa pelo começo da mensagem: <code>fatal error</code> num <code>#include</code> (pré-processador), <code>arquivo:linha:coluna: error</code> (compilador), <code>ld</code>/<code>referência não definida</code>/<code>collect2</code> (ligador).</li>
+  <li>Próximo passo: as <a href="versoes.html">Versões do C++</a>, e por que o guia sempre compila com <code>-std=c++23</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

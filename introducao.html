@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Introdução — o que é C++ e para que serve | Guia C++</title>
+<meta name="description" content="O que é C++, para que serve, onde é usado (jogos com Unreal, navegadores, bancos de dados, sistemas embarcados, compiladores), a história desde o C com Classes de Bjarne Stroustrup em 1979, C++ comparado com C, Java e Python, e o que você vai conseguir fazer com o guia.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Introdução</span></h1>
+
+<p class="intro">O <strong>C++</strong> (lê-se "cê mais mais") é uma linguagem de programação feita para criar programas <strong>rápidos</strong>, que aproveitam bem o computador: jogos, navegadores, bancos de dados, o software de um carro. Ele é uma linguagem <strong>compilada</strong>: antes de rodar, o seu texto é traduzido para a língua do processador. Nesta aula você vai entender o que isso quer dizer, onde o C++ é usado, de onde ele veio e como ele se compara com o C, o Java e o Python.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é programar e o que é uma linguagem de programação.</li>
+  <li>O que é o C++ e o que o torna diferente: velocidade e controle.</li>
+  <li>Onde o C++ é usado, com exemplos que você conhece: jogos, navegadores, bancos de dados, carros, compiladores.</li>
+  <li>A história: Bjarne Stroustrup, o "C com Classes" de 1979 e o C++ de 1985.</li>
+  <li>Como o C++ se compara com o C, o Java e o Python.</li>
+  <li>O que você vai conseguir fazer ao terminar o guia.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>Primeiro: o que é programar?</h2>
+<p>Um computador não "entende" nada sozinho. Ele só sabe seguir instruções, uma de cada vez, muito rápido. <strong>Programar</strong> é escrever essas instruções. Uma <strong>linguagem de programação</strong> é o idioma combinado entre você e o computador: um conjunto de palavras e símbolos com regras rígidas (onde vai o ponto e vírgula, onde abrem e fecham as chaves).</p>
+
+<p>Pense numa receita de bolo. Ela tem uma lista de passos, em ordem: "pré-aqueça o forno", "misture os ovos com o açúcar", "se a massa estiver grossa, acrescente leite". Um programa é igual: uma lista de passos, alguns com decisões ("se…") e repetições ("bata até ficar homogêneo"). A diferença é que o computador segue a receita <strong>ao pé da letra</strong>. Se você escrever <code>cuot</code> em vez de <code>cout</code>, ele não adivinha o que você quis dizer: ele para e reclama. Essas reclamações são as <strong>mensagens de erro</strong>, e o guia vai ensinar você a lê-las.</p>
+
+<h3>A língua do processador</h3>
+<p>O processador (a CPU, o "cérebro" do computador) não entende português, nem inglês, nem C++. Ele só entende <strong>código de máquina</strong>: números que querem dizer coisas como "some estes dois valores" ou "guarde isto na memória". Escrever programas diretamente em números seria um pesadelo. Por isso existem as linguagens de programação, que são feitas para <strong>pessoas</strong> lerem e escreverem.</p>
+
+<p>Alguém precisa traduzir o texto da linguagem para os números do processador. Existem dois jeitos de fazer isso:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Jeito</th><th>Como funciona</th><th>Comparação</th><th>Exemplos</th></tr>
+<tr><td><strong>Compilar</strong></td><td>Um programa chamado <strong>compilador</strong> traduz o texto inteiro <strong>antes</strong>, uma vez só, e gera um arquivo executável. Depois, o executável roda sozinho, quantas vezes você quiser.</td><td>Traduzir um livro inteiro e imprimir a tradução. Quem lê a versão traduzida não precisa do tradutor.</td><td>C, <strong>C++</strong>, Rust, Go</td></tr>
+<tr><td><strong>Interpretar</strong></td><td>Um programa chamado <strong>interpretador</strong> lê o texto e vai executando linha por linha, <strong>toda vez</strong> que o programa roda.</td><td>Um intérprete numa palestra, traduzindo frase por frase enquanto a pessoa fala. Sem o intérprete na sala, ninguém entende.</td><td>Python, JavaScript, PHP</td></tr>
+</table>
+</div>
+
+<p>O C++ é <strong>compilado</strong>. Essa é a principal razão de ele ser tão rápido: quando o programa roda, a tradução já foi feita, e o processador só executa. A aula <a href="como-funciona.html">Como o C++ Vira Programa</a> mostra a tradução acontecendo, etapa por etapa.</p>
+
+<hr>
+
+<h2>O que é o C++</h2>
+<p>O C++ é uma linguagem de <strong>uso geral</strong>: serve para quase qualquer tipo de programa. Três características explicam por que ele é escolhido:</p>
+
+<ul>
+  <li><strong>Rápido.</strong> O compilador gera código de máquina, e a linguagem não coloca nada "no meio do caminho" que você não pediu. A regra de ouro dos criadores é: <em>você não paga pelo que não usa</em>.</li>
+  <li><strong>Controle.</strong> Você decide onde e quando cada dado fica na memória do computador. Isso permite programas muito econômicos, mas também traz responsabilidade (o guia ensina as ferramentas modernas que tornam isso seguro, como <a href="smart-pointers.html">ponteiros inteligentes</a>).</li>
+  <li><strong>Abstração.</strong> Mesmo sendo rápido, o C++ permite escrever em "alto nível": textos (<code>std::string</code>), listas que crescem (<code>std::vector</code>), classes, ordenar uma lista com uma linha. Você escolhe o quanto quer descer aos detalhes.</li>
+</ul>
+
+<p>Veja um programa C++ pequeno. Ele faz uma conta simples dez milhões de vezes (somar o resto da divisão de cada número por 7) e mostra o total:</p>
+
+<pre class="file" data-file="conta.cpp">#include &lt;iostream&gt;
+
+int main() {
+    long long total = 0;
+    for (long long i = 0; i &lt; 10000000; i++) {
+        total += i % 7;
+    }
+    std::cout &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+
+<p>Não se preocupe em entender cada linha agora: <code>long long</code> é um tipo de número inteiro grande (aula <a href="inteiros.html">Inteiros</a>), o <code>for</code> repete um trecho (aula <a href="for.html">for</a>) e o <code>%</code> calcula o resto da divisão (aula <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>). A Ana escreveu o mesmo programa em Python, uma linguagem interpretada, e mediu o tempo dos dois com o comando <code>time</code>, que mostra quanto um programa demorou (a linha <code>real</code> é o tempo de relógio):</p>
+
+<pre class="file" data-file="conta.py">total = 0
+for i in range(10000000):
+    total += i % 7
+print(total)
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra conta.cpp -o conta
+$ time ./conta
+29999994
+
+real	0m0,043s                       « C++: 43 milésimos de segundo
+user	0m0,040s
+sys	0m0,003s
+$ time python3 conta.py
+29999994
+
+real	0m1,774s                       « Python: quase 2 segundos
+user	0m1,767s
+sys	0m0,005s</pre>
+
+<p>Mesmo resultado, e o C++ foi uns <strong>40 vezes mais rápido</strong> nesta conta, na máquina da Ana. Os números exatos mudam de computador para computador e de programa para programa, e o Python tem truques (bibliotecas escritas em C e C++) para chegar perto em muitas tarefas. Mas a ordem de grandeza é essa: em contas pesadas, um programa compilado costuma ganhar com folga. É por isso que jogos, navegadores e bancos de dados são feitos em C++.</p>
+
+<p>Rode o programa aqui. A caixa compila o código com um compilador C++ real e mostra o resultado:</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode como está e confira o <code>29999994</code>. Depois troque <code>10000000</code> por <code>10</code> e rode de novo: o total vira <code>24</code> (0+1+2+3+4+5+6+0+1+2). Conferiu de cabeça?</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    long long total = 0;
+    for (long long i = 0; i &lt; 10000000; i++) {
+        total += i % 7;
+    }
+    std::cout &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Onde o C++ é usado</h2>
+<p>O C++ está em lugares que você usa todo dia, quase sempre escondido:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Área</th><th>Exemplos concretos</th><th>Por que C++</th></tr>
+<tr><td><strong>Jogos</strong></td><td>A <strong>Unreal Engine</strong> (motor de jogos da Epic Games, usado em Fortnite e em centenas de outros jogos) é escrita em C++, e a lógica dos jogos feitos com ela também é programada em C++. Os grandes motores de jogos em geral têm o "coração" em C++.</td><td>Um jogo precisa desenhar a tela 60 vezes por segundo ou mais: cada milésimo conta.</td></tr>
+<tr><td><strong>Navegadores</strong></td><td>O <strong>Chromium</strong> (base do Chrome, do Edge, do Opera e do Brave) é escrito principalmente em C++, assim como o <strong>V8</strong>, o motor que roda o JavaScript dos sites (e também o Node.js). O <strong>Firefox</strong> é feito de C++ com Rust.</td><td>Abrir páginas pesadas rápido e usar pouca memória com dezenas de abas abertas.</td></tr>
+<tr><td><strong>Sistemas e aplicativos</strong></td><td>Partes do <strong>Windows</strong> e do macOS, o <strong>Photoshop</strong>, o <strong>LibreOffice</strong>, o Microsoft Office, o <strong>Blender</strong> (3D, feito em C e C++).</td><td>Programas grandes, que precisam responder na hora.</td></tr>
+<tr><td><strong>Bancos de dados</strong></td><td><strong>MySQL</strong> (C e C++), <strong>MongoDB</strong>, <strong>ClickHouse</strong>.</td><td>Procurar entre milhões de registros em milésimos de segundo.</td></tr>
+<tr><td><strong>Embarcados</strong></td><td>Os programas do <strong>Arduino</strong> (os "sketches") são C++. Centrais de carros, máquinas industriais, equipamentos médicos e aviões: o software do caça F-35 foi escrito em C++.</td><td>Aparelhos com pouca memória e pouca bateria, que não podem travar.</td></tr>
+<tr><td><strong>Compiladores e ferramentas</strong></td><td>O <strong>Clang/LLVM</strong> e o próprio <strong>GCC</strong> (o g++ deste guia) são escritos em C++. Ou seja: o C++ é compilado por programas escritos em C++.</td><td>Ferramentas que processam milhões de linhas de código.</td></tr>
+<tr><td><strong>Ciência, finanças e IA</strong></td><td>O núcleo do <strong>PyTorch</strong> e do <strong>TensorFlow</strong> (inteligência artificial) é C++; quem programa em Python chama esse C++ por baixo. Simulações científicas e sistemas de bolsa de valores também usam muito C++.</td><td>Contas enormes, feitas muitas vezes.</td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>E o Linux? E o Python?</strong>
+<p>Duas confusões comuns. O <strong>núcleo do Linux</strong> é escrito em <strong>C</strong> (e, mais recentemente, em parte em Rust), não em C++. E o interpretador mais usado do <strong>Python</strong> também é escrito em C. O C++ é "parente próximo" do C, e os dois convivem muito bem: um programa C++ consegue usar bibliotecas escritas em C sem esforço.</p>
+</div>
+
+<hr>
+
+<h2>Um pouco de história</h2>
+<p>O C++ nasceu de um problema prático. Em 1979, o dinamarquês <strong>Bjarne Stroustrup</strong> trabalhava no Bell Labs, o laboratório de pesquisa da AT&amp;T nos Estados Unidos, o mesmo lugar onde tinham sido criados o sistema Unix e a linguagem <strong>C</strong>. No doutorado, na Universidade de Cambridge, ele tinha usado a linguagem <strong>Simula</strong>, que organizava programas em "classes" (modelos de objetos, como "Conta bancária" ou "Aluno"). A Simula era ótima para organizar ideias, mas lenta demais. O C era rapidíssimo, mas não tinha classes. Stroustrup quis o melhor dos dois.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ano</th><th>O que aconteceu</th></tr>
+<tr><td>1972</td><td>Dennis Ritchie cria a linguagem <strong>C</strong> no Bell Labs, para escrever o sistema Unix.</td></tr>
+<tr><td>1979</td><td>Bjarne Stroustrup começa o <strong>"C com Classes"</strong> (<em>C with Classes</em>): o C, acrescido de classes. O código era traduzido para C e depois compilado por um compilador de C comum.</td></tr>
+<tr><td>1983</td><td>A linguagem ganha o nome <strong>C++</strong>, sugerido por Rick Mascitti, colega de Stroustrup.</td></tr>
+<tr><td>1985</td><td>Primeira versão comercial (o compilador <strong>Cfront</strong>, em outubro) e o livro <em>The C++ Programming Language</em>, de Stroustrup, que serviu de "manual oficial" por anos.</td></tr>
+<tr><td>1998</td><td>Primeiro padrão oficial da <strong>ISO</strong> (a organização internacional de normas): o <strong>C++98</strong>. A partir daí, a linguagem passa a ser decidida por um comitê internacional, e não mais por uma pessoa ou empresa.</td></tr>
+<tr><td>2011</td><td><strong>C++11</strong>: a grande virada, tão grande que Stroustrup disse que parecia "uma linguagem nova". É o começo do chamado <strong>C++ moderno</strong>.</td></tr>
+<tr><td>2023</td><td><strong>C++23</strong>, a versão que este guia ensina. Desde 2011 sai uma versão nova a cada três anos (aula <a href="versoes.html">Versões do C++</a>).</td></tr>
+</table>
+</div>
+
+<h3>Por que "++"?</h3>
+<p>O nome é uma piada de programador. Em C (e em C++), <code>++</code> é o operador que soma 1 a uma variável: <code>x++</code> quer dizer "x mais um" (aula <a href="incremento.html">++ e --</a>). Então <strong>C++</strong> quer dizer "o C, um passo à frente". E por que não "D"? Porque o C++ não substituiu o C: ele o <strong>estendeu</strong>. Quase todo programa em C também é um programa C++ válido.</p>
+
+<p>Rode a linha do tempo abaixo. Cada linha com <code>std::cout</code> escreve um ano e um acontecimento:</p>
+
+<div class="trycpp" data-goal="out:2023: C++23">
+<p class="try-task"><strong>Missão:</strong> a linha do tempo parou em 2011. Copie a última linha com <code>std::cout</code>, cole logo abaixo dela e mude para <code>2023: C++23</code>. Rode e confira que a lista ganhou uma linha.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "1979: C com Classes\n";
+    std::cout &lt;&lt; "1985: C++ chega às lojas\n";
+    std::cout &lt;&lt; "1998: C++98, o primeiro padrão ISO\n";
+    std::cout &lt;&lt; "2011: C++11, o C++ moderno\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "1979: C com Classes\n";
+    std::cout &lt;&lt; "1985: C++ chega às lojas\n";
+    std::cout &lt;&lt; "1998: C++98, o primeiro padrão ISO\n";
+    std::cout &lt;&lt; "2011: C++11, o C++ moderno\n";
+    std::cout &lt;&lt; "2023: C++23\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>C++, C, Java e Python</h2>
+<p>Quem começa a estudar programação quase sempre ouve falar dessas quatro linguagens. Cada uma brilha num lugar diferente:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>C++</th><th>C</th><th>Java</th><th>Python</th></tr>
+<tr><td><strong>Como roda</strong></td><td><strong>Compilado</strong> para código de máquina</td><td><strong>Compilado</strong> para código de máquina</td><td>Compilado para um código intermediário (<em>bytecode</em>), que a <strong>máquina virtual Java</strong> (JVM) executa</td><td><strong>Interpretado</strong></td></tr>
+<tr><td><strong>Velocidade</strong></td><td>Muito alta</td><td>Muito alta</td><td>Alta (a JVM otimiza enquanto roda)</td><td>Baixa em contas puras; alta quando usa bibliotecas escritas em C/C++</td></tr>
+<tr><td><strong>Memória</strong></td><td>Você controla; ferramentas modernas (ponteiros inteligentes, RAII) liberam sozinhas</td><td>Você controla tudo, à mão (<code>malloc</code> e <code>free</code>)</td><td>Automática: um "coletor de lixo" libera o que não é mais usado</td><td>Automática</td></tr>
+<tr><td><strong>Classes e objetos</strong></td><td>Sim, e também templates, funções soltas e mais</td><td>Não</td><td>Sim, tudo fica dentro de classes</td><td>Sim</td></tr>
+<tr><td><strong>Curva de aprendizado</strong></td><td>Longa: a linguagem é grande e tem detalhes de memória</td><td>Média: linguagem pequena, mas com armadilhas</td><td>Média</td><td>Suave: a mais fácil para começar</td></tr>
+<tr><td><strong>Olá, mundo</strong></td><td><code>std::cout &lt;&lt; "Olá";</code></td><td><code>printf("Olá");</code></td><td><code>System.out.println("Olá");</code></td><td><code>print("Olá")</code></td></tr>
+<tr><td><strong>Para rodar no seu PC</strong></td><td>Compilador (g++, Clang ou o da Microsoft)</td><td>Compilador (gcc, Clang)</td><td>JDK (o kit do Java)</td><td>O interpretador Python</td></tr>
+<tr><td><strong>Famoso por</strong></td><td>Jogos, navegadores, bancos de dados, sistemas que precisam de velocidade</td><td>Sistemas operacionais (Linux), firmware</td><td>Sistemas de empresas e bancos, Android</td><td>Ciência de dados, automação, inteligência artificial</td></tr>
+</table>
+</div>
+
+<p>Resumindo: o <strong>C</strong> é o "avô" pequeno e direto; o <strong>C++</strong> pegou o C e acrescentou ferramentas para organizar programas grandes, sem perder a velocidade; o <strong>Java</strong> nasceu em 1995 inspirado no C++, mas trocou parte do controle por segurança automática; o <strong>Python</strong> troca velocidade por facilidade. Nenhuma é "a melhor": cada uma resolve um tipo de problema.</p>
+
+<div class="tip">
+<strong>C++ é difícil demais para começar?</strong>
+<p>O C++ é grande, mas você não precisa saber tudo para escrever programas úteis. O guia apresenta uma coisa por vez, e ensina primeiro as partes modernas e seguras (<code>std::string</code>, <code>std::vector</code>, <code>std::print</code>), deixando ponteiros e memória para o Nível 2, quando você já estiver à vontade. Uma vantagem: quem aprende C++ aprende <strong>como o computador funciona</strong>, e depois qualquer outra linguagem fica mais fácil.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+<p>Ainda não escrevemos programas, mas há confusões muito comuns em quem está começando com C++:</p>
+
+<div class="cenario">
+<strong>"Achei um curso de C# (ou de C) pensando que era C++"</strong>
+<p><strong>O que aconteceu:</strong> os nomes são parecidos, mas são linguagens diferentes. O <strong>C#</strong> (lê-se "cê sharp") é uma linguagem da Microsoft, de 2000, mais parecida com o Java do que com o C++. O <strong>C</strong> é a linguagem de 1972 da qual o C++ nasceu. "Visual C++" não é outra linguagem: é o nome do compilador C++ da Microsoft.</p>
+<p><strong>Como conferir:</strong> um programa C++ costuma ter <code>#include &lt;iostream&gt;</code> e <code>std::cout</code>; um programa C, <code>#include &lt;stdio.h&gt;</code> e <code>printf</code>; um programa C#, <code>Console.WriteLine</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Salvei o código C++ com a extensão <code>.c</code> e o compilador de C reclamou</strong>
+<p>A Ana copiou o <code>ola.cpp</code> para <code>ola.c</code> e chamou o <code>gcc</code>, o compilador de C:</p>
+<pre class="term" data-cwd="~/cpp">$ gcc ola.c -o ola
+ola.c:1:10: fatal error: iostream: Arquivo ou diretório inexistente
+    1 | #include &lt;iostream&gt;
+      |          ^~~~~~~~~~
+compilation terminated.</pre>
+<p><strong>O que aconteceu:</strong> com um arquivo <code>.c</code>, o <code>gcc</code> trata o código como <strong>C</strong>, e o C não tem o <code>&lt;iostream&gt;</code> (ele é do C++). A mensagem diz "erro fatal: iostream: arquivo ou diretório inexistente" (essa parte veio traduzida, porque é o sistema que a escreve). "Fatal" quer dizer que o compilador desistiu ali mesmo.</p>
+<p><strong>Como resolver:</strong> salve o código C++ com a extensão <code>.cpp</code> (também existem <code>.cc</code> e <code>.cxx</code>, menos comuns) e compile com <code>g++</code>, o compilador de C++. A aula <a href="como-funciona.html">Como o C++ Vira Programa</a> conta mais sobre o <code>gcc</code> e o <code>g++</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Dei dois cliques no arquivo <code>.cpp</code> e só abriu um texto"</strong>
+<p><strong>O que aconteceu:</strong> nada de errado. O arquivo <code>.cpp</code> é só o <strong>texto</strong> do programa, o "código-fonte". Ele não roda sozinho: primeiro precisa ser compilado. Quem roda é o executável gerado pelo compilador.</p>
+<p><strong>Como resolver:</strong> use as caixas Experimente do guia ou instale um compilador (aulas <a href="instalar-linux.html">Instalar no Linux</a> e <a href="instalar-windows-mac.html">Instalar no Windows e macOS</a>).</p>
+</div>
+
+<hr>
+
+<h2>O que você vai conseguir fazer</h2>
+<p>Ao terminar cada nível do guia, você vai saber:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ao terminar</th><th>Você consegue</th></tr>
+<tr><td><strong>Nível 1 · Iniciante</strong></td><td>Escrever, compilar e rodar programas que guardam valores, fazem contas, leem o que o usuário digita, trabalham com textos, tomam decisões, repetem tarefas e organizam listas com <code>std::vector</code>. Ler as mensagens de erro e os avisos do compilador.</td></tr>
+<tr><td><strong>Nível 2 · Intermediário</strong></td><td>Dividir o programa em funções, entender a memória (referências, ponteiros, ponteiros inteligentes), criar seus próprios tipos com <code>struct</code> e <code>enum class</code>, ler e gravar arquivos, tratar erros com exceções, achar falhas com o GDB e os sanitizers, e organizar projetos com vários arquivos, Make e CMake.</td></tr>
+<tr><td><strong>Nível 3 · Avançado</strong></td><td>Programar com classes e objetos, herança e polimorfismo, escrever templates, usar a biblioteca padrão a fundo (<code>map</code>, algoritmos, ranges), entender movimento, <code>constexpr</code>, threads e módulos, e escrever testes automáticos.</td></tr>
+<tr><td><strong>Projetos</strong></td><td>Juntar tudo: calculadora, jogo de adivinhação, agenda de contatos, contas bancárias, controle de estoque e um analisador de texto.</td></tr>
+</table>
+</div>
+
+<p>Depois disso, você vai conseguir ler código C++ de projetos reais, estudar um motor de jogos como a Unreal, programar um Arduino ou aprender outra linguagem com facilidade. Para fechar, rode o seu primeiro programa da aula:</p>
+
+<div class="trycpp" data-goal="out:e eu vou aprender C++!,src:Meu nome é (?!\?\?\?)">
+<p class="try-task"><strong>Missão:</strong> o programa já escreve a primeira linha. Complete a segunda: troque <code>???</code> pelo seu nome e coloque um <code>!</code> depois de <code>C++</code>, para a saída ficar <code>Meu nome é Ana e eu vou aprender C++!</code> (com o seu nome no lugar de Ana).</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá! Este é o meu primeiro programa em C++.\n";
+    std::cout &lt;&lt; "Meu nome é ??? e eu vou aprender C++\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá! Este é o meu primeiro programa em C++.\n";
+    std::cout &lt;&lt; "Meu nome é Ana e eu vou aprender C++!\n";
+}
+</pre>
+</div>
+
+<p>O <code>\n</code> no fim de cada texto é a quebra de linha: ele faz a segunda frase começar numa linha nova. Tente apagar o primeiro <code>\n</code> e rodar: as duas frases ficam grudadas. A aula <a href="novas-linhas.html">Novas Linhas</a> conta tudo sobre ele.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">1. O que significa dizer que o C++ é uma linguagem <strong>compilada</strong>?</p>
+<label><input type="radio" name="q1"> Que o código é lido linha por linha toda vez que o programa roda.</label>
+<label><input type="radio" name="q1"> Que o código é traduzido para código de máquina antes de rodar, gerando um executável.</label>
+<label><input type="radio" name="q1"> Que o código só funciona dentro do navegador.</label>
+<label><input type="radio" name="q1"> Que o código precisa de uma máquina virtual, como a do Java.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">2. Quem criou o C++, e com que nome ele começou?</p>
+<label><input type="radio" name="q2"> Dennis Ritchie, com o nome C.</label>
+<label><input type="radio" name="q2"> James Gosling, com o nome Oak.</label>
+<label><input type="radio" name="q2"> Bjarne Stroustrup, com o nome "C com Classes".</label>
+<label><input type="radio" name="q2"> Guido van Rossum, com o nome ABC.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">3. Qual destes programas é escrito principalmente em C++?</p>
+<label><input type="radio" name="q3"> O Chromium, base do Google Chrome.</label>
+<label><input type="radio" name="q3"> O núcleo do Linux.</label>
+<label><input type="radio" name="q3"> O interpretador do Python.</label>
+<label><input type="radio" name="q3"> Nenhum programa famoso é feito em C++.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. O que quer dizer o <code>++</code> no nome C++?</p>
+<label><input type="radio" name="q4"> Que é a segunda versão do C.</label>
+<label><input type="radio" name="q4"> Que é duas vezes mais rápido que o C.</label>
+<label><input type="radio" name="q4"> Que só funciona com dois arquivos.</label>
+<label><input type="radio" name="q4"> É o operador "mais um" do C: o C++ é "o C, um passo à frente".</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Em que o C++ se diferencia do Java no cuidado com a memória?</p>
+<label><input type="radio" name="q5"> O C++ tem um coletor de lixo automático e o Java não.</label>
+<label><input type="radio" name="q5"> No C++, quem programa controla a memória (com ferramentas modernas que liberam sozinhas); o Java usa um coletor de lixo.</label>
+<label><input type="radio" name="q5"> Os dois funcionam exatamente igual.</label>
+<label><input type="radio" name="q5"> O C++ não usa memória.</label>
+</div>
+
+<div class="exercise">
+<h3>6. A extensão certa</h3>
+<p>Para o <code>g++</code> tratar o arquivo como código C++, qual é a extensão mais comum do nome do arquivo? Complete:</p>
+<div class="ex-code">ola<input data-answer=".cpp|cpp|.cc|.cxx" aria-label="extensão"></div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Programar é escrever instruções para o computador; o processador só entende código de máquina, e alguém precisa traduzir.</li>
+  <li>O C++ é <strong>compilado</strong>: o compilador traduz tudo antes, e o executável roda sozinho, rápido.</li>
+  <li>Ele combina <strong>velocidade</strong>, <strong>controle</strong> da memória e <strong>abstração</strong> (strings, listas, classes).</li>
+  <li>Está em jogos (Unreal), navegadores (Chromium, Firefox), bancos de dados (MySQL, MongoDB), embarcados (Arduino, carros, aviões) e compiladores (Clang, GCC).</li>
+  <li>Criado por <strong>Bjarne Stroustrup</strong>: "C com Classes" em 1979, nome C++ em 1983, lançamento em 1985, padrão ISO desde 1998; o guia ensina o <strong>C++23</strong>.</li>
+  <li>Comparado com C, Java e Python: tão rápido quanto o C, com mais ferramentas; mais controle que Java e Python, com uma curva de aprendizado mais longa.</li>
+  <li>Próximo passo: ver o código virar programa, etapa por etapa, em <a href="como-funciona.html">Como o C++ Vira Programa</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

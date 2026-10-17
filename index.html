@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tutorial C++ — aprenda C++23 do zero, como numa escola | Guia C++</title>
+<meta name="description" content="Curso de C++ moderno (C++23) do zero ao avançado, em português: cada linha de código explicada parte por parte, editor Experimente que compila e roda C++ de verdade no navegador, missões, projetos e exercícios. Todas as saídas e mensagens de erro conferidas com o g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="hero">
+<h1>Tutorial C++</h1>
+<p>Aprenda <strong>C++ do zero</strong>, como numa escola: cada linha de código é explicada parte por parte, você vê exatamente o que aparece na tela e pratica num editor aqui mesmo no navegador. E o editor não é uma imitação: ele <strong>compila e roda C++ de verdade</strong>, com um compilador real (o Clang) funcionando dentro da página. O guia ensina o <strong>C++23</strong>, a versão atual da linguagem, e todas as saídas e mensagens de erro foram conferidas num computador real, com o <strong>g++ 15</strong>. Vale para Linux, Windows e macOS.</p>
+<a class="btn btn-lg" href="introducao.html">Comece pelo Nível 1 &#10095;</a>
+</div>
+
+<div class="pager"></div>
+
+<h2>Experimente agora</h2>
+<p>A caixa abaixo é o editor <strong>Experimente</strong> do guia. Ela tem um programa C++ completo, de cinco linhas, pronto para rodar. Clique em <strong>Rodar</strong>. Na primeira vez, o navegador baixa o compilador (pode levar alguns segundos, dependendo da sua internet); depois disso, cada execução é bem mais rápida. Nada do que você fizer aqui mexe no seu computador.</p>
+
+<div class="trycpp" data-goal="out:Estou aprendendo C++!">
+<p class="try-task"><strong>Missão:</strong> clique em <strong>Rodar</strong> e veja o <code>Olá, mundo!</code> aparecer. Depois troque o texto entre as aspas por <code>Estou aprendendo C++!</code> e rode de novo. Cuidado para não apagar as aspas <code>"</code>, o <code>\n</code> nem o <code>;</code> do fim da linha.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Estou aprendendo C++!\n";
+}
+</pre>
+</div>
+
+<p>O que aconteceu: quando você clicou em Rodar, duas coisas aconteceram, uma depois da outra. Primeiro, o <strong>compilador</strong> leu o seu texto e o transformou num <strong>programa</strong> (como um tradutor que passa uma receita do português para a língua da cozinheira). Depois, o programa <strong>rodou</strong> e escreveu a frase. Esse "traduzir antes de rodar" é a marca do C++, e a aula <a href="como-funciona.html">Como o C++ Vira Programa</a> mostra cada etapa.</p>
+
+<p>Das cinco linhas, a que <strong>faz</strong> alguma coisa é a do meio: <code>std::cout</code> (lê-se "ésse-tê-dê cê-áut", de <em>character output</em>, "saída de caracteres") é a tela, e <code>&lt;&lt;</code> empurra o texto para ela. As outras linhas são a moldura que todo programa C++ precisa ter. A aula <a href="primeiro-programa.html">Olá, Mundo</a> explica cada pedaço com calma.</p>
+
+<p>Se você apagou o <code>;</code> sem querer, viu uma mensagem em inglês com a palavra <code>error</code> e o programa nem chegou a rodar. Não se assuste: é o compilador dizendo em que linha e em que coluna ele se perdeu. A aula <a href="erros-compilacao.html">Lendo Erros do Compilador</a> ensina a ler essas mensagens, que no começo parecem grego e depois viram as suas melhores amigas.</p>
+
+<h3>Um programa que faz conta</h3>
+<p>Computadores são ótimos em contas. A caixa abaixo guarda duas notas da Ana em duas <strong>variáveis</strong> (caixinhas com nome, aula <a href="variaveis.html">Variáveis</a>) e mostra a média. Rode e veja o resultado.</p>
+
+<div class="trycpp" data-goal="out:Média da Ana: 9">
+<p class="try-task"><strong>Missão:</strong> rode e veja a média <code>8</code>. A professora corrigiu as provas de novo: a primeira valia <code>8</code> e a segunda <code>10</code>. Troque os dois números, rode outra vez, e a média deve virar <code>9</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int prova1 = 7;
+    int prova2 = 9;
+    std::cout &lt;&lt; "Média da Ana: " &lt;&lt; (prova1 + prova2) / 2 &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int prova1 = 8;
+    int prova2 = 10;
+    std::cout &lt;&lt; "Média da Ana: " &lt;&lt; (prova1 + prova2) / 2 &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<p>Repare que o texto entre aspas aparece igualzinho, e a conta <code>(prova1 + prova2) / 2</code> aparece já <strong>calculada</strong>. Curiosidade que vai ser útil depois: se as notas fossem 7 e 8, a média apareceria <code>7</code>, e não <code>7.5</code>. Em C++, a divisão entre dois números inteiros joga fora a parte quebrada. A aula <a href="operadores-aritmeticos.html">Operadores Aritméticos</a> explica por quê e como pedir o <code>7.5</code>.</p>
+
+<hr>
+
+<h2>O que é este guia</h2>
+<p>O <strong>C++</strong> é a linguagem por trás de muita coisa que você usa todo dia sem perceber: o navegador em que você está lendo isto (Chrome, Firefox e Edge são escritos em boa parte em C++), os jogos feitos com a Unreal Engine, o Photoshop, bancos de dados como o MySQL, partes do Windows e do macOS, e o software de carros, aviões e máquinas de cartão. Ele é escolhido quando um programa precisa ser <strong>rápido</strong> e usar pouca memória. A aula <a href="introducao.html">O que é C++</a> mostra onde ele está e de onde ele veio.</p>
+
+<p>Quem aprende C++ consegue:</p>
+<ul>
+  <li>escrever programas que fazem contas, tomam decisões, repetem tarefas e organizam listas de dados;</li>
+  <li>entender o que acontece "por baixo" de um programa: memória, endereços, como o texto que você escreve vira instruções da máquina;</li>
+  <li>criar ferramentas de terminal, jogos simples, simulações e programas que leem e gravam arquivos;</li>
+  <li>ler e modificar código de projetos grandes em C++ e aprender com facilidade C, Java, C#, Rust e outras linguagens parecidas.</li>
+</ul>
+
+<p>O guia é para quem <strong>nunca programou</strong>. Ele começa do zero absoluto (o que é um programa? o que é compilar?) e vai até o C++ moderno: classes, templates, a biblioteca padrão (STL), ponteiros inteligentes, ranges, <code>std::print</code> e <code>std::expected</code> do C++23. O C++ tem fama de difícil. Parte da fama vem de um jeito antigo de ensinar, cheio de armadilhas; este guia ensina o jeito <strong>moderno e seguro</strong> desde a primeira aula, e mostra o antigo só para você reconhecê-lo quando encontrar.</p>
+
+<hr>
+
+<h2>Como as aulas funcionam</h2>
+<p>Nenhum código aparece "seco". Toda aula segue o mesmo caminho:</p>
+<ol class="passo">
+  <li><strong>A ideia primeiro.</strong> Antes do código, você entende o problema que ele resolve, com uma comparação do dia a dia.</li>
+  <li><strong>Anatomia.</strong> Cada pedaço de uma linha nova é separado e explicado: o que é palavra do C++, o que é nome escolhido por você, para que serve cada símbolo.</li>
+  <li><strong>A saída real.</strong> Você vê exatamente o que aparece na tela, com etiquetas laranja apontando o que importa. Toda saída foi produzida por um compilador de verdade.</li>
+  <li><strong>Experimente.</strong> Pelo menos duas caixas por aula para você mudar o código e rodar, muitas com uma <strong>missão</strong> e um botão para ver a solução. As caixas compilam o C++ de verdade, então os erros que você vir são erros reais.</li>
+  <li><strong>Várias formas de fazer.</strong> Quase sempre há mais de um caminho, e uma tabela "qual usar" mostra quando escolher cada um.</li>
+  <li><strong>Quando dá errado.</strong> O código com erro, a mensagem real do compilador (ou do programa), o que ela quer dizer e como consertar.</li>
+  <li><strong>Exercícios e resumo.</strong> Perguntas com correção na hora e uma lista curta do que levar da aula.</li>
+</ol>
+
+<h3>Exemplo: a anatomia de uma linha</h3>
+<p>Esta é a linha que você mudou lá em cima. Veja como as aulas desmontam uma linha de código:</p>
+
+<pre class="file" data-file="trecho">std::cout &lt;&lt; "Olá, mundo!\n";</pre>
+
+<dl class="anatomy">
+  <dt>std::cout</dt><dd>A saída do programa, normalmente a tela (<code>cout</code> = <em>character output</em>, "saída de caracteres"). O <code>std::</code> quer dizer "da biblioteca padrão" (<em>standard</em>): tudo o que vem pronto com o C++ mora numa "gaveta" chamada <code>std</code>, e os dois-pontos duplos <code>::</code> querem dizer "de dentro de". A aula <a href="namespaces.html">Namespaces</a> explica as gavetas.</dd>
+  <dt>&lt;&lt;</dt><dd>"Mande para". Pense numa seta: o texto à direita vai para o <code>cout</code> à esquerda.</dd>
+  <dt>"Olá, mundo!\n"</dt><dd>O texto a mostrar. As aspas marcam onde ele começa e termina e não aparecem na tela. O <code>\n</code> no fim é uma <strong>quebra de linha</strong> (aula <a href="novas-linhas.html">Novas Linhas</a>).</dd>
+  <dt>;</dt><dd>O ponto e vírgula termina a instrução, como o ponto final de uma frase. Esquecê-lo é o erro número um de quem começa.</dd>
+</dl>
+
+<h3>Exemplo: o terminal</h3>
+<p>Além do editor, as aulas mostram o <strong>terminal</strong> da máquina fictícia do guia: um computador chamado <code>notebook</code>, da usuária <code>ana</code>, com Linux em português e o g++ 15 instalado. Ali, a Ana guarda o código num arquivo, pede ao <code>g++</code> (o compilador) para transformá-lo em programa e depois roda o programa:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat ola.cpp                                     « mostra o conteúdo do arquivo
+#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!\n";
+}
+$ g++ -std=c++23 -Wall -Wextra ola.cpp -o ola     « compila: ola.cpp vira o programa ola
+$ ./ola                                           « roda o programa
+Olá, mundo!
+$ echo $?
+0                                                 « código de saída 0: terminou sem erro</pre>
+
+<p>Repare que o <code>g++</code> não escreveu nada: no mundo do terminal, <strong>silêncio quer dizer sucesso</strong>. Se houvesse um erro, ele apareceria ali. E quando falta o <code>;</code>, é assim que o g++ reclama:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra erro.cpp -o erro
+erro.cpp: In function ‘int main()’:
+erro.cpp:4:33: error: expected ‘;’ before ‘}’ token   « linha 4, coluna 33: faltou um ;
+    4 |     std::cout &lt;&lt; "Olá, mundo!\n"
+      |                                 ^
+      |                                 ;               « o g++ até mostra onde ele vai
+    5 | }
+      | ~
+$ echo $?
+1                                                     « 1: a compilação falhou, nenhum programa foi criado</pre>
+
+<p>As mensagens do compilador saem em inglês, mesmo com o computador em português. O guia traduz e explica cada uma. A aula <a href="compilar.html">Compilar com g++</a> explica o que significa cada pedaço do comando <code>g++ -std=c++23 -Wall -Wextra ola.cpp -o ola</code>, e a aula <a href="simulador.html">O Editor do Guia</a> ensina a usar as caixas Experimente.</p>
+
+<hr>
+
+<h2>Escolha sua trilha</h2>
+<div class="trilhas">
+  <div class="trilha n1">
+    <h3>Nível 1 · Iniciante</h3>
+    <p>Para quem nunca programou.</p>
+    <ul>
+      <li>O que é C++, como o código vira programa, instalar e escolher um editor</li>
+      <li>O primeiro programa, compilar com g++, ler erros e avisos</li>
+      <li>Variáveis, tipos, <code>cin</code>, operadores e textos (<code>std::string</code>)</li>
+      <li><code>if</code>, <code>switch</code>, laços, arrays e <code>std::vector</code></li>
+    </ul>
+    <a class="btn" href="introducao.html">Começar &#10095;</a>
+  </div>
+  <div class="trilha n2">
+    <h3>Nível 2 · Intermediário</h3>
+    <p>Funções, memória e organização.</p>
+    <ul>
+      <li>Funções, parâmetros, referências, lambdas e recursão</li>
+      <li>Como a memória funciona: ponteiros e ponteiros inteligentes</li>
+      <li><code>struct</code>, <code>enum class</code>, arquivos e exceções</li>
+      <li>Depurar com GDB e sanitizers, vários arquivos, Make e CMake</li>
+    </ul>
+    <a class="btn" href="funcoes.html">Começar &#10095;</a>
+  </div>
+  <div class="trilha n3">
+    <h3>Nível 3 · Avançado</h3>
+    <p>Objetos, templates e a STL.</p>
+    <ul>
+      <li>Classes, construtores, RAII, herança e polimorfismo</li>
+      <li>Templates e concepts</li>
+      <li>A biblioteca padrão: <code>map</code>, algoritmos, ranges, <code>optional</code></li>
+      <li>Movimento, <code>constexpr</code>, threads, módulos e o C++26</li>
+    </ul>
+    <a class="btn" href="poo.html">Começar &#10095;</a>
+  </div>
+  <div class="trilha proj">
+    <h3>Projetos</h3>
+    <p>Programas completos, construídos passo a passo.</p>
+    <ul>
+      <li>Calculadora e jogo de adivinhação</li>
+      <li>Agenda de contatos com arquivo</li>
+      <li>Contas bancárias com classes</li>
+      <li>Controle de estoque e analisador de texto</li>
+    </ul>
+    <a class="btn" href="projetos.html">Ver projetos &#10095;</a>
+  </div>
+  <div class="trilha ref">
+    <h3>Referência</h3>
+    <p>Consulta rápida para quando você já sabe o que procura.</p>
+    <ul>
+      <li>Tipos e seus limites</li>
+      <li><code>std::string</code>, containers e algoritmos</li>
+      <li>Mensagens de erro do compilador</li>
+      <li>Glossário e quiz</li>
+    </ul>
+    <a class="btn" href="ref-tipos.html">Consultar &#10095;</a>
+  </div>
+</div>
+
+<div class="tip">
+<strong>A regra de ouro</strong>
+<p>Ler não basta: digite cada exemplo. Use as caixas Experimente das aulas e, quando tiver o compilador instalado, repita no terminal do seu computador. Para instalar, veja <a href="instalar-linux.html">Instalar no Linux</a> ou <a href="instalar-windows-mac.html">Instalar no Windows e macOS</a>. Se ainda não quiser instalar nada, tudo bem: quase todo o Nível 1 pode ser feito só no navegador.</p>
+</div>
+
+<hr>
+
+<h2>Como ler este guia</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Elemento</th><th>O que significa</th></tr>
+<tr><td>Caixa com o nome <code>ola.cpp</code> no canto</td><td>O conteúdo de um arquivo de código. O nome no canto é o nome do arquivo. Quando aparece <code>trecho</code>, é só um pedaço de programa, não um arquivo inteiro.</td></tr>
+<tr><td><code>ola.cpp · erro de propósito</code></td><td>Código com erro, mostrado de propósito para você ver a mensagem do compilador. Não copie como exemplo a seguir.</td></tr>
+<tr><td><code>ana@notebook:~/cpp$</code></td><td>O prompt do terminal: usuária <code>ana</code>, na máquina <code>notebook</code>, na pasta <code>~/cpp</code> (a pasta <code>cpp</code> dentro da pasta pessoal). O que vem depois é o comando digitado.</td></tr>
+<tr><td><code>&gt;</code> no começo da linha</td><td>Continuação do comando da linha de cima (por exemplo, o texto de um arquivo sendo criado no terminal).</td></tr>
+<tr><td>Linhas sem prompt</td><td>A resposta do computador: a saída do programa ou a mensagem do compilador.</td></tr>
+<tr><td><span class="t-a">← etiqueta</span></td><td>Uma explicação do guia sobre aquela linha. Não aparece no terminal real.</td></tr>
+<tr><td><span class="versao">C++20</span></td><td>O recurso só existe a partir dessa versão do C++. A aula diz a alternativa para versões mais antigas (veja <a href="versoes.html">Versões do C++</a>).</td></tr>
+<tr><td><strong>ilustrativo</strong></td><td>Uma tela que não pôde ser produzida na máquina do guia (por exemplo, a instalação no Windows). Ela segue os passos oficiais, mas os detalhes podem variar.</td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>Versão de referência: C++23, com o g++ 15 e o Clang 21</strong>
+<p>As saídas do terminal foram conferidas com o <strong>g++ 15.2</strong> e o <strong>clang++ 21.1</strong>, num Linux (Ubuntu 26.04) em português do Brasil. O editor do navegador usa o <strong>Clang</strong>, compilado para WebAssembly (o formato de programa que os navegadores executam). Os dois compiladores seguem o mesmo padrão da linguagem, então o resultado dos programas é o mesmo; só as mensagens de erro usam palavras um pouco diferentes (a aula <a href="simulador.html">O Editor do Guia</a> compara as duas). Quase tudo do Nível 1 funciona em qualquer compilador dos últimos dez anos; quando um recurso é novo, a aula avisa com o selo de versão.</p>
+</div>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
