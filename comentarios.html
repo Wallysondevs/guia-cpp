@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Comentários — //, /* */ e comentar código para testar | Guia C++</title>
+<meta name="description" content="Comentários em C++ para quem nunca programou: // até o fim da linha, /* */ em várias linhas, comentar código para testar, comentários dentro de textos, o erro unterminated comment, /* dentro de /*, a barra invertida que engole a linha seguinte, #if 0 e a ideia do Doxygen (/** */), com mensagens reais do g++ 15 e do Clang 21.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Comentários</span></h1>
+
+<p class="intro">Um <strong>comentário</strong> é um texto dentro do código que o compilador ignora por completo. Ele existe para <strong>pessoas</strong>: para explicar por que o código foi escrito daquele jeito, deixar um lembrete, ou "desligar" uma linha sem apagá-la. O C++ tem dois tipos de comentário, <code>//</code> e <code>/* */</code>, e cada um tem uma armadilha que você vai conhecer nesta aula.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O comentário de linha, <code>//</code>.</li>
+  <li>O comentário de bloco, <code>/* … */</code>, que pode ocupar várias linhas.</li>
+  <li>Como "comentar" código para testar o programa sem uma parte dele.</li>
+  <li>Por que <code>"// isto"</code> dentro de aspas não é comentário.</li>
+  <li>O que escrever (e o que não escrever) num comentário.</li>
+  <li>Os erros reais: comentário que não fecha, <code>/*</code> dentro de <code>/*</code>, a barra invertida no fim de um <code>//</code>.</li>
+  <li>O que são os comentários <code>/** */</code> do Doxygen.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados na máquina da Ana com <code>g++ -std=c++23 -Wall -Wextra</code> (g++ 15.2) e, quando indicado, com o clang++ 21.1, o compilador do editor do guia.</p>
+
+<hr>
+
+<h2>A ideia: anotações a lápis na receita</h2>
+<p>A Ana tem um caderno de receitas cheio de anotações a lápis na margem: "a vovó usava menos açúcar", "forno da casa nova esquenta mais, tirar 5 minutos antes". Quem faz o bolo segue a receita; as anotações ajudam quem <strong>lê</strong>. E quando ela quer testar o bolo sem a cobertura, não arranca a página: risca a parte da cobertura, que continua legível ali, para voltar depois.</p>
+
+<p>Em C++, as anotações e os riscos são os comentários. O compilador "pula" tudo o que estiver dentro de um comentário, como se não existisse.</p>
+
+<hr>
+
+<h2>1. Comentário de linha: <code>//</code></h2>
+<p>Duas barras seguidas, <code>//</code>, começam um comentário que vai <strong>até o fim da linha</strong>. Ele pode ocupar uma linha inteira ou ficar depois do código:</p>
+
+<pre class="file" data-file="compras.cpp">// Programa da lista de compras da Ana
+#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Arroz\n";   // o mais importante
+    std::cout &lt;&lt; "Leite\n";   // o desnatado acabou
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra compras.cpp -o compras &amp;&amp; ./compras
+Arroz
+Leite</pre>
+
+<dl class="anatomy">
+  <dt>std::cout &lt;&lt; "Arroz\n";</dt><dd>Código normal: o compilador lê e executa.</dd>
+  <dt>//</dt><dd>A partir daqui, até o fim da linha, é comentário.</dd>
+  <dt>o mais importante</dt><dd>O texto do comentário. Pode ter qualquer coisa, inclusive acentos, símbolos e código. Não aparece na saída.</dd>
+</dl>
+
+<p>O <code>//</code> é o comentário mais usado em C++. Na linha seguinte, o código volta ao normal, sem precisar "fechar" nada.</p>
+
+<hr>
+
+<h2>2. Comentário de bloco: <code>/* … */</code></h2>
+<p>Barra e asterisco, <code>/*</code>, começam um comentário que vai até o asterisco e barra, <code>*/</code>, <strong>onde quer que estejam</strong>. Ele pode ocupar várias linhas:</p>
+
+<pre class="file" data-file="cabecalho.cpp">/*
+   Lista de compras da Ana
+   Escrito em outubro, para a aula de comentários.
+   Mostra só o que falta comprar.
+*/
+#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Arroz\n";
+}
+</pre>
+
+<p>Ou só um pedacinho, no meio de uma linha de código (o compilador trata o comentário como um espaço):</p>
+
+<pre class="file" data-file="meio.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Total: " &lt;&lt; /* preço */ 25 &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra meio.cpp -o meio &amp;&amp; ./meio
+Total: 25</pre>
+
+<p>Comentários no meio da linha são raros; em geral eles atrapalham a leitura. O uso típico do <code>/* */</code> é um texto de várias linhas, como o cabeçalho acima.</p>
+
+<div class="tip">
+<strong>Asteriscos decorativos</strong>
+<p>Você vai ver comentários de bloco com um <code>*</code> no começo de cada linha:</p>
+<pre class="file">/*
+ * Lista de compras da Ana
+ * Mostra só o que falta comprar.
+ */</pre>
+<p>Os <code>*</code> do meio são só enfeite: para o compilador, tudo entre <code>/*</code> e <code>*/</code> é comentário. Muitos editores acrescentam esses asteriscos sozinhos quando você aperta <kbd>Enter</kbd> dentro de um comentário.</p>
+</div>
+
+<hr>
+
+<h2>3. Comentar código para testar</h2>
+<p>O segundo grande uso dos comentários é <strong>desligar</strong> código temporariamente. Quer ver como o programa se comporta sem uma linha? Em vez de apagá-la (e ter de digitar de novo depois), ponha <code>//</code> na frente:</p>
+
+<pre class="file" data-file="lista.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Arroz\n";
+    // std::cout &lt;&lt; "Feijão\n";
+    std::cout &lt;&lt; "Café\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra lista.cpp -o lista &amp;&amp; ./lista
+Arroz
+Café                     « o Feijão não aparece: a linha virou comentário</pre>
+
+<p>Para desligar várias linhas de uma vez, envolva-as em <code>/* */</code>. E repare que um texto entre aspas com <code>//</code> dentro <strong>não</strong> é comentário: dentro das aspas, <code>//</code> é só texto.</p>
+
+<pre class="file" data-file="coment.cpp">// Programa da lista de compras da Ana
+#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Arroz\n";   // o mais importante
+    /* std::cout &lt;&lt; "Feijão\n";
+       std::cout &lt;&lt; "Café\n"; */
+    std::cout &lt;&lt; "Leite\n";
+    std::cout &lt;&lt; "// isto não é comentário\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra coment.cpp -o coment &amp;&amp; ./coment
+Arroz
+Leite
+// isto não é comentário</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que acontece</th></tr>
+<tr><td>1</td><td>Comentário de linha inteira: ignorado.</td></tr>
+<tr><td>5</td><td>Mostra <code>Arroz</code>; o <code>// o mais importante</code> é ignorado.</td></tr>
+<tr><td>6 e 7</td><td>Tudo entre <code>/*</code> e <code>*/</code> é ignorado, inclusive o código: Feijão e Café somem.</td></tr>
+<tr><td>8</td><td>Mostra <code>Leite</code>.</td></tr>
+<tr><td>9</td><td>As <code>//</code> estão <strong>dentro das aspas</strong>: fazem parte do texto e aparecem na tela.</td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>O atalho do editor</strong>
+<p>Quase todo editor de código comenta e descomenta as linhas selecionadas com um atalho: <kbd>Ctrl</kbd> + <kbd>/</kbd> na maioria deles (em alguns teclados brasileiros, o VS Code usa <kbd>Ctrl</kbd> + <kbd>;</kbd>). Ele põe ou tira <code>//</code> no começo de cada linha. Veja os atalhos do seu em <a href="editores.html">Editores e IDEs</a>.</p>
+</div>
+
+<div class="trycpp" data-goal="outre:^Bom dia!\nVamos à feira.\n$,src:Hoje chove">
+<p class="try-task"><strong>Missão:</strong> sem apagar nenhuma linha, transforme em comentário a linha da chuva, para a saída ficar só com <code>Bom dia!</code> e <code>Vamos à feira.</code>. Depois, acrescente um comentário seu no fim da última linha e rode de novo: a saída não deve mudar.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Bom dia!\n";
+    std::cout &lt;&lt; "Hoje chove.\n";
+    std::cout &lt;&lt; "Vamos à feira.\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Bom dia!\n";
+    // std::cout &lt;&lt; "Hoje chove.\n";
+    std::cout &lt;&lt; "Vamos à feira.\n";   // sábado de manhã
+}
+</pre>
+</div>
+
+<div class="warning">
+<strong>Não deixe código comentado para sempre</strong>
+<p>Comentar código é ótimo para testar. Mas, depois de decidir, apague o que não vai voltar. Um arquivo cheio de linhas desligadas confunde quem lê ("isto ainda vale? por que está aqui?"). Para guardar versões antigas do código existe o <strong>Git</strong>, que guarda todo o histórico do projeto.</p>
+</div>
+
+<hr>
+
+<h2>4. O que escrever num comentário</h2>
+<p>Um bom comentário diz <strong>por que</strong>, e não <strong>o que</strong>. O "o que" o próprio código já diz. Compare:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Comentário inútil (repete o código)</th><th>Comentário útil (explica o motivo)</th></tr>
+<tr><td><code>std::cout &lt;&lt; "\n";   // mostra uma quebra de linha</code></td><td><code>std::cout &lt;&lt; "\n";   // separa o cabeçalho da lista</code></td></tr>
+<tr><td><code>// soma 5</code></td><td><code>// a loja cobra 5 reais de entrega</code></td></tr>
+<tr><td><code>// main</code></td><td><code>// Programa da lista de compras: mostra o que falta comprar</code></td></tr>
+</table>
+</div>
+
+<p>Outras dicas:</p>
+<ul>
+  <li><strong>Um comentário no topo do arquivo</strong>, dizendo o que o programa faz, ajuda muito quem abre o arquivo pela primeira vez (inclusive você daqui a seis meses).</li>
+  <li><strong>Comentário errado é pior que nenhum.</strong> Mudou o código? Atualize o comentário.</li>
+  <li><strong>Acentos são permitidos</strong> nos comentários, porque o compilador nem os lê. Em projetos com pessoas de vários países, os comentários costumam ser em inglês; neste guia, são em português.</li>
+  <li>Muitos programadores marcam pendências com <code>// TODO:</code> ("a fazer"), e os editores destacam essas linhas.</li>
+</ul>
+
+<hr>
+
+<h2>5. <code>/** */</code>: comentários de documentação (Doxygen)</h2>
+<p>Você vai encontrar comentários que começam com <strong>dois</strong> asteriscos, <code>/**</code>, ou com <strong>três</strong> barras, <code>///</code>. Para o compilador, eles são comentários comuns (<code>/**</code> é um <code>/*</code> seguido de um <code>*</code>). Mas uma ferramenta chamada <strong>Doxygen</strong> lê esses comentários especiais e gera um site com a documentação do projeto. As palavras com <code>@</code>, como <code>@param</code> ("parâmetro"), são marcações para ela:</p>
+
+<pre class="file" data-file="doxy.cpp">#include &lt;iostream&gt;
+
+/**
+ * Mostra o total da compra na tela.
+ *
+ * @param total valor da compra, em reais
+ */
+void mostrarTotal(int total) {
+    std::cout &lt;&lt; "Total: R$ " &lt;&lt; total &lt;&lt; "\n";
+}
+
+int main() {
+    mostrarTotal(25); // a Ana gastou 25 reais
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra doxy.cpp -o doxy &amp;&amp; ./doxy
+Total: R$ 25</pre>
+
+<p>Não se preocupe com a função <code>mostrarTotal</code>: funções são do Nível 2 (<a href="funcoes.html">Funções</a>). Por enquanto, basta reconhecer o <code>/** */</code> quando aparecer. Os editores também usam esses comentários: ao passar o mouse sobre <code>mostrarTotal</code>, o VS Code mostra o texto do comentário.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: unterminated comment</code>: o comentário que não fecha</strong>
+<pre class="file" data-file="aberto.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int main() {
+    /* comentário que esqueci de fechar
+    std::cout &lt;&lt; "Olá!\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra aberto.cpp -o aberto
+aberto.cpp:4:5: error: unterminated comment
+    4 |     /* comentário que esqueci de fechar
+      |     ^
+aberto.cpp: In function ‘int main()’:
+aberto.cpp:3:13: error: expected ‘}’ at end of input
+    3 | int main() {
+      |            ~^</pre>
+<p><strong>O que significa:</strong> "comentário não terminado". O <code>/*</code> da linha 4 nunca encontrou um <code>*/</code>, então <strong>todo o resto do arquivo</strong> virou comentário, inclusive o <code>std::cout</code> e a <code>}</code> final. Por isso vem o segundo erro: "esperava <code>}</code> no fim da entrada", porque a <code>main</code> ficou sem fechar. O Clang diz o mesmo:</p>
+<pre class="term" data-cwd="~/cpp">$ clang++ -std=c++23 -Wall -Wextra aberto.cpp -o aberto
+aberto.cpp:4:5: error: unterminated /* comment
+    4 |     /* comentário que esqueci de fechar
+      |     ^
+aberto.cpp:6:2: error: expected '}'
+    6 | }
+      |  ^
+aberto.cpp:3:12: note: to match this '{'
+    3 | int main() {
+      |            ^
+2 errors generated.</pre>
+<p><strong>Como consertar:</strong> feche o comentário com <code>*/</code> onde ele deve acabar. Uma pista visual: no editor, o código depois de um <code>/*</code> aberto fica todo na cor dos comentários (geralmente cinza ou verde).</p>
+</div>
+
+<div class="cenario">
+<strong><code>‘/*’ within comment</code>: um <code>/* */</code> dentro do outro</strong>
+<p>A Ana quis desligar um trecho com <code>/* */</code>, mas dentro dele já havia um comentário de bloco:</p>
+<pre class="file" data-file="aninhado.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int main() {
+    /* desligando um trecho:
+    std::cout &lt;&lt; "Um\n";   /* explicação antiga */
+    std::cout &lt;&lt; "Dois\n";
+    */
+    std::cout &lt;&lt; "Três\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra aninhado.cpp -o aninhado
+aninhado.cpp:5:28: warning: ‘/*’ within comment [-Wcomment]
+    5 |     std::cout &lt;&lt; "Um\n";   /* explicação antiga */
+aninhado.cpp: In function ‘int main()’:
+aninhado.cpp:7:6: error: expected primary-expression before ‘/’ token
+    7 |     */
+      |      ^</pre>
+<p><strong>O que significa:</strong> comentários de bloco <strong>não se aninham</strong> (um não pode ficar dentro do outro). O comentário da linha 4 termina no <strong>primeiro</strong> <code>*/</code> que aparecer, que é o da linha 5. Então a linha 6 volta a ser código (o "Dois" seria mostrado), e o <code>*/</code> da linha 7 fica sobrando, solto no meio do código: "esperava uma expressão antes de <code>/</code>". O aviso da linha 5 ("<code>/*</code> dentro de comentário") é a pista da causa.</p>
+<p><strong>Como consertar:</strong> use <code>//</code> em cada linha (o atalho do editor faz isso), ou o truque do <code>#if 0</code>, logo abaixo.</p>
+</div>
+
+<div class="cenario">
+<strong><code>multi-line comment</code>: a barra invertida que engole a próxima linha</strong>
+<pre class="file" data-file="pasta.cpp · armadilha">#include &lt;iostream&gt;
+
+int main() {
+    // pasta do Windows: C:\fotos\
+    std::cout &lt;&lt; "Esta linha some!\n";
+    std::cout &lt;&lt; "Esta aparece.\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 pasta.cpp -o pasta &amp;&amp; ./pasta
+Esta aparece.            « sem -Wall: nenhum aviso, e uma linha sumiu
+$ g++ -std=c++23 -Wall -Wextra pasta.cpp -o pasta &amp;&amp; ./pasta
+pasta.cpp:4:5: warning: multi-line comment [-Wcomment]
+    4 |     // pasta do Windows: C:\fotos\
+      |     ^
+Esta aparece.</pre>
+<p><strong>O que significa:</strong> em C++, uma barra invertida <code>\</code> no <strong>último caractere</strong> de uma linha junta essa linha com a seguinte. O comentário <code>//</code> "continuou" na linha 5, e o primeiro <code>std::cout</code> virou comentário, sem nenhum erro. Só o <code>-Wall</code> avisa: "comentário de várias linhas". (O Clang avisa com <code>multi-line // comment</code>.) É mais um motivo para compilar sempre com <code>-Wall</code>.</p>
+<p><strong>Como consertar:</strong> não termine um <code>//</code> com <code>\</code>. Escreva <code>C:\fotos</code> sem a barra final, ou ponha algo depois dela.</p>
+</div>
+
+<h3>O truque do <code>#if 0</code></h3>
+<p>Para desligar um trecho grande que já tem comentários <code>/* */</code> dentro, programadores C++ usam uma ordem do pré-processador: tudo entre <code>#if 0</code> e <code>#endif</code> é descartado antes da compilação, com ou sem comentários dentro.</p>
+
+<pre class="file" data-file="if0.cpp">#include &lt;iostream&gt;
+
+int main() {
+#if 0
+    std::cout &lt;&lt; "Um\n";   /* explicação antiga */
+    std::cout &lt;&lt; "Dois\n";
+#endif
+    std::cout &lt;&lt; "Três\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra if0.cpp -o if0 &amp;&amp; ./if0
+Três</pre>
+
+<p>O <code>0</code> quer dizer "falso": "se falso, inclua este trecho", ou seja, nunca. Trocando por <code>#if 1</code>, o trecho volta. O <code>#if</code> é explicado em <a href="preprocessador.html">O Pré-processador</a>.</p>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th><th>Cuidado</th></tr>
+<tr><td><code>// texto</code></td><td>Comentário até o fim da linha</td><td>Não termine com <code>\</code></td></tr>
+<tr><td><code>/* texto */</code></td><td>Comentário até o <code>*/</code>, em uma ou várias linhas</td><td>Não pode ficar dentro de outro <code>/* */</code>; precisa fechar</td></tr>
+<tr><td><code>// codigo();</code></td><td>Desliga uma linha de código para testar</td><td>Apague depois de decidir</td></tr>
+<tr><td><code>"// texto"</code></td><td>Não é comentário: é texto e aparece na tela</td><td></td></tr>
+<tr><td><code>/** … */</code>, <code>///</code></td><td>Comentário de documentação (lido pelo Doxygen)</td><td>Para o compilador, é comentário comum</td></tr>
+<tr><td><code>#if 0</code> … <code>#endif</code></td><td>Desliga um trecho, mesmo com <code>/* */</code> dentro</td><td></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Comentário de linha</h3>
+<p>Complete para que o texto depois do código seja um comentário:</p>
+<div class="ex-code">std::cout &lt;&lt; "Arroz\n";   <input data-answer="//" aria-label="símbolo" size="3"> comprar 5 kg</div>
+</div>
+
+<div class="exercise">
+<h3>2. Fechar o bloco</h3>
+<p>Complete o símbolo que fecha um comentário de bloco:</p>
+<div class="ex-code">/* lista da semana <input data-answer="*/" aria-label="símbolo" size="3"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. O que este programa mostra? <code>std::cout &lt;&lt; "A\n"; // std::cout &lt;&lt; "B\n";</code> e, na linha de baixo, <code>std::cout &lt;&lt; "// C\n";</code></p>
+<label><input type="radio" name="q3"> <code>A</code>, <code>B</code> e <code>C</code></label>
+<label><input type="radio" name="q3"> Só <code>A</code></label>
+<label><input type="radio" name="q3"> <code>A</code> e <code>// C</code></label>
+<label><input type="radio" name="q3"> Nada: dá erro</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. A Ana abriu um <code>/*</code> na linha 3 e esqueceu o <code>*/</code>. O que acontece?</p>
+<label><input type="radio" name="q4"> Só a linha 3 vira comentário</label>
+<label><input type="radio" name="q4"> Todo o resto do arquivo vira comentário e o compilador dá <code>unterminated comment</code></label>
+<label><input type="radio" name="q4"> O compilador fecha o comentário sozinho no fim da linha</label>
+<label><input type="radio" name="q4"> Nada: o compilador ignora o <code>/*</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Qual comentário é mais útil?</p>
+<label><input type="radio" name="q5"> <code>std::cout &lt;&lt; "\n"; // mostra \n</code></label>
+<label><input type="radio" name="q5"> <code>// aqui tem um cout</code></label>
+<label><input type="radio" name="q5"> <code>// código</code></label>
+<label><input type="radio" name="q5"> <code>// a nota fiscal precisa de uma linha em branco antes do total</code></label>
+</div>
+
+<h3>Missão final: a receita comentada</h3>
+
+<div class="trycpp" data-goal="outre:^Receita de bolo\nFarinha\nOvos\nAçúcar\n$,src:Chocolate,src:/\*,semaviso">
+<p class="try-task"><strong>Missão:</strong> o bolo de hoje vai sem chocolate e sem cobertura. Sem apagar nenhuma linha de código: (1) desligue as <strong>duas</strong> últimas linhas de <code>std::cout</code> com <strong>um único</strong> comentário <code>/* */</code>; (2) acrescente no topo do arquivo um comentário <code>//</code> explicando o que o programa faz. A saída deve ser:</p>
+<pre class="out">Receita de bolo
+Farinha
+Ovos
+Açúcar</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Receita de bolo\n";
+    std::cout &lt;&lt; "Farinha\n";
+    std::cout &lt;&lt; "Ovos\n";
+    std::cout &lt;&lt; "Açúcar\n";
+    std::cout &lt;&lt; "Chocolate\n";
+    std::cout &lt;&lt; "Cobertura\n";
+}
+</pre>
+<pre class="solucao">// Mostra os ingredientes do bolo da Ana
+#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Receita de bolo\n";
+    std::cout &lt;&lt; "Farinha\n";
+    std::cout &lt;&lt; "Ovos\n";
+    std::cout &lt;&lt; "Açúcar\n";
+    /* std::cout &lt;&lt; "Chocolate\n";
+    std::cout &lt;&lt; "Cobertura\n"; */
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Comentários são para pessoas; o compilador os ignora.</li>
+  <li><code>//</code> comenta até o fim da linha. <code>/* */</code> comenta tudo entre a abertura e o primeiro fechamento, em uma ou várias linhas.</li>
+  <li>Comentar código serve para testar sem apagar. Depois de decidir, apague o que sobrou.</li>
+  <li>Dentro de aspas, <code>//</code> e <code>/*</code> são texto comum.</li>
+  <li>Comente o <strong>porquê</strong>, não o <strong>o quê</strong>.</li>
+  <li>Armadilhas: <code>/*</code> sem <code>*/</code> (<code>unterminated comment</code>), <code>/* */</code> dentro de <code>/* */</code>, e <code>\</code> no fim de um <code>//</code> (só o <code>-Wall</code> avisa). Para desligar trechos grandes, use <code>#if 0</code> … <code>#endif</code>.</li>
+  <li><code>/** */</code> e <code>///</code> são comentários de documentação, lidos pelo Doxygen.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
