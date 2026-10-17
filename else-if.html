@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ else if — mais de dois caminhos | Guia C++</title>
+<meta name="description" content="else if em C++ para quem nunca programou: encadear condições, por que a ordem importa (as faixas de notas da Ana e o bug da ordem errada), else if × vários if, fronteiras com &gt; e &gt;=, o else pendurado (-Wdangling-else), com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">else if</span></h1>
+
+<p class="intro">Com <a href="if-else.html">if e else</a>, o programa escolhe entre <strong>dois</strong> caminhos. Mas a professora Ana não dá só "aprovado" ou "reprovado": ela dá conceitos A, B, C e D, conforme a faixa da nota. Para três, quatro ou mais caminhos, você <strong>encadeia</strong> as perguntas com <code>else if</code> ("senão, se"). Nesta aula você vai montar o boletim da Ana, ver por que a <strong>ordem</strong> das perguntas muda o resultado e entender a diferença entre <code>else if</code> e vários <code>if</code> soltos.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como escrever uma cadeia <code>if</code> → <code>else if</code> → <code>else</code>, e como o C++ a percorre.</li>
+  <li>Por que a ordem das condições importa (o bug do "9,5 é conceito C").</li>
+  <li>A diferença entre <code>else if</code> e vários <code>if</code> independentes.</li>
+  <li>Os cuidados com as fronteiras: <code>&gt;</code> ou <code>&gt;=</code>?</li>
+  <li>Como tratar valores inválidos primeiro e o papel do <code>else</code> final.</li>
+  <li>O "else pendurado" e o aviso <code>-Wdangling-else</code>.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: a fila de perguntas da triagem</h2>
+<p>No pronto-socorro, a enfermeira faz perguntas <strong>em ordem</strong>, da mais grave para a mais leve: "Está inconsciente? Então, vermelho. <em>Senão</em>, está sangrando muito? Então, laranja. <em>Senão</em>, tem febre alta? Então, amarelo. <em>Senão</em>, verde". Assim que uma resposta é "sim", ela para de perguntar e encaminha o paciente. Só quem respondeu "não" a todas chega ao último caso.</p>
+
+<p>O <code>else if</code> funciona igual: o C++ testa as condições <strong>de cima para baixo</strong>, entra no <strong>primeiro</strong> bloco cuja condição é verdadeira e <strong>pula todo o resto</strong> da cadeia.</p>
+
+<hr>
+
+<h2>1. O boletim: conceitos A, B, C e D</h2>
+<p>As faixas da professora Ana:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Nota</th><th>Conceito</th></tr>
+<tr><td>9 ou mais</td><td>A</td></tr>
+<tr><td>de 7 até menos de 9</td><td>B</td></tr>
+<tr><td>de 5 até menos de 7</td><td>C</td></tr>
+<tr><td>menos de 5</td><td>D</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="conceito.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 0;
+    std::cout &lt;&lt; "Nota: ";
+    std::cin &gt;&gt; nota;
+
+    if (nota &gt;= 9) {
+        std::cout &lt;&lt; "Conceito A\n";
+    } else if (nota &gt;= 7) {
+        std::cout &lt;&lt; "Conceito B\n";
+    } else if (nota &gt;= 5) {
+        std::cout &lt;&lt; "Conceito C\n";
+    } else {
+        std::cout &lt;&lt; "Conceito D\n";
+    }
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>if (nota &gt;= 9)</dt><dd>A primeira pergunta. Se for verdadeira, mostra A e a cadeia <strong>acaba</strong>.</dd>
+  <dt>else if (nota &gt;= 7)</dt><dd>"Senão, se a nota for 7 ou mais". Só é testada se a primeira foi <strong>falsa</strong>. Por isso não precisa escrever <code>nota &lt; 9</code>: se chegou aqui, já se sabe que a nota é menor que 9.</dd>
+  <dt>else if (nota &gt;= 5)</dt><dd>Só testada se as duas anteriores foram falsas: aqui, a nota é menor que 7.</dd>
+  <dt>else</dt><dd>O "todos os outros casos": só roda se <strong>todas</strong> as condições foram falsas. Não tem condição.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/decisoes">$ g++ -std=c++23 -Wall -Wextra conceito.cpp -o conceito
+$ ./conceito
+Nota: 9.5                « a Ana digitou 9.5 e Enter
+Conceito A
+$ ./conceito
+Nota: 7                  « exatamente 7: 7 &gt;= 7 é verdadeiro
+Conceito B
+$ ./conceito
+Nota: 6.8
+Conceito C
+$ ./conceito
+Nota: 3
+Conceito D</pre>
+
+<p>Acompanhe a nota <code>6.8</code>:</p>
+<ol class="passo">
+  <li><code>6.8 &gt;= 9</code>? Falso. Desce.</li>
+  <li><code>6.8 &gt;= 7</code>? Falso. Desce.</li>
+  <li><code>6.8 &gt;= 5</code>? <strong>Verdadeiro</strong>. Mostra <code>Conceito C</code>.</li>
+  <li>O <code>else</code> é pulado, e o programa segue depois da cadeia.</li>
+</ol>
+
+<div class="tip">
+<strong>O <code>else if</code> não é uma palavra nova</strong>
+<p>O C++ não tem um comando "else if": é um <code>else</code> seguido de um <code>if</code>. Escrito com todas as chaves, o boletim seria uma escadinha de <code>if</code>s dentro de <code>else</code>s:</p>
+<pre class="file" data-file="escadinha.cpp">if (nota &gt;= 9) {
+    std::cout &lt;&lt; "Conceito A\n";
+} else {
+    if (nota &gt;= 7) {
+        std::cout &lt;&lt; "Conceito B\n";
+    } else {
+        if (nota &gt;= 5) {
+            std::cout &lt;&lt; "Conceito C\n";
+        } else {
+            std::cout &lt;&lt; "Conceito D\n";
+        }
+    }
+}
+</pre>
+<p>Funciona igual, mas vai empurrando o código para a direita. Escrever <code>else if</code> na mesma linha é a forma "achatada" de dizer a mesma coisa.</p>
+</div>
+
+<hr>
+
+<h2>2. A ordem importa</h2>
+<p>A mesma cadeia, com as perguntas em ordem crescente, parece igualmente certa. Veja o que acontece com a melhor aluna da turma:</p>
+
+<pre class="file" data-file="ordem.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 9.5;
+
+    if (nota &gt;= 5) {
+        std::cout &lt;&lt; "Conceito C\n";
+    } else if (nota &gt;= 7) {
+        std::cout &lt;&lt; "Conceito B\n";
+    } else if (nota &gt;= 9) {
+        std::cout &lt;&lt; "Conceito A\n";
+    } else {
+        std::cout &lt;&lt; "Conceito D\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/decisoes">$ g++ -std=c++23 -Wall -Wextra ordem.cpp -o ordem
+$ ./ordem
+Conceito C               « 9.5 deveria ser A!</pre>
+
+<p>Nenhum aviso, nenhum erro: o programa está "certo" para o compilador. Mas <code>9.5 &gt;= 5</code> é verdadeiro, então a primeira condição já captura a nota, e a cadeia acaba ali. As perguntas <code>&gt;= 7</code> e <code>&gt;= 9</code> nunca chegam a ser feitas para quem tirou 5 ou mais: os blocos de B e A são <strong>inalcançáveis</strong>.</p>
+
+<div class="warning">
+<strong>Regra: da faixa mais restrita para a mais ampla</strong>
+<p>Com <code>&gt;=</code>, comece pelo valor <strong>mais alto</strong> (9, depois 7, depois 5). Com <code>&lt;</code>, comece pelo <strong>mais baixo</strong> (<code>nota &lt; 5</code>, depois <code>nota &lt; 7</code>…). Faça a pergunta: "alguma condição de cima já engole os casos desta?". Se sim, a ordem está errada.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Conceito A,src:else if">
+<p class="try-task"><strong>Missão:</strong> este é o programa com a ordem errada. Reorganize as condições (sem mudar os números) para que a nota 9.5 dê <code>Conceito A</code>. Depois, teste com 7, 6.8 e 3.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 9.5;
+
+    if (nota &gt;= 5) {
+        std::cout &lt;&lt; "Conceito C\n";
+    } else if (nota &gt;= 7) {
+        std::cout &lt;&lt; "Conceito B\n";
+    } else if (nota &gt;= 9) {
+        std::cout &lt;&lt; "Conceito A\n";
+    } else {
+        std::cout &lt;&lt; "Conceito D\n";
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 9.5;
+
+    if (nota &gt;= 9) {
+        std::cout &lt;&lt; "Conceito A\n";
+    } else if (nota &gt;= 7) {
+        std::cout &lt;&lt; "Conceito B\n";
+    } else if (nota &gt;= 5) {
+        std::cout &lt;&lt; "Conceito C\n";
+    } else {
+        std::cout &lt;&lt; "Conceito D\n";
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. <code>else if</code> × vários <code>if</code></h2>
+<p>E se a Ana tirar o <code>else</code> e escrever três <code>if</code> independentes, um embaixo do outro?</p>
+
+<pre class="file" data-file="varios.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 9.5;
+
+    if (nota &gt;= 9) {
+        std::cout &lt;&lt; "Conceito A\n";
+    }
+    if (nota &gt;= 7) {
+        std::cout &lt;&lt; "Conceito B\n";
+    }
+    if (nota &gt;= 5) {
+        std::cout &lt;&lt; "Conceito C\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/decisoes">$ ./varios
+Conceito A
+Conceito B               « três conceitos para a mesma aluna!
+Conceito C</pre>
+
+<p>Sem <code>else</code>, cada <code>if</code> é uma pergunta <strong>separada</strong>, feita sempre, não importa o que aconteceu antes. 9.5 é maior ou igual a 9, a 7 e a 5: os três blocos rodam.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>if</code> / <code>else if</code> / <code>else</code></th><th>Vários <code>if</code> soltos</th></tr>
+<tr><td>Quantos blocos podem rodar</td><td><strong>No máximo um</strong> (exatamente um, se houver <code>else</code>)</td><td>Zero, um, vários ou todos</td></tr>
+<tr><td>Testa as condições seguintes depois de achar uma verdadeira?</td><td>Não</td><td>Sim, testa todas</td></tr>
+<tr><td>Use quando</td><td>As opções se <strong>excluem</strong>: um conceito por aluno, uma faixa de preço, uma opção de menu</td><td>As verificações são <strong>independentes</strong>: "tem desconto?", "tem frete grátis?", "ganhou brinde?" podem ser todas verdadeiras</td></tr>
+</table>
+</div>
+
+<p>Dá para fazer vários <code>if</code> soltos funcionarem com faixas completas, usando <code>&amp;&amp;</code> ("e", aula <a href="operadores-logicos.html">Operadores Lógicos</a>):</p>
+
+<pre class="file" data-file="faixas.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 9.5;
+
+    if (nota &gt;= 5 &amp;&amp; nota &lt; 7) {
+        std::cout &lt;&lt; "Conceito C\n";
+    }
+    if (nota &gt;= 7 &amp;&amp; nota &lt; 9) {
+        std::cout &lt;&lt; "Conceito B\n";
+    }
+    if (nota &gt;= 9) {
+        std::cout &lt;&lt; "Conceito A\n";
+    }
+    if (nota &lt; 5) {
+        std::cout &lt;&lt; "Conceito D\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/decisoes">$ ./faixas
+Conceito A               « faixas completas: a ordem não importa mais</pre>
+
+<p>Funciona, e a ordem deixa de importar. Mas é mais longo, faz sempre as quatro perguntas e é fácil errar uma fronteira (deixar um "buraco" entre duas faixas, ou uma sobreposição). Para opções que se excluem, a cadeia <code>else if</code> é mais simples e mais segura.</p>
+
+<hr>
+
+<h2>4. Fronteiras: <code>&gt;</code> ou <code>&gt;=</code>?</h2>
+<p>A tabela da professora diz "7 <strong>ou mais</strong> é B". Veja o que acontece se o programa usar <code>&gt;</code> ("maior que", sem o igual):</p>
+
+<pre class="file" data-file="fronteira.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 7.0;
+
+    if (nota &gt; 9) {
+        std::cout &lt;&lt; "Conceito A\n";
+    } else if (nota &gt; 7) {
+        std::cout &lt;&lt; "Conceito B\n";
+    } else if (nota &gt; 5) {
+        std::cout &lt;&lt; "Conceito C\n";
+    } else {
+        std::cout &lt;&lt; "Conceito D\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/decisoes">$ ./fronteira
+Conceito C               « 7 &gt; 7 é falso: o aluno com 7 caiu para C</pre>
+
+<p>Os erros de fronteira só aparecem com os valores <strong>exatamente</strong> no limite. Por isso, ao testar uma cadeia de <code>else if</code>, experimente sempre: um valor no meio de cada faixa <strong>e</strong> cada valor de fronteira (aqui: 9, 7 e 5).</p>
+
+<hr>
+
+<h2>5. Primeiro os casos inválidos; e o <code>else</code> final</h2>
+<p>No boletim, o que acontece com a nota <code>12</code>, digitada por engano? Ela é maior que 9: vira "Conceito A". E <code>-1</code> vira "Conceito D". Nenhum dos dois faz sentido. Uma boa prática é <strong>barrar os valores impossíveis primeiro</strong>, no topo da cadeia:</p>
+
+<pre class="file" data-file="invalida.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 0;
+    std::cout &lt;&lt; "Nota: ";
+    std::cin &gt;&gt; nota;
+
+    if (nota &lt; 0 || nota &gt; 10) {
+        std::cout &lt;&lt; "Nota inválida!\n";
+    } else if (nota &gt;= 9) {
+        std::cout &lt;&lt; "Conceito A\n";
+    } else if (nota &gt;= 7) {
+        std::cout &lt;&lt; "Conceito B\n";
+    } else if (nota &gt;= 5) {
+        std::cout &lt;&lt; "Conceito C\n";
+    } else {
+        std::cout &lt;&lt; "Conceito D\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/decisoes">$ ./invalida
+Nota: 12
+Nota inválida!
+$ ./invalida
+Nota: -1
+Nota inválida!</pre>
+
+<p>O <code>||</code> quer dizer "ou": "se a nota for menor que 0 <strong>ou</strong> maior que 10". Depois dessa barreira, todas as outras condições podem contar com uma nota entre 0 e 10.</p>
+
+<div class="note">
+<strong>O <code>else</code> final é opcional</strong>
+<p>Uma cadeia pode terminar num <code>else if</code>, sem <code>else</code>. Aí, se nenhuma condição for verdadeira, <strong>nada</strong> acontece. Às vezes é isso mesmo que você quer ("se for VIP, dê brinde; senão, se for aniversariante, dê desconto", e os outros clientes não ganham nada). Mas, se todo caso precisa de uma resposta, ponha o <code>else</code>: ele garante que o programa nunca fica calado.</p>
+</div>
+
+<hr>
+
+<h2>Formas diferentes + qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Quando usar</th></tr>
+<tr><td><code>if</code> / <code>else if</code> / <code>else</code></td><td>Opções que se excluem, decididas por faixas ou condições variadas (notas, preços, idades).</td></tr>
+<tr><td>Vários <code>if</code> soltos</td><td>Verificações independentes, que podem ser todas verdadeiras.</td></tr>
+<tr><td>Faixas completas com <code>&amp;&amp;</code></td><td>Quando a ordem não pode importar; em geral, a cadeia <code>else if</code> é melhor.</td></tr>
+<tr><td><code>switch</code></td><td>Uma variável comparada com <strong>valores exatos</strong> (opção 1, 2, 3 de um menu; a letra 'S' ou 'N'). Não serve para faixas. Aula <a href="switch.html">switch</a>.</td></tr>
+<tr><td>Ternário aninhado</td><td>Evite; veja <a href="ternario.html">Operador Ternário</a>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Uma faixa nunca aparece (o 9,5 virou C)</strong>
+<p><strong>O que significa:</strong> uma condição mais ampla está <strong>antes</strong> de uma mais restrita e "engole" os casos dela. O compilador não avisa.</p>
+<p><strong>Como consertar:</strong> com <code>&gt;=</code>, ordene do maior para o menor. Teste um valor de cada faixa.</p>
+</div>
+
+<div class="cenario">
+<strong>Aparecem várias respostas para um caso só</strong>
+<p><strong>O que significa:</strong> faltaram os <code>else</code>: são vários <code>if</code> independentes, e todos os verdadeiros rodaram.</p>
+<p><strong>Como consertar:</strong> ligue as condições com <code>else if</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Um valor exatamente na fronteira cai na faixa errada</strong>
+<p><strong>O que significa:</strong> <code>&gt;</code> no lugar de <code>&gt;=</code> (ou <code>&lt;</code> no lugar de <code>&lt;=</code>).</p>
+<p><strong>Como consertar:</strong> releia a regra ("7 <strong>ou mais</strong>" é <code>&gt;= 7</code>) e teste os valores das fronteiras.</p>
+</div>
+
+<div class="cenario">
+<strong><code>warning: suggest explicit braces to avoid ambiguous ‘else’ [-Wdangling-else]</code></strong>
+<pre class="file" data-file="dangling.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 4.0;
+    bool matriculada = false;
+
+    if (matriculada)
+        if (nota &gt;= 7)
+            std::cout &lt;&lt; "Aprovada\n";
+    else
+        std::cout &lt;&lt; "Não está matriculada\n";
+
+    std::cout &lt;&lt; "Fim\n";
+}
+</pre>
+<pre class="term" data-cwd="~/decisoes">$ g++ -std=c++23 -Wall -Wextra dangling.cpp -o dangling
+dangling.cpp: In function ‘int main()’:
+dangling.cpp:7:8: warning: suggest explicit braces to avoid ambiguous ‘else’ [-Wdangling-else]
+    7 |     if (matriculada)
+      |        ^
+$ ./dangling
+Fim                      « a mensagem "Não está matriculada" não apareceu</pre>
+<p><strong>O que significa:</strong> "sugiro chaves explícitas para evitar um <code>else</code> ambíguo". Pelo recuo, o <code>else</code> parece ser do primeiro <code>if</code> (<code>matriculada</code>). Mas, sem chaves, a regra do C++ é: <strong>o <code>else</code> pertence ao <code>if</code> mais próximo que ainda não tem <code>else</code></strong>, o de dentro (<code>nota &gt;= 7</code>). Como <code>matriculada</code> é falso, o <code>if</code> de fora pula tudo, inclusive o <code>else</code>. Esse é o famoso "else pendurado" (<em>dangling else</em>).</p>
+<p><strong>Como consertar:</strong> chaves deixam claro a quem o <code>else</code> pertence:</p>
+<pre class="file" data-file="dangling.cpp">    if (matriculada) {
+        if (nota &gt;= 7) {
+            std::cout &lt;&lt; "Aprovada\n";
+        }
+    } else {
+        std::cout &lt;&lt; "Não está matriculada\n";
+    }
+</pre>
+</div>
+
+<div class="cenario">
+<strong><code>error: ‘else’ without a previous ‘if’</code></strong>
+<p><strong>O que significa:</strong> há algo entre o fim de um bloco e o <code>else if</code>/<code>else</code> seguinte (uma linha solta, um <code>;</code> depois do <code>)</code>, uma chave fechada a mais).</p>
+<p><strong>Como consertar:</strong> o <code>else</code> precisa vir <strong>logo depois</strong> da <code>}</code> do bloco anterior. Veja o exemplo completo em <a href="if-else.html">if e else</a>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>if (c1) { A } else if (c2) { B } else { C }</code></td><td>Testa c1; se falso, testa c2; se falso, C. No máximo um bloco roda.</td></tr>
+<tr><td>Ordem com <code>&gt;=</code></td><td>Do maior limite para o menor</td></tr>
+<tr><td>Ordem com <code>&lt;</code></td><td>Do menor limite para o maior</td></tr>
+<tr><td><code>else</code> final</td><td>Opcional; garante uma resposta para todo caso</td></tr>
+<tr><td>Casos inválidos</td><td>Primeiro da cadeia: <code>if (x &lt; 0 || x &gt; 10) { … } else if …</code></td></tr>
+<tr><td><code>-Wdangling-else</code></td><td>Avisa quando um <code>else</code> sem chaves pode pertencer a dois <code>if</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Complete a cadeia</h3>
+<p>Complete para mostrar "Criança", "Adolescente" ou "Adulto":</p>
+<div class="ex-code">if (idade &lt; 12) { std::cout &lt;&lt; "Criança"; } <input data-answer="else if" aria-label="palavras"> (idade &lt; 18) { std::cout &lt;&lt; "Adolescente"; } <input data-answer="else" aria-label="palavra"> { std::cout &lt;&lt; "Adulto"; }</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">2. Com <code>x = 15</code>, o que mostra: <code>if (x &gt; 5) { std::cout &lt;&lt; "a"; } else if (x &gt; 10) { std::cout &lt;&lt; "b"; } else { std::cout &lt;&lt; "c"; }</code>?</p>
+<label><input type="radio" name="q2"> <code>ab</code></label>
+<label><input type="radio" name="q2"> <code>b</code></label>
+<label><input type="radio" name="q2"> <code>a</code></label>
+<label><input type="radio" name="q2"> <code>c</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">3. Com <code>x = 15</code>, o que mostra: <code>if (x &gt; 5) { std::cout &lt;&lt; "a"; } if (x &gt; 10) { std::cout &lt;&lt; "b"; }</code>?</p>
+<label><input type="radio" name="q3"> <code>ab</code></label>
+<label><input type="radio" name="q3"> <code>a</code></label>
+<label><input type="radio" name="q3"> <code>b</code></label>
+<label><input type="radio" name="q3"> Nada</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Numa cadeia com <code>&lt;</code>, qual ordem está certa?</p>
+<label><input type="radio" name="q4"> <code>x &lt; 100</code>, depois <code>x &lt; 50</code>, depois <code>x &lt; 10</code></label>
+<label><input type="radio" name="q4"> Tanto faz</label>
+<label><input type="radio" name="q4"> <code>x &lt; 50</code>, depois <code>x &lt; 100</code>, depois <code>x &lt; 10</code></label>
+<label><input type="radio" name="q4"> <code>x &lt; 10</code>, depois <code>x &lt; 50</code>, depois <code>x &lt; 100</code></label>
+</div>
+
+<h3>Missão final: o desconto da lojinha</h3>
+
+<div class="trycpp" data-stdin="130" data-goal="out:Desconto: 10%,src:else if">
+<p class="try-task"><strong>Missão:</strong> o programa lê o total da compra (a caixa já digita <code>130</code> para você). Complete a cadeia: a partir de R$ 200, <code>Desconto: 15%</code>; a partir de R$ 100, <code>Desconto: 10%</code>; a partir de R$ 50, <code>Desconto: 5%</code>; abaixo disso, <code>Sem desconto</code>. Com 130, deve sair <code>Desconto: 10%</code>. Para testar outros valores, troque a leitura por <code>double total = 250;</code>, por exemplo, e confira as fronteiras 200, 100 e 50.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    double total = 0;
+    std::cin &gt;&gt; total;
+
+    if (total &gt;= 200) {
+        std::cout &lt;&lt; "Desconto: 15%\n";
+    }
+    // continue a cadeia aqui
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    double total = 0;
+    std::cin &gt;&gt; total;
+
+    if (total &gt;= 200) {
+        std::cout &lt;&lt; "Desconto: 15%\n";
+    } else if (total &gt;= 100) {
+        std::cout &lt;&lt; "Desconto: 10%\n";
+    } else if (total &gt;= 50) {
+        std::cout &lt;&lt; "Desconto: 5%\n";
+    } else {
+        std::cout &lt;&lt; "Sem desconto\n";
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>else if</code> encadeia perguntas: o C++ testa de cima para baixo, entra no <strong>primeiro</strong> bloco verdadeiro e pula o resto.</li>
+  <li>A <strong>ordem importa</strong>: com <code>&gt;=</code>, do maior limite para o menor. Uma condição ampla no topo "engole" as de baixo, sem aviso do compilador.</li>
+  <li><code>else if</code> → no máximo um bloco roda. Vários <code>if</code> soltos → todos os verdadeiros rodam.</li>
+  <li>Teste os valores de <strong>fronteira</strong>: <code>&gt;</code> e <code>&gt;=</code> só diferem neles.</li>
+  <li>Barre os valores inválidos primeiro. O <code>else</code> final é opcional, mas garante uma resposta.</li>
+  <li>Sem chaves, o <code>else</code> pertence ao <code>if</code> mais próximo (<code>-Wdangling-else</code>). Use chaves sempre.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
