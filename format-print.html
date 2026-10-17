@@ -409,7 +409,7 @@ erro2.cpp:5:30:   in ‘constexpr’ expansion of ‘std::basic_format_string&lt
 </table>
 </div>
 
-<p>No editor do guia (Clang), a primeira linha é igual (<code>call to consteval function … is not a constant expression</code>), e o motivo aparece numa <code>note:</code> logo abaixo, por exemplo <code>non-constexpr function '__invalid_arg_id_in_format_string' cannot be used in a constant expression</code>.</p>
+<p>No editor do guia (Clang), a primeira linha diz o mesmo (<code>call to consteval function … is not a constant expression</code>). O motivo aparece nas linhas <code>note:</code> logo abaixo, com outras palavras, porque o editor usa outra biblioteca padrão (a <code>libc++</code>, do projeto LLVM).</p>
 
 <div class="note">
 <strong>A string de formato precisa estar escrita no código</strong>

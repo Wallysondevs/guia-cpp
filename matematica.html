@@ -166,7 +166,7 @@ abs.cpp:7:22: warning: conversion from ‘double’ to ‘int’ changes value f
     7 |     std::cout &lt;&lt; abs(-2.5) &lt;&lt; "\n";
       |                      ^~~~</pre>
 
-<p>Tradução: "conversão de <code>double</code> para <code>int</code> muda o valor de −2,5 para −2". No editor do guia, que usa o <strong>Clang</strong>, o aviso aparece mesmo sem <code>-Wconversion</code>, e ainda sugere a correção:</p>
+<p>Tradução: "conversão de <code>double</code> para <code>int</code> muda o valor de −2,5 para −2". O outro compilador do laboratório, o <strong>Clang</strong> (o mesmo do editor do guia), avisa mesmo sem <code>-Wconversion</code>, e ainda sugere a correção:</p>
 
 <pre class="term" data-cwd="~/mat">$ clang++ -std=c++23 -Wall -Wextra abs.cpp -o abs
 abs.cpp:7:18: warning: using integer absolute value function 'abs' when argument is of floating point type [-Wabsolute-value]
@@ -183,7 +183,7 @@ abs.cpp:7:22: warning: implicit conversion from 'double' to 'int' changes value 
 
 <div class="warning">
 <strong>Regra prática: sempre <code>std::abs</code></strong>
-<p>Com <code>std::</code>, o resultado é certo para qualquer tipo. Sem ele, o resultado depende de qual cabeçalho você incluiu: no laboratório, com <code>&lt;cmath&gt;</code> ou <code>&lt;cstdlib&gt;</code>, <code>abs(-2.75)</code> deu <code>2</code>; com o antigo <code>&lt;stdlib.h&gt;</code>, deu <code>2.75</code>. Programa que muda de resposta conforme o <code>#include</code> é armadilha. Você também vai ver <code>fabs</code> (o "<code>abs</code> para <code>double</code>" do C) em código antigo; em C++, <code>std::abs</code> já resolve.</p>
+<p>Com <code>std::</code>, o resultado é certo para qualquer tipo. Sem ele, o resultado depende de qual cabeçalho você incluiu: no laboratório, com <code>&lt;cmath&gt;</code> ou <code>&lt;cstdlib&gt;</code>, <code>abs(-2.75)</code> deu <code>2</code>; com o antigo <code>&lt;stdlib.h&gt;</code>, deu <code>2.75</code>. No editor do guia, que usa outra biblioteca padrão (a <code>libc++</code>, do projeto LLVM), o resultado também pode ser outro. Programa que muda de resposta conforme o <code>#include</code> ou a biblioteca é armadilha. Você também vai ver <code>fabs</code> (o "<code>abs</code> para <code>double</code>" do C) em código antigo; em C++, <code>std::abs</code> já resolve.</p>
 </div>
 
 <hr>
