@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ std::set — coleção sem repetidos e em ordem | Guia C++</title>
+<meta name="description" content="std::set em C++ para quem nunca programou: uma coleção sem repetidos e sempre ordenada, insert que diz se inseriu, contains e count, remover duplicados de um vector, std::unordered_set e uma menção ao std::multiset, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">std::set</span></h1>
+
+<p class="intro">O irmão da Ana coleciona figurinhas. Ele não quer saber quantas vezes tirou a número 17; quer saber se <strong>tem</strong> a 17, e quantas figurinhas <strong>diferentes</strong> já colou. É exatamente o que o <code>std::set</code> ("conjunto") faz: guarda valores <strong>sem repetidos</strong>, sempre <strong>em ordem</strong>, e responde rápido "este valor está aqui?". Ele é como um <a href="map.html">std::map</a> que só tem as chaves, sem os valores.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um <code>std::set</code>: sem repetidos e ordenado.</li>
+  <li>Como inserir e como o <code>insert</code> conta se o valor era novo.</li>
+  <li>Como perguntar com <code>contains</code>, <code>count</code> e <code>find</code>, e como apagar.</li>
+  <li>Dois jeitos de tirar os repetidos de um <code>std::vector</code>.</li>
+  <li>O <code>std::unordered_set</code> (sem ordem, mais rápido em média).</li>
+  <li>Que existe o <code>std::multiset</code> (com repetidos).</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp/set</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. É bom ter visto <a href="map.html">std::map</a> e <a href="unordered-map.html">std::unordered_map</a>.</p>
+
+<hr>
+
+<h2>A ideia: o álbum de figurinhas</h2>
+<p>O álbum tem um espaço para cada número. Se você tira a 17 e ela já está colada, não tem onde pôr: ela vai para a pilha de trocas. Folheando o álbum, as figurinhas aparecem em ordem de número, não na ordem em que foram coladas. E para saber se tem a 42, basta abrir na página dela.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No álbum</th><th>No <code>std::set</code></th></tr>
+<tr><td>Cada número só tem um espaço</td><td><strong>Sem repetidos</strong>: inserir um valor que já existe não faz nada</td></tr>
+<tr><td>Folhear do começo ao fim</td><td>Percorrer: sai <strong>em ordem</strong> crescente</td></tr>
+<tr><td>"Tenho a 42?"</td><td><code>album.contains(42)</code></td></tr>
+<tr><td>Quantas diferentes eu tenho</td><td><code>album.size()</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. Criar e inserir</h2>
+
+<pre class="file" data-file="figurinhas.cpp">#include &lt;iostream&gt;
+#include &lt;set&gt;
+
+int main() {
+    std::set&lt;int&gt; album;
+
+    album.insert(17);
+    album.insert(3);
+    album.insert(42);
+    album.insert(3);
+    album.insert(17);
+
+    std::cout &lt;&lt; "Figurinhas diferentes: " &lt;&lt; album.size() &lt;&lt; '\n';
+    for (int f : album) {
+        std::cout &lt;&lt; f &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;set&gt;</dt><dd>O cabeçalho do <code>std::set</code> (e do <code>std::multiset</code>).</dd>
+  <dt>std::set&lt;int&gt; album;</dt><dd>Um conjunto de inteiros, vazio. Um tipo só, entre <code>&lt;&gt;</code>: não há valor, só a "chave".</dd>
+  <dt>album.insert(17);</dt><dd>Põe o 17 no conjunto. O <code>set</code> não tem <code>push_back</code>: ele não tem "fim", porque decide sozinho o lugar de cada valor (a ordem).</dd>
+  <dt>album.insert(3); (a segunda vez)</dt><dd>O 3 já está lá: nada acontece. Nenhum erro, nenhuma cópia.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/set">$ g++ -std=c++23 -Wall -Wextra figurinhas.cpp -o figurinhas
+$ ./figurinhas
+Figurinhas diferentes: 3
+3 17 42                  « em ordem crescente, não na ordem de inserção</pre>
+
+<p>Cinco <code>insert</code>, três figurinhas. Também dá para criar já com valores: <code>std::set&lt;int&gt; album{3, 17, 42, 3};</code> (o segundo 3 é descartado).</p>
+
+<hr>
+
+<h2>2. O <code>insert</code> conta se era novo</h2>
+<p>Igual ao do <code>map</code>, o <code>insert</code> devolve uma dupla: um iterador para o valor e um <code>bool</code> que diz se ele <strong>entrou agora</strong> (<code>true</code>) ou <strong>já estava</strong> (<code>false</code>). Perfeito para separar as figurinhas novas das repetidas:</p>
+
+<pre class="file" data-file="inseriu.cpp">#include &lt;iostream&gt;
+#include &lt;set&gt;
+
+int main() {
+    std::set&lt;int&gt; album{3, 17, 42};
+    int pacotinho[] = {8, 17, 3, 25};
+
+    for (int f : pacotinho) {
+        auto [pos, inseriu] = album.insert(f);
+        if (inseriu) {
+            std::cout &lt;&lt; f &lt;&lt; ": nova! colei no álbum\n";
+        } else {
+            std::cout &lt;&lt; f &lt;&lt; ": repetida, vai para a troca\n";
+        }
+    }
+    std::cout &lt;&lt; "Álbum: " &lt;&lt; album.size() &lt;&lt; " figurinhas\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/set">$ g++ -std=c++23 -Wall -Wextra inseriu.cpp -o inseriu
+$ ./inseriu
+8: nova! colei no álbum
+17: repetida, vai para a troca
+3: repetida, vai para a troca
+25: nova! colei no álbum
+Álbum: 5 figurinhas</pre>
+
+<dl class="anatomy">
+  <dt>auto [pos, inseriu] = album.insert(f);</dt><dd>Desmonta a dupla devolvida em duas variáveis (<em>structured bindings</em>, aula <a href="pair-tuple.html">pair, tuple e Desestruturação</a>). <code>pos</code> aponta o valor no conjunto; <code>inseriu</code> é o <code>bool</code>.</dd>
+  <dt>if (inseriu)</dt><dd>Numa linha só, você insere <strong>e</strong> descobre se era novo, sem procurar duas vezes.</dd>
+</dl>
+
+<p>Este exemplo não usa o <code>pos</code>, e o g++ não reclama: variáveis de <em>structured bindings</em> não usadas não geram aviso.</p>
+
+<hr>
+
+<h2>3. Perguntar, apagar e o primeiro da ordem</h2>
+
+<pre class="file" data-file="perguntar.cpp">#include &lt;iostream&gt;
+#include &lt;set&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::set&lt;std::string&gt; convidados{"Ana", "Bruno", "Carla"};
+
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "Bruno vem? " &lt;&lt; convidados.contains("Bruno") &lt;&lt; '\n';
+    std::cout &lt;&lt; "Davi vem? " &lt;&lt; convidados.contains("Davi") &lt;&lt; '\n';
+    std::cout &lt;&lt; "count(\"Ana\") = " &lt;&lt; convidados.count("Ana") &lt;&lt; '\n';
+
+    convidados.erase("Bruno");
+    auto it = convidados.find("Bruno");
+    if (it == convidados.end()) {
+        std::cout &lt;&lt; "Bruno saiu da lista\n";
+    }
+    std::cout &lt;&lt; "Primeiro em ordem: " &lt;&lt; *convidados.begin() &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/set">$ g++ -std=c++23 -Wall -Wextra perguntar.cpp -o perguntar
+$ ./perguntar
+Bruno vem? true
+Davi vem? false
+count("Ana") = 1
+Bruno saiu da lista
+Primeiro em ordem: Ana</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>s.contains(x)</code> <span class="versao">C++20</span></td><td><code>true</code> se <code>x</code> está no conjunto. A forma mais clara.</td></tr>
+<tr><td><code>s.count(x)</code></td><td>0 ou 1 (num <code>set</code> não há repetidos). A forma antiga de perguntar.</td></tr>
+<tr><td><code>s.find(x)</code></td><td>Iterador para <code>x</code>, ou <code>s.end()</code>.</td></tr>
+<tr><td><code>s.erase(x)</code></td><td>Tira <code>x</code>; devolve quantos tirou (0 ou 1).</td></tr>
+<tr><td><code>*s.begin()</code></td><td>O <strong>menor</strong> valor (só se o conjunto não estiver vazio). O maior é <code>*s.rbegin()</code>.</td></tr>
+</table>
+</div>
+
+<p>Diferente do <code>map</code>, o <code>set</code> <strong>não tem <code>[]</code></strong>: não há "valor" para ler, e não existe "a figurinha da posição 0". Também não dá para <strong>mudar</strong> um valor que já está lá dentro, porque isso bagunçaria a ordem. Para "trocar" o 17 por 18: <code>erase(17)</code> e <code>insert(18)</code>. Os erros reais estão em "Quando dá errado".</p>
+
+<div class="trycpp" data-goal="out:Visitantes diferentes: 3,out:Ana Bruno Carla,src:std::set">
+<p class="try-task"><strong>Missão:</strong> o caderno de visitas da lojinha tem nomes repetidos. Ponha os nomes num <code>std::set&lt;std::string&gt;</code> e mostre quantos visitantes <strong>diferentes</strong> houve e os nomes em ordem. Saída esperada: <code>Visitantes diferentes: 3</code> e, na linha de baixo, <code>Ana Bruno Carla</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;set&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; visitas{"Bruno", "Ana", "Carla", "Ana", "Bruno", "Ana"};
+
+    // ponha as visitas num set e mostre o resultado
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;set&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; visitas{"Bruno", "Ana", "Carla", "Ana", "Bruno", "Ana"};
+
+    std::set&lt;std::string&gt; pessoas;
+    for (const auto&amp; nome : visitas) {
+        pessoas.insert(nome);
+    }
+
+    std::cout &lt;&lt; "Visitantes diferentes: " &lt;&lt; pessoas.size() &lt;&lt; '\n';
+    for (const auto&amp; nome : pessoas) {
+        std::cout &lt;&lt; nome &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>4. Tirar os repetidos de um <code>vector</code></h2>
+<p>É um dos usos mais comuns do <code>set</code>. Há dois jeitos:</p>
+
+<pre class="file" data-file="sem-repetidos.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;set&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 9, 7, 10, 9, 7, 4};
+
+    std::set&lt;int&gt; unicas(notas.begin(), notas.end());
+    std::vector&lt;int&gt; sem_repetidos(unicas.begin(), unicas.end());
+
+    for (int n : sem_repetidos) {
+        std::cout &lt;&lt; n &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+
+    std::sort(notas.begin(), notas.end());
+    notas.erase(std::unique(notas.begin(), notas.end()), notas.end());
+    for (int n : notas) {
+        std::cout &lt;&lt; n &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/set">$ g++ -std=c++23 -Wall -Wextra sem-repetidos.cpp -o sem-repetidos
+$ ./sem-repetidos
+4 7 9 10
+4 7 9 10</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Jeito</th><th>Como funciona</th><th>Quando usar</th></tr>
+<tr><td>Passar por um <code>set</code></td><td><code>std::set&lt;int&gt; unicas(v.begin(), v.end());</code> cria o conjunto com todos os itens da faixa (os repetidos caem fora). Depois, <code>std::vector&lt;int&gt; r(unicas.begin(), unicas.end());</code> volta para um vetor, já em ordem.</td><td>O mais fácil de ler. Bom quando você vai continuar usando o conjunto (para perguntar "tem?").</td></tr>
+<tr><td><code>sort</code> + <code>unique</code> + <code>erase</code></td><td>Ordena (repetidos ficam vizinhos); o <code>std::unique</code> junta os diferentes no começo e devolve onde a parte "útil" termina; o <code>erase</code> corta o resto. Explicado em <a href="algoritmos.html">Algoritmos</a>.</td><td>Mais rápido e sem memória extra. Bom com muitos itens.</td></tr>
+</table>
+</div>
+
+<p>Os dois jeitos <strong>ordenam</strong> o resultado. Se você precisa manter a ordem original (a primeira aparição de cada um), use o <code>insert</code> que conta se era novo (seção 2): percorra o vetor e guarde num vetor novo só os valores em que <code>inseriu</code> deu <code>true</code>.</p>
+
+<hr>
+
+<h2>5. <code>std::unordered_set</code>: sem ordem, mais rápido em média</h2>
+<p>Assim como existe o <code>unordered_map</code>, existe o <code>std::unordered_set</code> (cabeçalho <code>&lt;unordered_set&gt;</code>): a mesma ideia de "sem repetidos", mas guardado numa tabela de espalhamento (aula <a href="unordered-map.html">std::unordered_map</a>). Ele usa a mesma interface do <code>set</code>, só que sem ordem:</p>
+
+<pre class="file" data-file="unordered-set.cpp">#include &lt;iostream&gt;
+#include &lt;set&gt;
+#include &lt;string&gt;
+#include &lt;unordered_set&gt;
+
+int main() {
+    std::set&lt;std::string&gt; s{"pera", "uva", "maçã", "kiwi", "banana"};
+    std::unordered_set&lt;std::string&gt; u{"pera", "uva", "maçã", "kiwi", "banana"};
+
+    for (const auto&amp; f : s) std::cout &lt;&lt; f &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+    for (const auto&amp; f : u) std::cout &lt;&lt; f &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+    std::cout &lt;&lt; std::boolalpha &lt;&lt; u.contains("uva") &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/set">$ g++ -std=c++23 -Wall -Wextra unordered-set.cpp -o unordered-set
+$ ./unordered-set
+banana kiwi maçã pera uva
+banana kiwi maçã uva pera     « quase em ordem, por acaso: repare no uva antes do pera
+true</pre>
+
+<p>Aqui a ordem do <code>unordered_set</code> saiu <strong>quase</strong> alfabética, por coincidência das gavetas. Não confie nisso: com outras palavras, ou noutra biblioteca, sai outra coisa. A escolha entre os dois segue a mesma regra do <code>map</code>: precisa de ordem, <code>set</code>; só quer saber "tem ou não tem", com muitos itens, <code>unordered_set</code>.</p>
+
+<hr>
+
+<h2>6. <code>std::multiset</code>: só para conhecer</h2>
+<p>Às vezes você quer a ordem automática, mas <strong>com</strong> repetidos. Para isso existe o <code>std::multiset</code> (no mesmo cabeçalho <code>&lt;set&gt;</code>):</p>
+
+<pre class="term" data-cwd="~/cpp/set">$ ./multiset              « std::multiset&lt;int&gt; notas{7, 9, 7, 10, 7};
+5 notas, 3 vezes o 7
+7 7 7 9 10</pre>
+
+<p>Nele o <code>count</code> pode passar de 1 e o <code>insert</code> sempre insere. Da mesma família existem o <code>std::multimap</code> (uma chave com vários valores) e as versões <code>unordered_multiset</code>/<code>unordered_multimap</code>. São bem menos usados; quando precisar, você já sabe que existem.</p>
+
+<hr>
+
+<h2>Formas diferentes de "guardar sem repetidos", e qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Container</th><th>Repetidos?</th><th>Ordem</th><th>Use quando…</th></tr>
+<tr><td><code>std::set&lt;T&gt;</code></td><td>Não</td><td>Crescente</td><td>Precisa de ordem, ou do menor/maior valor.</td></tr>
+<tr><td><code>std::unordered_set&lt;T&gt;</code></td><td>Não</td><td>Nenhuma</td><td>Só "tem ou não tem", com muitos itens.</td></tr>
+<tr><td><code>std::multiset&lt;T&gt;</code></td><td>Sim</td><td>Crescente</td><td>Quer manter tudo ordenado automaticamente, com repetidos.</td></tr>
+<tr><td><code>std::map&lt;K, V&gt;</code></td><td>Chaves não</td><td>Por chave</td><td>Cada item tem um valor ligado a ele (nome → quantidade).</td></tr>
+<tr><td><code>std::vector&lt;T&gt;</code> + <code>std::find</code></td><td>Você controla</td><td>A de inserção</td><td>Poucos itens (algumas dezenas) e a ordem de chegada importa.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: no match for ‘operator[]’ (operand types are ‘std::set&lt;int&gt;’ and ‘int’)</code></strong>
+<pre class="term" data-cwd="~/cpp/set">$ g++ -std=c++23 -Wall -Wextra colchete.cpp -o colchete
+colchete.cpp: In function ‘int main()’:
+colchete.cpp:6:23: error: no match for ‘operator[]’ (operand types are ‘std::set&lt;int&gt;’ and ‘int’)
+    6 |     std::cout &lt;&lt; album[0] &lt;&lt; '\n';
+      |                       ^</pre>
+<p><strong>O que significa:</strong> o <code>set</code> não tem <code>[]</code>, nem por posição, nem por valor. No Clang: <code>type 'std::set&lt;int&gt;' does not provide a subscript operator</code>.</p>
+<p><strong>Como consertar:</strong> para perguntar se um valor existe, <code>contains</code>; para o menor, <code>*album.begin()</code>; para percorrer, <code>for</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: assignment of read-only location ‘it.std::_Rb_tree_const_iterator&lt;int&gt;::operator*()’</code></strong>
+<pre class="term" data-cwd="~/cpp/set">$ g++ -std=c++23 -Wall -Wextra mudar.cpp -o mudar      « auto it = album.find(17);  *it = 18;
+mudar.cpp: In function ‘int main()’:
+mudar.cpp:6:9: error: assignment of read-only location ‘it.std::_Rb_tree_const_iterator&lt;int&gt;::operator*()’
+    6 |     *it = 18;
+      |     ~~~~^~~~</pre>
+<p><strong>O que significa:</strong> você tentou mudar um valor dentro do <code>set</code>. Os iteradores do <code>set</code> são sempre <code>const</code> (repare no <code>_Rb_tree_const_iterator</code>: "iterador constante de árvore rubro-negra", a estrutura por dentro do <code>set</code>). Se o 17 virasse 18 no lugar, a ordem poderia quebrar.</p>
+<p><strong>Como consertar:</strong> <code>album.erase(17); album.insert(18);</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Inseri 5 valores e o <code>size()</code> deu 3"</strong>
+<p><strong>O que significa:</strong> não é erro: havia repetidos, e o <code>set</code> os descartou. Se você precisa guardar repetidos, use <code>vector</code> ou <code>multiset</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>std::set&lt;T&gt; s;</code> / <code>std::set&lt;T&gt; s{a, b, c};</code></td><td>Cria vazio / com valores (<code>&lt;set&gt;</code>)</td></tr>
+<tr><td><code>std::set&lt;T&gt; s(v.begin(), v.end());</code></td><td>Cria com os valores de outro container, sem repetidos</td></tr>
+<tr><td><code>s.insert(x)</code></td><td>Insere se não existe; devolve <code>{iterador, inseriu}</code></td></tr>
+<tr><td><code>s.contains(x)</code> <span class="versao">C++20</span>, <code>s.count(x)</code>, <code>s.find(x)</code></td><td>Perguntar se existe</td></tr>
+<tr><td><code>s.erase(x)</code></td><td>Tira <code>x</code> (devolve 0 ou 1)</td></tr>
+<tr><td><code>*s.begin()</code>, <code>*s.rbegin()</code></td><td>Menor e maior valor</td></tr>
+<tr><td><code>s.size()</code>, <code>s.empty()</code>, <code>s.clear()</code></td><td>Quantos, se está vazio, apagar tudo</td></tr>
+<tr><td><code>std::unordered_set&lt;T&gt;</code></td><td>Mesma interface, sem ordem (<code>&lt;unordered_set&gt;</code>)</td></tr>
+<tr><td><code>std::multiset&lt;T&gt;</code></td><td>Ordenado, com repetidos (<code>&lt;set&gt;</code>)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Criar</h3>
+<p>Complete para criar um conjunto de textos chamado <code>tags</code>:</p>
+<div class="ex-code">std::<input data-answer="set&lt;std::string&gt;" aria-label="tipo"> tags;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Tem?</h3>
+<p>Complete para perguntar se o 42 está no conjunto <code>album</code> (C++20):</p>
+<div class="ex-code">if (album.<input data-answer="contains" aria-label="método">(42)) { … }</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Depois de <code>std::set&lt;int&gt; s{5, 1, 5, 3, 1};</code>, o que mostra <code>for (int x : s) std::cout &lt;&lt; x &lt;&lt; ' ';</code>?</p>
+<label><input type="radio" name="q3"> <code>5 1 5 3 1</code></label>
+<label><input type="radio" name="q3"> <code>1 3 5</code></label>
+<label><input type="radio" name="q3"> <code>5 1 3</code></label>
+<label><input type="radio" name="q3"> <code>1 1 3 5 5</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. O que <code>auto [pos, inseriu] = s.insert(7);</code> guarda em <code>inseriu</code> quando o 7 já estava no conjunto?</p>
+<label><input type="radio" name="q4"> <code>true</code></label>
+<label><input type="radio" name="q4"> O número 7</label>
+<label><input type="radio" name="q4"> Quantas vezes o 7 aparece</label>
+<label><input type="radio" name="q4"> <code>false</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Como "trocar" o valor 17 por 18 num <code>std::set</code>?</p>
+<label><input type="radio" name="q5"> <code>s.erase(17); s.insert(18);</code></label>
+<label><input type="radio" name="q5"> <code>*s.find(17) = 18;</code></label>
+<label><input type="radio" name="q5"> <code>s[17] = 18;</code></label>
+<label><input type="radio" name="q5"> Não dá para tirar valores de um <code>set</code></label>
+</div>
+
+<h3>Missão final: a primeira letra repetida</h3>
+
+<div class="trycpp" data-goal="out:Primeira letra repetida: r,src:insert">
+<p class="try-task"><strong>Missão:</strong> descubra a primeira letra que aparece pela segunda vez na palavra <code>"programa"</code>. Percorra as letras, insira cada uma num <code>std::set&lt;char&gt;</code> e use o <code>bool</code> do <code>insert</code>: quando ele disser <code>false</code>, a letra já estava lá. Mostre <code>Primeira letra repetida: r</code> e pare o laço com <code>break</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;set&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string palavra = "programa";
+    std::set&lt;char&gt; vistas;
+
+    for (char letra : palavra) {
+        // insira a letra e confira se era nova
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;set&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string palavra = "programa";
+    std::set&lt;char&gt; vistas;
+
+    for (char letra : palavra) {
+        auto [pos, inseriu] = vistas.insert(letra);
+        if (!inseriu) {
+            std::cout &lt;&lt; "Primeira letra repetida: " &lt;&lt; letra &lt;&lt; '\n';
+            break;
+        }
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>std::set&lt;T&gt;</code> guarda valores <strong>sem repetidos</strong> e <strong>sempre em ordem</strong> crescente (<code>&lt;set&gt;</code>).</li>
+  <li><code>insert</code> devolve <code>{iterador, inseriu}</code>: <code>inseriu</code> é <code>false</code> se o valor já estava.</li>
+  <li>Perguntar: <code>contains</code> <span class="versao">C++20</span>, <code>count</code>, <code>find</code>. Apagar: <code>erase</code>. Não há <code>[]</code> e não dá para mudar um valor no lugar.</li>
+  <li>Tirar repetidos de um <code>vector</code>: passar por um <code>set</code>, ou <code>sort</code> + <code>unique</code> + <code>erase</code>.</li>
+  <li><code>std::unordered_set</code>: sem ordem, mais rápido em média. <code>std::multiset</code>: ordenado, com repetidos.</li>
+  <li>Próximo passo: <a href="stack-queue.html">stack e queue</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
