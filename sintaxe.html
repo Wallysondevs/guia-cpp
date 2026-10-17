@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Sintaxe — instruções, ponto e vírgula, blocos, maiúsculas e std:: | Guia C++</title>
+<meta name="description" content="As regras de escrita do C++ para quem nunca programou: instruções e ponto e vírgula, blocos com chaves, maiúsculas e minúsculas (Main e Cout dão erro), espaços, linhas e indentação, textos que não podem quebrar de linha, std:: e using namespace std (o que faz e por que evitar), com mensagens reais do g++ 15 e do Clang 21.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Sintaxe</span></h1>
+
+<p class="intro"><strong>Sintaxe</strong> é o conjunto de regras de escrita de uma linguagem: onde vai cada símbolo, o que termina uma frase, o que separa uma parte da outra. Em português, um leitor entende "oi tudo bem" mesmo sem vírgula nem ponto de interrogação. O compilador de C++ não é assim tão tolerante: um ponto e vírgula a menos, uma letra maiúscula no lugar errado, e ele recusa o programa inteiro. Nesta aula você conhece as regras básicas, e também as liberdades que a linguagem dá.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma <strong>instrução</strong> e por que ela termina com <code>;</code>.</li>
+  <li>Para que servem as chaves <code>{ }</code> (os <strong>blocos</strong>).</li>
+  <li>Por que <code>main</code> e <code>Main</code>, <code>cout</code> e <code>Cout</code> são coisas diferentes.</li>
+  <li>O que o compilador ignora (espaços, linhas em branco, recuo) e o que ele não ignora.</li>
+  <li>Por que um texto entre aspas não pode quebrar de linha.</li>
+  <li>O que é o <code>std::</code>, o que faz o <code>using namespace std;</code> e por que o guia evita usá-lo.</li>
+</ul>
+</div>
+
+<p>Todos os programas foram compilados na máquina da Ana com o comando padrão do guia, <code>g++ -std=c++23 -Wall -Wextra</code> (aula <a href="compilar.html">Compilar com g++</a>), com o g++ 15.2; alguns também com o clang++ 21.1, o compilador que o editor do guia usa.</p>
+
+<hr>
+
+<h2>A ideia: a gramática de uma receita</h2>
+<p>Uma receita tem uma estrutura: um título, uma lista de passos, cada passo numa frase que termina com ponto. "Bata os ovos. Junte o açúcar. Leve ao forno." Um programa em C++ é parecido:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na receita</th><th>Em C++</th><th>Exemplo</th></tr>
+<tr><td>Uma frase com uma ordem ("Bata os ovos.")</td><td>Uma <strong>instrução</strong></td><td><code>std::cout &lt;&lt; "Oi\n";</code></td></tr>
+<tr><td>O ponto final</td><td>O <strong>ponto e vírgula</strong></td><td><code>;</code></td></tr>
+<tr><td>Um grupo de passos com título ("Massa:", "Cobertura:")</td><td>Um <strong>bloco</strong>, entre chaves</td><td><code>int main() { … }</code></td></tr>
+<tr><td>As palavras, que precisam estar escritas certo</td><td>Os <strong>nomes</strong>, em que maiúsculas importam</td><td><code>main</code>, <code>std::cout</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. Instruções e o ponto e vírgula</h2>
+<p>Uma <strong>instrução</strong> (em inglês, <em>statement</em>) é uma ordem completa para o computador: "mostre isto", "guarde aquilo", "some estes números". Em C++, quase toda instrução termina com <code>;</code>. Este programa tem duas:</p>
+
+<pre class="file" data-file="duas.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Primeira instrução\n";
+    std::cout &lt;&lt; "Segunda instrução\n";
+}
+</pre>
+
+<p>O <code>;</code> é o que diz ao compilador onde uma instrução acaba e a próxima começa. <strong>Não</strong> é a quebra de linha: para o compilador, o fim da linha não significa nada. Por isso, isto também funciona, tudo numa linha só:</p>
+
+<pre class="file" data-file="umalinha.cpp">#include &lt;iostream&gt;
+int main(){std::cout&lt;&lt;"Uma linha só!\n";std::cout&lt;&lt;"E funciona.\n";}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra umalinha.cpp -o umalinha &amp;&amp; ./umalinha
+Uma linha só!
+E funciona.</pre>
+
+<p>Funciona, mas ninguém consegue ler. Escreva <strong>uma instrução por linha</strong>.</p>
+
+<h3>Onde <strong>não</strong> vai ponto e vírgula</h3>
+<ul>
+  <li><strong>Linhas que começam com <code>#</code></strong>, como <code>#include &lt;iostream&gt;</code>. Elas são ordens para o pré-processador, não instruções de C++, e terminam no fim da linha.</li>
+  <li><strong>Depois da <code>}</code> que fecha uma função</strong>, como a da <code>main</code>.</li>
+  <li><strong>Depois de <code>int main()</code></strong>, antes da <code>{</code>. Ali começa a função, não termina uma instrução.</li>
+</ul>
+
+<p>E um <code>;</code> sobrando? Um <code>;</code> sozinho é uma "instrução vazia", que não faz nada. Este programa compila sem erro nem aviso:</p>
+
+<pre class="file" data-file="pontos.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá!\n";;
+    ;
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra pontos.cpp -o pontos &amp;&amp; ./pontos
+Olá!</pre>
+
+<p>Inofensivo aqui, mas não se acostume: mais adiante, um <code>;</code> a mais logo depois de um <code>if</code> ou de um <code>for</code> muda o sentido do programa (você vai ver nas aulas <a href="if-else.html">if e else</a> e <a href="for.html">for</a>). O <code>;</code> a <strong>menos</strong> é que dá erro, e ele está na seção <a href="#quando-da-errado">Quando dá errado</a>.</p>
+
+<hr>
+
+<h2>2. Blocos: as chaves <code>{ }</code></h2>
+<p>As chaves agrupam várias instruções num <strong>bloco</strong>. Você já conhece um: o corpo da <code>main</code>, que vai da <code>{</code> até a <code>}</code>. Um bloco pode ter outros blocos dentro, e vai ter, quando você aprender <code>if</code>, <code>while</code> e <code>for</code>. Dá até para abrir um bloco "solto":</p>
+
+<pre class="file" data-file="bloco.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Antes do bloco\n";
+    {
+        std::cout &lt;&lt; "Dentro do bloco\n";
+    }
+    std::cout &lt;&lt; "Depois do bloco\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra bloco.cpp -o bloco &amp;&amp; ./bloco
+Antes do bloco
+Dentro do bloco
+Depois do bloco</pre>
+
+<p>Aqui o bloco do meio não muda nada na saída. Ele só começa a fazer diferença com variáveis: o que é criado dentro de um bloco deixa de existir quando o bloco fecha (aula <a href="escopo.html">Escopo</a>).</p>
+
+<p>Três regras das chaves:</p>
+<ol>
+  <li><strong>Toda <code>{</code> tem a sua <code>}</code></strong>, como parênteses numa conta. Uma chave sobrando ou faltando é erro (veja <a href="erros-compilacao.html">Lendo Erros do Compilador</a>).</li>
+  <li><strong>A última que abriu é a primeira que fecha.</strong> No exemplo, a <code>}</code> da linha 7 fecha o bloco do meio; a da linha 9 fecha a <code>main</code>.</li>
+  <li><strong>Não vai <code>;</code> depois da <code>}</code></strong> de um bloco ou de uma função. (Há exceções, como as <a href="structs.html">structs</a>, que você verá no Nível 2.)</li>
+</ol>
+
+<hr>
+
+<h2>3. Maiúsculas e minúsculas fazem diferença</h2>
+<p>O C++ é <strong>sensível a maiúsculas e minúsculas</strong> (em inglês, <em>case-sensitive</em>). Para ele, <code>main</code>, <code>Main</code> e <code>MAIN</code> são três nomes diferentes, tão diferentes quanto <code>main</code> e <code>banana</code>. Quase tudo da linguagem e da biblioteca padrão se escreve em <strong>minúsculas</strong>: <code>int</code>, <code>main</code>, <code>return</code>, <code>std</code>, <code>cout</code>, <code>include</code>.</p>
+
+<p>Veja o que acontece com uma maiúscula no lugar errado em cada parte do Olá, mundo.</p>
+
+<h3><code>Main</code> em vez de <code>main</code></h3>
+<pre class="file" data-file="Main.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int Main() {
+    std::cout &lt;&lt; "Olá!\n";
+    return 0;
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra Main.cpp -o Main
+/usr/bin/x86_64-linux-gnu-ld.bfd: /usr/lib/gcc/x86_64-linux-gnu/15/../../../x86_64-linux-gnu/Scrt1.o: na função "_start":
+(.text+0x1b): referência não definida para "main"
+collect2: error: ld returned 1 exit status</pre>
+
+<p>O compilador não reclamou de nada: <code>Main</code> é um nome válido para uma função qualquer. Quem reclamou foi o <strong>ligador</strong> (<code>ld</code>), a etapa final, que procura a função <code>main</code> para saber onde o programa começa e não a encontrou: "referência não definida para <code>main</code>" (em inglês, <code>undefined reference to `main'</code>). Esse tipo de erro, que aparece depois da compilação, é explicado em <a href="erros-compilacao.html">Lendo Erros do Compilador</a>.</p>
+
+<h3><code>Cout</code> em vez de <code>cout</code></h3>
+<pre class="file" data-file="cout.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int main() {
+    std::Cout &lt;&lt; "Olá!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra cout.cpp -o cout
+cout.cpp: In function ‘int main()’:
+cout.cpp:4:10: error: ‘Cout’ is not a member of ‘std’; did you mean ‘cout’?
+    4 |     std::Cout &lt;&lt; "Olá!\n";
+      |          ^~~~
+      |          cout</pre>
+
+<p>"<code>Cout</code> não é membro de <code>std</code>; você quis dizer <code>cout</code>?" O g++ percebeu que existe um nome muito parecido e sugeriu a correção, escrita embaixo da palavra errada. O Clang (o compilador do editor do guia) diz o mesmo com outras palavras:</p>
+
+<pre class="term" data-cwd="~/cpp">$ clang++ -std=c++23 -Wall -Wextra cout.cpp -o cout
+cout.cpp:4:10: error: no member named 'Cout' in namespace 'std'; did you mean 'cout'?
+    4 |     std::Cout &lt;&lt; "Olá!\n";
+      |          ^~~~
+      |          cout
+/usr/lib/gcc/x86_64-linux-gnu/15/../../../../include/c++/15/iostream:65:18: note: 'cout' declared here
+   65 |   extern ostream cout;          ///&lt; Linked to standard output
+      |                  ^
+1 error generated.</pre>
+
+<h3><code>STD</code> e <code>#Include</code></h3>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra STD.cpp -o STD          « STD::cout &lt;&lt; "Olá!\n";
+STD.cpp: In function ‘int main()’:
+STD.cpp:4:5: error: ‘STD’ has not been declared
+    4 |     STD::cout &lt;&lt; "Olá!\n";
+      |     ^~~</pre>
+
+<p>"<code>STD</code> não foi declarado": para o compilador, <code>STD</code> é um nome que ninguém criou.</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra include.cpp -o include  « primeira linha: #Include &lt;iostream&gt;
+include.cpp:1:2: error: invalid preprocessing directive #Include; did you mean #include?
+    1 | #Include &lt;iostream&gt;
+      |  ^~~~~~~
+      |  include
+include.cpp: In function ‘int main()’:
+include.cpp:4:10: error: ‘cout’ is not a member of ‘std’
+    4 |     std::cout &lt;&lt; "Olá!\n";
+      |          ^~~~
+include.cpp:1:1: note: ‘std::cout’ is defined in header ‘&lt;iostream&gt;’; this is probably fixable by adding ‘#include &lt;iostream&gt;’
+  +++ |+#include &lt;iostream&gt;
+    1 | #Include &lt;iostream&gt;</pre>
+
+<p>Um erro só (o <code>I</code> maiúsculo) gerou dois. O primeiro é a causa: "diretiva de pré-processador inválida <code>#Include</code>; você quis dizer <code>#include</code>?". Como o <code>iostream</code> não foi incluído, o <code>cout</code> também "sumiu", e veio o segundo erro. Corrigindo o primeiro, os dois desaparecem. Essa é uma regra de ouro que você vai ver de novo: <strong>corrija sempre o primeiro erro primeiro</strong>.</p>
+
+<div class="trycpp" data-goal="out:Bom dia\, Ana!,out:Hoje tem aula de C++.">
+<p class="try-task"><strong>Missão:</strong> este programa tem <strong>três</strong> maiúsculas no lugar errado. Rode, leia a primeira mensagem, corrija, e repita até ele mostrar as duas linhas. O editor usa o Clang, então as mensagens são parecidas com as do Clang acima.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::Cout &lt;&lt; "Bom dia, Ana!\n";
+    Std::cout &lt;&lt; "Hoje tem aula de C++.\n";
+    Return 0;
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Bom dia, Ana!\n";
+    std::cout &lt;&lt; "Hoje tem aula de C++.\n";
+    return 0;
+}
+</pre>
+</div>
+
+<div class="note">
+<strong>Dentro das aspas, vale o que você escrever</strong>
+<p>A regra das maiúsculas é para o <strong>código</strong>. O texto entre aspas é mostrado do jeito que está: <code>"OLÁ"</code>, <code>"olá"</code> e <code>"Olá"</code> são três textos válidos, e cada um aparece na tela exatamente assim.</p>
+</div>
+
+<hr>
+
+<h2>4. Espaços, linhas e recuo: o compilador não liga, mas você sim</h2>
+<p>Fora das aspas, o compilador trata espaços, tabulações e quebras de linha (os <strong>espaços em branco</strong>) como simples separadores. Um ou cem, tanto faz. Este programa "espalhado" compila e roda:</p>
+
+<pre class="file" data-file="espalhado.cpp">#include &lt;iostream&gt;
+
+int
+main
+(
+)
+{
+    std::cout
+        &lt;&lt;
+    "Espalhado, mas funciona.\n"
+    ;
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra espalhado.cpp -o espalhado &amp;&amp; ./espalhado
+Espalhado, mas funciona.</pre>
+
+<p>O espaço só é obrigatório onde ele separa duas palavras: <code>int main</code> não pode virar <code>intmain</code>. E ele é proibido <strong>dentro</strong> de um nome ou de um símbolo de dois caracteres: <code>std::co ut</code>, <code>std: :cout</code> e <code>&lt; &lt;</code> são erros.</p>
+
+<h3>O recuo (indentação) é para pessoas</h3>
+<p>Os quatro espaços antes de <code>std::cout</code> se chamam <strong>recuo</strong> ou <strong>indentação</strong>. O compilador os ignora, mas eles mostram, num relance, o que está dentro de quê. Compare:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sem recuo (compila, mas confunde)</th><th>Com recuo (o jeito certo)</th></tr>
+<tr><td><pre class="file">int main() {
+std::cout &lt;&lt; "Antes\n";
+{
+std::cout &lt;&lt; "Dentro\n";
+}
+std::cout &lt;&lt; "Depois\n";
+}</pre></td><td><pre class="file">int main() {
+    std::cout &lt;&lt; "Antes\n";
+    {
+        std::cout &lt;&lt; "Dentro\n";
+    }
+    std::cout &lt;&lt; "Depois\n";
+}</pre></td></tr>
+</table>
+</div>
+
+<p>A regra: a cada <code>{</code>, o recuo aumenta um nível; a cada <code>}</code>, diminui. O guia usa <strong>4 espaços</strong> por nível. Também é comum ver 2 espaços ou uma tabulação. Escolha um jeito e use sempre o mesmo. Os editores de código (<a href="editores.html">Editores e IDEs</a>) recuam sozinhos e têm um comando "formatar documento", que arruma tudo de uma vez (por baixo, muitos usam a ferramenta <code>clang-format</code>).</p>
+
+<h3>Onde fica a <code>{</code>?</h3>
+<p>Outra questão de gosto. O guia põe a chave de abertura no fim da linha (<code>int main() {</code>). Muitos projetos a põem sozinha na linha de baixo:</p>
+
+<pre class="file" data-file="estilos.cpp">#include &lt;iostream&gt;
+
+int main()
+{
+    std::cout &lt;&lt; "Chave na linha de baixo também vale.\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra estilos.cpp -o estilos &amp;&amp; ./estilos
+Chave na linha de baixo também vale.</pre>
+
+<p>Os dois estilos são corretos. Em um projeto que já existe, siga o estilo dele.</p>
+
+<h3>O texto entre aspas não pode quebrar de linha</h3>
+<p>Dentro das aspas, os espaços contam (eles aparecem na tela) e a quebra de linha é <strong>proibida</strong>. Se você apertar <kbd>Enter</kbd> no meio de um texto:</p>
+
+<pre class="file" data-file="quebra.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá,
+mundo!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra quebra.cpp -o quebra
+quebra.cpp:4:18: warning: missing terminating " character
+    4 |     std::cout &lt;&lt; "Olá,
+      |                  ^
+quebra.cpp:4:18: error: missing terminating " character
+    4 |     std::cout &lt;&lt; "Olá,
+      |                  ^~~~~
+quebra.cpp:5:7: error: stray ‘\’ in program
+    5 | mundo!\n";
+      |       ^
+quebra.cpp:5:9: warning: missing terminating " character
+    5 | mundo!\n";
+      |         ^
+quebra.cpp:5:9: error: missing terminating " character
+    5 | mundo!\n";
+      |         ^~
+quebra.cpp: In function ‘int main()’:
+quebra.cpp:5:1: error: ‘mundo’ was not declared in this scope
+    5 | mundo!\n";
+      | ^~~~~</pre>
+
+<p>"Falta o caractere <code>"</code> de fechamento" na linha 4. Depois disso, o compilador se perde: lê <code>mundo</code> como se fosse código e reclama de tudo na linha 5. Mais uma vez, o primeiro erro é o que importa.</p>
+
+<p>Para quebrar um texto longo em várias linhas do <strong>código</strong>, feche as aspas e abra de novo na linha de baixo. Dois textos entre aspas lado a lado, separados só por espaços, viram um só:</p>
+
+<pre class="file" data-file="juntas.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, "
+                 "mundo!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra juntas.cpp -o juntas &amp;&amp; ./juntas
+Olá, mundo!</pre>
+
+<p>Repare que a saída ficou numa linha só: quem quebra a linha <strong>na tela</strong> é o <code>\n</code>, não o <kbd>Enter</kbd> no código (aula <a href="novas-linhas.html">Novas Linhas</a>).</p>
+
+<hr>
+
+<h2>5. <code>std::</code> e o <code>using namespace std;</code></h2>
+<p>Tudo o que vem da biblioteca padrão tem o "sobrenome" <code>std</code>: <code>std::cout</code>, <code>std::cin</code>, <code>std::string</code>. Esse sobrenome é um <strong>namespace</strong> ("espaço de nomes"), uma espécie de bairro onde os nomes moram. Ele existe para evitar confusão: se você criar no seu programa algo chamado <code>count</code>, ele não briga com o <code>std::count</code> da biblioteca, porque moram em bairros diferentes.</p>
+
+<p>Esquecer o sobrenome dá erro:</p>
+
+<pre class="file" data-file="semstd.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int main() {
+    cout &lt;&lt; "Olá!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semstd.cpp -o semstd
+semstd.cpp: In function ‘int main()’:
+semstd.cpp:4:5: error: ‘cout’ was not declared in this scope; did you mean ‘std::cout’?
+    4 |     cout &lt;&lt; "Olá!\n";
+      |     ^~~~
+      |     std::cout
+In file included from semstd.cpp:1:
+/usr/include/c++/15/iostream:65:18: note: ‘std::cout’ declared here
+   65 |   extern ostream cout;          ///&lt; Linked to standard output
+      |                  ^~~~</pre>
+
+<p>"<code>cout</code> não foi declarado neste escopo; você quis dizer <code>std::cout</code>?" A <code>note</code> ainda mostra onde o <code>std::cout</code> de verdade está declarado, dentro do arquivo <code>iostream</code> da biblioteca. Você não precisa abrir esse arquivo; basta a sugestão.</p>
+
+<h3>O atalho: <code>using namespace std;</code></h3>
+<p>Em muitos sites, livros e exercícios, você vai ver esta linha logo depois dos <code>#include</code>:</p>
+
+<pre class="file" data-file="using.cpp">#include &lt;iostream&gt;
+using namespace std;
+
+int main() {
+    cout &lt;&lt; "Olá com using!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra using.cpp -o using &amp;&amp; ./using
+Olá com using!</pre>
+
+<dl class="anatomy">
+  <dt>using</dt><dd>"Usando". Pede ao compilador que procure nomes em outro lugar também.</dd>
+  <dt>namespace</dt><dd>"Espaço de nomes": o que vem a seguir é um namespace inteiro, não um nome só.</dd>
+  <dt>std</dt><dd>O namespace da biblioteca padrão.</dd>
+  <dt>;</dt><dd>É uma instrução, então termina com ponto e vírgula.</dd>
+</dl>
+
+<p>Em português: "a partir daqui, quando eu escrever um nome solto e você não achar, procure também no <code>std</code>". É como derrubar o muro entre o seu bairro e o bairro <code>std</code>. Funciona, e economiza digitação. O problema é que a biblioteca padrão tem <strong>milhares</strong> de nomes, muitos deles palavras comuns em inglês: <code>size</code>, <code>count</code>, <code>max</code>, <code>list</code>, <code>data</code>. Com o muro derrubado, um nome seu pode trombar com um deles. A Ana criou uma variável chamada <code>size</code> ("tamanho"):</p>
+
+<pre class="file" data-file="ambiguo.cpp · erro de propósito">#include &lt;iostream&gt;
+using namespace std;
+
+int size = 3;
+
+int main() {
+    cout &lt;&lt; "Tamanho: " &lt;&lt; size &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ambiguo.cpp -o ambiguo
+ambiguo.cpp: In function ‘int main()’:
+ambiguo.cpp:7:28: error: reference to ‘size’ is ambiguous
+    7 |     cout &lt;&lt; "Tamanho: " &lt;&lt; size &lt;&lt; "\n";
+      |                            ^~~~
+In file included from /usr/include/c++/15/string:55,
+                 from /usr/include/c++/15/bits/locale_classes.h:42,
+                 from /usr/include/c++/15/bits/ios_base.h:43,
+                 from /usr/include/c++/15/ios:46,
+                 from /usr/include/c++/15/bits/ostream.h:43,
+                 from /usr/include/c++/15/ostream:42,
+                 from /usr/include/c++/15/iostream:43,
+                 from ambiguo.cpp:1:
+/usr/include/c++/15/bits/range_access.h:284:5: note: candidates are: ‘template&lt;class _Tp, long unsigned int _Nm&gt; constexpr std::size_t std::size(const _Tp (&amp;)[_Nm])’
+  284 |     size(const _Tp (&amp;)[_Nm]) noexcept
+      |     ^~~~
+/usr/include/c++/15/bits/range_access.h:274:5: note:                 ‘template&lt;class _Container&gt; constexpr decltype (__cont.size()) std::size(const _Container&amp;)’
+  274 |     size(const _Container&amp; __cont) noexcept(noexcept(__cont.size()))
+      |     ^~~~
+ambiguo.cpp:4:5: note:                 ‘int size’
+    4 | int size = 3;
+      |     ^~~~</pre>
+
+<p>Assustador, mas a primeira linha de erro resume tudo: "a referência a <code>size</code> é <strong>ambígua</strong>". O compilador achou dois <code>size</code>: o da Ana (a última <code>note</code>, linha 4) e o <code>std::size</code>, uma função da biblioteca que ela nem sabia que existia (as <code>note</code> do meio mostram onde ele mora, dentro dos arquivos que o <code>iostream</code> puxa). Ele não sabe qual usar e desiste. Sem o <code>using namespace std;</code>, o mesmo programa (com <code>std::cout</code>) compila sem problema, porque o <code>size</code> da Ana e o <code>std::size</code> continuam em bairros separados.</p>
+
+<p>Em programas de 10 linhas, o risco é pequeno. Em programas grandes, com vários arquivos e bibliotecas, essas trombadas aparecem de repente, às vezes quando você atualiza o compilador e a biblioteca ganha um nome novo. Num arquivo de cabeçalho (<code>.h</code>), o <code>using namespace std;</code> é pior ainda, porque derruba o muro em todo arquivo que o incluir (aula <a href="headers.html">Arquivos .h e .cpp</a>).</p>
+
+<h3>Formas de escrever, e qual usar</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Quando</th></tr>
+<tr><td>Nome completo</td><td><code>std::cout &lt;&lt; "Oi\n";</code></td><td><strong>A forma do guia.</strong> Sempre claro de onde o nome vem.</td></tr>
+<tr><td>Trazer um nome só</td><td><code>using std::cout;</code> e depois <code>cout &lt;&lt; "Oi\n";</code></td><td>Quando um nome se repete muito num arquivo <code>.cpp</code>. Traz só ele, não os milhares.</td></tr>
+<tr><td>Trazer o namespace inteiro</td><td><code>using namespace std;</code></td><td>Exercícios curtos e código de outras pessoas. Evite em programas grandes e nunca use em <code>.h</code>.</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="usingcout.cpp">#include &lt;iostream&gt;
+using std::cout;
+
+int main() {
+    cout &lt;&lt; "Só o cout veio para cá.\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra usingcout.cpp -o usingcout &amp;&amp; ./usingcout
+Só o cout veio para cá.</pre>
+
+<p>Os namespaces (inclusive como criar os seus) têm aula própria no Nível 2: <a href="namespaces.html">Namespaces</a>.</p>
+
+<hr>
+
+<h2 id="quando-da-errado">Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: expected ‘;’ before …</code></strong>
+<pre class="file" data-file="semponto.cpp · erro de propósito">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!\n"
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ semponto.cpp -o semponto
+semponto.cpp: In function ‘int main()’:
+semponto.cpp:4:33: error: expected ‘;’ before ‘}’ token
+    4 |     std::cout &lt;&lt; "Olá, mundo!\n"
+      |                                 ^
+      |                                 ;
+    5 | }
+      | ~                                </pre>
+<p><strong>O que significa:</strong> "esperava <code>;</code> antes de <code>}</code>". Uma instrução não foi terminada. O <code>g++</code> indica o lugar e até desenha o <code>;</code> que falta.</p>
+<p><strong>Como consertar:</strong> ponha o <code>;</code> no fim da instrução indicada. Se a linha apontada parece certa, olhe o fim da linha <strong>de cima</strong>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>‘Cout’ is not a member of ‘std’; did you mean ‘cout’?</code></strong>
+<p><strong>O que significa:</strong> um nome da biblioteca foi escrito com maiúscula (ou com uma letra trocada). Mensagens com <code>did you mean</code> ("você quis dizer") trazem a correção pronta.</p>
+<p><strong>Como consertar:</strong> escreva o nome como sugerido, em minúsculas.</p>
+</div>
+
+<div class="cenario">
+<strong><code>‘cout’ was not declared in this scope; did you mean ‘std::cout’?</code></strong>
+<p><strong>O que significa:</strong> faltou o <code>std::</code> na frente do nome.</p>
+<p><strong>Como consertar:</strong> escreva <code>std::cout</code>. (O <code>using namespace std;</code> também "resolve", mas traz os riscos da seção 5.)</p>
+</div>
+
+<div class="cenario">
+<strong><code>referência não definida para "main"</code> / <code>undefined reference to `main'</code></strong>
+<p><strong>O que significa:</strong> o programa não tem uma função chamada exatamente <code>main</code>. Quase sempre é <code>Main</code>, <code>mian</code> ou <code>MAIN</code>.</p>
+<p><strong>Como consertar:</strong> <code>int main()</code>, tudo em minúsculas.</p>
+</div>
+
+<div class="cenario">
+<strong><code>missing terminating " character</code></strong>
+<p><strong>O que significa:</strong> um texto abriu aspas e não fechou na mesma linha. Ou faltou a <code>"</code> final, ou você quebrou a linha no meio do texto.</p>
+<p><strong>Como consertar:</strong> feche as aspas na mesma linha. Para textos longos, use dois textos lado a lado (<code>"Olá, " "mundo!\n"</code>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>reference to ‘size’ is ambiguous</code></strong>
+<p><strong>O que significa:</strong> com <code>using namespace std;</code>, um nome seu ficou igual a um nome da biblioteca padrão.</p>
+<p><strong>Como consertar:</strong> tire o <code>using namespace std;</code> e use <code>std::</code>, ou dê outro nome à sua variável (<code>tamanho</code>, em vez de <code>size</code>).</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Regra</th><th>Certo</th><th>Errado</th></tr>
+<tr><td>Instrução termina com <code>;</code></td><td><code>std::cout &lt;&lt; "Oi\n";</code></td><td><code>std::cout &lt;&lt; "Oi\n"</code></td></tr>
+<tr><td>Sem <code>;</code> em linhas com <code>#</code></td><td><code>#include &lt;iostream&gt;</code></td><td><code>#include &lt;iostream&gt;;</code> (o g++ avisa: <code>extra tokens at end of ‘#include’ directive</code>)</td></tr>
+<tr><td>Toda <code>{</code> tem sua <code>}</code></td><td><code>int main() { … }</code></td><td><code>int main() { …</code></td></tr>
+<tr><td>Maiúsculas importam</td><td><code>main</code>, <code>std::cout</code>, <code>return</code></td><td><code>Main</code>, <code>std::Cout</code>, <code>Return</code></td></tr>
+<tr><td>Espaços e linhas: livres fora das aspas</td><td><code>std::cout &lt;&lt; "Oi\n";</code></td><td><code>std::co ut</code>, <code>&lt; &lt;</code></td></tr>
+<tr><td>Texto não quebra de linha</td><td><code>"Olá, " "mundo"</code></td><td><code>"Olá,</code> + <kbd>Enter</kbd> + <code>mundo"</code></td></tr>
+<tr><td>Recuo de 4 espaços por bloco</td><td colspan="2">Não muda o programa; muda quem lê</td></tr>
+<tr><td>Nomes da biblioteca com <code>std::</code></td><td><code>std::cout</code></td><td><code>cout</code> (sem <code>using</code>)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O que falta?</h3>
+<p>Complete o símbolo que termina esta instrução:</p>
+<div class="ex-code">std::cout &lt;&lt; "Bom dia!\n"<input data-answer=";" aria-label="símbolo" size="3"></div>
+</div>
+
+<div class="exercise">
+<h3>2. O sobrenome</h3>
+<p>Complete para usar o <code>cout</code> da biblioteca padrão sem <code>using</code>:</p>
+<div class="ex-code"><input data-answer="std::" aria-label="namespace" size="6">cout &lt;&lt; "Oi\n";</div>
+</div>
+
+<div class="exercise">
+<h3>3. Trazer um nome só</h3>
+<p>Complete para trazer só o <code>cout</code> para o seu arquivo (e não o namespace inteiro):</p>
+<div class="ex-code"><input data-answer="using" aria-label="palavra" size="7"> std::cout;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Qual destas linhas compila?</p>
+<label><input type="radio" name="q4"> <code>Std::cout &lt;&lt; "Oi\n";</code></label>
+<label><input type="radio" name="q4"> <code>std::cout&lt;&lt;"Oi\n"   ;</code></label>
+<label><input type="radio" name="q4"> <code>std::cout &lt;&lt; "Oi\n"</code></label>
+<label><input type="radio" name="q4"> <code>std::cout &lt; &lt; "Oi\n";</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. O que o compilador faz com o recuo (os espaços no começo das linhas)?</p>
+<label><input type="radio" name="q5"> Usa para saber onde o bloco termina, como no Python</label>
+<label><input type="radio" name="q5"> Dá erro se não forem exatamente 4 espaços</label>
+<label><input type="radio" name="q5"> Ignora: o recuo serve para quem lê o código</label>
+<label><input type="radio" name="q5"> Mostra os espaços na tela</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Por que o guia evita <code>using namespace std;</code>?</p>
+<label><input type="radio" name="q6"> Porque ele traz milhares de nomes, que podem trombar com os nomes do seu programa</label>
+<label><input type="radio" name="q6"> Porque ele deixa o programa mais lento</label>
+<label><input type="radio" name="q6"> Porque ele não funciona no C++23</label>
+<label><input type="radio" name="q6"> Porque ele só funciona no Windows</label>
+</div>
+
+<h3>Missão final: arrume a bagunça</h3>
+
+<div class="trycpp" data-goal="out:Lista da feira,out:- tomate,out:- alface,semaviso,src:(std::cout[\s\S]*){3}">
+<p class="try-task"><strong>Missão:</strong> a Ana escreveu este programa com pressa. Ele tem um erro de maiúscula, um <code>;</code> faltando e usa <code>using namespace std;</code>. Faça ele mostrar as três linhas, <strong>sem</strong> o <code>using namespace std;</code> (use <code>std::cout</code>), e arrume o recuo para 4 espaços.</p>
+<pre class="out">Lista da feira
+- tomate
+- alface</pre>
+<pre class="script">#include &lt;iostream&gt;
+using namespace std;
+int main() {
+cout &lt;&lt; "Lista da feira\n"
+  Cout &lt;&lt; "- tomate\n";
+        cout &lt;&lt; "- alface\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Lista da feira\n";
+    std::cout &lt;&lt; "- tomate\n";
+    std::cout &lt;&lt; "- alface\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma <strong>instrução</strong> é uma ordem completa e termina com <code>;</code>. Linhas com <code>#</code> e a <code>}</code> de uma função não levam <code>;</code>.</li>
+  <li><strong>Blocos</strong> agrupam instruções entre <code>{ }</code>. Toda chave aberta precisa ser fechada.</li>
+  <li>Maiúsculas importam: <code>main</code>, <code>std::cout</code>, <code>return</code>, <code>#include</code>, tudo em minúsculas.</li>
+  <li>Espaços, linhas em branco e recuo não mudam o programa, mas mudam muito a leitura. Use 4 espaços por nível.</li>
+  <li>Um texto entre aspas não pode quebrar de linha no código; para isso, use dois textos lado a lado.</li>
+  <li><code>std::</code> é o "sobrenome" da biblioteca padrão. <code>using namespace std;</code> derruba o muro e pode causar trombadas de nomes; o guia usa <code>std::</code>.</li>
+  <li>Corrija sempre o <strong>primeiro</strong> erro: muitas vezes ele causa os outros.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
