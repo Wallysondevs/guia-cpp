@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Compilar com g++ — o comando completo, opção por opção | Guia C++</title>
+<meta name="description" content="O comando de compilação do Guia C++, g++ -std=c++23 -Wall -Wextra ola.cpp -o ola, explicado peça por peça: -std, -Wall, -Wextra, -o, -g e -O2. Compilar e rodar numa linha com &&, recompilar depois de editar, o erro real de std::println sem -std=c++23 e o clang++ como alternativa, com saídas reais do g++ 15 e do Clang 21.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Compilar com g++</span></h1>
+
+<p class="intro">Na aula anterior você compilou com o comando mais curto possível, <code>g++ ola.cpp -o ola</code>. Ele funciona, mas deixa o compilador no "modo de fábrica": usando uma versão antiga do C++ e calado sobre muitos erros prováveis. Nesta aula você monta, peça por peça, o comando que o guia usa em todas as aulas daqui para a frente, e aprende a compilar e rodar numa linha só.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra ola.cpp -o ola</code>.</li>
+  <li>O que fazem <code>-std</code>, <code>-Wall</code>, <code>-Wextra</code> e <code>-o</code>, e para que servem <code>-g</code> e <code>-O2</code>.</li>
+  <li>Por que o <code>std::println</code> dá erro sem <code>-std=c++23</code>.</li>
+  <li>Compilar e rodar numa linha com <code>&amp;&amp;</code>.</li>
+  <li>Por que é preciso <strong>recompilar</strong> depois de editar o código.</li>
+  <li>Como usar o <code>clang++</code>, o outro grande compilador, no lugar do <code>g++</code>.</li>
+</ul>
+</div>
+
+<p>Todos os comandos foram executados na máquina da Ana com o <strong>g++ 15.2</strong> e o <strong>clang++ 21.1</strong> do Ubuntu 26.04, na pasta <code>~/cpp</code>, com o <code>ola.cpp</code> da aula <a href="primeiro-programa.html">Olá, Mundo</a>.</p>
+
+<hr>
+
+<h2>A ideia: os botões do forno</h2>
+<p>Voltando à cozinha da aula anterior: o compilador é a cozinheira, e o código é a receita. Mas a cozinheira também precisa saber <strong>como</strong> trabalhar. "Use a receita nova, não a da vovó." "Me avise se algum ingrediente parecer estragado." "Capriche, que é para festa." Essas instruções extras são as <strong>opções</strong> do compilador: palavras que começam com <code>-</code> (hífen) e mudam o jeito como ele trabalha, sem mudar o código.</p>
+
+<hr>
+
+<h2>1. O comando padrão do guia</h2>
+<p>Este é o comando que você vai digitar em quase todas as aulas:</p>
+
+<dl class="anatomy">
+  <dt>g++</dt><dd>O compilador de C++ do projeto GNU.</dd>
+  <dt>-std=c++23</dt><dd>"Use o C++23", a versão da linguagem que o guia ensina. Seção 2.</dd>
+  <dt>-Wall</dt><dd>"Avise sobre tudo o que é suspeito" (<em>Warnings: all</em>). Seção 3.</dd>
+  <dt>-Wextra</dt><dd>"E mais alguns avisos extras." Seção 3.</dd>
+  <dt>ola.cpp</dt><dd>O arquivo de código.</dd>
+  <dt>-o ola</dt><dd>O nome do programa que será criado. Seção 4.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ola.cpp -o ola
+$ ./ola
+Olá, mundo!</pre>
+
+<p>O resultado é o mesmo de antes, porque o <code>ola.cpp</code> é simples e não tem nada de errado. A diferença aparece quando o código usa recursos novos ou tem problemas escondidos, como você vai ver a seguir.</p>
+
+<div class="tip">
+<strong>A ordem não importa (quase)</strong>
+<p>As opções podem vir em qualquer ordem: <code>g++ ola.cpp -Wextra -o ola -std=c++23 -Wall</code> funciona igual. A única regra é que o nome do programa vem <strong>logo depois</strong> do <code>-o</code>. O guia usa sempre a mesma ordem, para você se acostumar.</p>
+</div>
+
+<hr>
+
+<h2>2. <code>-std=c++23</code>: qual C++ usar</h2>
+<p>O C++ ganha uma versão nova a cada três anos: C++11, C++14, C++17, C++20, C++23 (veja <a href="versoes.html">Versões do C++</a>). Cada uma traz recursos novos. O <code>-std</code> (de <em>standard</em>, "padrão") diz ao compilador qual versão seguir.</p>
+
+<p>E se você não disser? O g++ 15 usa o <strong>C++17</strong>, de 2017. Dá para conferir: todo compilador define um número especial, <code>__cplusplus</code>, com o ano e o mês da versão em uso. Este programa só mostra esse número:</p>
+
+<pre class="file" data-file="versao.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; __cplusplus &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ versao.cpp -o versao &amp;&amp; ./versao
+201703                   « sem -std: C++17 (2017, mês 03)
+$ g++ -std=c++20 versao.cpp -o versao &amp;&amp; ./versao
+202002                   « C++20
+$ g++ -std=c++23 versao.cpp -o versao &amp;&amp; ./versao
+202302                   « C++23: o que o guia usa
+$ g++ -std=c++26 versao.cpp -o versao &amp;&amp; ./versao
+202400                   « C++26: ainda em acabamento, por isso o número "provisório"</pre>
+
+<p>(O <code>&amp;&amp;</code> entre os dois comandos é explicado na seção 5.)</p>
+
+<h3>O que acontece sem <code>-std=c++23</code></h3>
+<p>O C++23 trouxe o <code>std::println</code>, um jeito mais simples de mostrar texto (aula <a href="format-print.html">std::format e std::print</a>). Veja o que acontece ao compilar um programa com ele <strong>sem</strong> pedir o C++23:</p>
+
+<pre class="file" data-file="println.cpp">#include &lt;print&gt;
+
+int main() {
+    std::println("Olá, {}!", "Ana");
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ println.cpp -o println
+println.cpp: In function ‘int main()’:
+println.cpp:4:10: error: ‘println’ is not a member of ‘std’
+    4 |     std::println("Olá, {}!", "Ana");
+      |          ^~~~~~~
+println.cpp:4:10: note: ‘std::println’ is only available from C++23 onwards
+$ g++ -std=c++23 println.cpp -o println &amp;&amp; ./println
+Olá, Ana!</pre>
+
+<p>A primeira mensagem diz "<code>println</code> não é membro de <code>std</code>": o compilador, no modo C++17, não conhece esse nome. A <code>note</code> (nota) logo abaixo é a dica preciosa: "<code>std::println</code> só está disponível a partir do C++23". Com <code>-std=c++23</code>, o mesmo arquivo compila e roda.</p>
+
+<div class="note">
+<strong><code>c++23</code> ou <code>gnu++23</code>?</strong>
+<p>Você pode encontrar <code>-std=gnu++23</code>. É o C++23 mais algumas extensões próprias do GNU, que não existem nos outros compiladores. Na verdade, o padrão de fábrica do g++ 15 é o <code>gnu++17</code>. O guia usa <code>c++23</code> (sem extensões) para o seu código funcionar em qualquer compilador.</p>
+</div>
+
+<p>O editor do guia já compila com <code>-std=c++23</code>. Experimente ver o número da versão e o <code>std::println</code> funcionando:</p>
+
+<div class="trycpp" data-goal="out:202302,out:Olá\, Ana!">
+<p class="try-task"><strong>Missão:</strong> rode e confira o número da versão. Depois acrescente, antes da <code>}</code>, uma linha com <code>std::println("Olá, {}!", "Ana");</code> e rode de novo. (O <code>#include &lt;print&gt;</code> já está lá.)</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;print&gt;
+
+int main() {
+    std::cout &lt;&lt; __cplusplus &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;print&gt;
+
+int main() {
+    std::cout &lt;&lt; __cplusplus &lt;&lt; "\n";
+    std::println("Olá, {}!", "Ana");
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. <code>-Wall</code> e <code>-Wextra</code>: peça para ser avisado</h2>
+<p>O compilador encontra dois tipos de problema:</p>
+<ul>
+  <li><strong>Erros</strong> (<code>error:</code>): o código não segue as regras do C++. O programa <strong>não</strong> é criado.</li>
+  <li><strong>Avisos</strong> (<code>warning:</code>): o código segue as regras, mas tem cara de engano. O programa <strong>é</strong> criado, e o compilador só comenta: "tem certeza?".</li>
+</ul>
+
+<p>No modo de fábrica, o g++ mostra pouquíssimos avisos. As opções que começam com <code>-W</code> (de <em>warning</em>, "aviso") ligam grupos deles. Veja este programa, em que a Ana criou uma variável <code>itens</code> e esqueceu de usá-la (variáveis são o assunto de <a href="variaveis.html">Variáveis</a>; aqui basta saber que <code>int itens = 3;</code> guarda o número 3 com o nome <code>itens</code>):</p>
+
+<pre class="file" data-file="compras.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int itens = 3;
+    std::cout &lt;&lt; "Lista de compras da Ana\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ compras.cpp -o compras
+$                        « nenhuma palavra
+$ g++ -Wall compras.cpp -o compras
+compras.cpp: In function ‘int main()’:
+compras.cpp:4:9: warning: unused variable ‘itens’ [-Wunused-variable]
+    4 |     int itens = 3;
+      |         ^~~~~</pre>
+
+<p>Com <code>-Wall</code>, o g++ avisou: "variável não usada: <code>itens</code>". Não é um erro (o programa foi criado), mas é uma pista: ou a variável sobrou, ou você esqueceu de mostrá-la. Entre colchetes, <code>[-Wunused-variable]</code> é o nome do aviso, que você pode pesquisar.</p>
+
+<p>Apesar do nome, <code>-Wall</code> ("todos") <strong>não</strong> liga todos os avisos. O <code>-Wextra</code> acrescenta outros. Um exemplo: uma <code>main</code> que declara que recebe os argumentos da linha de comando (as palavras digitadas depois do nome do programa; os parâmetros são explicados em <a href="parametros.html">Parâmetros e Argumentos</a>) mas não usa nenhum:</p>
+
+<pre class="file" data-file="args.cpp">#include &lt;iostream&gt;
+
+int main(int argc, char* argv[]) {
+    std::cout &lt;&lt; "Olá!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -Wall args.cpp -o args
+$                        « o -Wall sozinho não viu nada
+$ g++ -Wall -Wextra args.cpp -o args
+args.cpp: In function ‘int main(int, char**)’:
+args.cpp:3:14: warning: unused parameter ‘argc’ [-Wunused-parameter]
+    3 | int main(int argc, char* argv[]) {
+      |          ~~~~^~~~
+args.cpp:3:26: warning: unused parameter ‘argv’ [-Wunused-parameter]
+    3 | int main(int argc, char* argv[]) {
+      |                    ~~~~~~^~~~~~</pre>
+
+<p>Os avisos têm aula própria, com os casos que realmente salvam programas (comparações que dão resultado errado, variáveis sem valor, <code>=</code> no lugar de <code>==</code>): <a href="avisos.html">Avisos (-Wall -Wextra)</a>. Por enquanto, a regra é simples: <strong>compile sempre com <code>-Wall -Wextra</code></strong>, e trate cada aviso como um erro a corrigir.</p>
+
+<div class="warning">
+<strong>Maiúsculas importam nas opções</strong>
+<p><code>-Wall</code> tem <strong>W maiúsculo</strong>. Com minúsculo, o g++ não reconhece a opção, mas pelo menos sugere a certa:</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -wall ola.cpp -o ola
+g++: error: unrecognized command-line option ‘-wall’; did you mean ‘-Wall’?
+$ g++ -std=c+23 ola.cpp -o ola
+g++: error: unrecognized command-line option ‘-std=c+23’; did you mean ‘-std=c++23’?</pre>
+<p>"Opção de linha de comando não reconhecida; você quis dizer…?" Leia a sugestão e corrija.</p>
+</div>
+
+<hr>
+
+<h2>4. <code>-o</code>: o nome do programa</h2>
+<p>Você já conhece: <code>-o ola</code> cria o programa <code>ola</code>; sem <code>-o</code>, o nome é <code>a.out</code> (aula <a href="primeiro-programa.html">Olá, Mundo</a>). Dois detalhes:</p>
+<ul>
+  <li>Se já existir um programa com esse nome, ele é <strong>substituído</strong> sem perguntar. É o que você quer quando recompila.</li>
+  <li>O nome depois de <code>-o</code> nunca deve ser o do arquivo <code>.cpp</code>. O g++ 15 recusa (<code>input file ‘ola.cpp’ is the same as output file</code>), mas não conte com isso para outros arquivos.</li>
+</ul>
+
+<hr>
+
+<h2>5. Compilar e rodar numa linha: <code>&amp;&amp;</code></h2>
+<p>Você vai compilar e rodar centenas de vezes. Para não digitar dois comandos, junte-os com <code>&amp;&amp;</code> ("e então"):</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ola.cpp -o ola &amp;&amp; ./ola
+Olá, mundo!</pre>
+
+<p>O <code>&amp;&amp;</code> é do terminal, não do C++: ele roda o segundo comando <strong>só se o primeiro der certo</strong>. Se a compilação falhar, o programa não roda. Isso é exatamente o que você quer, como mostra a próxima seção.</p>
+
+<div class="tip">
+<strong>Repetir o último comando</strong>
+<p>No terminal, a <kbd>seta para cima</kbd> traz de volta o último comando. O ciclo de trabalho vira: editar, salvar, ir ao terminal, <kbd>↑</kbd>, <kbd>Enter</kbd>.</p>
+</div>
+
+<hr>
+
+<h2>6. Mudou o código? Compile de novo</h2>
+<p>Lembra do bolo? Se você muda a receita, o bolo que já está pronto não muda sozinho. O programa <code>ola</code> é uma "foto" do <code>ola.cpp</code> no momento em que foi compilado. Veja: a Ana troca <code>mundo</code> por <code>Ana</code> no <code>ola.cpp</code>, salva, e roda o programa <strong>sem compilar</strong>:</p>
+
+<pre class="file" data-file="ola.cpp (editado)">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, Ana!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ ./ola
+Olá, mundo!              « o programa antigo! ninguém o recompilou
+$ g++ -std=c++23 -Wall -Wextra ola.cpp -o ola
+$ ./ola
+Olá, Ana!                « agora sim</pre>
+
+<p>É um dos sustos mais comuns: "eu mudei o código e nada mudou!". Antes de procurar o erro, pergunte-se: <strong>salvei o arquivo? Recompilei?</strong></p>
+
+<h3>Por que o <code>&amp;&amp;</code> protege você</h3>
+<p>Agora a Ana troca para <code>Bruno</code>, mas esquece o <code>;</code>. Com <code>&amp;&amp;</code>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ola.cpp -o ola &amp;&amp; ./ola
+ola.cpp: In function ‘int main()’:
+ola.cpp:4:33: error: expected ‘;’ before ‘}’ token
+    4 |     std::cout &lt;&lt; "Olá, Bruno!\n"
+      |                                 ^
+      |                                 ;
+    5 | }
+      | ~                                </pre>
+
+<p>A compilação falhou, o <code>./ola</code> não rodou, e a tela mostra só o erro. Agora compare com <code>;</code> (ponto e vírgula do terminal, que roda o segundo comando <strong>sempre</strong>):</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ola.cpp -o ola ; ./ola
+ola.cpp: In function ‘int main()’:
+ola.cpp:4:33: error: expected ‘;’ before ‘}’ token
+    4 |     std::cout &lt;&lt; "Olá, Bruno!\n"
+      |                                 ^
+      |                                 ;
+    5 | }
+      | ~
+Olá, Ana!                « o programa ANTIGO rodou, e parece que deu tudo certo</pre>
+
+<p>Quando a compilação falha, o g++ <strong>não</strong> mexe no programa que já existia. Com <code>;</code>, o terminal roda esse programa velho, e a última linha da tela engana: parece que funcionou. Use sempre <code>&amp;&amp;</code>.</p>
+
+<hr>
+
+<h2>7. Duas opções para depois: <code>-g</code> e <code>-O2</code></h2>
+<p>Você não vai precisar delas agora, mas vai encontrá-las em todo lugar.</p>
+
+<h3><code>-g</code>: informações para depurar</h3>
+<p>O <code>-g</code> guarda dentro do programa um "mapa" que liga cada pedaço do programa à linha do código-fonte. Ele não muda o que o programa faz; só permite que um <strong>depurador</strong> como o <code>gdb</code> mostre "parei na linha 4" e o valor das variáveis (aula <a href="depuracao-gdb.html">Depurar com o GDB</a>). O preço é um arquivo maior:</p>
+
+<h3><code>-O2</code>: otimizar</h3>
+<p><code>-O</code> (letra O maiúscula, de <em>optimize</em>) seguido de um nível: <code>-O0</code> (nenhuma otimização, o padrão), <code>-O1</code>, <code>-O2</code>, <code>-O3</code>. Com <code>-O2</code>, o compilador gasta mais tempo procurando jeitos de o programa rodar mais rápido: reorganiza contas, elimina trabalho repetido. É o nível usado na maioria dos programas que vão para os usuários.</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ola.cpp -o ola
+$ g++ -std=c++23 -Wall -Wextra -g ola.cpp -o ola-debug
+$ g++ -std=c++23 -Wall -Wextra -O2 ola.cpp -o ola-rapido
+$ ls -l ola ola-debug ola-rapido
+-rwxrwxr-x 1 ana ana 16120 out 16 21:41 ola
+-rwxrwxr-x 1 ana ana 50080 out 16 21:41 ola-debug      « o -g triplicou o tamanho: é o "mapa"
+-rwxrwxr-x 1 ana ana 16144 out 16 21:41 ola-rapido</pre>
+
+<p>Num Olá, mundo não há o que acelerar. Num programa que faz muita conta, a diferença aparece. Este faz 300 milhões de somas (não se preocupe com o <code>for</code>, que é da aula <a href="for.html">for</a>; o <code>time</code> do terminal mede quanto tempo o programa levou):</p>
+
+<pre class="file" data-file="soma.cpp">#include &lt;iostream&gt;
+
+int main() {
+    long long soma = 0;
+    for (long long i = 1; i &lt;= 300000000; i++) {
+        soma = soma + i % 7;
+    }
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra soma.cpp -o soma
+$ time ./soma
+Soma: 900000003
+
+real	0m1,079s                « sem otimização: pouco mais de 1 segundo
+user	0m1,078s
+sys	0m0,001s
+$ g++ -std=c++23 -Wall -Wextra -O2 soma.cpp -o soma
+$ time ./soma
+Soma: 900000003
+
+real	0m0,493s                « com -O2: menos da metade do tempo, mesmo resultado
+user	0m0,490s
+sys	0m0,002s</pre>
+
+<p>Enquanto aprende, compile <strong>sem</strong> <code>-O2</code> e, para depurar, com <code>-g</code>: o programa otimizado fica tão reorganizado que o depurador não consegue mais seguir as linhas. O <code>-O2</code> tem um bônus: ele faz o g++ analisar o código mais a fundo e, por isso, achar alguns avisos a mais (aula <a href="avisos.html">Avisos</a>).</p>
+
+<hr>
+
+<h2>8. A alternativa: <code>clang++</code></h2>
+<p>O g++ não é o único compilador de C++. O outro grande é o <strong>Clang</strong> (comando <code>clang++</code>), do projeto LLVM, usado pela Apple no macOS e por muitas empresas. Ele aceita as <strong>mesmas opções</strong>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ clang++ --version
+Ubuntu clang version 21.1.8 (6ubuntu1)
+Target: x86_64-pc-linux-gnu
+Thread model: posix
+InstalledDir: /usr/lib/llvm-21/bin
+$ clang++ -std=c++23 -Wall -Wextra ola.cpp -o ola &amp;&amp; ./ola
+Olá, mundo!</pre>
+
+<p>No Ubuntu, ele vem no pacote <code>clang</code> (<a href="instalar-linux.html">Instalar no Linux</a>). As mensagens de erro dizem a mesma coisa que as do g++, com outras palavras. Veja o <code>std::println</code> sem <code>-std=c++23</code> (o Clang 21 também usa C++17 se você não pedir outro):</p>
+
+<pre class="term" data-cwd="~/cpp">$ clang++ println.cpp -o println
+println.cpp:4:10: error: no member named 'println' in namespace 'std'
+    4 |     std::println("Olá, {}!", "Ana");
+      |          ^~~~~~~
+1 error generated.
+$ clang++ -std=c++23 println.cpp -o println &amp;&amp; ./println
+Olá, Ana!</pre>
+
+<p>"Nenhum membro chamado <code>println</code> no namespace <code>std</code>": o mesmo erro do g++, sem a nota sobre o C++23. Saber ler os dois é útil, porque <strong>o editor do guia usa o Clang</strong> (compilado para rodar no navegador), enquanto os exemplos de terminal usam o g++. Comparações lado a lado dos dois estão em <a href="erros-compilacao.html">Lendo Erros do Compilador</a>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>g++ (GCC)</th><th>clang++ (LLVM)</th></tr>
+<tr><td>Quem faz</td><td>Projeto GNU</td><td>Projeto LLVM</td></tr>
+<tr><td>Onde é o padrão</td><td>Linux</td><td>macOS (e o editor deste guia)</td></tr>
+<tr><td>Opções</td><td colspan="2">As mesmas para o dia a dia: <code>-std=c++23 -Wall -Wextra -o -g -O2</code></td></tr>
+<tr><td>Mensagens</td><td>Aspas tipográficas ‘assim’, notas longas</td><td>Aspas simples 'assim', terminam com "N errors generated."</td></tr>
+</table>
+</div>
+
+<p><strong>Qual usar?</strong> Qualquer um. O guia mostra o g++ porque é o que vem no Ubuntu. Compilar o mesmo código com os dois é um bom teste: se os dois aceitam sem avisos, o seu código provavelmente segue o padrão à risca.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: ‘println’ is not a member of ‘std’</code></strong>
+<p><strong>O que significa:</strong> você usou um recurso de uma versão mais nova do C++ sem o <code>-std</code> correspondente. A <code>note</code> logo abaixo costuma dizer a versão (<code>only available from C++23 onwards</code>). Também acontece quando falta o <code>#include</code> (aqui, <code>#include &lt;print&gt;</code>).</p>
+<p><strong>Como consertar:</strong> compile com <code>-std=c++23</code> e confira o <code>#include</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>g++: error: unrecognized command-line option</code></strong>
+<p><strong>O que significa:</strong> uma opção foi digitada errado: <code>-wall</code>, <code>-std=c+23</code>, <code>-Wextras</code>. O g++ costuma sugerir a certa (<code>did you mean …?</code>).</p>
+<p><strong>Como consertar:</strong> copie a sugestão. Maiúsculas e minúsculas importam.</p>
+</div>
+
+<div class="cenario">
+<strong>"Mudei o código e o programa continua igual"</strong>
+<p><strong>O que significa:</strong> você está rodando o programa antigo. Ou o arquivo não foi salvo, ou não foi recompilado, ou a compilação falhou e você rodou o programa velho (com <code>;</code> em vez de <code>&amp;&amp;</code>, ou rodando <code>./ola</code> sem ler o erro).</p>
+<p><strong>Como consertar:</strong> salve, compile com <code>g++ … &amp;&amp; ./ola</code> e leia tudo o que aparecer antes da saída do programa.</p>
+</div>
+
+<div class="cenario">
+<strong>Apareceram avisos e o programa rodou mesmo assim</strong>
+<p><strong>O que significa:</strong> avisos não impedem a criação do programa. Mas eles quase sempre apontam um engano real.</p>
+<p><strong>Como consertar:</strong> leia cada <code>warning:</code> e corrija o código até a compilação ficar em silêncio. A aula <a href="avisos.html">Avisos</a> mostra os mais comuns.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Opção</th><th>O que faz</th><th>Quando usar</th></tr>
+<tr><td><code>-std=c++23</code></td><td>Segue o C++23 (sem ela, o g++ 15 usa C++17)</td><td>Sempre, neste guia</td></tr>
+<tr><td><code>-Wall</code></td><td>Liga os avisos mais importantes</td><td>Sempre</td></tr>
+<tr><td><code>-Wextra</code></td><td>Liga avisos extras</td><td>Sempre</td></tr>
+<tr><td><code>-o nome</code></td><td>Nome do programa criado (sem ela: <code>a.out</code>)</td><td>Sempre</td></tr>
+<tr><td><code>-g</code></td><td>Guarda informações para o depurador</td><td>Ao depurar (<a href="depuracao-gdb.html">GDB</a>)</td></tr>
+<tr><td><code>-O2</code></td><td>Otimiza: programa mais rápido, compilação mais lenta</td><td>Na versão final; para achar mais avisos</td></tr>
+<tr><td><code>-Werror</code></td><td>Transforma avisos em erros</td><td>Projetos sérios (<a href="avisos.html">Avisos</a>)</td></tr>
+<tr><td><code>cmd1 &amp;&amp; cmd2</code></td><td>Roda <code>cmd2</code> só se <code>cmd1</code> deu certo</td><td>Compilar e rodar: <code>g++ … &amp;&amp; ./ola</code></td></tr>
+<tr><td><code>clang++</code></td><td>O compilador Clang, com as mesmas opções</td><td>Alternativa ao <code>g++</code></td></tr>
+</table>
+</div>
+
+<p>Outras opções que você vai conhecer mais adiante: <code>-c</code> e vários arquivos (<a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>), <code>-fsanitize</code> (<a href="sanitizers.html">Sanitizers</a>), <code>-I</code> e <code>-l</code> (<a href="bibliotecas.html">Usar Bibliotecas Externas</a>). Quando os comandos ficarem compridos, ferramentas como <a href="make.html">Make</a> e <a href="cmake.html">CMake</a> digitam por você.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A versão</h3>
+<p>Complete o comando para compilar seguindo o C++23:</p>
+<div class="ex-code">g++ <input data-answer="-std=c++23" aria-label="opção"> -Wall -Wextra jogo.cpp -o jogo</div>
+</div>
+
+<div class="exercise">
+<h3>2. Compilar e rodar</h3>
+<p>Complete para rodar o <code>./jogo</code> só se a compilação der certo:</p>
+<div class="ex-code">g++ -std=c++23 -Wall -Wextra jogo.cpp -o jogo <input data-answer="&amp;&amp;" aria-label="operador"> ./jogo</div>
+</div>
+
+<div class="exercise">
+<h3>3. Depurar</h3>
+<p>Qual opção guarda no programa as informações que o <code>gdb</code> usa?</p>
+<div class="ex-code">g++ -std=c++23 -Wall -Wextra <input data-answer="-g" aria-label="opção"> jogo.cpp -o jogo</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Você editou e salvou o <code>jogo.cpp</code>, rodou <code>./jogo</code> e viu a saída antiga. Por quê?</p>
+<label><input type="radio" name="q4"> O <code>-Wall</code> desfez a mudança</label>
+<label><input type="radio" name="q4"> O C++ demora alguns minutos para atualizar</label>
+<label><input type="radio" name="q4"> Faltou recompilar: o programa é uma "foto" do código no momento da compilação</label>
+<label><input type="radio" name="q4"> Faltou o <code>-O2</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Sem nenhum <code>-std</code>, qual versão do C++ o g++ 15 segue?</p>
+<label><input type="radio" name="q5"> C++23</label>
+<label><input type="radio" name="q5"> C++17</label>
+<label><input type="radio" name="q5"> C++98</label>
+<label><input type="radio" name="q5"> A mais nova que existir</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. O que acontece com um programa que gerou só avisos (<code>warning:</code>), sem erros?</p>
+<label><input type="radio" name="q6"> Não é criado</label>
+<label><input type="radio" name="q6"> É criado, mas não pode ser rodado</label>
+<label><input type="radio" name="q6"> É apagado</label>
+<label><input type="radio" name="q6"> É criado normalmente; os avisos apontam enganos prováveis que você deve corrigir</label>
+</div>
+
+<h3>Missão final: o recado em C++23</h3>
+
+<div class="trycpp" data-goal="out:Lista de compras da Ana,out:1 kg de arroz,src:std::println,semaviso">
+<p class="try-task"><strong>Missão:</strong> o editor compila como o comando padrão do guia (<code>-std=c++23 -Wall -Wextra</code>). Este programa compila, mas com um aviso. Faça três coisas: (1) rode e leia o aviso; (2) apague a linha que o causa; (3) troque o <code>std::cout</code> por <code>std::println</code>, que já quebra a linha sozinho (por isso, sem o <code>\n</code>), e acrescente uma segunda linha: <code>1 kg de arroz</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;print&gt;
+
+int main() {
+    int itens = 3;
+    std::cout &lt;&lt; "Lista de compras da Ana\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;print&gt;
+
+int main() {
+    std::println("Lista de compras da Ana");
+    std::println("1 kg de arroz");
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</li>
+  <li><code>-std=c++23</code> escolhe a versão; sem ele, o g++ 15 usa C++17 e não conhece o <code>std::println</code>.</li>
+  <li><code>-Wall -Wextra</code> ligam os avisos: o programa é criado, mas o compilador aponta enganos prováveis.</li>
+  <li><code>-g</code> serve ao depurador; <code>-O2</code> deixa o programa mais rápido.</li>
+  <li><code>g++ … &amp;&amp; ./programa</code> compila e roda, e não roda nada se a compilação falhar.</li>
+  <li>Mudou o código? Salve e recompile. O programa antigo não muda sozinho.</li>
+  <li><code>clang++</code> aceita as mesmas opções; o editor do guia usa o Clang.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
