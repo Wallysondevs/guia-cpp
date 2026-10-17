@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Concepts — dizer quais tipos um template aceita (C++20) | Guia C++</title>
+<meta name="description" content="Concepts do C++20 para quem nunca programou: template &lt;std::integral T&gt;, a cláusula requires, std::integral, std::floating_point e std::totally_ordered, a mensagem de erro com e sem concept comparadas no g++ 15 e como escrever o seu próprio concept.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Concepts</span> <span class="versao">C++20</span></h1>
+
+<p class="intro">Um template aceita "qualquer tipo" só no papel. Na prática, o corpo usa operações (<code>%</code>, <code>&gt;</code>, <code>.size()</code>) que nem todo tipo tem, e quando você passa o tipo errado, o erro aparece <strong>lá dentro</strong> do template, longe da sua linha. Um <strong>concept</strong> (em português, "conceito") é uma regra escrita na entrada do template: "aqui só entram números inteiros". O compilador confere a regra <strong>antes</strong> de abrir o template, e o erro sai na sua chamada, dizendo qual regra falhou.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O problema que os concepts resolvem, com um erro real.</li>
+  <li>Como restringir um template: <code>template &lt;std::integral T&gt;</code>.</li>
+  <li>As quatro formas de escrever a mesma regra, incluindo a cláusula <code>requires</code>.</li>
+  <li>Os concepts prontos da biblioteca: <code>std::integral</code>, <code>std::floating_point</code>, <code>std::totally_ordered</code> e outros.</li>
+  <li>A mensagem de erro sem concept × com concept, lado a lado.</li>
+  <li>Como escrever o seu próprio concept, com <code>concept</code> e <code>requires</code>.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp/conc</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Antes, leia <a href="templates-funcao.html">Templates de Função</a>: esta aula continua de onde ela parou.</p>
+
+<hr>
+
+<h2>A ideia: a placa na porta do brinquedo</h2>
+<p>No parque de diversões, a montanha-russa tem uma placa na entrada: "altura mínima: 1,40 m". O funcionário confere <strong>na fila</strong>. Sem a placa, a criança pequena entraria, sentaria, e só no meio da volta alguém perceberia que a trava não fecha. Bem pior.</p>
+
+<p>Um template sem concept é o brinquedo sem placa: aceita qualquer tipo e só descobre o problema no meio do corpo. Um concept é a placa: <code>template &lt;std::integral T&gt;</code> diz "só entram tipos inteiros", e o compilador barra os outros na entrada, na linha em que você chamou.</p>
+
+<hr>
+
+<h2>1. O problema, sem concept</h2>
+<p>A Ana escreveu um template que diz se um número é par. Ele usa <code>%</code> (o resto da divisão, aula <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>), que só existe para inteiros. Por engano, ela chamou com <code>7.5</code>:</p>
+
+<pre class="file" data-file="par-sem.cpp">#include &lt;iostream&gt;
+
+template &lt;typename T&gt;
+bool eh_par(T numero) {
+    return numero % 2 == 0;
+}
+
+int main() {
+    std::cout &lt;&lt; eh_par(10) &lt;&lt; '\n';
+    std::cout &lt;&lt; eh_par(7.5) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/conc">$ g++ -std=c++23 -Wall -Wextra par-sem.cpp -o par-sem
+par-sem.cpp: In instantiation of ‘bool eh_par(T) [with T = double]’:
+par-sem.cpp:10:24:   required from here
+   10 |     std::cout &lt;&lt; eh_par(7.5) &lt;&lt; '\n';
+      |                  ~~~~~~^~~~~
+par-sem.cpp:5:19: error: invalid operands of types ‘double’ and ‘int’ to binary ‘operator%’
+    5 |     return numero % 2 == 0;
+      |            ~~~~~~~^~~</pre>
+
+<p>O <code>error:</code> aponta a <strong>linha 5</strong>, dentro do template: "operandos inválidos (<code>double</code> e <code>int</code>) para o <code>%</code>". Mas a linha 5 está certa! O erro de verdade é a chamada da linha 10, que aparece só como <code>required from here</code>. Num template pequeno, você acha. Num template da biblioteca, como o <code>std::max</code> da aula anterior, essa mesma situação vira 61 linhas.</p>
+
+<p>E tem outro problema: quem lê <code>template &lt;typename T&gt; bool eh_par(T numero)</code> não sabe que <code>T</code> precisa ser inteiro. Essa regra só existe "escondida" no corpo.</p>
+
+<hr>
+
+<h2>2. A solução: <code>template &lt;std::integral T&gt;</code></h2>
+<p>Troque <code>typename</code> pelo nome de um concept. <code>std::integral</code> ("integral", de número inteiro) vem do cabeçalho <code>&lt;concepts&gt;</code> e quer dizer "tipo inteiro": <code>int</code>, <code>long</code>, <code>char</code>, <code>bool</code>…</p>
+
+<pre class="file" data-file="par-ok.cpp">#include &lt;concepts&gt;
+#include &lt;iostream&gt;
+
+template &lt;std::integral T&gt;
+bool eh_par(T numero) {
+    return numero % 2 == 0;
+}
+
+int main() {
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; eh_par(10) &lt;&lt; '\n';
+    std::cout &lt;&lt; eh_par(7) &lt;&lt; '\n';
+    std::cout &lt;&lt; eh_par(42L) &lt;&lt; '\n';
+    std::cout &lt;&lt; eh_par('A') &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;concepts&gt;</dt><dd>O cabeçalho dos concepts prontos da biblioteca.</dd>
+  <dt>template &lt;std::integral T&gt;</dt><dd>"<code>T</code> é um tipo, <strong>e</strong> tem que satisfazer <code>std::integral</code>." Antes de gerar a função, o compilador confere a regra.</dd>
+  <dt>std::boolalpha</dt><dd>Faz o <code>cout</code> escrever <code>true</code>/<code>false</code> em vez de <code>1</code>/<code>0</code> (aula <a href="bool.html">Booleanos</a>).</dd>
+  <dt>eh_par('A')</dt><dd>Um <code>char</code> também é inteiro para o C++: <code>'A'</code> vale 65 (aula <a href="char.html">Caracteres</a>).</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/conc">$ g++ -std=c++23 -Wall -Wextra par-ok.cpp -o par-ok
+$ ./par-ok
+true
+false
+true
+false                    « 'A' é 65, que é ímpar</pre>
+
+<p>Com inteiros, nada muda. A diferença aparece quando você erra o tipo. A seção 4 compara as mensagens.</p>
+
+<div class="trycpp" data-goal="erro:constraints not satisfied,src:std::floating_point">
+<p class="try-task"><strong>Missão (provoque o erro):</strong> o template <code>media</code> foi feito para números com vírgula, mas hoje aceita inteiros, e <code>media(3, 4)</code> dá <code>3</code> (a divisão de inteiros joga fora o <code>.5</code>). Rode para ver. Depois troque <code>typename</code> por <code>std::floating_point</code> e rode de novo: o compilador deve <strong>recusar</strong> <code>media(3, 4)</code> com <code>constraints not satisfied</code> ("restrições não satisfeitas").</p>
+<pre class="script">#include &lt;concepts&gt;
+#include &lt;iostream&gt;
+
+template &lt;typename T&gt;
+T media(T a, T b) {
+    return (a + b) / 2;
+}
+
+int main() {
+    std::cout &lt;&lt; media(3.0, 4.0) &lt;&lt; '\n';
+    std::cout &lt;&lt; media(3, 4) &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;concepts&gt;
+#include &lt;iostream&gt;
+
+template &lt;std::floating_point T&gt;
+T media(T a, T b) {
+    return (a + b) / 2;
+}
+
+int main() {
+    std::cout &lt;&lt; media(3.0, 4.0) &lt;&lt; '\n';
+    std::cout &lt;&lt; media(3, 4) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<p>Depois de ver o erro, conserte a chamada para <code>media(3.0, 4.0)</code>, ou <code>media(3.0, 4.5)</code>, e veja que tudo volta a compilar. O concept transformou um resultado errado em silêncio (<code>3</code>) num erro de compilação claro.</p>
+
+<hr>
+
+<h2>3. Quatro formas de escrever a mesma regra</h2>
+<p>O C++20 permite escrever a restrição de quatro jeitos. Todas fazem exatamente a mesma coisa:</p>
+
+<pre class="file" data-file="formas.cpp">#include &lt;concepts&gt;
+#include &lt;iostream&gt;
+
+template &lt;std::integral T&gt;
+T dobro1(T x) { return x * 2; }
+
+template &lt;typename T&gt;
+    requires std::integral&lt;T&gt;
+T dobro2(T x) { return x * 2; }
+
+template &lt;typename T&gt;
+T dobro3(T x) requires std::integral&lt;T&gt; { return x * 2; }
+
+auto dobro4(std::integral auto x) { return x * 2; }
+
+int main() {
+    std::cout &lt;&lt; dobro1(5) &lt;&lt; ' ' &lt;&lt; dobro2(5) &lt;&lt; ' '
+              &lt;&lt; dobro3(5) &lt;&lt; ' ' &lt;&lt; dobro4(5) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/conc">$ g++ -std=c++23 -Wall -Wextra formas.cpp -o formas
+$ ./formas
+10 10 10 10</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Escrita</th><th>Quando usar</th></tr>
+<tr><td>1. Concept no lugar de <code>typename</code></td><td><code>template &lt;std::integral T&gt;</code></td><td>A mais comum e a mais fácil de ler. Use sempre que a regra for um concept só.</td></tr>
+<tr><td>2. Cláusula <code>requires</code> depois do <code>template</code></td><td><code>template &lt;typename T&gt; requires std::integral&lt;T&gt;</code></td><td>Quando a regra combina condições: <code>requires std::integral&lt;T&gt; &amp;&amp; (sizeof(T) &gt;= 4)</code>.</td></tr>
+<tr><td>3. <code>requires</code> no fim da assinatura</td><td><code>T f(T x) requires std::integral&lt;T&gt;</code></td><td>Rara. Aparece em métodos de templates de classe.</td></tr>
+<tr><td>4. Concept antes do <code>auto</code></td><td><code>auto f(std::integral auto x)</code></td><td>Funções curtas, no estilo do template abreviado (<code>auto</code> nos parâmetros).</td></tr>
+</table>
+</div>
+
+<p><code>requires</code> quer dizer "exige". Na forma 2, leia: "template de <code>T</code>, que <strong>exige</strong> que <code>T</code> seja inteiro". Repare que, ali, o concept é usado como uma pergunta de sim ou não: <code>std::integral&lt;T&gt;</code> é <code>true</code> ou <code>false</code>. Dá até para mostrar a resposta:</p>
+
+<pre class="file" data-file="perguntar.cpp">#include &lt;concepts&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "int é integral? " &lt;&lt; std::integral&lt;int&gt; &lt;&lt; '\n';
+    std::cout &lt;&lt; "char é integral? " &lt;&lt; std::integral&lt;char&gt; &lt;&lt; '\n';
+    std::cout &lt;&lt; "bool é integral? " &lt;&lt; std::integral&lt;bool&gt; &lt;&lt; '\n';
+    std::cout &lt;&lt; "double é integral? " &lt;&lt; std::integral&lt;double&gt; &lt;&lt; '\n';
+    std::cout &lt;&lt; "double é floating_point? " &lt;&lt; std::floating_point&lt;double&gt; &lt;&lt; '\n';
+    std::cout &lt;&lt; "string é totally_ordered? " &lt;&lt; std::totally_ordered&lt;std::string&gt; &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/conc">$ g++ -std=c++23 -Wall -Wextra perguntar.cpp -o perguntar
+$ ./perguntar
+int é integral? true
+char é integral? true
+bool é integral? true
+double é integral? false
+double é floating_point? true
+string é totally_ordered? true</pre>
+
+<p>A resposta é calculada <strong>durante a compilação</strong>; o programa só mostra o resultado pronto.</p>
+
+<hr>
+
+<h2>4. A mensagem de erro: sem concept × com concept</h2>
+<p>Agora o mesmo erro da seção 1 (<code>eh_par(7.5)</code>), com o template protegido por <code>std::integral</code>:</p>
+
+<pre class="term" data-cwd="~/cpp/conc">$ g++ -std=c++23 -Wall -Wextra par-com.cpp -o par-com
+par-com.cpp: In function ‘int main()’:
+par-com.cpp:11:24: error: no matching function for call to ‘eh_par(double)’
+   11 |     std::cout &lt;&lt; eh_par(7.5) &lt;&lt; '\n';
+      |                  ~~~~~~^~~~~
+par-com.cpp:11:24: note: there is 1 candidate
+par-com.cpp:5:6: note: candidate 1: ‘template&lt;class T&gt;  requires  integral&lt;T&gt; bool eh_par(T)’
+    5 | bool eh_par(T numero) {
+      |      ^~~~~~
+par-com.cpp:5:6: note: template argument deduction/substitution failed:
+par-com.cpp:5:6: note: constraints not satisfied
+In file included from par-com.cpp:1:
+/usr/include/c++/15/concepts: In substitution of ‘template&lt;class T&gt;  requires  integral&lt;T&gt; bool eh_par(T) [with T = double]’:
+par-com.cpp:11:24:   required from here
+   11 |     std::cout &lt;&lt; eh_par(7.5) &lt;&lt; '\n';
+      |                  ~~~~~~^~~~~
+/usr/include/c++/15/concepts:109:13:   required for the satisfaction of ‘integral&lt;T&gt;’ [with T = double]
+/usr/include/c++/15/concepts:109:24: note: the expression ‘is_integral_v&lt;_Tp&gt; [with _Tp = double]’ evaluated to ‘false’
+  109 |     concept integral = is_integral_v&lt;_Tp&gt;;
+      |                        ^~~~~~~~~~~~~~~~~~</pre>
+
+<p>Ficou mais <strong>comprida</strong>, mas é bem <strong>melhor</strong>. Compare:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Sem concept</th><th>Com <code>std::integral</code></th></tr>
+<tr><td>Onde está o <code>error:</code></td><td>Linha 5, <strong>dentro do template</strong> (que está certo)</td><td>Linha 11, <strong>na sua chamada</strong> (que é o erro)</td></tr>
+<tr><td>O que ele diz</td><td><code>invalid operands … to binary ‘operator%’</code>: um sintoma, lá dentro</td><td><code>no matching function for call to ‘eh_par(double)’</code>: "não aceito <code>double</code>"</td></tr>
+<tr><td>Por quê</td><td>Você precisa ler o corpo para deduzir que <code>%</code> exige inteiro</td><td><code>constraints not satisfied</code> → <code>integral&lt;T&gt;</code> com <code>T = double</code> → <code>evaluated to ‘false’</code></td></tr>
+<tr><td>O template chegou a ser gerado?</td><td>Sim, e quebrou no meio</td><td>Não: barrado na entrada</td></tr>
+</table>
+</div>
+
+<p>Leia a versão com concept assim:</p>
+<ol class="passo">
+  <li><code>error: no matching function for call to ‘eh_par(double)’</code>: na linha 11, ninguém aceita um <code>double</code>.</li>
+  <li><code>candidate 1: ‘template&lt;class T&gt; requires integral&lt;T&gt; …’</code>: a candidata tinha uma exigência (<code>requires</code>).</li>
+  <li><code>constraints not satisfied</code>: "restrições não satisfeitas".</li>
+  <li>A última nota diz qual: <code>integral&lt;T&gt;</code>, com <code>T = double</code>, deu <code>false</code>. Ou seja: <em>double não é inteiro</em>.</li>
+</ol>
+
+<div class="tip">
+<strong>No editor do guia (Clang), fica ainda mais direto</strong>
+<p>O Clang resume a mesma situação numa frase: <code>note: because 'double' does not satisfy 'integral'</code> ("porque <code>double</code> não satisfaz <code>integral</code>"). Experimente na missão da seção 2.</p>
+</div>
+
+<h3>Um caso maior: <code>std::totally_ordered</code></h3>
+<p>Lembra do <code>maior(p1, p2)</code> com dois <code>Produto</code>, da aula <a href="templates-funcao.html">Templates de Função</a>? Agora com a regra <code>std::totally_ordered</code> ("totalmente ordenado": dá para comparar com <code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code>, <code>==</code> e <code>!=</code>):</p>
+
+<pre class="file" data-file="maior-ordenado.cpp">#include &lt;concepts&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco;
+};
+
+template &lt;std::totally_ordered T&gt;
+T maior(T a, T b) {
+    return a &gt; b ? a : b;
+}
+
+int main() {
+    Produto p1{"caderno", 12.5};
+    Produto p2{"caneta", 3.0};
+    Produto m = maior(p1, p2);
+    std::cout &lt;&lt; m.nome &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/conc">$ g++ -std=c++23 -Wall -Wextra maior-ordenado.cpp -o maior-ordenado
+maior-ordenado.cpp: In function ‘int main()’:
+maior-ordenado.cpp:18:22: error: no matching function for call to ‘maior(Produto&amp;, Produto&amp;)’
+   18 |     Produto m = maior(p1, p2);
+      |                 ~~~~~^~~~~~~~
+maior-ordenado.cpp:18:22: note: there is 1 candidate
+maior-ordenado.cpp:11:3: note: candidate 1: ‘template&lt;class T&gt;  requires  totally_ordered&lt;T&gt; T maior(T, T)’
+   11 | T maior(T a, T b) {
+      |   ^~~~~
+maior-ordenado.cpp:11:3: note: template argument deduction/substitution failed:
+maior-ordenado.cpp:11:3: note: constraints not satisfied
+In file included from maior-ordenado.cpp:1:
+/usr/include/c++/15/concepts: In substitution of ‘template&lt;class T&gt;  requires  totally_ordered&lt;T&gt; T maior(T, T) [with T = Produto]’:
+maior-ordenado.cpp:18:22:   required from here
+   18 |     Produto m = maior(p1, p2);
+      |                 ~~~~~^~~~~~~~
+/usr/include/c++/15/concepts:304:15:   required for the satisfaction of ‘__weakly_eq_cmp_with&lt;_Tp, _Tp&gt;’ [with _Tp = Produto]
+/usr/include/c++/15/concepts:314:13:   required for the satisfaction of ‘equality_comparable&lt;_Tp&gt;’ [with _Tp = Produto]
+/usr/include/c++/15/concepts:343:13:   required for the satisfaction of ‘totally_ordered&lt;T&gt;’ [with T = Produto]
+/usr/include/c++/15/concepts:305:4:   in requirements with ‘std::remove_reference_t&lt;_Tp&gt;&amp; __t’, ‘std::remove_reference_t&lt;_Rhs&gt;&amp; __u’ [with _Tp = Produto; _Up = Produto]
+/usr/include/c++/15/concepts:306:17: note: the required expression ‘(__t == __u)’ is invalid
+  306 |           { __t == __u } -&gt; __boolean_testable;
+      |             ~~~~^~~~~~
+/usr/include/c++/15/concepts:307:17: note: the required expression ‘(__t != __u)’ is invalid
+  307 |           { __t != __u } -&gt; __boolean_testable;
+      |             ~~~~^~~~~~
+/usr/include/c++/15/concepts:308:17: note: the required expression ‘(__u == __t)’ is invalid
+  308 |           { __u == __t } -&gt; __boolean_testable;
+      |             ~~~~^~~~~~
+/usr/include/c++/15/concepts:309:17: note: the required expression ‘(__u != __t)’ is invalid
+  309 |           { __u != __t } -&gt; __boolean_testable;
+      |             ~~~~^~~~~~
+cc1plus: note: set ‘-fconcepts-diagnostics-depth=’ to at least 2 for more detail</pre>
+
+<p>Mesma receita: o <code>error:</code> está na <strong>linha 18</strong> (a sua chamada); a cadeia de <code>required for the satisfaction of</code> mostra que <code>totally_ordered</code> depende de <code>equality_comparable</code> ("comparável por igualdade"); e as últimas notas dizem o que falta: <code>the required expression ‘(__t == __u)’ is invalid</code>, "a expressão exigida <code>a == b</code> é inválida". Ou seja: <code>Produto</code> nem sabe dizer se dois produtos são iguais, que dirá qual é maior. A última linha sugere uma opção (<code>-fconcepts-diagnostics-depth=2</code>) para o g++ contar ainda mais detalhes; normalmente não precisa.</p>
+
+<div class="note">
+<strong>Sendo honesto sobre o tamanho</strong>
+<p>No g++, uma mensagem com concept nem sempre é <strong>curta</strong>: aqui deu 32 linhas. O ganho é que ela começa pela <strong>sua</strong> linha e termina dizendo <strong>qual regra</strong> falhou, em vez de mostrar um sintoma lá no fundo da biblioteca. A técnica de leitura é a mesma da aula anterior: primeiro <code>error:</code>, depois <code>required from here</code>, depois as últimas <code>note:</code>.</p>
+</div>
+
+<hr>
+
+<h2>5. Os concepts prontos da biblioteca</h2>
+<p>O cabeçalho <code>&lt;concepts&gt;</code> traz dezenas. Estes são os que você vai usar primeiro:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Concept</th><th>Quer dizer</th><th>Satisfazem</th><th>Não satisfazem</th></tr>
+<tr><td><code>std::integral&lt;T&gt;</code></td><td>Tipo inteiro</td><td><code>int</code>, <code>long</code>, <code>short</code>, <code>char</code>, <code>bool</code>, <code>unsigned</code></td><td><code>double</code>, <code>std::string</code></td></tr>
+<tr><td><code>std::signed_integral&lt;T&gt;</code></td><td>Inteiro com sinal</td><td><code>int</code>, <code>long</code></td><td><code>unsigned</code>, <code>bool</code></td></tr>
+<tr><td><code>std::unsigned_integral&lt;T&gt;</code></td><td>Inteiro sem sinal (aula <a href="inteiros.html">Inteiros</a>)</td><td><code>unsigned</code>, <code>std::size_t</code></td><td><code>int</code></td></tr>
+<tr><td><code>std::floating_point&lt;T&gt;</code></td><td>Número com vírgula</td><td><code>float</code>, <code>double</code>, <code>long double</code></td><td><code>int</code></td></tr>
+<tr><td><code>std::totally_ordered&lt;T&gt;</code></td><td>Comparável com <code>&lt;</code> <code>&gt;</code> <code>&lt;=</code> <code>&gt;=</code> <code>==</code> <code>!=</code></td><td><code>int</code>, <code>double</code>, <code>std::string</code></td><td>uma <code>struct</code> sem operadores</td></tr>
+<tr><td><code>std::equality_comparable&lt;T&gt;</code></td><td>Comparável com <code>==</code> e <code>!=</code></td><td><code>int</code>, <code>std::string</code>, <code>std::vector&lt;int&gt;</code></td><td>uma <code>struct</code> sem <code>==</code></td></tr>
+<tr><td><code>std::same_as&lt;T, U&gt;</code></td><td><code>T</code> e <code>U</code> são o mesmo tipo</td><td><code>same_as&lt;int, int&gt;</code></td><td><code>same_as&lt;int, long&gt;</code></td></tr>
+<tr><td><code>std::convertible_to&lt;T, U&gt;</code></td><td><code>T</code> pode virar <code>U</code></td><td><code>convertible_to&lt;int, double&gt;</code></td><td><code>convertible_to&lt;std::string, int&gt;</code></td></tr>
+</table>
+</div>
+
+<p>Concepts também permitem ter duas versões de uma função, uma para cada "família" de tipos. O compilador escolhe pela regra que o tipo satisfaz:</p>
+
+<pre class="file" data-file="descrever.cpp">#include &lt;concepts&gt;
+#include &lt;iostream&gt;
+
+void descrever(std::integral auto x) {
+    std::cout &lt;&lt; x &lt;&lt; " é um número inteiro\n";
+}
+
+void descrever(std::floating_point auto x) {
+    std::cout &lt;&lt; x &lt;&lt; " é um número com vírgula\n";
+}
+
+int main() {
+    descrever(10);
+    descrever(2.5);
+    descrever(7L);
+    descrever(1.5f);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/conc">$ g++ -std=c++23 -Wall -Wextra descrever.cpp -o descrever
+$ ./descrever
+10 é um número inteiro
+2.5 é um número com vírgula
+7 é um número inteiro       « 7L é long: também é integral
+1.5 é um número com vírgula « 1.5f é float: também é floating_point</pre>
+
+<p>Com <a href="sobrecarga.html">sobrecarga</a> comum, você precisaria de uma função para <code>int</code>, outra para <code>long</code>, outra para <code>double</code>, outra para <code>float</code>… Aqui são duas, uma por família.</p>
+
+<hr>
+
+<h2>6. Escrever o seu próprio concept</h2>
+<p>Um concept é só um nome para uma condição sobre tipos. Você o cria com a palavra <code>concept</code>. Há dois jeitos de escrever a condição:</p>
+<ul>
+  <li><strong>Combinando concepts que já existem</strong>, com <code>&amp;&amp;</code> (e) e <code>||</code> (ou), como num <a href="if-else.html">if</a>.</li>
+  <li><strong>Com uma expressão <code>requires</code></strong>, que lista código que tem que compilar com o tipo: "um <code>T</code> tem que aceitar <code>coisa.size()</code>".</li>
+</ul>
+
+<pre class="file" data-file="meu-concept.cpp">#include &lt;concepts&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+template &lt;typename T&gt;
+concept Numero = std::integral&lt;T&gt; || std::floating_point&lt;T&gt;;
+
+template &lt;typename T&gt;
+concept TemTamanho = requires(T coisa) {
+    coisa.size();
+};
+
+template &lt;Numero T&gt;
+T dobro(T x) {
+    return x * 2;
+}
+
+void mostrar_tamanho(const TemTamanho auto&amp; coisa) {
+    std::cout &lt;&lt; "tamanho: " &lt;&lt; coisa.size() &lt;&lt; '\n';
+}
+
+int main() {
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; Numero&lt;int&gt; &lt;&lt; ' ' &lt;&lt; Numero&lt;double&gt; &lt;&lt; ' '
+              &lt;&lt; Numero&lt;std::string&gt; &lt;&lt; '\n';
+    std::cout &lt;&lt; dobro(21) &lt;&lt; ' ' &lt;&lt; dobro(1.25) &lt;&lt; '\n';
+    mostrar_tamanho(std::string("arroz"));
+    mostrar_tamanho(std::vector&lt;int&gt;{7, 9, 10});
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>template &lt;typename T&gt; concept Numero = …;</dt><dd>Cria o concept <code>Numero</code>. Todo concept começa com <code>template &lt;typename T&gt;</code> e termina com <code>;</code>.</dd>
+  <dt>std::integral&lt;T&gt; || std::floating_point&lt;T&gt;</dt><dd>A condição: "<code>T</code> é inteiro <strong>ou</strong> é com vírgula".</dd>
+  <dt>requires(T coisa) { coisa.size(); }</dt><dd>Uma <strong>expressão requires</strong>: "imagine uma variável <code>coisa</code> do tipo <code>T</code>. O código entre chaves tem que compilar". O código <strong>não roda</strong>; o compilador só confere se ele faz sentido.</dd>
+  <dt>template &lt;Numero T&gt;</dt><dd>Usa o seu concept exatamente como os da biblioteca.</dd>
+  <dt>const TemTamanho auto&amp; coisa</dt><dd>A forma 4 (concept antes do <code>auto</code>), recebendo por <a href="passagem-referencia.html">referência constante</a>.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/conc">$ g++ -std=c++23 -Wall -Wextra meu-concept.cpp -o meu-concept
+$ ./meu-concept
+true true false
+42 2.5
+tamanho: 5
+tamanho: 3</pre>
+
+<p>E se alguém passar um <code>int</code> (que não tem <code>.size()</code>) para <code>mostrar_tamanho</code>?</p>
+
+<pre class="term" data-cwd="~/cpp/conc">$ g++ -std=c++23 -Wall -Wextra tamanho-erro.cpp -o tamanho-erro     « mostrar_tamanho(42);
+tamanho-erro.cpp: In function ‘int main()’:
+tamanho-erro.cpp:13:20: error: no matching function for call to ‘mostrar_tamanho(int)’
+   13 |     mostrar_tamanho(42);
+      |     ~~~~~~~~~~~~~~~^~~~
+tamanho-erro.cpp:13:20: note: there is 1 candidate
+tamanho-erro.cpp:8:6: note: candidate 1: ‘template&lt;class auto:11&gt;  requires  TemTamanho&lt;auto:11&gt; void mostrar_tamanho(const auto:11&amp;)’
+    8 | void mostrar_tamanho(const TemTamanho auto&amp; coisa) {
+      |      ^~~~~~~~~~~~~~~
+tamanho-erro.cpp:8:6: note: template argument deduction/substitution failed:
+tamanho-erro.cpp:8:6: note: constraints not satisfied
+tamanho-erro.cpp: In substitution of ‘template&lt;class auto:11&gt;  requires  TemTamanho&lt;auto:11&gt; void mostrar_tamanho(const auto:11&amp;) [with auto:11 = int]’:
+tamanho-erro.cpp:13:20:   required from here
+   13 |     mostrar_tamanho(42);
+      |     ~~~~~~~~~~~~~~~^~~~
+tamanho-erro.cpp:4:9:   required for the satisfaction of ‘TemTamanho&lt;auto:11&gt;’ [with auto:11 = int]
+tamanho-erro.cpp:4:22:   in requirements with ‘T coisa’ [with T = int]
+tamanho-erro.cpp:5:15: note: the required expression ‘coisa.size()’ is invalid
+    5 |     coisa.size();
+      |     ~~~~~~~~~~^~
+cc1plus: note: set ‘-fconcepts-diagnostics-depth=’ to at least 2 for more detail</pre>
+
+<p>A última nota aponta para a <strong>sua</strong> regra: <code>the required expression ‘coisa.size()’ is invalid</code>, "a expressão exigida <code>coisa.size()</code> é inválida" para <code>T = int</code>. (O <code>auto:11</code> é o nome que o g++ inventou para o tipo do <code>auto</code>.) Um concept com um bom nome vira documentação: <code>TemTamanho</code> diz o que a função espera antes de você ler uma linha do corpo.</p>
+
+<div class="note">
+<strong>Convenção de nomes</strong>
+<p>Os concepts da biblioteca usam minúsculas com sublinhado (<code>floating_point</code>, <code>totally_ordered</code>). Nos seus, use o estilo do seu projeto; neste guia, usamos maiúscula no começo (<code>Numero</code>, <code>TemTamanho</code>), para não confundir com variáveis.</p>
+</div>
+
+<hr>
+
+<h2>7. Antes do C++20</h2>
+<p>Concepts só existem a partir do C++20. Com <code>-std=c++17</code>, o g++ nem reconhece o nome, e avisa de onde ele é:</p>
+
+<pre class="term" data-cwd="~/cpp/conc">$ g++ -std=c++17 -Wall -Wextra par-com.cpp -o par-com
+par-com.cpp:4:11: error: ‘std::integral’ has not been declared
+    4 | template &lt;std::integral T&gt;
+      |           ^~~
+par-com.cpp:4:11: note: ‘std::integral’ is only available from C++20 onwards
+par-com.cpp:5:13: error: ‘T’ was not declared in this scope
+    5 | bool eh_par(T numero) {
+      |             ^
+par-com.cpp:5:22: error: expected ‘;’ before ‘{’ token
+    5 | bool eh_par(T numero) {
+      |                      ^~
+      |                      ;
+par-com.cpp: In function ‘int main()’:
+par-com.cpp:10:24: error: missing template arguments before ‘(’ token
+   10 |     std::cout &lt;&lt; eh_par(10) &lt;&lt; '\n';
+      |                        ^
+par-com.cpp:11:24: error: missing template arguments before ‘(’ token
+   11 |     std::cout &lt;&lt; eh_par(7.5) &lt;&lt; '\n';
+      |                        ^</pre>
+
+<p>O primeiro erro já diz tudo: <code>‘std::integral’ is only available from C++20 onwards</code>, "só está disponível do C++20 em diante". Os outros quatro são consequência. Em código antigo, você vai ver truques para fazer o mesmo papel (<code>std::enable_if</code>, <code>static_assert</code>); são bem mais difíceis de ler, e os concepts vieram justamente para substituí-los.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: no matching function for call to …</code> + <code>note: constraints not satisfied</code></strong>
+<p><strong>O que significa:</strong> o tipo que você passou não satisfaz o concept do template. As últimas <code>note:</code> dizem qual regra falhou (<code>evaluated to ‘false’</code> ou <code>the required expression … is invalid</code>).</p>
+<p><strong>Como consertar:</strong> passe um tipo que satisfaça a regra (por exemplo, <code>3.0</code> em vez de <code>3</code> para <code>std::floating_point</code>). Se a regra estiver exigente demais, revise o concept.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: ‘std::integral’ has not been declared</code></strong>
+<p><strong>O que significa:</strong> ou você compilou com um padrão anterior ao C++20 (a nota diz <code>only available from C++20 onwards</code>), ou esqueceu o <code>#include &lt;concepts&gt;</code>.</p>
+<p><strong>Como consertar:</strong> compile com <code>-std=c++23</code> e inclua <code>&lt;concepts&gt;</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>#include &lt;concepts&gt;</code></td><td>Concepts prontos da biblioteca</td></tr>
+<tr><td><code>template &lt;std::integral T&gt;</code></td><td>Template que só aceita tipos inteiros</td></tr>
+<tr><td><code>template &lt;typename T&gt; requires std::integral&lt;T&gt;</code></td><td>O mesmo, com cláusula <code>requires</code></td></tr>
+<tr><td><code>auto f(std::integral auto x)</code></td><td>O mesmo, na forma abreviada</td></tr>
+<tr><td><code>requires A&lt;T&gt; &amp;&amp; B&lt;T&gt;</code></td><td>Exige as duas regras</td></tr>
+<tr><td><code>template &lt;typename T&gt; concept Nome = condição;</code></td><td>Cria um concept</td></tr>
+<tr><td><code>requires(T x) { x.size(); }</code></td><td>Condição: "este código tem que compilar com <code>T</code>"</td></tr>
+<tr><td><code>std::integral&lt;int&gt;</code></td><td>Usado como valor: <code>true</code> ou <code>false</code>, calculado na compilação</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Restringir</h3>
+<p>Complete para o template aceitar só números com vírgula:</p>
+<div class="ex-code">template &lt;<input data-answer="std::floating_point" aria-label="concept"> T&gt;<br>T metade(T x) { return x / 2; }</div>
+</div>
+
+<div class="exercise">
+<h3>2. A palavra que exige</h3>
+<p>Complete a cláusula:</p>
+<div class="ex-code">template &lt;typename T&gt;<br><input data-answer="requires" aria-label="palavra"> std::integral&lt;T&gt;<br>T dobro(T x) { return x * 2; }</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Qual é a principal vantagem da mensagem de erro com concept?</p>
+<label><input type="radio" name="q3"> Ela é sempre mais curta</label>
+<label><input type="radio" name="q3"> Ela aponta a sua chamada e diz qual regra o tipo não cumpriu</label>
+<label><input type="radio" name="q3"> Ela some: o compilador conserta sozinho</label>
+<label><input type="radio" name="q3"> Ela vira um aviso, não um erro</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Qual destes tipos <strong>não</strong> satisfaz <code>std::integral</code>?</p>
+<label><input type="radio" name="q4"> <code>char</code></label>
+<label><input type="radio" name="q4"> <code>bool</code></label>
+<label><input type="radio" name="q4"> <code>long</code></label>
+<label><input type="radio" name="q4"> <code>float</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. O que faz <code>requires(T x) { x.size(); }</code> dentro de um concept?</p>
+<label><input type="radio" name="q5"> Exige que <code>x.size()</code> compile para o tipo <code>T</code>, sem rodar nada</label>
+<label><input type="radio" name="q5"> Chama <code>size()</code> durante a execução</label>
+<label><input type="radio" name="q5"> Cria uma variável <code>x</code> no programa</label>
+<label><input type="radio" name="q5"> Exige que o tamanho seja maior que zero</label>
+</div>
+
+<h3>Missão final: o seu concept</h3>
+
+<div class="trycpp" data-goal="out:12,out:4.5,src:concept\s+Numero\s*=,src:template\s*&lt;\s*Numero\s+T">
+<p class="try-task"><strong>Missão:</strong> crie o concept <code>Numero</code> ("inteiro ou com vírgula") e use-o no template <code>triplo</code>, no lugar do <code>typename</code>. O programa deve mostrar <code>12</code> e <code>4.5</code>. Depois, como teste, acrescente <code>triplo(std::string("a"))</code> e leia a mensagem.</p>
+<pre class="script">#include &lt;concepts&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+// crie o concept Numero aqui
+
+template &lt;typename T&gt;
+T triplo(T x) {
+    return x * 3;
+}
+
+int main() {
+    std::cout &lt;&lt; triplo(4) &lt;&lt; '\n';
+    std::cout &lt;&lt; triplo(1.5) &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;concepts&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+template &lt;typename T&gt;
+concept Numero = std::integral&lt;T&gt; || std::floating_point&lt;T&gt;;
+
+template &lt;Numero T&gt;
+T triplo(T x) {
+    return x * 3;
+}
+
+int main() {
+    std::cout &lt;&lt; triplo(4) &lt;&lt; '\n';
+    std::cout &lt;&lt; triplo(1.5) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um <strong>concept</strong> é uma regra sobre tipos, conferida na entrada do template <span class="versao">C++20</span>.</li>
+  <li>Forma mais comum: <code>template &lt;std::integral T&gt;</code>. Outras: <code>requires std::integral&lt;T&gt;</code> e <code>std::integral auto x</code>.</li>
+  <li>Concepts prontos (<code>&lt;concepts&gt;</code>): <code>std::integral</code>, <code>std::floating_point</code>, <code>std::totally_ordered</code>, <code>std::equality_comparable</code>, <code>std::same_as</code>…</li>
+  <li>Com concept, o erro aponta a <strong>sua chamada</strong> (<code>constraints not satisfied</code>) e diz qual regra falhou, em vez de um sintoma no meio do template.</li>
+  <li>O seu concept: <code>template &lt;typename T&gt; concept Nome = condição;</code>, combinando concepts com <code>&amp;&amp;</code>/<code>||</code> ou exigindo código com <code>requires(T x) { … }</code>.</li>
+  <li>Próximo passo: a biblioteca padrão, feita de templates, em <a href="stl.html">O que é a STL</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
