@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Templates de Função — uma função para vários tipos | Guia C++</title>
+<meta name="description" content="Templates de função em C++ para quem nunca programou: template &lt;typename T&gt;, dedução do tipo, maior&lt;double&gt;(3, 4.5), o erro deduced conflicting types, como ler um erro de template enorme e auto nos parâmetros (C++20), com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Templates de Função</span></h1>
+
+<p class="intro">A Ana escreveu uma função <code>maior</code> que devolve o maior de dois números inteiros. Depois precisou da mesma coisa para preços (<code>double</code>) e para nomes (<code>std::string</code>). Copiar a função três vezes, trocando só o tipo, funciona, mas é chato e espalha erros. Um <strong>template</strong> (em português, "modelo" ou "molde") resolve isso: você escreve a função <strong>uma vez</strong>, com um tipo "em branco", e o compilador cria sozinho uma versão para cada tipo que você usar.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que escrever a mesma função para <code>int</code>, <code>double</code> e <code>std::string</code> é um problema.</li>
+  <li>Como escrever um template de função: <code>template &lt;typename T&gt; T maior(T a, T b)</code>.</li>
+  <li>Como o compilador <strong>deduz</strong> o tipo <code>T</code> olhando os argumentos.</li>
+  <li>Como escolher o tipo à mão: <code>maior&lt;double&gt;(3, 4.5)</code>.</li>
+  <li>O erro <code>deduced conflicting types</code>, quando os dois argumentos têm tipos diferentes.</li>
+  <li>Como ler um erro de template <strong>enorme</strong> sem pânico: procure a linha <code>required from here</code>.</li>
+  <li>O atalho do C++20: <code>auto</code> nos parâmetros.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code> (veja <a href="compilar.html">Compilar com g++</a>). Antes desta aula, é bom conhecer <a href="funcoes.html">Funções</a> e <a href="sobrecarga.html">Sobrecarga de Funções</a>.</p>
+
+<hr>
+
+<h2>A ideia: uma forma de biscoito</h2>
+<p>Pense numa forma de biscoito em formato de estrela. A forma não é um biscoito: é um <strong>molde</strong>. Com a mesma forma você faz biscoito de chocolate, de coco, de laranja. Muda a massa; o formato é o mesmo.</p>
+
+<p>Um template de função é a forma. O "formato" é o código da função (comparar dois valores e devolver o maior). A "massa" é o <strong>tipo</strong>: <code>int</code>, <code>double</code>, <code>std::string</code>. Quando você usa o template com inteiros, o compilador "assa" uma função de verdade para inteiros. Quando usa com textos, assa outra, para textos.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na cozinha</th><th>No C++</th></tr>
+<tr><td>A forma de estrela</td><td>O <strong>template</strong>: <code>template &lt;typename T&gt; T maior(T a, T b)</code></td></tr>
+<tr><td>A massa escolhida</td><td>O tipo que entra no lugar de <code>T</code>: <code>int</code>, <code>double</code>…</td></tr>
+<tr><td>O biscoito pronto</td><td>A função de verdade que o compilador gera: <code>maior&lt;int&gt;</code>, <code>maior&lt;double&gt;</code>…</td></tr>
+<tr><td>Assar</td><td><strong>Instanciar</strong>: o compilador cria a função na hora em que você a usa</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. O problema: a mesma função três vezes</h2>
+<p>Sem templates, a única saída é a <a href="sobrecarga.html">sobrecarga</a>: três funções com o mesmo nome e tipos diferentes.</p>
+
+<pre class="file" data-file="sem-template.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int maior(int a, int b) {
+    return a &gt; b ? a : b;
+}
+
+double maior(double a, double b) {
+    return a &gt; b ? a : b;
+}
+
+std::string maior(std::string a, std::string b) {
+    return a &gt; b ? a : b;
+}
+
+int main() {
+    std::cout &lt;&lt; maior(3, 7) &lt;&lt; '\n';
+    std::cout &lt;&lt; maior(2.5, 1.5) &lt;&lt; '\n';
+    std::cout &lt;&lt; maior(std::string("Ana"), std::string("Bruno")) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sem-template.cpp -o sem-template
+$ ./sem-template
+7
+2.5
+Bruno                    « "Bruno" vem depois de "Ana" no alfabeto: é o "maior"</pre>
+
+<p>O <code>a &gt; b ? a : b</code> é o <a href="ternario.html">operador ternário</a>: "se <code>a</code> for maior que <code>b</code>, o resultado é <code>a</code>; senão, é <code>b</code>". Funciona. Mas olhe as três funções: o <strong>corpo é idêntico</strong>, só o tipo muda. E se amanhã você achar um erro nesse corpo, precisa consertar em três lugares (e vai esquecer um). Se precisar de <code>long</code>, <code>char</code> e <code>float</code>, são mais três cópias.</p>
+
+<hr>
+
+<h2>2. O primeiro template</h2>
+<p>Agora a mesma coisa com um template: uma função só, com um tipo "em branco" chamado <code>T</code>.</p>
+
+<pre class="file" data-file="maior.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+template &lt;typename T&gt;
+T maior(T a, T b) {
+    return a &gt; b ? a : b;
+}
+
+int main() {
+    std::cout &lt;&lt; maior(3, 7) &lt;&lt; '\n';
+    std::cout &lt;&lt; maior(2.5, 1.5) &lt;&lt; '\n';
+    std::cout &lt;&lt; maior(std::string("Ana"), std::string("Bruno")) &lt;&lt; '\n';
+    std::cout &lt;&lt; maior('a', 'z') &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>template</dt><dd>"Modelo". Avisa ao compilador: o que vem logo abaixo não é uma função comum, é um <strong>molde</strong> de função.</dd>
+  <dt>&lt;typename T&gt;</dt><dd>A lista de "espaços em branco", entre <code>&lt;</code> e <code>&gt;</code>. <code>typename</code> quer dizer "nome de tipo": <code>T</code> vai ser um tipo (<code>int</code>, <code>double</code>…). Esse <code>T</code> é o <strong>parâmetro de template</strong>.</dd>
+  <dt>T</dt><dd>Um nome qualquer, como o de uma variável. A tradição é usar <code>T</code> (de <em>type</em>, "tipo"), mas <code>Tipo</code> também valeria.</dd>
+  <dt>T maior(T a, T b)</dt><dd>Uma função normal, só que com <code>T</code> onde antes estava <code>int</code>: recebe dois valores do tipo <code>T</code> e devolve um <code>T</code>.</dd>
+  <dt>return a &gt; b ? a : b;</dt><dd>O mesmo corpo de antes. Ele funciona para qualquer tipo que saiba fazer <code>&gt;</code>.</dd>
+  <dt>maior(3, 7)</dt><dd>A chamada não muda nada: você usa o template como uma função comum.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra maior.cpp -o maior
+$ ./maior
+7
+2.5
+Bruno
+z                        « o template serviu até para char, que nem estava nos planos</pre>
+
+<p>Uma função escrita, quatro tipos atendidos. Se houver um erro no corpo, você conserta num lugar só.</p>
+
+<div class="note">
+<strong><code>typename</code> ou <code>class</code>?</strong>
+<p>Você vai encontrar muito código escrito <code>template &lt;class T&gt;</code>. Aqui as duas palavras são <strong>a mesma coisa</strong>: <code>class</code> nesse lugar não quer dizer que <code>T</code> precisa ser uma classe (o <code>int</code> serve). O próprio g++ escreve <code>class</code> nas mensagens de erro, como você vai ver adiante. Este guia usa <code>typename</code>, que diz melhor o que é.</p>
+</div>
+
+<h3>O compilador realmente cria uma função para cada tipo</h3>
+<p>O template em si não vira código de máquina. Na hora de compilar, o g++ vê cada chamada, descobre o tipo e <strong>gera</strong> (instancia) uma função de verdade. Dá para ver isso no programa pronto com o <code>nm</code>, uma ferramenta que lista os nomes das funções dentro de um executável (<code>-C</code> deixa os nomes legíveis):</p>
+
+<pre class="term" data-cwd="~/cpp">$ nm -C maior | grep maior
+0000000000002d66 W char maior&lt;char&gt;(char, char)
+0000000000002af3 W double maior&lt;double&gt;(double, double)
+0000000000002ad3 W int maior&lt;int&gt;(int, int)
+0000000000002cee W std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt; maior&lt;std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt; &gt;(std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;, std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;)</pre>
+
+<p>Quatro funções, uma por tipo usado: <code>maior&lt;char&gt;</code>, <code>maior&lt;double&gt;</code>, <code>maior&lt;int&gt;</code> e uma para texto. A última tem um nome assustador porque <code>std::string</code>, por dentro, se chama <code>std::basic_string&lt;char, …&gt;</code>: ela mesma é um template (aula <a href="templates-classe.html">Templates de Classe</a>). Guarde essa imagem: <strong>nomes enormes assim aparecem nas mensagens de erro</strong>, e não são culpa sua.</p>
+
+<hr>
+
+<h2>3. Dedução: o compilador descobre o <code>T</code></h2>
+<p>Em <code>maior(3, 7)</code> você não disse qual é o <code>T</code>. O compilador olhou os argumentos e <strong>deduziu</strong>: <code>3</code> é <code>int</code>, <code>7</code> é <code>int</code>, então <code>T = int</code>. Isso se chama <strong>dedução de argumentos de template</strong>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Chamada</th><th>Tipo dos argumentos</th><th><code>T</code> deduzido</th><th>Função gerada</th></tr>
+<tr><td><code>maior(3, 7)</code></td><td><code>int</code>, <code>int</code></td><td><code>int</code></td><td><code>int maior(int, int)</code></td></tr>
+<tr><td><code>maior(2.5, 1.5)</code></td><td><code>double</code>, <code>double</code></td><td><code>double</code></td><td><code>double maior(double, double)</code></td></tr>
+<tr><td><code>maior('a', 'z')</code></td><td><code>char</code>, <code>char</code></td><td><code>char</code></td><td><code>char maior(char, char)</code></td></tr>
+<tr><td><code>maior(std::string("Ana"), std::string("Bruno"))</code></td><td><code>std::string</code>, <code>std::string</code></td><td><code>std::string</code></td><td><code>std::string maior(std::string, std::string)</code></td></tr>
+</table>
+</div>
+
+<div class="warning">
+<strong>Por que <code>std::string("Ana")</code> e não só <code>"Ana"</code>?</strong>
+<p>Um texto entre aspas, sozinho, <strong>não</strong> é um <code>std::string</code>: é um array de <code>char</code> herdado do C (aula <a href="strings.html">Strings</a>). Com <code>maior("Ana", "Bruno")</code>, o <code>T</code> seria deduzido como <code>const char*</code> (um <a href="ponteiros.html">ponteiro</a>), e o <code>&gt;</code> compararia <strong>endereços de memória</strong>, não letras. Compila, mas o resultado depende de onde os textos foram parar na memória. Por isso o exemplo transforma os textos em <code>std::string</code> antes.</p>
+</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode como está. Depois acrescente uma chamada com dois <code>long</code>, como <code>maior(10L, 20L)</code>, e uma com dois nomes de pessoas da sua casa (lembre do <code>std::string(...)</code>). Você não precisa mexer no template.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+template &lt;typename T&gt;
+T maior(T a, T b) {
+    return a &gt; b ? a : b;
+}
+
+int main() {
+    std::cout &lt;&lt; maior(15, 8) &lt;&lt; '\n';
+    std::cout &lt;&lt; maior(4.99, 5.49) &lt;&lt; '\n';
+    std::cout &lt;&lt; maior(std::string("pera"), std::string("maçã")) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>4. Escolher o tipo à mão: <code>maior&lt;double&gt;(…)</code></h2>
+<p>Você também pode <strong>dizer</strong> o tipo, em vez de deixar o compilador deduzir. Escreva o tipo entre <code>&lt;</code> e <code>&gt;</code> logo depois do nome da função:</p>
+
+<pre class="file" data-file="explicito.cpp">#include &lt;iostream&gt;
+
+template &lt;typename T&gt;
+T maior(T a, T b) {
+    return a &gt; b ? a : b;
+}
+
+int main() {
+    std::cout &lt;&lt; maior&lt;double&gt;(3, 4.5) &lt;&lt; '\n';
+    std::cout &lt;&lt; maior&lt;int&gt;(3, 4.5) &lt;&lt; '\n';
+    std::cout &lt;&lt; maior(3.0, 4.5) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra explicito.cpp -o explicito
+$ ./explicito
+4.5
+4                        « maior&lt;int&gt;: o 4.5 virou 4 antes da comparação
+4.5</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que acontece</th></tr>
+<tr><td><code>maior&lt;double&gt;(3, 4.5)</code></td><td>Você mandou: <code>T = double</code>. Não há dedução. O <code>3</code> é convertido para <code>3.0</code>, e o resultado é <code>4.5</code>.</td></tr>
+<tr><td><code>maior&lt;int&gt;(3, 4.5)</code></td><td><code>T = int</code>. O <code>4.5</code> é convertido para <code>int</code> e <strong>perde a parte depois da vírgula</strong>: vira <code>4</code>. O resultado é <code>4</code>. Repare: <strong>nenhum aviso</strong>, nem com <code>-Wall -Wextra</code>.</td></tr>
+<tr><td><code>maior(3.0, 4.5)</code></td><td>Outra forma de resolver: escrever o <code>3</code> como <code>3.0</code>. Agora os dois são <code>double</code> e a dedução funciona.</td></tr>
+</table>
+</div>
+
+<p>Quando você escreve o tipo, a função passa a se comportar como uma função comum daquele tipo: os argumentos são <a href="conversao-tipos.html">convertidos</a> se precisar. Isso é útil, mas exige cuidado com conversões que perdem informação, como <code>double</code> → <code>int</code>.</p>
+
+<hr>
+
+<h2>5. Argumentos de tipos diferentes: <code>deduced conflicting types</code></h2>
+<p>E se você deixar o compilador deduzir, mas os dois argumentos tiverem tipos diferentes?</p>
+
+<pre class="file" data-file="misturado.cpp">#include &lt;iostream&gt;
+
+template &lt;typename T&gt;
+T maior(T a, T b) {
+    return a &gt; b ? a : b;
+}
+
+int main() {
+    std::cout &lt;&lt; maior(3, 4.5) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra misturado.cpp -o misturado
+misturado.cpp: In function ‘int main()’:
+misturado.cpp:9:23: error: no matching function for call to ‘maior(int, double)’
+    9 |     std::cout &lt;&lt; maior(3, 4.5) &lt;&lt; '\n';
+      |                  ~~~~~^~~~~~~~
+misturado.cpp:9:23: note: there is 1 candidate
+misturado.cpp:4:3: note: candidate 1: ‘template&lt;class T&gt; T maior(T, T)’
+    4 | T maior(T a, T b) {
+      |   ^~~~~
+misturado.cpp:4:3: note: template argument deduction/substitution failed:
+misturado.cpp:9:23: note:   deduced conflicting types for parameter ‘T’ (‘int’ and ‘double’)
+    9 |     std::cout &lt;&lt; maior(3, 4.5) &lt;&lt; '\n';
+      |                  ~~~~~^~~~~~~~</pre>
+
+<p>Leia de cima para baixo (a estrutura <code>arquivo:linha:coluna</code> está em <a href="erros-compilacao.html">Lendo Erros do Compilador</a>):</p>
+
+<dl class="anatomy">
+  <dt>error: no matching function for call to ‘maior(int, double)’</dt><dd>"Nenhuma função combina com a chamada <code>maior(int, double)</code>". O g++ mostra os tipos que você passou.</dd>
+  <dt>note: there is 1 candidate</dt><dd>"Há 1 candidata": o compilador achou uma função chamada <code>maior</code> e explica por que ela não serviu.</dd>
+  <dt>candidate 1: ‘template&lt;class T&gt; T maior(T, T)’</dt><dd>A candidata é o seu template (o g++ escreve <code>class</code> no lugar de <code>typename</code>).</dd>
+  <dt>template argument deduction/substitution failed</dt><dd>"A dedução dos argumentos de template falhou."</dd>
+  <dt>deduced conflicting types for parameter ‘T’ (‘int’ and ‘double’)</dt><dd>O motivo: "deduzi tipos conflitantes para <code>T</code>". Pelo <code>3</code>, <code>T</code> seria <code>int</code>; pelo <code>4.5</code>, seria <code>double</code>. <code>T</code> só pode ser <strong>um</strong> tipo, e o compilador não escolhe por você.</dd>
+</dl>
+
+<p>Repare que, na dedução, o compilador <strong>não converte</strong> nada: ele exige que os dois argumentos já tenham o mesmo tipo. Há três consertos:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Conserto</th><th>Código</th><th>Quando usar</th></tr>
+<tr><td>Dizer o tipo</td><td><code>maior&lt;double&gt;(3, 4.5)</code></td><td>Os valores vêm de variáveis de tipos diferentes e você sabe qual tipo quer.</td></tr>
+<tr><td>Igualar os argumentos</td><td><code>maior(3.0, 4.5)</code> ou <code>maior(static_cast&lt;double&gt;(qtd), 4.5)</code></td><td>Você pode mudar o valor escrito, ou converter uma variável (aula <a href="conversao-tipos.html">Conversão de Tipos</a>).</td></tr>
+<tr><td>Aceitar dois tipos</td><td><code>auto maior(auto a, auto b)</code> (seção 8)</td><td>Misturar tipos é normal no seu caso e o resultado pode ser do tipo "maior".</td></tr>
+</table>
+</div>
+
+<div class="trycpp" data-goal="out:4.5,compila">
+<p class="try-task"><strong>Missão:</strong> rode e veja o erro <code>deduced conflicting types</code> (no editor, o Clang escreve <code>deduced conflicting types for parameter 'T' ('int' vs. 'double')</code>). Conserte só a linha do <code>main</code>, sem mexer no template, para o programa mostrar <code>4.5</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+template &lt;typename T&gt;
+T maior(T a, T b) {
+    return a &gt; b ? a : b;
+}
+
+int main() {
+    std::cout &lt;&lt; maior(3, 4.5) &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+template &lt;typename T&gt;
+T maior(T a, T b) {
+    return a &gt; b ? a : b;
+}
+
+int main() {
+    std::cout &lt;&lt; maior&lt;double&gt;(3, 4.5) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>6. Um tipo que não serve: <code>required from here</code></h2>
+<p>O template promete funcionar para "qualquer <code>T</code>", mas o corpo dele usa <code>a &gt; b</code>. E se o tipo não souber fazer <code>&gt;</code>? Uma <a href="structs.html">struct</a> <code>Produto</code>, por exemplo, não sabe: você nunca disse o que é um produto "maior" que outro.</p>
+
+<pre class="file" data-file="produto.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco;
+};
+
+template &lt;typename T&gt;
+T maior(T a, T b) {
+    return a &gt; b ? a : b;
+}
+
+int main() {
+    Produto p1{"caderno", 12.5};
+    Produto p2{"caneta", 3.0};
+    Produto m = maior(p1, p2);
+    std::cout &lt;&lt; m.nome &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra produto.cpp -o produto
+produto.cpp: In instantiation of ‘T maior(T, T) [with T = Produto]’:
+produto.cpp:17:22:   required from here
+   17 |     Produto m = maior(p1, p2);
+      |                 ~~~~~^~~~~~~~
+produto.cpp:11:14: error: no match for ‘operator&gt;’ (operand types are ‘Produto’ and ‘Produto’)
+   11 |     return a &gt; b ? a : b;
+      |            ~~^~~</pre>
+
+<dl class="anatomy">
+  <dt>In instantiation of ‘T maior(T, T) [with T = Produto]’</dt><dd>"Ao instanciar (assar) <code>maior</code> com <code>T = Produto</code>…". A dedução <strong>funcionou</strong> (<code>T = Produto</code>); o problema apareceu depois, ao gerar a função.</dd>
+  <dt>produto.cpp:17:22: required from here</dt><dd>"Exigido a partir daqui": a linha <strong>17 do seu arquivo</strong>, a chamada que pediu essa versão do template. É a linha mais importante.</dd>
+  <dt>produto.cpp:11:14: error: no match for ‘operator&gt;’</dt><dd>O erro em si, na linha 11 (dentro do template): "não há <code>operator&gt;</code> para <code>Produto</code> e <code>Produto</code>". <code>operator&gt;</code> é o nome técnico do sinal <code>&gt;</code>.</dd>
+</dl>
+
+<p>Repare na diferença: o erro <strong>aponta para dentro do template</strong> (linha 11), mas o template está certo. O culpado é quem chamou (linha 17), com um tipo que não serve. Os consertos possíveis: comparar o que interessa (<code>maior(p1.preco, p2.preco)</code>) ou ensinar o <code>Produto</code> a fazer <code>&gt;</code> (aula <a href="sobrecarga-operadores.html">Sobrecarga de Operadores</a>).</p>
+
+<hr>
+
+<h2>7. O erro de template enorme (e como lê-lo)</h2>
+<p>No exemplo acima, o template era seu e pequeno, e o erro coube em sete linhas. Agora a Ana tenta a mesma coisa com o <code>std::max</code>, um template <strong>da biblioteca padrão</strong> (do cabeçalho <code>&lt;algorithm&gt;</code>) que faz exatamente o que o nosso <code>maior</code> faz:</p>
+
+<pre class="file" data-file="max-produto.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco;
+};
+
+int main() {
+    Produto p1{"caderno", 12.5};
+    Produto p2{"caneta", 3.0};
+    std::cout &lt;&lt; std::max(p1, p2).nome &lt;&lt; '\n';
+}
+</pre>
+
+<p>Treze linhas de programa. Sessenta e uma linhas de erro, copiadas inteiras do terminal:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra max-produto.cpp -o max-produto
+In file included from /usr/include/c++/15/algorithm:62,
+                 from max-produto.cpp:1:
+/usr/include/c++/15/bits/stl_algobase.h: In instantiation of ‘constexpr const _Tp&amp; std::max(const _Tp&amp;, const _Tp&amp;) [with _Tp = Produto]’:
+max-produto.cpp:13:26:   required from here
+   13 |     std::cout &lt;&lt; std::max(p1, p2).nome &lt;&lt; '\n';
+      |                  ~~~~~~~~^~~~~~~~
+/usr/include/c++/15/bits/stl_algobase.h:263:15: error: no match for ‘operator&lt;’ (operand types are ‘const Produto’ and ‘const Produto’)
+  263 |       if (__a &lt; __b)
+      |           ~~~~^~~~~
+/usr/include/c++/15/bits/stl_algobase.h:263:15: note: there are 7 candidates
+In file included from /usr/include/c++/15/bits/stl_algobase.h:64:
+/usr/include/c++/15/bits/stl_pair.h:1049:5: note: candidate 1: ‘template&lt;class _T1, class _T2, class _U1, class _U2&gt; constexpr std::common_comparison_category_t&lt;decltype (std::__detail::__synth3way(declval&lt;_T1&amp;&gt;(), declval&lt;_U1&amp;&gt;())), decltype (std::__detail::__synth3way(declval&lt;_T2&amp;&gt;(), declval&lt;_U2&amp;&gt;()))&gt; std::operator&lt;=&gt;(const pair&lt;_T1, _T2&gt;&amp;, const pair&lt;_U1, _U2&gt;&amp;)’ (reversed)
+ 1049 |     operator&lt;=&gt;(const pair&lt;_T1, _T2&gt;&amp; __x, const pair&lt;_U1, _U2&gt;&amp; __y)
+      |     ^~~~~~~~
+/usr/include/c++/15/bits/stl_pair.h:1049:5: note: template argument deduction/substitution failed:
+/usr/include/c++/15/bits/stl_algobase.h:263:15: note:   ‘const Produto’ is not derived from ‘const std::pair&lt;_T1, _T2&gt;’
+  263 |       if (__a &lt; __b)
+      |           ~~~~^~~~~
+In file included from /usr/include/c++/15/bits/stl_algobase.h:67:
+/usr/include/c++/15/bits/stl_iterator.h:578:5: note: candidate 2: ‘template&lt;class _IteratorL, class _IteratorR&gt;  requires  three_way_comparable_with&lt;_IteratorR, _IteratorL, std::partial_ordering&gt; constexpr std::compare_three_way_result_t&lt;_IteratorL, _IteratorR&gt; std::operator&lt;=&gt;(const reverse_iterator&lt;_IteratorL&gt;&amp;, const reverse_iterator&lt;_IteratorR&gt;&amp;)’ (reversed)
+  578 |     operator&lt;=&gt;(const reverse_iterator&lt;_IteratorL&gt;&amp; __x,
+      |     ^~~~~~~~
+/usr/include/c++/15/bits/stl_iterator.h:578:5: note: template argument deduction/substitution failed:
+/usr/include/c++/15/bits/stl_algobase.h:263:15: note:   ‘const Produto’ is not derived from ‘const std::reverse_iterator&lt;_IteratorL&gt;’
+  263 |       if (__a &lt; __b)
+      |           ~~~~^~~~~
+/usr/include/c++/15/bits/stl_iterator.h:1674:5: note: candidate 3: ‘template&lt;class _IteratorL, class _IteratorR&gt;  requires  three_way_comparable_with&lt;_IteratorR, _IteratorL, std::partial_ordering&gt; constexpr std::compare_three_way_result_t&lt;_IteratorL, _IteratorR&gt; std::operator&lt;=&gt;(const move_iterator&lt;_IteratorL&gt;&amp;, const move_iterator&lt;_IteratorR&gt;&amp;)’ (reversed)
+ 1674 |     operator&lt;=&gt;(const move_iterator&lt;_IteratorL&gt;&amp; __x,
+      |     ^~~~~~~~
+/usr/include/c++/15/bits/stl_iterator.h:1674:5: note: template argument deduction/substitution failed:
+/usr/include/c++/15/bits/stl_algobase.h:263:15: note:   ‘const Produto’ is not derived from ‘const std::move_iterator&lt;_IteratorL&gt;’
+  263 |       if (__a &lt; __b)
+      |           ~~~~^~~~~
+/usr/include/c++/15/bits/stl_iterator.h:596:5: note: candidate 4: ‘template&lt;class _Iterator&gt;  requires  three_way_comparable&lt;_Iterator, std::partial_ordering&gt; constexpr std::compare_three_way_result_t&lt;_Iterator, _Iterator&gt; std::operator&lt;=&gt;(const reverse_iterator&lt;_IteratorL&gt;&amp;, const reverse_iterator&lt;_IteratorL&gt;&amp;)’ (rewritten)
+  596 |     operator&lt;=&gt;(const reverse_iterator&lt;_Iterator&gt;&amp; __x,
+      |     ^~~~~~~~
+/usr/include/c++/15/bits/stl_iterator.h:596:5: note: template argument deduction/substitution failed:
+/usr/include/c++/15/bits/stl_algobase.h:263:15: note:   ‘const Produto’ is not derived from ‘const std::reverse_iterator&lt;_IteratorL&gt;’
+  263 |       if (__a &lt; __b)
+      |           ~~~~^~~~~
+/usr/include/c++/15/bits/stl_iterator.h:1741:5: note: candidate 5: ‘template&lt;class _Iterator&gt;  requires  three_way_comparable&lt;_Iterator, std::partial_ordering&gt; constexpr std::compare_three_way_result_t&lt;_Iterator, _Iterator&gt; std::operator&lt;=&gt;(const move_iterator&lt;_IteratorL&gt;&amp;, const move_iterator&lt;_IteratorL&gt;&amp;)’ (rewritten)
+ 1741 |     operator&lt;=&gt;(const move_iterator&lt;_Iterator&gt;&amp; __x,
+      |     ^~~~~~~~
+/usr/include/c++/15/bits/stl_iterator.h:1741:5: note: template argument deduction/substitution failed:
+/usr/include/c++/15/bits/stl_algobase.h:263:15: note:   ‘const Produto’ is not derived from ‘const std::move_iterator&lt;_IteratorL&gt;’
+  263 |       if (__a &lt; __b)
+      |           ~~~~^~~~~
+/usr/include/c++/15/bits/stl_iterator.h:545:5: note: candidate 6: ‘template&lt;class _IteratorL, class _IteratorR&gt; constexpr bool std::operator&lt;(const reverse_iterator&lt;_IteratorL&gt;&amp;, const reverse_iterator&lt;_IteratorR&gt;&amp;) requires requires{{std::operator&lt;::__x-&gt;base() &gt; std::operator&lt;::__y-&gt;base()} -&gt; decltype(auto) [requires std::convertible_to&lt;&lt;placeholder&gt;, bool&gt;];}’
+  545 |     operator&lt;(const reverse_iterator&lt;_IteratorL&gt;&amp; __x,
+      |     ^~~~~~~~
+/usr/include/c++/15/bits/stl_iterator.h:545:5: note: template argument deduction/substitution failed:
+/usr/include/c++/15/bits/stl_algobase.h:263:15: note:   ‘const Produto’ is not derived from ‘const std::reverse_iterator&lt;_IteratorL&gt;’
+  263 |       if (__a &lt; __b)
+      |           ~~~~^~~~~
+/usr/include/c++/15/bits/stl_iterator.h:1689:5: note: candidate 7: ‘template&lt;class _IteratorL, class _IteratorR&gt; constexpr bool std::operator&lt;(const move_iterator&lt;_IteratorL&gt;&amp;, const move_iterator&lt;_IteratorR&gt;&amp;) requires requires{{std::operator&lt;::__x-&gt;base() &lt; std::operator&lt;::__y-&gt;base()} -&gt; decltype(auto) [requires std::convertible_to&lt;&lt;placeholder&gt;, bool&gt;];}’
+ 1689 |     operator&lt;(const move_iterator&lt;_IteratorL&gt;&amp; __x,
+      |     ^~~~~~~~
+/usr/include/c++/15/bits/stl_iterator.h:1689:5: note: template argument deduction/substitution failed:
+/usr/include/c++/15/bits/stl_algobase.h:263:15: note:   ‘const Produto’ is not derived from ‘const std::move_iterator&lt;_IteratorL&gt;’
+  263 |       if (__a &lt; __b)
+      |           ~~~~^~~~~</pre>
+
+<p>Assusta, e é normal: <strong>todo mundo</strong> que programa em C++ já levou um desses. O segredo é que você não precisa ler tudo. Siga estes passos:</p>
+
+<ol class="passo">
+  <li><strong>Procure a primeira linha com <code>required from here</code></strong> (use a busca do terminal ou do editor). É sempre uma linha do <strong>seu</strong> arquivo: aqui, <code>max-produto.cpp:13:26: required from here</code>. Logo abaixo, o g++ mostra a linha 13 e marca a chamada <code>std::max(p1, p2)</code>. É ali que você vai mexer.</li>
+  <li><strong>Leia a primeira linha com <code>error:</code></strong> logo depois: <code>no match for ‘operator&lt;’ (operand types are ‘const Produto’ and ‘const Produto’)</code>. Tradução: "não sei fazer <code>&lt;</code> com dois <code>Produto</code>". (O <code>std::max</code> usa <code>&lt;</code>, o nosso <code>maior</code> usava <code>&gt;</code>; a ideia é a mesma.)</li>
+  <li><strong>Leia a linha <code>In instantiation of</code></strong> (a terceira) se quiser saber qual template e com qual tipo: <code>std::max</code> com <code>_Tp = Produto</code>. Nomes que começam com <code>_</code> (<code>_Tp</code>, <code>__a</code>) são nomes internos da biblioteca; leia <code>_Tp</code> como "o T deles".</li>
+  <li><strong>Ignore o resto.</strong> As linhas <code>note: candidate 1</code> até <code>candidate 7</code> são o compilador contando todas as outras funções <code>&lt;</code> que ele testou (para <code>pair</code>, <code>reverse_iterator</code>…) e por que nenhuma serviu. Quase nunca ajudam.</li>
+  <li><strong>Ignore os caminhos <code>/usr/include/c++/15/…</code></strong>. São os arquivos da biblioteca padrão. O erro "acontece" lá dentro, mas a biblioteca está certa: o problema é o tipo que você mandou.</li>
+</ol>
+
+<p>Resumindo a montanha de texto em uma frase: <em>"na linha 13, você pediu o <code>std::max</code> de dois <code>Produto</code>, e <code>Produto</code> não sabe fazer <code>&lt;</code>"</em>. É o mesmo erro da seção anterior, só que com um template maior.</p>
+
+<div class="tip">
+<strong>No editor do guia (Clang)</strong>
+<p>O Clang escreve <code>in instantiation of function template specialization 'std::max&lt;Produto&gt;' requested here</code> no lugar de <code>required from here</code>, e põe o <code>error:</code> antes, com o texto <code>invalid operands to binary expression ('const Produto' and 'const Produto')</code> ("operandos inválidos"). A regra é a mesma: procure a linha que cita o <strong>seu</strong> arquivo. A aula <a href="concepts.html">Concepts</a> mostra como o C++20 deixa essas mensagens bem mais curtas.</p>
+</div>
+
+<hr>
+
+<h2>8. <code>auto</code> nos parâmetros <span class="versao">C++20</span></h2>
+<p>Desde o C++20, existe um atalho: escrever <code>auto</code> no tipo de cada parâmetro. Isso se chama <strong>template de função abreviado</strong>: o compilador transforma a função num template sem você escrever a linha <code>template &lt;…&gt;</code>.</p>
+
+<pre class="file" data-file="abreviado.cpp">#include &lt;iostream&gt;
+
+auto maior(auto a, auto b) {
+    return a &gt; b ? a : b;
+}
+
+int main() {
+    std::cout &lt;&lt; maior(3, 7) &lt;&lt; '\n';
+    std::cout &lt;&lt; maior(3, 4.5) &lt;&lt; '\n';
+    std::cout &lt;&lt; maior(10, 2.5) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra abreviado.cpp -o abreviado
+$ ./abreviado
+7
+4.5                      « maior(3, 4.5) agora compila!
+10</pre>
+
+<dl class="anatomy">
+  <dt>auto a, auto b</dt><dd>Cada <code>auto</code> num parâmetro vira um parâmetro de template <strong>separado</strong>. É como se você tivesse escrito <code>template &lt;typename T1, typename T2&gt; auto maior(T1 a, T2 b)</code>. Por isso <code>maior(3, 4.5)</code> compila: <code>a</code> é <code>int</code> e <code>b</code> é <code>double</code>, cada um com seu tipo.</dd>
+  <dt>auto maior(…)</dt><dd>O <code>auto</code> antes do nome diz: "o tipo de retorno, descubra pelo <code>return</code>" (veja <a href="auto.html">auto</a>).</dd>
+  <dt>a &gt; b ? a : b</dt><dd>Com um <code>int</code> e um <code>double</code>, o ternário converte os dois para <code>double</code>. Por isso a função devolve <code>double</code>: em <code>maior(10, 2.5)</code>, o resultado é <code>10.0</code> (o <code>cout</code> mostra <code>10</code>).</dd>
+</dl>
+
+<p>Se você esquecer o <code>-std=c++20</code> (ou mais novo), o g++ 15, que usa C++17 por padrão, avisa:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++17 -Wall -Wextra abreviado.cpp -o abreviado
+abreviado.cpp:3:12: warning: use of ‘auto’ in parameter declaration only available with ‘-std=c++20’ or ‘-fconcepts’ [-Wc++20-extensions]
+    3 | auto maior(auto a, auto b) {
+      |            ^~~~
+abreviado.cpp:3:20: warning: use of ‘auto’ in parameter declaration only available with ‘-std=c++20’ or ‘-fconcepts’ [-Wc++20-extensions]
+    3 | auto maior(auto a, auto b) {
+      |                    ^~~~</pre>
+
+<p>"Uso de <code>auto</code> em declaração de parâmetro só disponível com <code>-std=c++20</code>". É só um aviso (o g++ compila assim mesmo, como extensão), mas outro compilador pode recusar. Use sempre o <code>-std=c++23</code> do comando padrão.</p>
+
+<hr>
+
+<h2>9. Formas diferentes, e qual usar</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Os dois argumentos podem ter tipos diferentes?</th><th>Quando usar</th></tr>
+<tr><td>Sobrecarga (uma função por tipo)</td><td><code>int maior(int, int)</code> + <code>double maior(double, double)</code></td><td>Não (cada uma tem os seus)</td><td>Quando o <strong>corpo muda</strong> de um tipo para outro.</td></tr>
+<tr><td>Template com <code>typename T</code></td><td><code>template &lt;typename T&gt; T maior(T a, T b)</code></td><td>Não: os dois são <code>T</code></td><td>O caso mais comum: mesmo corpo, e você <strong>quer</strong> que os dois sejam do mesmo tipo.</td></tr>
+<tr><td>Template com <code>auto</code> nos parâmetros <span class="versao">C++20</span></td><td><code>auto maior(auto a, auto b)</code></td><td>Sim: cada <code>auto</code> é um tipo</td><td>Funções curtas e genéricas, quando misturar tipos é aceitável.</td></tr>
+<tr><td>Template com tipo escolhido na chamada</td><td><code>maior&lt;double&gt;(3, 4.5)</code></td><td>Sim, convertendo para o tipo escolhido</td><td>Quando a dedução falha ou dá um tipo que você não quer.</td></tr>
+</table>
+</div>
+
+<p>Um detalhe de boa prática: para tipos "pesados" (<code>std::string</code>, <code>std::vector</code>), receba por <a href="passagem-referencia.html">referência constante</a>, <code>const T&amp;</code>, para não copiar à toa. Um template muito útil é um "mostrar" que serve para vetores de qualquer tipo:</p>
+
+<pre class="file" data-file="mostrar.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+template &lt;typename T&gt;
+void mostrar(const std::vector&lt;T&gt;&amp; itens) {
+    for (const T&amp; item : itens) {
+        std::cout &lt;&lt; "- " &lt;&lt; item &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "(" &lt;&lt; itens.size() &lt;&lt; " itens)\n";
+}
+
+int main() {
+    std::vector&lt;std::string&gt; compras{"arroz", "feijão", "café"};
+    std::vector&lt;int&gt; notas{7, 9, 10};
+    mostrar(compras);
+    mostrar(notas);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra mostrar.cpp -o mostrar
+$ ./mostrar
+- arroz
+- feijão
+- café
+(3 itens)
+- 7
+- 9
+- 10
+(3 itens)</pre>
+
+<p>Aqui o compilador deduziu <code>T</code> olhando <strong>dentro</strong> do argumento: <code>compras</code> é um <code>std::vector&lt;std::string&gt;</code>, então <code>T = std::string</code>. O <code>void</code> diz que a função não devolve nada (aula <a href="retorno.html">Retorno</a>).</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: no matching function for call to ‘maior(int, double)’</code> … <code>deduced conflicting types</code></strong>
+<p><strong>O que significa:</strong> os argumentos têm tipos diferentes, e o template exige que os dois sejam o mesmo <code>T</code>.</p>
+<p><strong>Como consertar:</strong> diga o tipo (<code>maior&lt;double&gt;(3, 4.5)</code>), iguale os argumentos (<code>3.0</code>) ou use <code>auto</code> nos parâmetros.</p>
+</div>
+
+<div class="cenario">
+<strong><code>In instantiation of …</code> / <code>required from here</code> / <code>error: no match for ‘operator&gt;’</code></strong>
+<p><strong>O que significa:</strong> o tipo deduzido não sabe fazer uma operação que o corpo do template usa (<code>&gt;</code>, <code>&lt;</code>, <code>&lt;&lt;</code>…).</p>
+<p><strong>Como consertar:</strong> vá até a linha do <code>required from here</code>: é a sua chamada. Passe um tipo que tenha a operação (por exemplo, <code>p1.preco</code> em vez de <code>p1</code>) ou ensine o tipo a fazê-la (<a href="sobrecarga-operadores.html">Sobrecarga de Operadores</a>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: ‘T’ does not name a type</code></strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra esqueci.cpp -o esqueci
+esqueci.cpp:3:1: error: ‘T’ does not name a type
+    3 | T maior(T a, T b) {
+      | ^
+esqueci.cpp: In function ‘int main()’:
+esqueci.cpp:8:18: error: ‘maior’ was not declared in this scope
+    8 |     std::cout &lt;&lt; maior(3, 7) &lt;&lt; '\n';
+      |                  ^~~~~</pre>
+<p><strong>O que significa:</strong> "<code>T</code> não é nome de um tipo". Você esqueceu a linha <code>template &lt;typename T&gt;</code> antes da função, e o compilador não sabe o que é <code>T</code>. Como a função não pôde ser criada, o segundo erro (<code>‘maior’ was not declared</code>) é só consequência do primeiro. No Clang: <code>unknown type name 'T'</code>.</p>
+<p><strong>Como consertar:</strong> ponha <code>template &lt;typename T&gt;</code> na linha logo acima da função. Conserte sempre o <strong>primeiro</strong> erro e compile de novo.</p>
+</div>
+
+<div class="cenario">
+<strong>Compila, mas o resultado perdeu os decimais</strong>
+<p><strong>O que significa:</strong> você escolheu um tipo inteiro (<code>maior&lt;int&gt;(3, 4.5)</code>) e o <code>4.5</code> virou <code>4</code> em silêncio.</p>
+<p><strong>Como consertar:</strong> escolha o tipo que guarda todos os valores (<code>double</code>). Se quiser que o compilador avise nesses casos, compile com <code>-Wconversion</code> (aula <a href="avisos.html">Avisos</a>):</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -Wconversion explicito.cpp -o explicito
+explicito.cpp: In function ‘int main()’:
+explicito.cpp:10:32: warning: conversion from ‘double’ to ‘int’ changes value from ‘4.5e+0’ to ‘4’ [-Wfloat-conversion]
+   10 |     std::cout &lt;&lt; maior&lt;int&gt;(3, 4.5) &lt;&lt; '\n';
+      |                                ^~~</pre>
+<p>"Conversão de <code>double</code> para <code>int</code> muda o valor de 4.5 para 4."</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>template &lt;typename T&gt;</code></td><td>Começa um template com um parâmetro de tipo chamado <code>T</code></td></tr>
+<tr><td><code>template &lt;class T&gt;</code></td><td>O mesmo que <code>typename T</code></td></tr>
+<tr><td><code>template &lt;typename T, typename U&gt;</code></td><td>Template com dois tipos independentes</td></tr>
+<tr><td><code>maior(3, 7)</code></td><td>Chamada com dedução: <code>T = int</code></td></tr>
+<tr><td><code>maior&lt;double&gt;(3, 4.5)</code></td><td>Chamada com o tipo escolhido: <code>T = double</code></td></tr>
+<tr><td><code>auto f(auto a, auto b)</code> <span class="versao">C++20</span></td><td>Template abreviado: cada <code>auto</code> é um tipo próprio</td></tr>
+<tr><td><code>const T&amp;</code></td><td>Recebe sem copiar (bom para tipos grandes)</td></tr>
+<tr><td><code>required from here</code></td><td>Nas mensagens do g++: a linha do <strong>seu</strong> código que pediu o template</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A primeira linha</h3>
+<p>Complete a linha que transforma a função abaixo num template:</p>
+<div class="ex-code">template &lt;<input data-answer="typename T|class T" aria-label="parâmetro">&gt;<br>T dobro(T x) { return x * 2; }</div>
+</div>
+
+<div class="exercise">
+<h3>2. Escolher o tipo</h3>
+<p>Complete para chamar <code>maior</code> com <code>T = double</code>:</p>
+<div class="ex-code">maior<input data-answer="&lt;double&gt;" aria-label="tipo">(3, 4.5)</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Com <code>template &lt;typename T&gt; T maior(T a, T b)</code>, o que acontece em <code>maior(2, 9)</code>?</p>
+<label><input type="radio" name="q3"> Erro: faltou dizer o tipo</label>
+<label><input type="radio" name="q3"> O compilador deduz <code>T = int</code> e o resultado é 9</label>
+<label><input type="radio" name="q3"> O compilador deduz <code>T = double</code> e o resultado é 9.0</label>
+<label><input type="radio" name="q3"> Erro: <code>deduced conflicting types</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Num erro de template de 60 linhas, qual linha procurar primeiro?</p>
+<label><input type="radio" name="q4"> A última</label>
+<label><input type="radio" name="q4"> A primeira que cita <code>/usr/include/c++/15/</code></label>
+<label><input type="radio" name="q4"> A primeira com <code>required from here</code>, que aponta para o seu arquivo</label>
+<label><input type="radio" name="q4"> As linhas <code>note: candidate</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Por que <code>auto maior(auto a, auto b)</code> aceita <code>maior(3, 4.5)</code>, mas <code>template &lt;typename T&gt; T maior(T a, T b)</code> não?</p>
+<label><input type="radio" name="q5"> Porque cada <code>auto</code> é um parâmetro de template separado</label>
+<label><input type="radio" name="q5"> Porque <code>auto</code> converte tudo para <code>double</code></label>
+<label><input type="radio" name="q5"> Porque <code>auto</code> não é template</label>
+<label><input type="radio" name="q5"> Porque o C++20 desligou a dedução</label>
+</div>
+
+<h3>Missão final: o menor preço</h3>
+
+<div class="trycpp" data-goal="out:4,out:1.5,out:maçã,src:template\s*&lt;\s*(typename|class)\s+\w+\s*&gt;">
+<p class="try-task"><strong>Missão:</strong> escreva um template <code>menor</code> (o contrário do <code>maior</code>) com <code>template &lt;typename T&gt;</code> e use-o para mostrar o menor de <code>4</code> e <code>9</code>, o menor de <code>2.5</code> e <code>1.5</code> e o menor entre os textos <code>"pera"</code> e <code>"maçã"</code> (como <code>std::string</code>). Saída esperada:</p>
+<pre class="out">4
+1.5
+maçã</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+// escreva o template menor aqui
+
+int main() {
+    // chame menor três vezes aqui
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+template &lt;typename T&gt;
+T menor(T a, T b) {
+    return a &lt; b ? a : b;
+}
+
+int main() {
+    std::cout &lt;&lt; menor(4, 9) &lt;&lt; '\n';
+    std::cout &lt;&lt; menor(2.5, 1.5) &lt;&lt; '\n';
+    std::cout &lt;&lt; menor(std::string("pera"), std::string("maçã")) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um <strong>template de função</strong> é um molde: você escreve a função uma vez, com um tipo em branco (<code>T</code>), e o compilador gera uma versão para cada tipo usado.</li>
+  <li>A forma: <code>template &lt;typename T&gt;</code> na linha de cima, e <code>T</code> no lugar do tipo. <code>class T</code> é o mesmo que <code>typename T</code>.</li>
+  <li>O compilador <strong>deduz</strong> <code>T</code> pelos argumentos. Para escolher à mão: <code>maior&lt;double&gt;(3, 4.5)</code>.</li>
+  <li>Argumentos de tipos diferentes para o mesmo <code>T</code> dão <code>deduced conflicting types</code>.</li>
+  <li>Se o tipo não tem a operação que o corpo usa, o erro aponta para dentro do template. Procure <code>required from here</code>: é a sua linha. Ignore os <code>candidate</code> e os caminhos da biblioteca.</li>
+  <li>No C++20, <code>auto f(auto a, auto b)</code> é um template abreviado, com um tipo para cada <code>auto</code>.</li>
+  <li>Próximo passo: moldes de <strong>classes</strong>, em <a href="templates-classe.html">Templates de Classe</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
