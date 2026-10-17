@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ ++ e -- — incremento e decremento, pré × pós | Guia C++</title>
+<meta name="description" content="Os operadores ++ e -- em C++ para quem nunca programou: somar e subtrair 1, a diferença entre ++x e x++ (pré e pós) com saídas reais, o uso no for, os erros com bool, constantes e números, e por que i = i++ e i++ + i++ são armadilhas (aviso -Wsequence-point).">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">++ e --</span></h1>
+
+<p class="intro">Somar 1 numa variável é, provavelmente, a conta mais feita em programação: contar visitas, passar para a próxima senha da fila, andar para o próximo item de uma lista, ganhar uma vida no jogo. É tão comum que tem um operador só para isso, o <code>++</code>, e o seu irmão que subtrai 1, o <code>--</code>. A própria linguagem tem esse nome por causa dele: <strong>C++</strong> é "o C, mais um passo". Nesta aula você vai usar os dois, entender a diferença entre <code>++x</code> e <code>x++</code>, e ver por que algumas combinações são proibidas pelo bom senso (e pelo compilador).</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que <code>++</code> (incremento) e <code>--</code> (decremento) fazem.</li>
+  <li>A diferença entre <strong>pré</strong> (<code>++x</code>) e <strong>pós</strong> (<code>x++</code>): quando o valor muda e qual valor é entregue.</li>
+  <li>Onde eles aparecem mais: no laço <code>for</code>.</li>
+  <li>Em que tipos funcionam, e os erros com <code>bool</code>, <code>const</code> e números.</li>
+  <li>Por que <code>i = i++</code> e <code>i++ + i++</code> são armadilhas, e o aviso <code>-Wsequence-point</code>.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: o contador de pessoas da portaria</h2>
+<p>Sabe aquele contador de mão, de metal, que o segurança aperta a cada pessoa que entra no show? Cada clique soma exatamente 1. Ele não serve para somar 5 de uma vez, só para "mais um". O <code>++</code> é esse contador. O <code>--</code> é o mesmo contador apertado ao contrário, quando alguém sai.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrito</th><th>Faz o mesmo que</th><th>Nome</th></tr>
+<tr><td><code>++x;</code> ou <code>x++;</code></td><td><code>x += 1;</code> ou <code>x = x + 1;</code></td><td>Incremento</td></tr>
+<tr><td><code>--x;</code> ou <code>x--;</code></td><td><code>x -= 1;</code> ou <code>x = x - 1;</code></td><td>Decremento</td></tr>
+</table>
+</div>
+
+<p>Os sinais são dois <code>+</code> (ou dois <code>-</code>) grudados, e ficam grudados na variável, antes ou depois dela. O <code>+=</code> da tabela vem da aula <a href="operadores-atribuicao.html">Operadores de Atribuição</a>.</p>
+
+<hr>
+
+<h2>1. Somar e subtrair 1</h2>
+
+<pre class="file" data-file="incremento.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int vidas = 3;
+    ++vidas;
+    std::cout &lt;&lt; vidas &lt;&lt; '\n';
+    vidas++;
+    std::cout &lt;&lt; vidas &lt;&lt; '\n';
+    --vidas;
+    std::cout &lt;&lt; vidas &lt;&lt; '\n';
+    vidas--;
+    std::cout &lt;&lt; vidas &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra incremento.cpp -o incremento
+$ ./incremento
+4        « ++vidas: 3 + 1
+5        « vidas++: 4 + 1
+4        « --vidas: 5 - 1
+3        « vidas--: 4 - 1</pre>
+
+<p>Quando o <code>++</code> ou o <code>--</code> está <strong>sozinho na linha</strong>, como aqui, tanto faz escrever antes ou depois da variável: <code>++vidas;</code> e <code>vidas++;</code> fazem exatamente a mesma coisa. A diferença só aparece quando o resultado é <strong>usado</strong> na mesma linha, como você vai ver agora.</p>
+
+<hr>
+
+<h2>2. Pré × pós: <code>++x</code> e <code>x++</code></h2>
+<p>Além de mudar a variável, o <code>++</code> <strong>entrega um valor</strong>, que pode ser guardado ou mostrado. E aí as duas formas se separam:</p>
+<ul>
+  <li><strong>Pré-incremento</strong>, <code>++x</code> (o <code>++</code> vem <strong>antes</strong>): primeiro soma, depois entrega o valor <strong>novo</strong>.</li>
+  <li><strong>Pós-incremento</strong>, <code>x++</code> (o <code>++</code> vem <strong>depois</strong>): entrega o valor <strong>antigo</strong>, e soma depois.</li>
+</ul>
+
+<pre class="file" data-file="prepos.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int a = 5;
+    int b = ++a;    // pré: soma primeiro, depois entrega
+    std::cout &lt;&lt; "a = " &lt;&lt; a &lt;&lt; ", b = " &lt;&lt; b &lt;&lt; '\n';
+
+    int c = 5;
+    int d = c++;    // pós: entrega o valor antigo, depois soma
+    std::cout &lt;&lt; "c = " &lt;&lt; c &lt;&lt; ", d = " &lt;&lt; d &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra prepos.cpp -o prepos
+$ ./prepos
+a = 6, b = 6     « ++a: o a virou 6 e o b recebeu o 6 novo
+c = 6, d = 5     « c++: o d recebeu o 5 antigo, e o c virou 6 do mesmo jeito</pre>
+
+<p>Repare: nos dois casos a variável <strong>terminou com 6</strong>. O que muda é só o valor entregue para quem estava esperando (<code>b</code> e <code>d</code>).</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Com <code>x</code> = 5</th><th>Valor entregue</th><th><code>x</code> depois</th><th>Leia como</th></tr>
+<tr><td><code>++x</code></td><td>6</td><td>6</td><td>"some e me dê"</td></tr>
+<tr><td><code>x++</code></td><td>5</td><td>6</td><td>"me dê e some"</td></tr>
+<tr><td><code>--x</code></td><td>4</td><td>4</td><td>"subtraia e me dê"</td></tr>
+<tr><td><code>x--</code></td><td>5</td><td>4</td><td>"me dê e subtraia"</td></tr>
+</table>
+</div>
+
+<p>Um truque para lembrar: <strong>leia da esquerda para a direita</strong>. Em <code>++x</code>, você encontra primeiro o <code>++</code> (soma) e depois o <code>x</code> (entrega). Em <code>x++</code>, encontra primeiro o <code>x</code> (entrega) e depois o <code>++</code> (soma).</p>
+
+<h3>A fila de senhas</h3>
+<p>O pós-incremento combina com a ideia de "chamar e avançar". Na fila do banco, o painel mostra a senha atual e já prepara a próxima:</p>
+
+<pre class="file" data-file="prepos2.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int senha = 100;
+    std::cout &lt;&lt; senha++ &lt;&lt; '\n';
+    std::cout &lt;&lt; senha &lt;&lt; '\n';
+    std::cout &lt;&lt; ++senha &lt;&lt; '\n';
+    std::cout &lt;&lt; senha-- &lt;&lt; '\n';
+    std::cout &lt;&lt; --senha &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra prepos2.cpp -o prepos2
+$ ./prepos2
+100      « senha++ mostra 100 e a senha vira 101
+101      « confirmando
+102      « ++senha: vira 102 e mostra 102
+102      « senha-- mostra 102 e a senha vira 101
+100      « --senha: vira 100 e mostra 100</pre>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> antes de rodar, escreva num papel o que você acha que cada linha vai mostrar. Depois rode e confira. Troque <code>x++</code> por <code>++x</code> na primeira linha e veja o que muda.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int x = 10;
+    int y = x++;
+    std::cout &lt;&lt; "x = " &lt;&lt; x &lt;&lt; ", y = " &lt;&lt; y &lt;&lt; '\n';
+    int z = --x;
+    std::cout &lt;&lt; "x = " &lt;&lt; x &lt;&lt; ", z = " &lt;&lt; z &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<div class="tip">
+<strong>Na dúvida, use sozinho na linha</strong>
+<p>Misturar <code>++</code> com outras coisas na mesma linha economiza uma linha, mas obriga quem lê a pensar em "antes ou depois". <code>std::cout &lt;&lt; senha &lt;&lt; '\n'; ++senha;</code> é mais claro que <code>std::cout &lt;&lt; senha++ &lt;&lt; '\n';</code>. E quando estiver sozinho, prefira o <strong>pré</strong> (<code>++x</code>): com <code>int</code> não faz diferença, mas com tipos mais complexos que você verá depois (como os <a href="iteradores.html">iteradores</a>), o pós precisa guardar uma cópia do valor antigo, e o pré não.</p>
+</div>
+
+<hr>
+
+<h2>3. No laço <code>for</code></h2>
+<p>O lugar onde você mais vai ver <code>++</code> e <code>--</code> é a terceira parte do <code>for</code>, o laço que repete um bloco contando (aula <a href="for.html">for</a>). Ali, o valor entregue não é usado, então <code>++i</code> e <code>i++</code> dão o mesmo resultado:</p>
+
+<pre class="file" data-file="contagem.cpp">#include &lt;iostream&gt;
+
+int main() {
+    for (int i = 1; i &lt;= 3; ++i) {
+        std::cout &lt;&lt; "Volta " &lt;&lt; i &lt;&lt; '\n';
+    }
+    for (int i = 3; i &gt;= 1; i--) {
+        std::cout &lt;&lt; i &lt;&lt; "... ";
+    }
+    std::cout &lt;&lt; "Já!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra contagem.cpp -o contagem
+$ ./contagem
+Volta 1
+Volta 2
+Volta 3
+3... 2... 1... Já!</pre>
+
+<dl class="anatomy">
+  <dt>for (int i = 1; i &lt;= 3; ++i)</dt><dd>"Comece com <code>i</code> = 1; enquanto <code>i &lt;= 3</code>, repita; depois de cada volta, <code>++i</code>." O <code>++i</code> é o que faz a contagem andar.</dd>
+  <dt>for (int i = 3; i &gt;= 1; i--)</dt><dd>Contagem regressiva: começa em 3 e o <code>i--</code> desce de 1 em 1.</dd>
+</dl>
+
+<p>Esqueceu o <code>++</code>? O <code>i</code> nunca muda, a condição nunca fica falsa, e o laço roda para sempre. Os detalhes estão na aula <a href="for.html">for</a>.</p>
+
+<hr>
+
+<h2>4. Em que tipos funcionam</h2>
+<p>O <code>++</code> e o <code>--</code> funcionam com todos os tipos de número, inclusive <code>double</code> (soma 1.0) e <code>char</code> (vai para o próximo caractere da tabela):</p>
+
+<pre class="file" data-file="doubleinc.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double temperatura = 21.5;
+    temperatura++;
+    std::cout &lt;&lt; temperatura &lt;&lt; '\n';
+    char letra = 'a';
+    letra++;
+    std::cout &lt;&lt; letra &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra doubleinc.cpp -o doubleinc
+$ ./doubleinc
+22.5
+b        « 'a' (97) + 1 = 'b' (98)</pre>
+
+<p>Mas há três coisas em que eles <strong>não</strong> funcionam:</p>
+
+<h3><code>bool</code>: proibido desde o C++17</h3>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra boolinc.cpp -o boolinc
+boolinc.cpp: In function ‘int main()’:
+boolinc.cpp:3:5: error: use of an operand of type ‘bool’ in ‘operator++’ is forbidden in C++17
+    3 |     ligado++;
+      |     ^~~~~~</pre>
+<p>"O uso de um operando do tipo <code>bool</code> no <code>operator++</code> é proibido no C++17." Antigamente, <code>ligado++</code> transformava <code>false</code> em <code>true</code>, mas isso confundia mais do que ajudava e foi removido. Para ligar, escreva <code>ligado = true;</code>; para inverter, <code>ligado = !ligado;</code> (veja <a href="operadores-logicos.html">Operadores Lógicos</a>).</p>
+
+<h3>Constantes</h3>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra consti.cpp -o consti
+consti.cpp: In function ‘int main()’:
+consti.cpp:3:5: error: decrement of read-only variable ‘vidas’
+    3 |     vidas--;
+      |     ^~~~~</pre>
+<p>"Decremento de variável somente leitura." <code>vidas</code> foi criada como <code>const int vidas = 3;</code> (aula <a href="constantes.html">Constantes</a>), e nada pode mudá-la.</p>
+
+<h3>Números escritos direto</h3>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra literal.cpp -o literal
+literal.cpp: In function ‘int main()’:
+literal.cpp:2:13: error: lvalue required as increment operand
+    2 |     int x = 5++;
+      |             ^
+literal.cpp:2:9: warning: unused variable ‘x’ [-Wunused-variable]
+    2 |     int x = 5++;
+      |         ^</pre>
+<p>"É necessário um <em>lvalue</em> como operando do incremento": o <code>++</code> precisa de um <strong>lugar</strong> para guardar o resultado, ou seja, uma variável. O <code>5</code> não é um lugar (o mesmo erro da aula de <a href="operadores-atribuicao.html">atribuição</a>, com <code>10 = estoque</code>). Se você queria 6, escreva <code>5 + 1</code>. O aviso de baixo é consequência: como a linha deu erro, o <code>x</code> nunca foi usado.</p>
+
+<hr>
+
+<h2>5. A armadilha: mudar e usar a mesma variável na mesma conta</h2>
+<p>O <code>++</code> faz duas coisas ao mesmo tempo: entrega um valor e muda a variável. Se a <strong>mesma</strong> variável aparece mais de uma vez na mesma expressão, e alguma dessas aparições a muda, surge a pergunta: em que ordem as coisas acontecem? Às vezes a regra do C++ não responde, e aí o programa tem <strong>comportamento indefinido</strong>: o compilador pode fazer qualquer coisa (aula <a href="comportamento-indefinido.html">Comportamento Indefinido</a>).</p>
+
+<h3><code>i++ + i++</code>: indefinido</h3>
+
+<pre class="file" data-file="ub2.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int i = 5;
+    int r = i++ + i++;
+    std::cout &lt;&lt; r &lt;&lt; ' ' &lt;&lt; i &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ub2.cpp -o ub2
+ub2.cpp: In function ‘int main()’:
+ub2.cpp:5:14: warning: operation on ‘i’ may be undefined [-Wsequence-point]
+    5 |     int r = i++ + i++;
+      |             ~^~
+$ ./ub2
+11 7</pre>
+
+<p>"A operação em <code>i</code> pode ser indefinida." O C++ não diz qual dos dois <code>i++</code> é feito primeiro, nem quando cada um guarda o resultado. O g++ escolheu um jeito e deu 11 (5 + 6); outro compilador, ou o mesmo com outras opções, pode dar outra coisa, e isso é <strong>permitido</strong> pela regra. O nome do aviso, <code>-Wsequence-point</code> ("ponto de sequência"), vem dos antigos "pontos" em que o C e o C++ garantiam que tudo antes já tinha acontecido. Ele faz parte do <code>-Wall</code>. No editor do guia, o Clang avisa assim: <code>multiple unsequenced modifications to 'i' [-Wunsequenced]</code>, "várias modificações sem ordem definida em <code>i</code>".</p>
+
+<h3><code>i = i++</code>: não faça</h3>
+<p>Uma tentativa comum de quem começa: "quero somar 1 no <code>i</code>, então <code>i = i++</code>". Veja:</p>
+
+<pre class="file" data-file="ub.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int i = 5;
+    i = i++;
+    std::cout &lt;&lt; i &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ub.cpp -o ub
+ub.cpp: In function ‘int main()’:
+ub.cpp:5:7: warning: operation on ‘i’ may be undefined [-Wsequence-point]
+    5 |     i = i++;
+      |     ~~^~~~~
+ub.cpp:5:7: warning: operation on ‘i’ may be undefined [-Wsequence-point]
+$ ./ub
+5        « não somou nada!</pre>
+
+<p>O <code>i</code> continuou 5. Até o C++14, essa linha era comportamento indefinido, como a anterior. O C++17 criou uma regra para ela: o lado direito do <code>=</code> é resolvido <strong>inteiro</strong> antes da atribuição. Então:</p>
+<ol class="passo">
+  <li><code>i++</code> entrega o valor antigo, <strong>5</strong>, e muda <code>i</code> para 6.</li>
+  <li>A atribuição guarda o <strong>5</strong> entregue em <code>i</code>, por cima do 6.</li>
+  <li>Resultado: <code>i</code> volta a ser 5. O <code>++</code> foi desperdiçado.</li>
+</ol>
+<p>Ou seja: no C++ de hoje ela não é mais indefinida, mas é <strong>inútil</strong>, e em código C++14 ou mais antigo é indefinida. O g++ 15 continua avisando, mesmo com <code>-std=c++23</code> (o Clang 21 só avisa se você pedir <code>-std=c++14</code>). Seja qual for a versão, a resposta é a mesma: <strong>não escreva isso</strong>. Para somar 1, basta <code>++i;</code> (ou <code>i++;</code>, ou <code>i += 1;</code>), sozinho.</p>
+
+<div class="warning">
+<strong>A regra prática</strong>
+<p>Numa mesma expressão, se uma variável é mudada (<code>++</code>, <code>--</code>, <code>=</code>, <code>+=</code>…), <strong>não use essa variável de novo</strong>. Separe em linhas. Assim você nunca precisa saber as regras finas de ordem, e o código fica mais fácil de ler. E nunca ignore o aviso <code>may be undefined</code>.</p>
+</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode e leia o aviso do compilador na linha do <code>r</code>. Depois reescreva em três linhas sem ambiguidade: some o <code>i</code> ao <code>r</code>, faça <code>++i</code>, some de novo. O aviso deve sumir.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int i = 5;
+    int r = i++ + i++;
+    std::cout &lt;&lt; "r = " &lt;&lt; r &lt;&lt; ", i = " &lt;&lt; i &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Formas diferentes: qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Para somar 1 em <code>x</code></th><th>Quando usar</th></tr>
+<tr><td><code>++x;</code></td><td>O padrão: sozinho na linha e no <code>for</code>.</td></tr>
+<tr><td><code>x++;</code></td><td>Igual ao <code>++x</code> quando sozinho. Muito comum também; é questão de estilo.</td></tr>
+<tr><td><code>x += 1;</code></td><td>Quando o passo pode mudar depois (<code>x += 2</code>).</td></tr>
+<tr><td><code>x = x + 1;</code></td><td>A forma mais longa; útil para quem está começando a ler código.</td></tr>
+<tr><td><code>y = x++;</code> / <code>y = ++x;</code></td><td>Só quando você quer mesmo o valor antigo/novo, e a linha fica clara.</td></tr>
+<tr><td><code>x = x++;</code>, <code>x++ + x++</code></td><td><strong>Nunca.</strong></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>warning: operation on ‘i’ may be undefined [-Wsequence-point]</code></strong>
+<p><strong>O que aconteceu:</strong> a mesma variável é mudada e usada (ou mudada duas vezes) numa expressão só, como <code>i = i++</code> ou <code>i++ + i++</code>.</p>
+<p><strong>Como resolver:</strong> separe em linhas, uma mudança por linha. Para simplesmente somar 1, <code>++i;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: use of an operand of type ‘bool’ in ‘operator++’ is forbidden in C++17</code></strong>
+<p><strong>O que aconteceu:</strong> <code>++</code> ou <code>--</code> numa variável <code>bool</code>.</p>
+<p><strong>Como resolver:</strong> atribua o valor que você quer: <code>ligado = true;</code>, ou inverta: <code>ligado = !ligado;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: lvalue required as increment operand</code></strong>
+<p><strong>O que aconteceu:</strong> o <code>++</code> foi aplicado a algo que não é uma variável: um número (<code>5++</code>) ou uma conta (<code>(a + b)++</code>).</p>
+<p><strong>Como resolver:</strong> use <code>+ 1</code> para calcular sem mudar nada, ou aplique o <code>++</code> numa variável.</p>
+</div>
+
+<div class="cenario">
+<strong>O valor saiu "um a menos" (ou "um a mais") do que o esperado</strong>
+<p><strong>O que aconteceu:</strong> você usou o pós (<code>x++</code>) onde queria o valor novo, ou o pré (<code>++x</code>) onde queria o antigo.</p>
+<p><strong>Como resolver:</strong> separe: faça o <code>++x;</code> numa linha e use o <code>x</code> na outra, na ordem que você quer.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operador</th><th>Muda <code>x</code> para</th><th>Entrega</th><th>Funciona com</th></tr>
+<tr><td><code>++x</code></td><td><code>x + 1</code></td><td>o valor novo</td><td>inteiros, <code>double</code>, <code>char</code> (não <code>bool</code>, não <code>const</code>)</td></tr>
+<tr><td><code>x++</code></td><td><code>x + 1</code></td><td>o valor antigo</td><td>idem</td></tr>
+<tr><td><code>--x</code></td><td><code>x - 1</code></td><td>o valor novo</td><td>idem</td></tr>
+<tr><td><code>x--</code></td><td><code>x - 1</code></td><td>o valor antigo</td><td>idem</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Pós-incremento</h3>
+<p><code>int a = 7;</code> e depois <code>int b = a++;</code>. Quanto vale <code>b</code>?</p>
+<div class="ex-code"><input data-answer="7" aria-label="valor de b"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Pré-decremento</h3>
+<p><code>int a = 7;</code> e depois <code>int b = --a;</code>. Quanto vale <code>b</code>?</p>
+<div class="ex-code"><input data-answer="6" aria-label="valor de b"></div>
+</div>
+
+<div class="exercise">
+<h3>3. Contagem regressiva</h3>
+<p>Complete o <code>for</code> para contar de 10 até 1, descendo de 1 em 1:</p>
+<div class="ex-code">for (int i = 10; i &gt;= 1; <input data-answer="--i|i--|i -= 1|i-=1|i = i - 1" aria-label="passo">)</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. <code>int x = 3;</code> e depois <code>int y = x++ * 2;</code>. Quanto valem <code>x</code> e <code>y</code>?</p>
+<label><input type="radio" name="q4"> <code>x</code> = 4, <code>y</code> = 8</label>
+<label><input type="radio" name="q4"> <code>x</code> = 4, <code>y</code> = 6</label>
+<label><input type="radio" name="q4"> <code>x</code> = 3, <code>y</code> = 6</label>
+<label><input type="radio" name="q4"> <code>x</code> = 3, <code>y</code> = 8</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Qual destas linhas é a forma recomendada de somar 1 em <code>i</code>?</p>
+<label><input type="radio" name="q5"> <code>i = i++;</code></label>
+<label><input type="radio" name="q5"> <code>i = ++i + 0;</code></label>
+<label><input type="radio" name="q5"> <code>i++ + 1;</code></label>
+<label><input type="radio" name="q5"> <code>++i;</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. <code>bool ativo = false;</code> O que acontece com <code>ativo++;</code> compilando com <code>-std=c++23</code>?</p>
+<label><input type="radio" name="q6"> Erro de compilação: é proibido desde o C++17</label>
+<label><input type="radio" name="q6"> <code>ativo</code> vira <code>true</code></label>
+<label><input type="radio" name="q6"> <code>ativo</code> vira 2</label>
+<label><input type="radio" name="q6"> Só um aviso</label>
+</div>
+
+<h3>Missão final: o painel de senhas</h3>
+
+<div class="trycpp" data-goal="out:Chamando a senha 41,out:Chamando a senha 42,out:Próxima: 43,src:\+\+">
+<p class="try-task"><strong>Missão:</strong> o painel precisa chamar duas senhas seguidas e mostrar qual é a próxima. Use <code>++</code> (pré ou pós, onde quiser) para a saída ficar assim:</p>
+<pre class="out">Chamando a senha 41
+Chamando a senha 42
+Próxima: 43</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int senha = 41;
+    std::cout &lt;&lt; "Chamando a senha " &lt;&lt; senha &lt;&lt; '\n';
+    std::cout &lt;&lt; "Chamando a senha " &lt;&lt; senha &lt;&lt; '\n';
+    std::cout &lt;&lt; "Próxima: " &lt;&lt; senha &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int senha = 41;
+    std::cout &lt;&lt; "Chamando a senha " &lt;&lt; senha &lt;&lt; '\n';
+    ++senha;
+    std::cout &lt;&lt; "Chamando a senha " &lt;&lt; senha &lt;&lt; '\n';
+    ++senha;
+    std::cout &lt;&lt; "Próxima: " &lt;&lt; senha &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>++x</code> / <code>x++</code> somam 1; <code>--x</code> / <code>x--</code> subtraem 1.</li>
+  <li>Sozinhos na linha, pré e pós são iguais. Dentro de uma expressão: <code>++x</code> entrega o valor <strong>novo</strong>; <code>x++</code> entrega o <strong>antigo</strong>. A variável muda nos dois casos.</li>
+  <li>O uso mais comum é no <code>for</code>: <code>for (int i = 0; i &lt; n; ++i)</code>.</li>
+  <li>Funcionam com inteiros, <code>double</code> e <code>char</code>. Não funcionam com <code>bool</code> (proibido desde o C++17), com <code>const</code> nem com números escritos direto.</li>
+  <li>Não mude e use a mesma variável na mesma expressão: <code>i++ + i++</code> é comportamento indefinido, e <code>i = i++</code> é indefinido até o C++14 e inútil depois. O g++ avisa com <code>-Wsequence-point</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
