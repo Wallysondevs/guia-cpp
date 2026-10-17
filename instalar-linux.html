@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Instalar no Linux — g++, build-essential e clang | Guia C++</title>
+<meta name="description" content="Como instalar um compilador C++ no Linux: conferir se o g++ já existe, instalar o build-essential no Ubuntu e no Debian (com a saída real do apt), Fedora (dnf install gcc-c++), Arch (pacman -S gcc), a versão que cada distribuição traz, o clang como alternativa, conferir com g++ --version e compilar o primeiro programa.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Instalar no Linux</span></h1>
+
+<p class="intro">As caixas Experimente do guia compilam C++ no navegador, mas, para escrever programas de verdade, guardados no seu computador, você precisa de um <strong>compilador</strong> instalado. No Linux isso é fácil: o compilador <code>g++</code> está no gerenciador de pacotes de todas as distribuições, e um comando basta. Nesta aula você vai conferir se ele já existe, instalá-lo no Ubuntu, no Debian, no Fedora e no Arch, conhecer o <code>clang++</code> como alternativa e compilar o seu primeiro programa no terminal.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como saber se o <code>g++</code> já está instalado.</li>
+  <li>O que é o pacote <code>build-essential</code> e como instalá-lo no Ubuntu e no Debian.</li>
+  <li>Como ler a saída do <code>apt</code> e descobrir qual versão você vai receber (<code>apt-cache policy</code>).</li>
+  <li>Os comandos do Fedora (<code>dnf</code>), do Arch (<code>pacman</code>) e do openSUSE (<code>zypper</code>).</li>
+  <li>Como instalar e usar o <code>clang++</code>, o outro grande compilador.</li>
+  <li>Como conferir a instalação e compilar o primeiro programa, inclusive um teste do C++23.</li>
+</ul>
+</div>
+
+<p>Se você usa Windows ou macOS, vá para <a href="instalar-windows-mac.html">Instalar no Windows e macOS</a>. Se ainda não quer instalar nada, tudo bem: quase todo o Nível 1 funciona nas caixas Experimente.</p>
+
+<hr>
+
+<h2>A ideia: a loja de aplicativos do Linux</h2>
+<p>No celular, você não procura aplicativos em sites aleatórios: abre a loja, procura pelo nome e toca em "Instalar". O Linux tem isso desde muito antes dos celulares: o <strong>gerenciador de pacotes</strong>. Cada programa vem num <strong>pacote</strong>, que o gerenciador baixa dos servidores da sua distribuição, confere e instala, junto com tudo de que ele depende. Para atualizar, o mesmo gerenciador cuida de tudo.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Distribuição</th><th>Gerenciador de pacotes</th><th>Comando</th></tr>
+<tr><td>Ubuntu, Debian, Linux Mint, Pop!_OS</td><td>APT</td><td><code>apt</code></td></tr>
+<tr><td>Fedora, Red Hat, Rocky, AlmaLinux</td><td>DNF</td><td><code>dnf</code></td></tr>
+<tr><td>Arch, Manjaro, EndeavourOS</td><td>pacman</td><td><code>pacman</code></td></tr>
+<tr><td>openSUSE</td><td>zypper</td><td><code>zypper</code></td></tr>
+</table>
+</div>
+
+<p>Instalar programas mexe no sistema inteiro, então os gerenciadores pedem permissão de administrador: por isso os comandos começam com <code>sudo</code> ("faça como superusuário"), e o terminal pede a sua senha. Ao digitar a senha, nada aparece na tela, nem asteriscos: é normal, digite e tecle Enter.</p>
+
+<hr>
+
+<h2>1. O g++ já está instalado?</h2>
+<p>Em muitas distribuições, o compilador já vem instalado ou entra junto com outros programas. Antes de instalar, pergunte. Abra o terminal (no Ubuntu: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd>) e digite:</p>
+
+<pre class="term">$ g++ --version
+g++ (Ubuntu 15.2.0-16ubuntu1) 15.2.0              « está instalado: versão 15.2
+Copyright (C) 2025 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+</pre>
+
+<p>Se apareceu uma versão, o g++ já está aí. Se a versão for <strong>14 ou mais nova</strong>, você tem tudo de que o guia precisa; pule para a <a href="#conferir">seção 5</a>. Se ele não estiver instalado, a resposta é esta:</p>
+
+<pre class="term">$ g++ --version
+bash: g++: comando não encontrado                « o terminal não achou nenhum programa chamado g++</pre>
+
+<p>(No Ubuntu, logo abaixo pode aparecer uma sugestão do pacote que tem o comando.) Nesse caso, siga a seção da sua distribuição.</p>
+
+<hr>
+
+<h2>2. Ubuntu e Debian: <code>build-essential</code></h2>
+<p>No Ubuntu, no Debian e nos derivados (Linux Mint, Pop!_OS, elementary), instale o pacote <strong><code>build-essential</code></strong>. Ele é um "pacote-kit": não tem programa nenhum dentro, só uma lista do que é <strong>essencial para construir</strong> (<em>build</em>) programas. O comando <code>apt-cache depends</code> mostra essa lista:</p>
+
+<pre class="term">$ apt-cache depends build-essential
+build-essential
+ |Depende: libc6-dev                              « os arquivos da biblioteca do C para compilar
+  Depende: &lt;libc-dev&gt;
+    libc6-dev
+  Depende: gcc                                     « o compilador de C
+  Depende: g++                                     « o compilador de C++: o que você quer
+  Depende: make                                    « o make, que automatiza compilações
+    make-guile
+  Depende: dpkg-dev
+  Depende: libcrypt-dev
+  Depende: coreutils-from-uutils</pre>
+
+<p>Daria para instalar só o <code>g++</code>, mas o <code>build-essential</code> já traz o <code>make</code> (aula <a href="make.html">Make</a>) e as peças que outras ferramentas esperam encontrar. É a recomendação oficial do Ubuntu e do Debian.</p>
+
+<h3>Instalando</h3>
+<p>São dois comandos. O primeiro atualiza a lista de pacotes (o "catálogo da loja"); o segundo instala:</p>
+
+<pre class="file" data-file="no terminal">sudo apt update
+sudo apt install build-essential</pre>
+
+<dl class="anatomy">
+  <dt>sudo</dt><dd>"Faça como administrador". Pede a sua senha (que não aparece enquanto você digita).</dd>
+  <dt>apt</dt><dd>O gerenciador de pacotes do Ubuntu e do Debian.</dd>
+  <dt>install</dt><dd>A ação: instalar.</dd>
+  <dt>build-essential</dt><dd>O nome do pacote. Você pode pôr vários, separados por espaço: <code>sudo apt install build-essential clang</code>.</dd>
+</dl>
+
+<p>O <code>apt</code> mostra a lista do que vai instalar, quanto vai baixar e pergunta <code>Deseja continuar? [S/n]</code>. Tecle Enter (o <code>S</code> maiúsculo é a resposta padrão) e espere. Em uma conexão comum, leva um ou dois minutos.</p>
+
+<p>Dá para ver o que <strong>aconteceria</strong>, sem instalar nada, com a opção <code>-s</code> (<em>simulate</em>, "simular") do <code>apt-get</code>, o "irmão mais velho" do <code>apt</code>. A simulação nem precisa de <code>sudo</code>. No computador da Ana, que já tem o g++, a resposta foi esta:</p>
+
+<pre class="term">$ apt-get -s install build-essential g++
+NOTA: Esta é apenas uma simulação!
+      apt-get precisa de privilégios de root para execução real.
+      Lembre-se também de que a trava está desativada e,
+      portanto, não dependa da relevância para a situação real atual!
+Lendo listas de pacotes...
+Construindo árvore de dependências...
+Lendo informação de estado...
+build-essential já é a versão mais nova (12.12ubuntu2.26.04.2).   « já instalado
+g++ já é a versão mais nova (4:15.2.0-5ubuntu1).                 « já instalado
+Resolvendo dependências...
+0 pacotes atualizados, 0 pacotes novos instalados, 0 a serem removidos e 12 não atualizados.</pre>
+
+<p>Pedir para instalar algo que já está instalado não faz mal nenhum: o <code>apt</code> só diz "já é a versão mais nova" e não muda nada. Para ver como fica uma instalação de verdade, a Ana simulou a instalação de um compilador que ela <strong>não</strong> tem, o <code>g++-16</code> (uma versão extra, mais nova, que o Ubuntu 26.04 oferece ao lado do g++ 15). As linhas técnicas do fim (<code>Inst</code> e <code>Conf</code>, uma por pacote) foram filtradas com o <code>grep -v</code>:</p>
+
+<pre class="term">$ apt-get -s install g++-16 | grep -v "^Conf\|^Inst"
+NOTA: Esta é apenas uma simulação!
+      apt-get precisa de privilégios de root para execução real.
+      Lembre-se também de que a trava está desativada e,
+      portanto, não dependa da relevância para a situação real atual!
+Lendo listas de pacotes...
+Construindo árvore de dependências...
+Lendo informação de estado...
+Resolvendo dependências...
+Os pacotes adicionais a seguir serão instalados:              « dependências: vêm junto, automaticamente
+  cpp-16 cpp-16-x86-64-linux-gnu g++-16-x86-64-linux-gnu gcc-16
+  gcc-16-x86-64-linux-gnu libgcc-16-dev libstdc++-16-dev
+Pacotes sugeridos:                                           « opcionais: NÃO serão instalados
+  gcc-16-locales cpp-16-doc g++-16-multilib gcc-16-doc gcc-16-multilib
+  libstdc++-16-doc
+Os NOVOS pacotes a seguir serão instalados:                  « o total: o que você pediu + dependências
+  cpp-16 cpp-16-x86-64-linux-gnu g++-16 g++-16-x86-64-linux-gnu gcc-16
+  gcc-16-x86-64-linux-gnu libgcc-16-dev libstdc++-16-dev
+0 pacotes atualizados, 8 pacotes novos instalados, 0 a serem removidos e 12 não atualizados.</pre>
+
+<p>Você pediu um pacote, e o <code>apt</code> trouxe oito: o <code>cpp-16</code> é o pré-processador, o <code>gcc-16</code> é a base da família GCC, e o <code>libstdc++-16-dev</code> são os arquivos da biblioteca padrão do C++ (o <code>iostream</code> que o pré-processador cola, lembra da aula <a href="como-funciona.html">Como o C++ Vira Programa</a>?). Esse é o trabalho do gerenciador: resolver as dependências por você. Na instalação real, depois dessa lista vêm a pergunta <code>Deseja continuar? [S/n]</code>, o download e a configuração.</p>
+
+<h3>Qual versão vou receber?</h3>
+<p>Cada versão de distribuição "congela" uma versão do compilador. O comando <code>apt-cache policy</code> mostra a versão instalada e a que está disponível:</p>
+
+<pre class="term">$ apt-cache policy g++
+g++:
+  Instalado: 4:15.2.0-5ubuntu1                    « a instalada
+  Candidato: 4:15.2.0-5ubuntu1                    « a que o apt instalaria (a mesma: está em dia)
+  Tabela de versão:
+ *** 4:15.2.0-5ubuntu1 500
+        500 http://archive.ubuntu.com/ubuntu resolute/main amd64 Packages   « vem do repositório principal do Ubuntu 26.04
+        100 /var/lib/dpkg/status</pre>
+
+<p>Como ler <code>4:15.2.0-5ubuntu1</code>: o <code>4:</code> é um número interno do empacotamento (pode ignorar), <code>15.2.0</code> é a versão do GCC, e <code>-5ubuntu1</code> é a revisão do pacote feita pelo Ubuntu. Se o g++ não estiver instalado, a linha <code>Instalado</code> diz <code>(nenhum)</code>. O <code>resolute</code> é o apelido do Ubuntu 26.04.</p>
+
+<p>Versões que as distribuições mais usadas trazem (conferido nos repositórios oficiais em outubro de 2026):</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Distribuição</th><th>g++ padrão</th><th>Serve para o guia?</th></tr>
+<tr><td>Ubuntu 26.04 LTS</td><td>15</td><td>Sim, é a do guia</td></tr>
+<tr><td>Ubuntu 24.04 LTS, Linux Mint 22</td><td>13</td><td>Quase tudo. Falta o <code>std::print</code>/<code>std::println</code> (chegou no g++ 14): instale também o <code>g++-14</code> (veja abaixo)</td></tr>
+<tr><td>Debian 13 (trixie)</td><td>14</td><td>Sim</td></tr>
+<tr><td>Debian 12 (bookworm)</td><td>12</td><td>Só o Nível 1 básico: faltam <code>std::format</code> e <code>std::print</code></td></tr>
+</table>
+</div>
+
+<p>Se a sua distribuição traz um g++ mais velho, procure uma versão extra com número no nome, como a Ana fez com o <code>g++-16</code>. No Ubuntu 24.04, por exemplo:</p>
+
+<pre class="file" data-file="no terminal (Ubuntu 24.04)">sudo apt install g++-14
+g++-14 --version</pre>
+
+<p>As duas versões convivem: <code>g++</code> continua sendo o 13, e <code>g++-14</code> é o novo. Nesse caso, nos comandos do guia, digite <code>g++-14</code> no lugar de <code>g++</code>.</p>
+
+<hr>
+
+<h2>3. Fedora, Arch e openSUSE</h2>
+<p>Nas outras famílias de distribuição, o pacote do compilador C++ tem outro nome. Os comandos abaixo seguem a documentação oficial de cada uma. Eles não foram executados na máquina da Ana (que é Ubuntu), por isso a tabela é <strong>ilustrativa</strong>:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Distribuição</th><th>Comando</th><th>Observação</th></tr>
+<tr><td><strong>Fedora</strong> (e Red Hat, Rocky, AlmaLinux)</td><td><code>sudo dnf install gcc-c++</code></td><td>No Fedora, o pacote <code>gcc</code> é só o compilador de C; o de C++ é o <code>gcc-c++</code>. O <code>make</code> vem com <code>sudo dnf install make</code>.</td></tr>
+<tr><td><strong>Arch</strong> (e Manjaro, EndeavourOS)</td><td><code>sudo pacman -S gcc</code></td><td>No Arch, o pacote <code>gcc</code> já inclui o <code>g++</code>. Para o kit completo (com <code>make</code>), use <code>sudo pacman -S base-devel</code>.</td></tr>
+<tr><td><strong>openSUSE</strong></td><td><code>sudo zypper install gcc-c++</code></td><td>Mesmo nome do Fedora.</td></tr>
+</table>
+</div>
+
+<p>O Fedora e o Arch costumam trazer versões mais novas do GCC que o Ubuntu e o Debian (o GCC 16 saiu em abril de 2026), o que é ótimo para o guia. Só lembre: o GCC 16 usa o C++20 quando você não passa <code>-std</code>, enquanto o g++ 15 usa o C++17. Com o <code>-std=c++23</code> do comando padrão das aulas, isso não faz diferença (aula <a href="versoes.html">Versões do C++</a>).</p>
+
+<hr>
+
+<h2>4. O clang++, a alternativa</h2>
+<p>O <strong>Clang</strong> é o outro grande compilador de C++ livre, do projeto <strong>LLVM</strong>. Ele entende o mesmo C++ que o g++, gera programas tão rápidos quanto, e é conhecido pelas mensagens de erro claras. O <strong>editor do guia usa o Clang</strong>, então tê-lo no computador ajuda a ver exatamente as mesmas mensagens das caixas Experimente. No Ubuntu e no Debian:</p>
+
+<pre class="file" data-file="no terminal">sudo apt install clang</pre>
+
+<p>(No Fedora, <code>sudo dnf install clang</code>; no Arch, <code>sudo pacman -S clang</code>.) O comando se chama <code>clang++</code> e aceita as mesmas opções principais do g++:</p>
+
+<pre class="term">$ clang++ --version
+Ubuntu clang version 21.1.8 (6ubuntu1)            « Clang 21.1.8
+Target: x86_64-pc-linux-gnu
+Thread model: posix
+InstalledDir: /usr/lib/llvm-21/bin
+$ apt-cache policy clang
+clang:
+  Instalado: 1:21.1.6-71                         « o pacote "clang" é um atalho para o clang-21
+  Candidato: 1:21.1.6-71
+  Tabela de versão:
+ *** 1:21.1.6-71 500
+        500 http://archive.ubuntu.com/ubuntu resolute/universe amd64 Packages
+        100 /var/lib/dpkg/status</pre>
+
+<p>Os números diferentes (<code>21.1.6</code> no pacote <code>clang</code>, <code>21.1.8</code> no programa) não são erro: o pacote <code>clang</code> é só um "atalho" que aponta para o pacote <code>clang-21</code>, que tem o compilador de verdade e foi atualizado separadamente. E o <code>universe</code> indica que o Clang vem da parte do Ubuntu mantida pela comunidade.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>g++ (GCC)</th><th>clang++ (LLVM)</th></tr>
+<tr><td>Instalar no Ubuntu/Debian</td><td><code>sudo apt install build-essential</code></td><td><code>sudo apt install clang</code></td></tr>
+<tr><td>Compilar</td><td><code>g++ -std=c++23 -Wall -Wextra ola.cpp -o ola</code></td><td><code>clang++ -std=c++23 -Wall -Wextra ola.cpp -o ola</code></td></tr>
+<tr><td>Biblioteca padrão no Linux</td><td>libstdc++ (do GCC)</td><td>a mesma libstdc++, por padrão</td></tr>
+<tr><td>Usado</td><td>nas saídas de terminal do guia</td><td>no editor do guia; padrão no macOS</td></tr>
+<tr><td>Qual usar?</td><td colspan="2">Os dois. O guia usa o g++ nos exemplos de terminal porque é o padrão do Linux. Quando uma mensagem de erro não fizer sentido num, compile no outro: às vezes a explicação do outro é mais clara.</td></tr>
+</table>
+</div>
+
+<p>Repare que o Clang no Linux usa a <strong>mesma</strong> biblioteca padrão do g++ (a <code>libstdc++</code>). Por isso o <code>build-essential</code> é útil mesmo para quem prefere o Clang.</p>
+
+<hr>
+
+<h2 id="conferir">5. Conferindo a instalação</h2>
+<p>Depois de instalar, confira três coisas: a versão, onde o programa está e se ele aceita o C++23.</p>
+
+<pre class="term">$ g++ --version
+g++ (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+Copyright (C) 2025 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+$ which g++                                       « onde está o programa
+/usr/bin/g++
+$ readlink /usr/bin/g++                           « para onde aponta o atalho
+g++-15</pre>
+
+<p>O <code>which</code> mostra a pasta do programa, e o <code>readlink</code> revela que <code>/usr/bin/g++</code> é um <strong>atalho</strong> (um link simbólico) para o <code>g++-15</code>. É assim que várias versões convivem: o atalho <code>g++</code> aponta para a versão padrão, e as outras são chamadas pelo nome com número (<code>g++-16</code>).</p>
+
+<hr>
+
+<h2>6. O teste final: o primeiro programa</h2>
+<p>Agora o teste de verdade: escrever, compilar e rodar. Crie uma pasta para os seus programas e entre nela:</p>
+
+<pre class="term">$ mkdir cpp                                       « cria a pasta cpp na sua pasta pessoal
+$ cd cpp                                          « entra nela</pre>
+
+<p>Abra um editor de texto e crie o arquivo <code>ola.cpp</code> dentro dessa pasta. Pode ser o editor de textos do seu sistema, o <code>nano</code> no terminal (<code>nano ola.cpp</code>; para salvar, <kbd>Ctrl</kbd>+<kbd>O</kbd> e Enter; para sair, <kbd>Ctrl</kbd>+<kbd>X</kbd>) ou um editor de programação (aula <a href="editores.html">Editores e IDEs</a>). Digite:</p>
+
+<pre class="file" data-file="ola.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Olá, mundo!\n";
+}
+</pre>
+
+<p>Salve, volte ao terminal, compile com o comando padrão do guia e rode:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ola.cpp -o ola
+$ ./ola
+Olá, mundo!</pre>
+
+<p>Se apareceu <code>Olá, mundo!</code>, o compilador está funcionando. Falta conferir o C++23: este programa usa o <code>std::println</code>, que só existe no g++ 14 ou mais novo, com <code>-std=c++23</code>:</p>
+
+<pre class="file" data-file="teste23.cpp">#include &lt;print&gt;
+
+int main() {
+    std::println("C++23 funcionando: {}", __cplusplus);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra teste23.cpp -o teste23
+$ ./teste23
+C++23 funcionando: 202302                          « 202302 = C++23 (aula Versões do C++)</pre>
+
+<p>Se os dois rodaram, a sua instalação está pronta para o guia inteiro. Faça o mesmo teste aqui no editor do guia, que usa outro compilador (o Clang) e deve dar o mesmo resultado:</p>
+
+<div class="trycpp" data-goal="out:C++23 funcionando: 202302,out:Instalação da Ana: OK">
+<p class="try-task"><strong>Missão:</strong> rode e confira o <code>202302</code>. Depois acrescente uma segunda linha com <code>std::println("Instalação da Ana: OK");</code> logo abaixo da primeira (o <code>{}</code> só é preciso quando há um valor para encaixar).</p>
+<pre class="script">#include &lt;print&gt;
+
+int main() {
+    std::println("C++23 funcionando: {}", __cplusplus);
+}
+</pre>
+<pre class="solucao">#include &lt;print&gt;
+
+int main() {
+    std::println("C++23 funcionando: {}", __cplusplus);
+    std::println("Instalação da Ana: OK");
+}
+</pre>
+</div>
+
+<p>Para comparar, compile o <code>ola.cpp</code> também com o Clang, se você o instalou. O resultado é o mesmo programa:</p>
+
+<pre class="term" data-cwd="~/cpp">$ clang++ -std=c++23 -Wall -Wextra ola.cpp -o ola
+$ ./ola
+Olá, mundo!</pre>
+
+<h3>Atualizando</h3>
+<p>O compilador é atualizado junto com o resto do sistema: <code>sudo apt update</code> seguido de <code>sudo apt upgrade</code> (no Fedora, <code>sudo dnf upgrade</code>; no Arch, <code>sudo pacman -Syu</code>). Versões principais novas (do 15 para o 16) chegam quando você atualiza a distribuição inteira, ou instalando a versão extra com número no nome.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>bash: g++: comando não encontrado</code></strong>
+<pre class="term">$ g++ --version
+bash: g++: comando não encontrado</pre>
+<p><strong>O que significa:</strong> o terminal procurou um programa chamado <code>g++</code> nas pastas do sistema e não achou. Ou ele não está instalado, ou você instalou só o <code>gcc</code> (o compilador de C), que em algumas distribuições vem sem o g++.</p>
+<p><strong>Como consertar:</strong> instale o <code>build-essential</code> (Ubuntu/Debian), o <code>gcc-c++</code> (Fedora/openSUSE) ou o <code>gcc</code> (Arch), e rode <code>g++ --version</code> de novo.</p>
+</div>
+
+<div class="cenario">
+<strong><code>E: Não foi possível abrir arquivo de trava … (13: Permissão negada)</code></strong>
+<pre class="term">$ apt-get install g++-14
+E: Não foi possível abrir arquivo de trava /var/lib/dpkg/lock-frontend - open (13: Permissão negada)
+E: Não é possível adquirir a trava da interface do dpkg (/var/lib/dpkg/lock-frontend), você é root?</pre>
+<p><strong>O que significa:</strong> faltou o <code>sudo</code>. Instalar programas exige permissão de administrador (<code>root</code>), e o apt pergunta, no fim: "você é root?". A "trava" (<em>lock</em>) é um arquivo que impede dois programas de instalarem coisas ao mesmo tempo, e só o administrador pode mexer nela.</p>
+<p><strong>Como consertar:</strong> repita com <code>sudo</code> na frente: <code>sudo apt install g++-14</code>. Se a mensagem disser que a trava está "em uso por outro processo", é porque outra instalação (por exemplo, a atualização automática do sistema) está rodando: espere alguns minutos e tente de novo.</p>
+</div>
+
+<div class="cenario">
+<strong><code>E: Não é possível encontrar o pacote …</code></strong>
+<pre class="term">$ apt-get -s install buil-essential
+NOTA: Esta é apenas uma simulação!
+      apt-get precisa de privilégios de root para execução real.
+      Lembre-se também de que a trava está desativada e,
+      portanto, não dependa da relevância para a situação real atual!
+Lendo listas de pacotes...
+Construindo árvore de dependências...
+Lendo informação de estado...
+E: Não é possível encontrar o pacote buil-essential   « faltou o d de build</pre>
+<p><strong>O que significa:</strong> nenhum pacote com esse nome existe no catálogo. Quase sempre é um erro de digitação, um nome de outra distribuição (<code>gcc-c++</code> é do Fedora, não existe no Ubuntu) ou um catálogo desatualizado.</p>
+<p><strong>Como consertar:</strong> confira o nome; rode <code>sudo apt update</code> para atualizar o catálogo; para procurar, use <code>apt search g++</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>cc1plus: fatal error: ola.cpp: Arquivo ou diretório inexistente</code></strong>
+<pre class="term" data-cwd="/tmp">$ g++ ola.cpp -o ola
+cc1plus: fatal error: ola.cpp: Arquivo ou diretório inexistente
+compilation terminated.</pre>
+<p><strong>O que significa:</strong> o compilador está instalado e funcionando, mas não achou o arquivo <code>ola.cpp</code> na pasta onde você está. Repare no prompt: a Ana estava em <code>/tmp</code>, e o arquivo está em <code>~/cpp</code>. O <code>cc1plus</code> é o compilador interno que o <code>g++</code> chama (aula <a href="como-funciona.html">Como o C++ Vira Programa</a>).</p>
+<p><strong>Como consertar:</strong> entre na pasta do arquivo (<code>cd ~/cpp</code>) ou confira o nome com <code>ls</code>. Cuidado com editores que salvam como <code>ola.cpp.txt</code>: o <code>ls</code> mostra o nome verdadeiro.</p>
+</div>
+
+<div class="cenario">
+<strong>O <code>std::println</code> não funciona, mesmo com <code>-std=c++23</code></strong>
+<p><strong>O que significa:</strong> o seu g++ é anterior ao 14 (por exemplo, o g++ 13 do Ubuntu 24.04), e a biblioteca padrão dele ainda não tem o arquivo <code>&lt;print&gt;</code>. O erro tem o mesmo formato do <code>#include</code> errado que você viu na aula <a href="como-funciona.html">Como o C++ Vira Programa</a>: <code>fatal error: print: Arquivo ou diretório inexistente</code> (<strong>ilustrativo</strong>: a máquina do guia tem o g++ 15, onde o <code>&lt;print&gt;</code> existe).</p>
+<p><strong>Como consertar:</strong> instale uma versão mais nova ao lado (<code>sudo apt install g++-14</code>) e compile com <code>g++-14</code>; ou use o <code>std::cout</code>, que funciona em qualquer versão.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tarefa</th><th>Ubuntu / Debian</th><th>Fedora</th><th>Arch</th></tr>
+<tr><td>Instalar o g++</td><td><code>sudo apt install build-essential</code></td><td><code>sudo dnf install gcc-c++</code></td><td><code>sudo pacman -S gcc</code> (ou <code>base-devel</code>)</td></tr>
+<tr><td>Instalar o Clang</td><td><code>sudo apt install clang</code></td><td><code>sudo dnf install clang</code></td><td><code>sudo pacman -S clang</code></td></tr>
+<tr><td>Ver a versão disponível</td><td><code>apt-cache policy g++</code></td><td><code>dnf info gcc-c++</code></td><td><code>pacman -Si gcc</code></td></tr>
+<tr><td>Atualizar</td><td><code>sudo apt update &amp;&amp; sudo apt upgrade</code></td><td><code>sudo dnf upgrade</code></td><td><code>sudo pacman -Syu</code></td></tr>
+<tr><td>Simular (sem instalar)</td><td><code>apt-get -s install …</code></td><td><code>dnf install --assumeno …</code></td><td>(não tem)</td></tr>
+</table>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Para conferir</th><th>Comando</th></tr>
+<tr><td>a versão do g++</td><td><code>g++ --version</code></td></tr>
+<tr><td>a versão do Clang</td><td><code>clang++ --version</code></td></tr>
+<tr><td>onde está o programa</td><td><code>which g++</code></td></tr>
+<tr><td>se o C++23 funciona</td><td>compilar o <code>teste23.cpp</code> com <code>-std=c++23</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Instalar no Ubuntu</h3>
+<p>Complete o comando que instala o kit de compilação no Ubuntu:</p>
+<div class="ex-code">sudo apt install <input data-answer="build-essential" aria-label="pacote" size="16"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Instalar no Fedora</h3>
+<p>No Fedora, qual é o nome do pacote do compilador C++?</p>
+<div class="ex-code">sudo dnf install <input data-answer="gcc-c++" aria-label="pacote" size="10"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. O <code>apt</code> respondeu <code>E: Não é possível adquirir a trava … você é root?</code>. O que faltou?</p>
+<label><input type="radio" name="q3"> Atualizar o catálogo com <code>apt update</code>.</label>
+<label><input type="radio" name="q3"> Reiniciar o computador.</label>
+<label><input type="radio" name="q3"> O <code>sudo</code> no começo do comando.</label>
+<label><input type="radio" name="q3"> Instalar o Clang antes.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. A Ana tem o Ubuntu 24.04, com g++ 13. O que acontece com o <code>std::println</code>?</p>
+<label><input type="radio" name="q4"> Funciona normalmente com <code>-std=c++23</code>.</label>
+<label><input type="radio" name="q4"> Não funciona: o g++ 13 não tem o <code>&lt;print&gt;</code>. Ela pode instalar o <code>g++-14</code> ao lado.</label>
+<label><input type="radio" name="q4"> Funciona só com o <code>sudo</code>.</label>
+<label><input type="radio" name="q4"> Funciona só no Fedora.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Para que serve o <code>apt-get -s install</code>?</p>
+<label><input type="radio" name="q5"> Mostra o que seria instalado, sem instalar nada.</label>
+<label><input type="radio" name="q5"> Instala sem pedir senha.</label>
+<label><input type="radio" name="q5"> Instala só os pacotes sugeridos.</label>
+<label><input type="radio" name="q5"> Desinstala o pacote.</label>
+</div>
+
+<h3>Missão final: o cartão de boas-vindas</h3>
+
+<div class="trycpp" data-goal="out:Compilador instalado!,out:Pasta de trabalho: ~/cpp,src:println">
+<p class="try-task"><strong>Missão:</strong> escreva um programa que mostre as duas linhas abaixo, cada uma com um <code>std::println</code>. Lembre: o texto vai entre aspas, e cada linha termina com <code>;</code>.</p>
+<pre class="out">Compilador instalado!
+Pasta de trabalho: ~/cpp</pre>
+<pre class="script">#include &lt;print&gt;
+
+int main() {
+    // escreva aqui as duas linhas com std::println
+}
+</pre>
+<pre class="solucao">#include &lt;print&gt;
+
+int main() {
+    std::println("Compilador instalado!");
+    std::println("Pasta de trabalho: ~/cpp");
+}
+</pre>
+</div>
+
+<p>A linha que começa com <code>//</code> é um <strong>comentário</strong>: o compilador a ignora, ela serve só para pessoas lerem (aula <a href="comentarios.html">Comentários</a>). Pode apagá-la ou deixá-la.</p>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Confira primeiro: <code>g++ --version</code>. <code>comando não encontrado</code> = não está instalado.</li>
+  <li>Ubuntu/Debian: <code>sudo apt update</code> e <code>sudo apt install build-essential</code> (traz <code>g++</code>, <code>gcc</code> e <code>make</code>).</li>
+  <li>Fedora: <code>sudo dnf install gcc-c++</code>; Arch: <code>sudo pacman -S gcc</code>; openSUSE: <code>sudo zypper install gcc-c++</code>.</li>
+  <li><code>apt-cache policy g++</code> mostra a versão; para o guia, o ideal é g++ 14 ou mais novo (o <code>std::println</code> chegou no 14). Versões extras: <code>g++-14</code>, <code>g++-16</code>.</li>
+  <li>O <code>clang++</code> (<code>sudo apt install clang</code>) é a alternativa, e é o compilador do editor do guia.</li>
+  <li>Teste final: <code>g++ -std=c++23 -Wall -Wextra ola.cpp -o ola</code> e <code>./ola</code>; depois o <code>teste23.cpp</code> com <code>std::println</code>.</li>
+  <li>Próximo passo: escolher um editor de código, em <a href="editores.html">Editores e IDEs</a> (ou, no Windows e no macOS, <a href="instalar-windows-mac.html">Instalar no Windows e macOS</a>).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
