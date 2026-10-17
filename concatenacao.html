@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Juntar Strings — +, +=, append e to_string | Guia C++</title>
+<meta name="description" content="Como juntar textos em C++ para quem nunca programou: o operador +, o +=, a função append, por que &quot;idade: &quot; + 30 mostra lixo, como converter número com std::to_string e o erro invalid operands ao somar dois textos entre aspas, com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Juntar Strings</span></h1>
+
+<p class="intro">Na aula <a href="strings.html">Strings</a> você aprendeu a guardar um texto num <code>std::string</code>. Agora vamos <strong>juntar</strong> textos: o nome com o sobrenome, "Olá, " com o nome de quem chegou, os itens da lista de compras um atrás do outro. Juntar textos tem um nome técnico, <strong>concatenar</strong> (do latim "acorrentar junto"). Você vai ver três ferramentas para isso e duas armadilhas famosas do C++: somar um número a um texto e somar dois textos entre aspas.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como juntar strings com <code>+</code>, e por que o espaço não aparece sozinho.</li>
+  <li>Como acrescentar no fim de uma string com <code>+=</code> e com <code>.append()</code>.</li>
+  <li>Por que <code>"idade: " + 30</code> compila e mostra <strong>lixo</strong>, e como converter número em texto com <code>std::to_string</code>.</li>
+  <li>Por que <code>"a" + "b"</code> dá o erro <code>invalid operands of types ‘const char [2]’…</code> e as três formas de consertar.</li>
+  <li>Qual forma usar em cada situação, incluindo o <code>std::format</code>.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com o comando padrão <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. No editor do guia, que usa o compilador Clang, as mensagens de erro têm outras palavras (veja <a href="simulador.html">O Editor do Guia</a>); quando a diferença importa, a aula mostra as duas.</p>
+
+<hr>
+
+<h2>A ideia: engatar vagões</h2>
+<p>Pense num trem de brinquedo. Cada vagão leva algumas letras: um leva <code>Ana</code>, outro leva <code>Souza</code>. Para formar <code>Ana Souza</code>, você engata os vagões em ordem e, no meio, um vagãozinho com um espaço. Nada é misturado nem reordenado: o trem novo é o primeiro vagão, depois o segundo, depois o terceiro.</p>
+
+<p>Concatenar é isso: <strong>colocar um texto logo depois do outro</strong>. O computador não pensa por você: se você não engatar o vagão do espaço, as palavras ficam grudadas.</p>
+
+<hr>
+
+<h2>1. O operador <code>+</code></h2>
+<p>Com números, <code>+</code> soma. Com strings, <code>+</code> <strong>junta</strong>: o resultado é uma string nova, com o texto da esquerda seguido do texto da direita.</p>
+
+<pre class="file" data-file="juntar.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana";
+    std::string sobrenome = "Souza";
+    std::string completo = nome + " " + sobrenome;
+    std::cout &lt;&lt; completo &lt;&lt; '\n';
+    std::cout &lt;&lt; nome + sobrenome &lt;&lt; '\n';
+    std::cout &lt;&lt; "Olá, " + nome + "!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra juntar.cpp -o juntar
+$ ./juntar
+Ana Souza
+AnaSouza           « sem o " " no meio, as palavras grudam
+Olá, Ana!</pre>
+
+<dl class="anatomy">
+  <dt>nome + " " + sobrenome</dt><dd>Junta três pedaços, da esquerda para a direita: primeiro <code>nome + " "</code> vira <code>"Ana "</code>; depois <code>"Ana " + sobrenome</code> vira <code>"Ana Souza"</code>.</dd>
+  <dt>std::string completo = …;</dt><dd>Guarda o resultado numa string nova. As variáveis <code>nome</code> e <code>sobrenome</code> <strong>não mudam</strong>: o <code>+</code> só lê os dois lados e monta um texto novo.</dd>
+  <dt>nome + sobrenome</dt><dd>Sem espaço no meio: <code>AnaSouza</code>. O <code>+</code> nunca coloca espaço sozinho.</dd>
+  <dt>"Olá, " + nome + "!\n"</dt><dd>Você pode misturar texto entre aspas e variáveis, desde que uma das <strong>duas primeiras</strong> partes seja um <code>std::string</code>. A seção 5 explica essa regra.</dd>
+</dl>
+
+<div class="tip">
+<strong><code>&lt;&lt;</code> ou <code>+</code>?</strong>
+<p>Para <strong>mostrar</strong> na tela, você não precisa juntar nada: <code>std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "!\n";</code> mostra os pedaços em sequência (veja <a href="saida-cout.html">Saída com cout</a>). O <code>+</code> serve quando você quer o texto junto <strong>numa string</strong>, para guardar, medir, passar adiante ou gravar num arquivo.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Bom dia\, Ana Souza!,src:nome\s*\+">
+<p class="try-task"><strong>Missão:</strong> monte a string <code>saudacao</code> com <code>+</code>, usando as variáveis <code>nome</code> e <code>sobrenome</code> (sem digitar Ana nem Souza no texto), para o programa mostrar <code>Bom dia, Ana Souza!</code>. Cuidado com os espaços.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana";
+    std::string sobrenome = "Souza";
+    std::string saudacao = "Bom dia, ";   // complete esta linha
+    std::cout &lt;&lt; saudacao &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana";
+    std::string sobrenome = "Souza";
+    std::string saudacao = "Bom dia, " + nome + " " + sobrenome + "!";
+    std::cout &lt;&lt; saudacao &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Acrescentar no fim: <code>+=</code></h2>
+<p>Muitas vezes você não quer um texto novo: quer <strong>aumentar</strong> o que já tem, como quem vai escrevendo a lista de compras item por item. Para isso existe o <code>+=</code> ("mais igual"), o mesmo que você viu com números em <a href="operadores-atribuicao.html">Operadores de Atribuição</a>.</p>
+
+<pre class="file" data-file="maisigual.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string lista = "arroz";
+    lista += ", feijão";
+    lista += ", café";
+    lista += '.';
+    std::cout &lt;&lt; lista &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra maisigual.cpp -o maisigual
+$ ./maisigual
+arroz, feijão, café.</pre>
+
+<dl class="anatomy">
+  <dt>lista += ", feijão";</dt><dd>Pega a <code>lista</code> e acrescenta <code>, feijão</code> no fim, <strong>na própria variável</strong>. É o mesmo que <code>lista = lista + ", feijão";</code>, só que mais curto e mais rápido (não monta uma string nova para depois copiar).</dd>
+  <dt>lista += '.';</dt><dd>Também aceita um único <code>char</code>, com aspas simples.</dd>
+</dl>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita longa</th><th>Escrita curta</th><th>Resultado</th></tr>
+<tr><td><code>s = s + "texto";</code></td><td><code>s += "texto";</code></td><td>Acrescenta no fim de <code>s</code></td></tr>
+<tr><td><code>s = "texto" + s;</code></td><td>(não existe)</td><td>Acrescenta no <strong>começo</strong>: aqui só a forma longa serve (ou <code>.insert</code>, em <a href="funcoes-string.html">Funções de String</a>)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>3. A função <code>.append()</code></h2>
+<p><code>.append()</code> ("anexar", em inglês) faz o mesmo que o <code>+=</code>, escrita como uma função-membro. Ela tem uma forma extra útil: repetir um caractere várias vezes.</p>
+
+<pre class="file" data-file="append.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string grito = "Gol";
+    grito.append("aço");
+    std::cout &lt;&lt; grito &lt;&lt; '\n';
+    grito.append(3, '!');
+    std::cout &lt;&lt; grito &lt;&lt; '\n';
+    std::string frase = "Bom";
+    frase.append(" dia").append(", Bia");
+    std::cout &lt;&lt; frase &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra append.cpp -o append
+$ ./append
+Golaço
+Golaço!!!
+Bom dia, Bia</pre>
+
+<dl class="anatomy">
+  <dt>grito.append("aço");</dt><dd>Acrescenta <code>aço</code> no fim de <code>grito</code>. Igual a <code>grito += "aço";</code>.</dd>
+  <dt>grito.append(3, '!');</dt><dd>Acrescenta <strong>3 vezes</strong> o caractere <code>'!'</code>. Primeiro a quantidade, depois o caractere (a mesma ordem de <code>std::string(10, '-')</code>, da aula <a href="strings.html">Strings</a>).</dd>
+  <dt>frase.append(" dia").append(", Bia");</dt><dd>O <code>.append()</code> devolve a própria string, então dá para emendar outro <code>.append()</code> em seguida. Isso se chama <strong>encadear</strong> chamadas.</dd>
+</dl>
+
+<h3>Qual usar?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Quando usar</th></tr>
+<tr><td><code>+</code></td><td><code>nome + " " + sobrenome</code></td><td>Montar um texto <strong>novo</strong> a partir de pedaços.</td></tr>
+<tr><td><code>+=</code></td><td><code>lista += ", café";</code></td><td>Aumentar uma string que já existe. A mais usada no dia a dia.</td></tr>
+<tr><td><code>.append()</code></td><td><code>s.append(3, '!');</code></td><td>Quando precisa das formas extras (repetir um caractere, pegar só um pedaço de outro texto). Fora isso, prefira <code>+=</code>.</td></tr>
+<tr><td><code>std::format</code> <span class="versao">C++20</span></td><td><code>std::format("{} tem {} anos", nome, idade)</code></td><td>Textos com <strong>números</strong> e vários pedaços: fica mais legível. Veja a seção 4 e a aula <a href="format-print.html">std::format e std::print</a>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>4. Juntar um número: a armadilha</h2>
+<p>Em muitas linguagens, <code>"idade: " + 30</code> dá <code>"idade: 30"</code>. Em C++, veja o que acontece:</p>
+
+<pre class="file" data-file="idade.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string texto = "idade: " + 30;
+    std::cout &lt;&lt; "[" &lt;&lt; texto &lt;&lt; "]\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra idade.cpp -o idade
+$ ./idade
+[create]           « nenhum erro, nenhum aviso... e um texto que você nunca escreveu</pre>
+
+<p>Compilou sem reclamar e mostrou <code>create</code>, uma palavra que não está no programa. De onde ela veio?</p>
+
+<p>Lembre da aula <a href="strings.html">Strings</a>: <code>"idade: "</code> <strong>não é</strong> um <code>std::string</code>, é um literal, uma fileira fixa de caracteres na memória. Para o C++, somar um número a um literal quer dizer <strong>"ande 30 casas para a frente na memória, a partir do começo deste texto"</strong>. O texto <code>"idade: "</code> tem só 8 casas (7 caracteres e o <code>'\0'</code>). Andar 30 casas cai <strong>fora</strong> dele, no meio de outros textos que a biblioteca guardou ali perto. O programa mostra o que estiver lá até achar um <code>'\0'</code>. Hoje foi <code>create</code>; com outra variável, foi isto:</p>
+
+<pre class="file" data-file="idade2.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    int idade = 30;
+    std::string texto = "idade: " + idade;
+    std::cout &lt;&lt; "[" &lt;&lt; texto &lt;&lt; "]\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra idade2.cpp -o idade2
+$ ./idade2
+[construction from null is not valid]</pre>
+
+<p>Ler memória fora do texto é <strong>comportamento indefinido</strong>: o C++ não promete nada. Pode mostrar lixo, pode mostrar nada, pode travar o programa, e o resultado muda de um compilador para outro (veja <a href="comportamento-indefinido.html">Comportamento Indefinido</a>). O pior é que o g++ <strong>não avisou</strong>, mesmo com <code>-Wall -Wextra</code>. O Clang, que é o compilador do editor do guia, avisa:</p>
+
+<pre class="term" data-cwd="~/cpp">$ clang++ -std=c++23 -Wall -Wextra idade.cpp -o idade
+idade.cpp:5:35: warning: adding 'int' to a string does not append to the string [-Wstring-plus-int]
+    5 |     std::string texto = "idade: " + 30;
+      |                         ~~~~~~~~~~^~~~
+idade.cpp:5:35: note: use array indexing to silence this warning
+    5 |     std::string texto = "idade: " + 30;
+      |                                   ^
+      |                         &amp;         [   ]
+1 warning generated.</pre>
+
+<p>"Somar um <code>int</code> a uma string <strong>não</strong> acrescenta ao fim da string." É exatamente o problema. (A nota sugere uma escrita para "calar" o aviso; ignore-a: você não quer andar casas na memória, quer o texto <code>30</code>.)</p>
+
+<h3>E com um <code>std::string</code> de verdade?</h3>
+<p>Se o texto já é um <code>std::string</code>, o resultado é outro tipo de surpresa:</p>
+
+<pre class="file" data-file="idade3.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string texto = "idade: ";
+    int idade = 65;
+    texto += idade;
+    std::cout &lt;&lt; "[" &lt;&lt; texto &lt;&lt; "]\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra idade3.cpp -o idade3
+$ ./idade3
+[idade: A]         « 65 virou a letra A</pre>
+
+<p>O <code>+=</code> aceita um <code>char</code>, e o C++ converte o <code>int</code> 65 em <code>char</code> sem pedir licença. Na tabela de caracteres (a ASCII, que você viu em <a href="char.html">Caracteres</a>), o número 65 é a letra <code>A</code>. Com 30, seria um caractere invisível. Nenhum dos dois compiladores avisa.</p>
+
+<h3>A solução: <code>std::to_string</code></h3>
+<p>Para pôr um número dentro de um texto, <strong>converta o número em texto primeiro</strong>. A função <code>std::to_string</code> ("para string") faz isso:</p>
+
+<pre class="file" data-file="tostring.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    int idade = 30;
+    double altura = 1.65;
+    std::string texto = "idade: " + std::to_string(idade);
+    std::cout &lt;&lt; texto &lt;&lt; '\n';
+    std::cout &lt;&lt; "altura: " + std::to_string(altura) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tostring.cpp -o tostring
+$ ./tostring
+idade: 30
+altura: 1.650000   « com double, sempre 6 casas depois do ponto</pre>
+
+<dl class="anatomy">
+  <dt>std::to_string(idade)</dt><dd>Recebe o número <code>30</code> e devolve o <code>std::string</code> <code>"30"</code>. Como o resultado é um <code>std::string</code>, o <code>+</code> passa a <strong>juntar</strong> em vez de "andar casas".</dd>
+  <dt>std::to_string(altura)</dt><dd>Com <code>double</code>, o resultado tem sempre 6 casas decimais (<code>1.650000</code>) e usa ponto, não vírgula. Para controlar as casas, use <code>std::format</code>.</dd>
+</dl>
+
+<p>Quando o texto tem vários números e pedaços, o <code>std::format</code> <span class="versao">C++20</span> costuma ser mais legível: cada <code>{}</code> é trocado por um valor, na ordem.</p>
+
+<pre class="file" data-file="formato.cpp">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana";
+    int idade = 30;
+    std::string texto = std::format("{} tem {} anos", nome, idade);
+    std::cout &lt;&lt; texto &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra formato.cpp -o formato
+$ ./formato
+Ana tem 30 anos</pre>
+
+<p>Todos os detalhes (casas decimais, alinhamento, <code>std::print</code>) estão em <a href="format-print.html">std::format e std::print</a>. O caminho inverso, transformar o texto <code>"30"</code> no número 30, está em <a href="string-numero.html">Texto ↔ Número</a>.</p>
+
+<hr>
+
+<h2>5. <code>"a" + "b"</code>: somar dois textos entre aspas</h2>
+<p>A segunda armadilha. Parece a coisa mais natural do mundo:</p>
+
+<pre class="file" data-file="doislit.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string s = "a" + "b";
+    std::cout &lt;&lt; s &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra doislit.cpp -o doislit
+doislit.cpp: In function ‘int main()’:
+doislit.cpp:5:25: error: invalid operands of types ‘const char [2]’ and ‘const char [2]’ to binary ‘operator+’
+    5 |     std::string s = "a" + "b";
+      |                     ~~~ ^ ~~~
+      |                     |     |
+      |                     |     const char [2]
+      |                     const char [2]</pre>
+
+<p>Traduzindo: "operandos inválidos, dos tipos <code>const char [2]</code> e <code>const char [2]</code>, para o <code>operator+</code> binário". Os <strong>operandos</strong> são as duas coisas dos lados do <code>+</code>. O desenho embaixo do código aponta cada uma e diz o tipo dela: os dois lados são literais (<code>"a"</code> ocupa 2 casas: a letra e o <code>'\0'</code>). <strong>Não existe <code>+</code> entre dois literais</strong>: o <code>+</code> que junta textos pertence ao <code>std::string</code>, e aqui nenhum dos lados é um. Repare que <code>std::string s = …</code> à esquerda não ajuda: o C++ calcula o lado direito primeiro, e só depois guarda.</p>
+
+<p>No editor do guia (Clang), a mesma mensagem sai assim:</p>
+<pre class="term" data-cwd="~/cpp">$ clang++ -std=c++23 -Wall -Wextra doislit.cpp -o doislit
+doislit.cpp:5:25: error: invalid operands to binary expression ('const char[2]' and 'const char[2]')
+    5 |     std::string s = "a" + "b";
+      |                     ~~~ ^ ~~~
+1 error generated.</pre>
+
+<h3>A regra: um dos dois primeiros tem de ser <code>std::string</code></h3>
+<p>O C++ resolve uma soma longa <strong>de dois em dois, da esquerda para a direita</strong>. Por isso este funciona:</p>
+
+<pre class="file" data-file="ordem.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana";
+    std::string s = nome + ", " + "bom dia" + "!";
+    std::cout &lt;&lt; s &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ordem.cpp -o ordem
+$ ./ordem
+Ana, bom dia!</pre>
+
+<ol class="passo">
+  <li><code>nome + ", "</code>: <code>std::string</code> + literal = <code>std::string</code> <code>"Ana, "</code>.</li>
+  <li><code>"Ana, " + "bom dia"</code>: o da esquerda já é <code>std::string</code>, então junta: <code>"Ana, bom dia"</code>.</li>
+  <li><code>"Ana, bom dia" + "!"</code>: idem. Resultado: <code>"Ana, bom dia!"</code>.</li>
+</ol>
+
+<p>E este falha, porque os dois <strong>primeiros</strong> são literais, mesmo com um <code>std::string</code> no fim:</p>
+
+<pre class="file" data-file="doislit2.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana";
+    std::string s = "Olá, " + "querida " + nome;
+    std::cout &lt;&lt; s &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra doislit2.cpp -o doislit2
+doislit2.cpp: In function ‘int main()’:
+doislit2.cpp:6:29: error: invalid operands of types ‘const char [7]’ and ‘const char [9]’ to binary ‘operator+’
+    6 |     std::string s = "Olá, " + "querida " + nome;
+      |                     ~~~~~~~ ^ ~~~~~~~~~~
+      |                     |         |
+      |                     |         const char [9]
+      |                     const char [7]</pre>
+
+<p>(Por que <code>const char [7]</code>, se <code>"Olá, "</code> tem 5 letras? Porque o <code>á</code> ocupa 2 bytes, mais o <code>'\0'</code> do fim: 7. É o mesmo "problema dos acentos" de <a href="acentos-utf8.html">Acentos e UTF-8</a>.)</p>
+
+<h3>Três formas de consertar</h3>
+
+<pre class="file" data-file="solucao.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+using namespace std::string_literals;
+
+int main() {
+    std::string a = std::string("a") + "b";
+    std::string b = "a"s + "b";
+    std::string nome = "Ana";
+    std::string c = "Olá, " + ("querida "s + nome);
+    std::string d = "Olá, "s + "querida " + nome;
+    std::cout &lt;&lt; a &lt;&lt; '\n' &lt;&lt; b &lt;&lt; '\n' &lt;&lt; c &lt;&lt; '\n' &lt;&lt; d &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra solucao.cpp -o solucao
+$ ./solucao
+ab
+ab
+Olá, querida Ana
+Olá, querida Ana</pre>
+
+<dl class="anatomy">
+  <dt>std::string("a") + "b"</dt><dd>Transforma o primeiro literal num <code>std::string</code> na hora. Funciona em qualquer versão do C++.</dd>
+  <dt>using namespace std::string_literals;</dt><dd>Liga o <strong>sufixo <code>s</code></strong>. Esta linha só "abre" os sufixos de texto, não a biblioteca inteira, por isso é aceitável no topo do arquivo.</dd>
+  <dt>"a"s</dt><dd>Um <code>s</code> colado depois das aspas faz o literal já nascer como <code>std::string</code> <span class="versao">C++14</span>. É a forma mais curta.</dd>
+  <dt>"Olá, " + ("querida "s + nome)</dt><dd>Os parênteses mudam a ordem: o de dentro é calculado primeiro e vira <code>std::string</code>; depois, literal + <code>std::string</code> funciona.</dd>
+</dl>
+
+<div class="tip">
+<strong>E se os dois pedaços são fixos?</strong>
+<p>Se você só quer quebrar um texto comprido em dois pedaços no código, nem precisa de <code>+</code>: escreva os literais lado a lado, <code>"Olá, " "querida"</code>, e o compilador os cola sozinho antes de tudo. Isso é assunto de <a href="escapes.html">Caracteres Especiais e Raw Strings</a>.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: invalid operands of types ‘const char [N]’ and ‘const char [M]’ to binary ‘operator+’</code></strong>
+<p><strong>O que significa:</strong> os dois lados de um <code>+</code> são textos entre aspas (literais). O <code>+</code> que junta textos só existe quando pelo menos um lado é <code>std::string</code>. No Clang: <code>invalid operands to binary expression ('const char[2]' and 'const char[2]')</code>.</p>
+<p><strong>Como consertar:</strong> faça o primeiro pedaço virar <code>std::string</code> (<code>std::string("…")</code> ou <code>"…"s</code>), comece a soma por uma variável <code>std::string</code>, ou, se os dois são fixos, apague o <code>+</code> e deixe os literais lado a lado.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: invalid operands of types ‘const char*’ and ‘const char [8]’ to binary ‘operator+’</code></strong>
+<pre class="file" data-file="pedido.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string cliente = "Bia";
+    int quantidade = 3;
+    std::string pedido = "Pedido de " + cliente + ": pão";
+    pedido += " (" + quantidade + " itens)";
+    std::cout &lt;&lt; pedido &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra pedido.cpp -o pedido
+pedido.cpp: In function ‘int main()’:
+pedido.cpp:8:33: error: invalid operands of types ‘const char*’ and ‘const char [8]’ to binary ‘operator+’
+    8 |     pedido += " (" + quantidade + " itens)";
+      |               ~~~~~~~~~~~~~~~~~ ^ ~~~~~~~~~
+      |                    |              |
+      |                    const char*    const char [8]</pre>
+<p><strong>O que significa:</strong> as duas armadilhas juntas. <code>" (" + quantidade</code> é literal + número: "ande 3 casas na memória", e o resultado é um <code>const char*</code> (um endereço, veja <a href="ponteiros.html">Ponteiros</a>). Depois, endereço + literal não existe, e aí o compilador reclama. Aqui você teve sorte: o erro apareceu. Sem o <code>" itens)"</code> no fim, teria compilado e mostrado lixo.</p>
+<p><strong>Como consertar:</strong> converta o número: <code>pedido += " (" + std::to_string(quantidade) + " itens)";</code>. Você vai fazer isso na missão final.</p>
+</div>
+
+<div class="cenario">
+<strong>O programa mostra um texto que você não escreveu (<code>create</code>, <code>construction from null…</code>)</strong>
+<p><strong>O que significa:</strong> em algum lugar há <code>"texto" + número</code>. O C++ andou casas na memória em vez de juntar. É comportamento indefinido, e o g++ não avisa; o Clang avisa com <code>adding 'int' to a string does not append to the string</code>.</p>
+<p><strong>Como consertar:</strong> procure <code>+</code> entre aspas e um número ou uma variável <code>int</code>/<code>double</code> e use <code>std::to_string(…)</code> ou <code>std::format</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Aparece uma letra (ou nada) no lugar do número</strong>
+<p><strong>O que significa:</strong> você fez <code>texto += numero;</code> com <code>texto</code> sendo <code>std::string</code>. O número virou um <code>char</code>: 65 é <code>A</code>, 30 é um caractere invisível.</p>
+<p><strong>Como consertar:</strong> <code>texto += std::to_string(numero);</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>As palavras saem grudadas: <code>AnaSouza</code></strong>
+<p><strong>O que significa:</strong> o <code>+</code> nunca coloca espaço.</p>
+<p><strong>Como consertar:</strong> junte um <code>" "</code> no meio: <code>nome + " " + sobrenome</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th><th>Exemplo → resultado</th></tr>
+<tr><td><code>a + b</code></td><td>Junta, criando uma string nova (um dos lados precisa ser <code>std::string</code>)</td><td><code>nome + "!"</code> → <code>"Ana!"</code></td></tr>
+<tr><td><code>s += x</code></td><td>Acrescenta <code>x</code> (texto ou <code>char</code>) no fim de <code>s</code></td><td><code>lista += ", café";</code></td></tr>
+<tr><td><code>s.append(x)</code></td><td>O mesmo que <code>+=</code></td><td><code>s.append("aço");</code></td></tr>
+<tr><td><code>s.append(n, c)</code></td><td>Acrescenta <code>n</code> vezes o caractere <code>c</code></td><td><code>s.append(3, '!');</code> → <code>"!!!"</code> no fim</td></tr>
+<tr><td><code>std::to_string(n)</code></td><td>Número → texto</td><td><code>std::to_string(30)</code> → <code>"30"</code></td></tr>
+<tr><td><code>std::format("{} {}", a, b)</code></td><td>Monta um texto trocando cada <code>{}</code> por um valor <span class="versao">C++20</span></td><td><code>std::format("{} anos", 30)</code> → <code>"30 anos"</code></td></tr>
+<tr><td><code>"texto"s</code></td><td>Literal que já é <code>std::string</code> (precisa de <code>using namespace std::string_literals;</code>)</td><td><code>"a"s + "b"</code> → <code>"ab"</code></td></tr>
+<tr><td><code>"a" "b"</code></td><td>Literais lado a lado: o compilador cola</td><td><code>"a" "b"</code> → <code>"ab"</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Acrescentar</h3>
+<p>Complete para acrescentar <code>", leite"</code> no fim da string <code>lista</code>, sem repetir o nome da variável do lado direito:</p>
+<div class="ex-code">lista <input data-answer="+=" aria-label="operador"> ", leite";</div>
+</div>
+
+<div class="exercise">
+<h3>2. Número no texto</h3>
+<p>Complete para juntar a idade (um <code>int</code>) ao texto de forma correta:</p>
+<div class="ex-code">std::string t = "idade: " + <input data-answer="std::to_string" aria-label="função">(idade);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Repetir</h3>
+<p>Complete para acrescentar 5 asteriscos no fim de <code>s</code>:</p>
+<div class="ex-code">s.<input data-answer="append" aria-label="função">(5, '*');</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Qual destas linhas <strong>não compila</strong>? (<code>nome</code> é um <code>std::string</code>.)</p>
+<label><input type="radio" name="q4"> <code>std::string s = nome + " " + "Souza";</code></label>
+<label><input type="radio" name="q4"> <code>std::string s = "Sra. " + "Ana";</code></label>
+<label><input type="radio" name="q4"> <code>std::string s = "Sra. " + nome;</code></label>
+<label><input type="radio" name="q4"> <code>std::string s = "Sra. " "Ana";</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. O que acontece com <code>std::string t = "total: " + 10;</code>?</p>
+<label><input type="radio" name="q5"> <code>t</code> fica <code>"total: 10"</code></label>
+<label><input type="radio" name="q5"> Erro de compilação sempre</label>
+<label><input type="radio" name="q5"> Compila, mas o <code>+</code> anda 10 casas na memória: comportamento indefinido</label>
+<label><input type="radio" name="q5"> <code>t</code> fica <code>"total: "</code> e o 10 é ignorado</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Depois de <code>std::string a = "Bom"; std::string b = a + " dia";</code>, quanto vale <code>a</code>?</p>
+<label><input type="radio" name="q6"> <code>"Bom"</code></label>
+<label><input type="radio" name="q6"> <code>"Bom dia"</code></label>
+<label><input type="radio" name="q6"> <code>" dia"</code></label>
+<label><input type="radio" name="q6"> Vazia</label>
+</div>
+
+<h3>Missão final: o pedido da lojinha</h3>
+
+<div class="trycpp" data-goal="out:Pedido de Bia: pão\, leite\, café (3 itens),src:\+=,src:to_string\s*\(\s*quantidade">
+<p class="try-task"><strong>Missão:</strong> este programa não compila (é o mesmo erro da seção "Quando dá errado"). Conserte a linha do <code>(3 itens)</code> com <code>std::to_string</code> e, antes dela, acrescente <code>, leite</code> e <code>, café</code> com <code>+=</code>, para mostrar exatamente:</p>
+<pre class="out">Pedido de Bia: pão, leite, café (3 itens)</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string cliente = "Bia";
+    int quantidade = 3;
+    std::string pedido = "Pedido de " + cliente + ": pão";
+    // acrescente ", leite" e ", café" aqui
+
+    pedido += " (" + quantidade + " itens)";
+    std::cout &lt;&lt; pedido &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string cliente = "Bia";
+    int quantidade = 3;
+    std::string pedido = "Pedido de " + cliente + ": pão";
+    pedido += ", leite";
+    pedido += ", café";
+    pedido += " (" + std::to_string(quantidade) + " itens)";
+    std::cout &lt;&lt; pedido &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>Concatenar</strong> = juntar textos, um depois do outro. O espaço não aparece sozinho.</li>
+  <li><code>a + b</code> cria uma string nova; <code>s += x</code> e <code>s.append(x)</code> aumentam <code>s</code>. <code>s.append(3, '!')</code> repete um caractere.</li>
+  <li><code>"texto" + número</code> <strong>não</strong> junta: anda casas na memória e mostra lixo (comportamento indefinido, sem aviso do g++). <code>std::string += número</code> vira um <code>char</code>. Use <code>std::to_string(n)</code> ou <code>std::format</code>.</li>
+  <li><code>"a" + "b"</code> não compila (<code>invalid operands…</code>): um dos <strong>dois primeiros</strong> pedaços precisa ser <code>std::string</code>. Conserte com <code>std::string("a")</code>, <code>"a"s</code>, parênteses ou literais lado a lado.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
