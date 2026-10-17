@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Projetos — como usar os seis projetos do guia | Guia C++</title>
+<meta name="description" content="Como usar os projetos do Guia C++: seis programas completos construídos em etapas (calculadora, jogo de adivinhação, agenda, banco, estoque e analisador de texto), as aulas que cada um pratica, em que ordem fazê-los e como rodar cada etapa no editor do guia ou no terminal com g++.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Projetos</span></h1>
+
+<p class="intro">Nas aulas, cada página ensina <strong>um</strong> assunto. Nos projetos, você junta vários assuntos para construir um programa de verdade, do arquivo vazio até a versão final. É aqui que o que você estudou se encaixa: o <code>cin</code> da aula de entrada conversa com um <code>switch</code>, que chama uma função, que guarda os dados num <code>vector</code> e grava tudo num arquivo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como os seis projetos do guia estão organizados (em etapas pequenas).</li>
+  <li>Que aulas cada projeto pratica e em que ordem fazê-los.</li>
+  <li>Como rodar cada etapa: no editor do guia ou no terminal do seu computador.</li>
+  <li>Como o editor "digita" a entrada dos programas que leem o teclado.</li>
+  <li>O que fazer quando o seu código não bate com o da etapa.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: construir como um pedreiro, não como um mágico</h2>
+<p>Ninguém escreve um programa inteiro de uma vez. Um pedreiro não levanta a casa num dia: primeiro a fundação, depois uma parede, confere se está no prumo, depois a outra. Programar é igual. Cada projeto deste guia é dividido em <strong>etapas</strong>, e cada etapa acrescenta <strong>uma</strong> coisa nova ao programa da etapa anterior. No fim de toda etapa, o programa <strong>compila e roda</strong>. Você nunca fica com um monte de código "que ainda não funciona".</p>
+
+<p>Toda página de projeto segue o mesmo roteiro:</p>
+
+<ol class="passo">
+  <li><strong>O que vamos construir.</strong> Uma sessão real do programa pronto, para você ver aonde vai chegar.</li>
+  <li><strong>Antes de começar.</strong> As aulas que você precisa ter visto (com links) e a pasta do projeto.</li>
+  <li><strong>As etapas.</strong> Cada uma mostra o código novo, explica o que mudou, mostra a compilação e a saída reais (com o g++ 15 na máquina da Ana) e termina com uma caixa <em>Experimente</em> em que <strong>você</strong> faz a etapa.</li>
+  <li><strong>Quando dá errado.</strong> Os erros que aparecem de verdade naquele projeto, com a mensagem completa e a correção.</li>
+  <li><strong>O código completo e os desafios.</strong> A versão final, inteira, e ideias para você continuar sozinho.</li>
+</ol>
+
+<hr>
+
+<h2>Os seis projetos</h2>
+<p>Os projetos estão em ordem de dificuldade. Os três primeiros usam o <a href="index.html">Nível 1</a> e o começo do Nível 2 (funções, structs, arquivos); os três últimos pedem classes, a biblioteca padrão e organização em vários arquivos, do Nível 3.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Projeto</th><th>O que é</th><th>Aulas que ele pratica</th><th>Faça depois de</th></tr>
+<tr><td><a href="projeto-calculadora.html">Calculadora</a><br>6 etapas</td><td>Calculadora de terminal: lê dois números e a operação, recusa a divisão por zero e o texto no lugar de número, repete até você sair.</td><td><a href="entrada-cin.html">cin</a>, <a href="switch.html">switch</a>, <a href="ponto-flutuante.html">double</a>, <a href="do-while.html">do-while</a>, <a href="validar-entrada.html">Validar a Entrada</a>, <a href="funcoes.html">Funções</a></td><td>Nível 1 + <a href="funcoes.html">Funções</a></td></tr>
+<tr><td><a href="projeto-adivinhacao.html">Jogo de Adivinhação</a><br>6 etapas</td><td>O computador sorteia um número de 1 a 100 e você tenta adivinhar, com dicas, contagem de tentativas, "jogar de novo" e recorde.</td><td><a href="if-else.html">if</a>/<a href="else-if.html">else if</a>, <a href="while.html">while</a>, <a href="incremento.html">++</a>, <a href="aleatorios.html">Números Aleatórios</a>, <a href="funcoes.html">Funções</a>, <a href="passagem-referencia.html">Referência</a></td><td>Nível 1 + <a href="funcoes.html">Funções</a></td></tr>
+<tr><td><a href="projeto-agenda.html">Agenda de Contatos</a><br>6 etapas</td><td>Adiciona, lista, busca (sem diferenciar maiúsculas) e remove contatos, e guarda tudo num arquivo de texto.</td><td><a href="structs.html">Structs</a>, <a href="vector.html">vector</a>, <a href="getline.html">getline</a>, <a href="funcoes-string.html">Funções de String</a>, <a href="passagem-referencia.html">Referência</a>, <a href="arquivos.html">Arquivos</a></td><td><a href="structs.html">Structs</a> e <a href="arquivos.html">Arquivos</a></td></tr>
+<tr><td><a href="projeto-banco.html">Contas Bancárias (POO)</a><br>8 etapas</td><td>Contas que depositam e sacam com validação, uma exceção para saldo insuficiente, conta poupança, extrato alinhado e o programa dividido em <code>.h</code> e <code>.cpp</code>.</td><td><a href="classes-objetos.html">Classes</a>, <a href="encapsulamento.html">public e private</a>, <a href="excecoes.html">Exceções</a>, <a href="heranca.html">Herança</a>, <a href="polimorfismo.html">Polimorfismo</a>, <a href="smart-pointers.html">unique_ptr</a>, <a href="format-print.html">std::format</a>, <a href="multiplos-arquivos.html">Vários Arquivos</a></td><td><a href="polimorfismo.html">Polimorfismo</a></td></tr>
+<tr><td><a href="projeto-estoque.html">Controle de Estoque</a><br>7 etapas</td><td>Os produtos da papelaria da Ana: entradas e saídas, alerta de estoque baixo, relatório ordenado por valor e um arquivo CSV.</td><td><a href="structs.html">Structs</a>, <a href="map.html">std::map</a>, <a href="optional-variant.html">optional</a>, <a href="pair-tuple.html">Desestruturação</a>, <a href="lambdas.html">Lambdas</a>, <a href="algoritmos.html">sort</a>, <a href="string-numero.html">Texto ↔ Número</a>, <a href="arquivos.html">Arquivos</a></td><td><a href="map.html">std::map</a> e <a href="algoritmos.html">Algoritmos</a></td></tr>
+<tr><td><a href="projeto-texto.html">Analisador de Texto</a><br>7 etapas</td><td>Lê um arquivo e conta linhas, palavras e caracteres (com acentos!), as palavras mais frequentes e a mais longa, comparando com o <code>wc</code> do Linux.</td><td><a href="arquivos.html">Arquivos</a>, <a href="acentos-utf8.html">Acentos e UTF-8</a>, <a href="map.html">std::map</a>, <a href="algoritmos.html">sort</a>, <a href="lambdas.html">Lambdas</a>, <a href="format-print.html">std::format</a></td><td><a href="map.html">std::map</a> e <a href="acentos-utf8.html">Acentos e UTF-8</a></td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>Não precisa ter terminado o nível inteiro</strong>
+<p>A coluna "Faça depois de" é o mínimo. Se alguma etapa usar algo que você ainda não viu, o texto tem o link para a aula. Abra numa aba nova, leia e volte. E não é preciso seguir a ordem da tabela: se você gosta de jogos, comece pela adivinhação.</p>
+</div>
+
+<hr>
+
+<h2>Onde rodar: duas formas</h2>
+
+<h3>1. No editor do guia (mais fácil)</h3>
+<p>Toda etapa tem uma caixa <strong>Experimente</strong> com o código da etapa anterior. Você edita, clica em <strong>Rodar</strong> e vê os avisos do compilador e a saída. Se travar, o botão de solução mostra a resposta. Veja como o editor funciona em <a href="simulador.html">O Editor do Guia</a>.</p>
+
+<p>Quase todos os projetos <strong>leem o teclado</strong>. Nas missões, o guia já preenche o que "a pessoa digitaria": é a <strong>entrada da missão</strong>, descrita no enunciado (por exemplo, "a entrada é <code>10</code>, <code>/</code>, <code>4</code>"). Há uma diferença em relação ao terminal: lá, o que você digita aparece na tela depois de cada pergunta. No editor, a entrada já está pronta e <strong>não aparece</strong> na saída. Por isso as perguntas ficam grudadas:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No terminal (você digita 10 e 5)</th><th>No editor (entrada da missão: 10 e 5)</th></tr>
+<tr><td><pre class="term">Primeiro número: 10
+Segundo número: 5
+10 + 5 = 15</pre></td><td><pre class="term">Primeiro número: Segundo número: 10 + 5 = 15</pre></td></tr>
+</table>
+</div>
+
+<p>Experimente agora. Este programa lê um nome, como os projetos fazem o tempo todo. A entrada <code>Ana</code> já vem preenchida:</p>
+
+<div class="trycpp" data-stdin="Ana\n" data-goal="out:Olá\, Ana! Vamos programar.,src:&lt;&lt;\s*nome">
+<p class="try-task"><strong>Missão:</strong> depois de ler o nome, mostre <code>Olá, Ana! Vamos programar.</code> usando a variável <code>nome</code> (não escreva "Ana" no código). Se precisar, revise <a href="getline.html">getline</a> e <a href="concatenacao.html">Juntar Strings</a>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome;
+    std::cout &lt;&lt; "Seu nome: ";
+    std::getline(std::cin, nome);
+    // escreva aqui a saudação
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome;
+    std::cout &lt;&lt; "Seu nome: ";
+    std::getline(std::cin, nome);
+    std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "! Vamos programar.\n";
+}
+</pre>
+</div>
+
+<h3>2. No terminal do seu computador (o jeito "de verdade")</h3>
+<p>Para guardar o seu trabalho, crie uma pasta para cada projeto dentro de <code>~/cpp</code>, escreva o arquivo num editor (<a href="editores.html">Editores e IDEs</a> mostra as opções) e compile com o comando padrão do guia (veja <a href="compilar.html">Compilar com g++</a>). Esta é a máquina da Ana fazendo a primeira etapa da calculadora:</p>
+
+<pre class="term">$ mkdir -p cpp/calculadora           « cria a pasta do projeto (e a cpp, se não existir)
+$ cd cpp/calculadora
+$ ls                                  « vazia, por enquanto
+$ ls                                  « a Ana escreveu o arquivo no editor
+calculadora.cpp
+$ g++ -std=c++23 -Wall -Wextra calculadora.cpp -o calculadora
+$ ls
+calculadora  calculadora.cpp          « o g++ criou o programa "calculadora"
+$ ./calculadora
+=== Calculadora da Ana ===
+Primeiro número: 7                    « 7 e 3 foram digitados pela Ana
+Segundo número: 3
+7 + 3 = 10</pre>
+
+<dl class="anatomy">
+  <dt>g++ -std=c++23 -Wall -Wextra</dt><dd>Compila em C++23, com os avisos ligados. Sem o <code>-std=c++23</code>, o g++ 15 usa o C++17 e recursos novos não funcionam (veja <a href="novidades.html">Novidades do C++11 ao C++26</a>).</dd>
+  <dt>calculadora.cpp</dt><dd>O código-fonte.</dd>
+  <dt>-o calculadora</dt><dd>O nome do programa a criar (<code>-o</code> de <em>output</em>, "saída").</dd>
+  <dt>./calculadora</dt><dd>Roda o programa que está nesta pasta (<code>./</code> = "aqui").</dd>
+</dl>
+
+<p>Toda vez que mudar o código, compile de novo antes de rodar: o programa <code>calculadora</code> é uma "foto" do código no momento da compilação. Para não esquecer, junte os dois comandos com <code>&amp;&amp;</code> ("e, se deu certo, então"): <code>g++ -std=c++23 -Wall -Wextra calculadora.cpp -o calculadora &amp;&amp; ./calculadora</code>.</p>
+
+<p>O projeto <a href="projeto-banco.html">Contas Bancárias</a> termina dividido em vários arquivos <code>.h</code> e <code>.cpp</code>, compilados juntos; a página mostra o comando, e a aula <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a> explica o porquê. Projetos maiores costumam usar <a href="make.html">Make</a> ou <a href="cmake.html">CMake</a>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Como</th><th>Quando usar</th></tr>
+<tr><td>Editor do guia</td><td>botão Rodar</td><td>Para fazer as etapas rapidamente, em qualquer computador ou celular. A entrada vem pronta.</td></tr>
+<tr><td>Terminal</td><td><code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code> e <code>./programa</code></td><td>Para guardar o projeto, digitar a entrada de verdade e usar arquivos que ficam no seu disco (agenda, estoque, texto).</td></tr>
+<tr><td>Vários arquivos</td><td><code>g++ … a.cpp b.cpp -o programa</code></td><td>Quando o projeto é dividido em <code>.h</code> e <code>.cpp</code> (banco).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Como estudar um projeto</h2>
+<ol class="passo">
+  <li><strong>Leia a etapa inteira antes de digitar.</strong> Entenda o que muda e por quê.</li>
+  <li><strong>Digite o código, não copie e cole.</strong> Parece mais lento, mas é digitando que você erra, lê a mensagem do compilador e aprende a consertar. Os erros mais comuns estão em <a href="ref-erros.html">Mensagens de Erro</a>.</li>
+  <li><strong>Compile com os avisos ligados e rode depois de cada etapa.</strong> Compare com a saída mostrada. Se for diferente, procure a diferença no código antes de seguir.</li>
+  <li><strong>Mude alguma coisa.</strong> Troque uma mensagem, um número, uma condição. Rode de novo. Prever o que vai acontecer e conferir é o melhor exercício que existe.</li>
+  <li><strong>Só então vá para a próxima etapa.</strong> No fim, tente os desafios sem olhar a solução.</li>
+</ol>
+
+<div class="cenario">
+<strong>"O meu não funciona e o da página funciona"</strong>
+<p>Quase sempre é um destes: um <code>;</code> esquecido, uma chave <code>}</code> a mais ou a menos, um <code>#include</code> que faltou, aspas duplas onde deviam ser simples (<code>"+"</code> em vez de <code>'+'</code>), ou o programa antigo rodando porque você não compilou de novo. Leia a <strong>primeira</strong> linha com <code>error</code>: ela diz o arquivo, a linha e a coluna (<code>calculadora.cpp:12:5: error: …</code>). Veja como ler essas mensagens em <a href="erros-compilacao.html">Lendo Erros do Compilador</a>. E não ignore os <code>warning</code>: em vários projetos, o aviso é a única pista de um erro de lógica (veja <a href="avisos.html">Avisos</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>O programa ficou repetindo a mesma linha sem parar</strong>
+<p>Um laço que lê do teclado e não confere se a leitura deu certo vira um laço infinito quando alguém digita texto no lugar de número. Aperte <kbd>Ctrl</kbd>+<kbd>C</kbd> para parar o programa. A <a href="projeto-calculadora.html#etapa5">etapa 5 da Calculadora</a> mostra o problema e a solução, com saídas reais.</p>
+</div>
+
+<hr>
+
+<h2>Missão: o esqueleto de todo menu</h2>
+<p>A calculadora, a agenda, o banco e o estoque têm a mesma estrutura: um menu que se repete até a pessoa escolher sair. Monte esse esqueleto agora, e você vai reconhecê-lo em todos os projetos.</p>
+
+<div class="trycpp" data-stdin="1\n2\n7\n0\n" data-goal="out:Oi!,out:Tchau!,out:Opção inválida.,out:Fim do programa.,src:while\s*\(">
+<p class="try-task"><strong>Missão:</strong> o menu funciona, mas só uma vez. Coloque o trecho que mostra o menu, lê a opção e executa o <code>switch</code> dentro de um <code>while (opcao != 0)</code>. A entrada escolhe <code>1</code>, <code>2</code>, <code>7</code> (inválida) e <code>0</code>. Veja <a href="while.html">while</a> e <a href="switch.html">switch</a> se precisar.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int opcao = -1;
+
+    std::cout &lt;&lt; "\n1. Dizer oi  2. Dizer tchau  0. Sair\n";
+    std::cout &lt;&lt; "Opção: ";
+    if (!(std::cin &gt;&gt; opcao)) {
+        opcao = 0;  // a entrada acabou ou não era número: sai
+    }
+    switch (opcao) {
+        case 1: std::cout &lt;&lt; "Oi!\n"; break;
+        case 2: std::cout &lt;&lt; "Tchau!\n"; break;
+        case 0: break;
+        default: std::cout &lt;&lt; "Opção inválida.\n";
+    }
+
+    std::cout &lt;&lt; "Fim do programa.\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int opcao = -1;
+
+    while (opcao != 0) {
+        std::cout &lt;&lt; "\n1. Dizer oi  2. Dizer tchau  0. Sair\n";
+        std::cout &lt;&lt; "Opção: ";
+        if (!(std::cin &gt;&gt; opcao)) {
+            opcao = 0;  // a entrada acabou ou não era número: sai
+        }
+        switch (opcao) {
+            case 1: std::cout &lt;&lt; "Oi!\n"; break;
+            case 2: std::cout &lt;&lt; "Tchau!\n"; break;
+            case 0: break;
+            default: std::cout &lt;&lt; "Opção inválida.\n";
+        }
+    }
+
+    std::cout &lt;&lt; "Fim do programa.\n";
+}
+</pre>
+</div>
+
+<p>No terminal da Ana, a solução fica assim:</p>
+
+<pre class="term" data-cwd="~/cpp/projetos">$ g++ -std=c++23 -Wall -Wextra menu.cpp -o menu
+$ ./menu
+
+1. Dizer oi  2. Dizer tchau  0. Sair
+Opção: 1
+Oi!
+
+1. Dizer oi  2. Dizer tchau  0. Sair
+Opção: 2
+Tchau!
+
+1. Dizer oi  2. Dizer tchau  0. Sair
+Opção: 7
+Opção inválida.
+
+1. Dizer oi  2. Dizer tchau  0. Sair
+Opção: 0
+Fim do programa.</pre>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">1. A Ana terminou a etapa 2 de um projeto, mas o programa não compila. O que ela deve fazer?</p>
+<label><input type="radio" name="q1"> Pular para a etapa 3, que talvez conserte.</label>
+<label><input type="radio" name="q1"> Copiar o código completo do fim da página.</label>
+<label><input type="radio" name="q1"> Ler a primeira linha com <code>error</code>, achar a linha indicada e consertar antes de seguir.</label>
+<label><input type="radio" name="q1"> Apagar tudo e começar de novo.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">2. Na missão, o editor mostrou <code>Primeiro número: Segundo número: 10 + 5 = 15</code>, tudo numa linha. O que aconteceu?</p>
+<label><input type="radio" name="q2"> O programa tem um erro: faltou <code>\n</code> nas perguntas.</label>
+<label><input type="radio" name="q2"> Nada de errado: no editor, a entrada da missão já vem pronta e não aparece na tela, então as perguntas ficam juntas.</label>
+<label><input type="radio" name="q2"> O <code>cin</code> falhou.</label>
+<label><input type="radio" name="q2"> O editor usa outro compilador, que não pula linhas.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">3. Qual projeto pratica classes, herança e exceções?</p>
+<label><input type="radio" name="q3"> Calculadora</label>
+<label><input type="radio" name="q3"> Jogo de Adivinhação</label>
+<label><input type="radio" name="q3"> Agenda de Contatos</label>
+<label><input type="radio" name="q3"> Contas Bancárias (POO)</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. A Ana mudou o código, rodou <code>./agenda</code> e nada mudou. Qual a causa mais provável?</p>
+<label><input type="radio" name="q4"> Ela não compilou de novo depois de mudar o código.</label>
+<label><input type="radio" name="q4"> O <code>./</code> está errado.</label>
+<label><input type="radio" name="q4"> O arquivo <code>agenda.txt</code> está vazio.</label>
+<label><input type="radio" name="q4"> O g++ guarda o código antigo para sempre.</label>
+</div>
+
+<div class="exercise">
+<p>5. Complete o comando que compila <code>agenda.cpp</code> no padrão do guia e, se deu certo, roda o programa:</p>
+<div class="ex-code">g++ -std=c++23 -Wall -Wextra agenda.cpp -o agenda <input data-answer="&amp;&amp; ./agenda|&amp;&amp;./agenda" aria-label="continuação"></div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Cada projeto é construído em etapas; no fim de cada etapa, o programa compila e roda.</li>
+  <li>Seis projetos, em ordem de dificuldade: <a href="projeto-calculadora.html">Calculadora</a>, <a href="projeto-adivinhacao.html">Adivinhação</a>, <a href="projeto-agenda.html">Agenda</a>, <a href="projeto-banco.html">Banco</a>, <a href="projeto-estoque.html">Estoque</a> e <a href="projeto-texto.html">Analisador de Texto</a>.</li>
+  <li>No editor do guia, a entrada da missão vem pronta e não aparece na saída; no terminal, você digita.</li>
+  <li>No terminal: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa &amp;&amp; ./programa</code>, e compile de novo a cada mudança.</li>
+  <li>Leia a etapa, digite, compile, compare a saída, mude algo, e só então siga.</li>
+</ul>
+<p>Comece pelo primeiro: <a href="projeto-calculadora.html">Calculadora</a>.</p>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
