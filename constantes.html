@@ -95,7 +95,7 @@ mudar.cpp:5:18: error: assignment of read-only variable ‘diasDaSemana’
 
 <p>É um <strong>error</strong>: o programa não foi gerado. Essa é a graça da constante: o engano é pego <strong>antes</strong> de o programa rodar, e não depois, por um cliente reclamando do preço. No editor do guia, o Clang diz o mesmo com outras palavras: <code>cannot assign to variable 'diasDaSemana' with const-qualified type 'const int'</code> ("não é possível atribuir a uma variável de tipo <code>const</code>").</p>
 
-<div class="trycpp" data-goal="erro:/read-only\|const-qualified/">
+<div class="trycpp" data-goal="erro:/read-only|const-qualified/">
 <p class="try-task"><strong>Missão:</strong> provoque o erro. Rode o programa como está (funciona). Depois acrescente, antes do <code>std::cout</code>, uma linha que tente mudar as vidas do jogo para 5, e rode de novo: o compilador tem que recusar.</p>
 <pre class="script">#include &lt;iostream&gt;
 
