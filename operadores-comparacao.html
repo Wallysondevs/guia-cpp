@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Operadores de Comparação — == != &lt; &gt; &lt;= &gt;= e &lt;=&gt; | Guia C++</title>
+<meta name="description" content="Operadores de comparação em C++ para quem nunca programou: ==, !=, &lt;, &gt;, &lt;=, &gt;=, o resultado bool, comparar double com tolerância, comparar std::string e textos do C, a armadilha signed × unsigned (-1 &lt; 1u é falso) e o &lt;=&gt; do C++20, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Operadores de Comparação</span></h1>
+
+<p class="intro">A Ana é maior de idade? A nota passou da média? O estoque acabou? A senha está certa? Todo programa que <strong>toma decisões</strong> começa com uma pergunta de sim ou não, e quase sempre essa pergunta é uma <strong>comparação</strong> entre dois valores. Nesta aula você vai conhecer os seis operadores de comparação do C++, ver o que eles respondem e cair (de propósito, para aprender) nas três armadilhas clássicas: comparar números com vírgula, comparar textos do jeito antigo e misturar números com e sem sinal.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Os seis operadores: <code>==</code>, <code>!=</code>, <code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code> e <code>&gt;=</code>.</li>
+  <li>Que toda comparação responde um <code>bool</code> (<code>true</code> ou <code>false</code>), e como mostrar essa resposta.</li>
+  <li>Por que <code>0.1 + 0.2 == 0.3</code> é falso, e como comparar <code>double</code> com uma tolerância.</li>
+  <li>Como comparar textos com <code>std::string</code>, e por que comparar textos do C (<code>char[]</code>) não funciona.</li>
+  <li>Por que <code>-1 &lt; 1u</code> é <strong>falso</strong> em C++.</li>
+  <li>Por que <code>0 &lt;= nota &lt;= 10</code> não faz o que parece.</li>
+  <li>O que é o operador "nave espacial", <code>&lt;=&gt;</code>, do C++20.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: a balança de dois pratos</h2>
+<p>Uma comparação é como uma balança antiga, de dois pratos. Você coloca um valor em cada prato e faz <strong>uma pergunta</strong>: "estão iguais?", "o da esquerda é mais leve?". A balança não muda os pesos; ela só <strong>responde</strong>, e a resposta é sempre <strong>sim ou não</strong>.</p>
+<p>Em C++, "sim" é <code>true</code> (verdadeiro) e "não" é <code>false</code> (falso): os dois valores do tipo <code>bool</code> (aula <a href="bool.html">Booleanos</a>). Toda comparação produz um <code>bool</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operador</th><th>Pergunta</th><th>Exemplo</th><th>Resposta</th></tr>
+<tr><td><code>==</code></td><td>É igual a?</td><td><code>5 == 5</code></td><td><code>true</code></td></tr>
+<tr><td><code>!=</code></td><td>É diferente de?</td><td><code>5 != 5</code></td><td><code>false</code></td></tr>
+<tr><td><code>&lt;</code></td><td>É menor que?</td><td><code>3 &lt; 5</code></td><td><code>true</code></td></tr>
+<tr><td><code>&gt;</code></td><td>É maior que?</td><td><code>3 &gt; 5</code></td><td><code>false</code></td></tr>
+<tr><td><code>&lt;=</code></td><td>É menor ou igual a?</td><td><code>5 &lt;= 5</code></td><td><code>true</code></td></tr>
+<tr><td><code>&gt;=</code></td><td>É maior ou igual a?</td><td><code>3 &gt;= 5</code></td><td><code>false</code></td></tr>
+</table>
+</div>
+
+<p>Os sinais de dois caracteres são escritos <strong>grudados</strong> e nesta ordem: <code>&lt;=</code> e <code>&gt;=</code> (o <code>=</code> por último, como se fala: "menor ou igual"); <code>!=</code> (o <code>!</code> quer dizer "não": "não igual"). E a igualdade tem <strong>dois</strong> sinais de igual: um só, <code>=</code>, é atribuição, que <strong>muda</strong> a variável (veja <a href="operadores-atribuicao.html">Operadores de Atribuição</a>).</p>
+
+<hr>
+
+<h2>1. Comparar números e ver a resposta</h2>
+
+<pre class="file" data-file="compara.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 17;
+    std::cout &lt;&lt; (idade == 18) &lt;&lt; '\n';
+    std::cout &lt;&lt; (idade != 18) &lt;&lt; '\n';
+    std::cout &lt;&lt; (idade &lt; 18) &lt;&lt; '\n';
+    std::cout &lt;&lt; (idade &gt; 18) &lt;&lt; '\n';
+    std::cout &lt;&lt; (idade &lt;= 17) &lt;&lt; '\n';
+    std::cout &lt;&lt; (idade &gt;= 18) &lt;&lt; '\n';
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; (idade &gt;= 18) &lt;&lt; '\n';
+    bool maior = idade &gt;= 18;
+    std::cout &lt;&lt; "maior de idade? " &lt;&lt; maior &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra compara.cpp -o compara
+$ ./compara
+0        « 17 == 18? não
+1        « 17 != 18? sim
+1        « 17 &lt; 18? sim
+0        « 17 &gt; 18? não
+1        « 17 &lt;= 17? sim
+0        « 17 &gt;= 18? não
+false    « a mesma pergunta, agora com std::boolalpha
+maior de idade? false</pre>
+
+<dl class="anatomy">
+  <dt>(idade == 18)</dt><dd>A comparação. Os <strong>parênteses são obrigatórios</strong> dentro do <code>cout</code>: sem eles, o <code>&lt;&lt;</code> do <code>cout</code> "rouba" os operandos (veja a seção "Quando dá errado").</dd>
+  <dt>0 e 1</dt><dd>Por padrão, o <code>cout</code> mostra <code>false</code> como <code>0</code> e <code>true</code> como <code>1</code>.</dd>
+  <dt>std::boolalpha</dt><dd>Um "ajuste" do <code>cout</code> (<em>bool alphabetic</em>: bool por extenso). Depois dele, os <code>bool</code> aparecem como <code>true</code> e <code>false</code>. Vale até o fim do programa (ou até um <code>std::noboolalpha</code>).</dd>
+  <dt>bool maior = idade &gt;= 18;</dt><dd>A resposta de uma comparação pode ser guardada numa variável <code>bool</code>, para usar depois. Aqui os parênteses não são necessários, porque não há <code>&lt;&lt;</code> na linha.</dd>
+</dl>
+
+<p>Na prática, o lugar mais comum de uma comparação é dentro de um <code>if</code> ("se") ou de um <code>while</code> ("enquanto"): <code>if (idade &gt;= 18) { … }</code>. Você vai usar isso em <a href="if-else.html">if e else</a> e <a href="while.html">while</a>. Aqui o foco é a pergunta em si.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> mude o valor de <code>estoque</code> (tente 0, 3 e 10) e veja as respostas mudarem. Depois acrescente a pergunta "o estoque é maior que 5?".</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int estoque = 3;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "Acabou? " &lt;&lt; (estoque == 0) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Tem algum? " &lt;&lt; (estoque != 0) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Está baixo (até 3)? " &lt;&lt; (estoque &lt;= 3) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Comparar <code>double</code>: use uma tolerância</h2>
+<p>Com números inteiros, <code>==</code> é exato. Com <code>double</code>, não dá para confiar nele. Veja uma conta que qualquer criança acerta:</p>
+
+<pre class="file" data-file="real.cpp">#include &lt;cmath&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    double a = 0.1 + 0.2;
+    double b = 0.3;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; (a == b) &lt;&lt; '\n';
+    std::cout.precision(17);
+    std::cout &lt;&lt; a &lt;&lt; '\n' &lt;&lt; b &lt;&lt; '\n';
+    std::cout &lt;&lt; (std::abs(a - b) &lt; 1e-9) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra real.cpp -o real
+$ ./real
+false                    « 0.1 + 0.2 == 0.3? NÃO!
+0.30000000000000004      « o que o 0.1 + 0.2 realmente guardou
+0.29999999999999999      « o que o 0.3 realmente guardou
+true                     « "estão a menos de 0.000000001 de distância?" sim</pre>
+
+<p>O <code>double</code> guarda os números em <strong>binário</strong> (base 2), e números como 0.1 e 0.3 não têm representação exata em binário, assim como 1/3 não tem em decimal (0,3333…). Cada um é guardado como o valor mais próximo possível, e os pequenos erros não se cancelam. O <code>std::cout.precision(17)</code> pediu 17 algarismos para mostrar essa diferença, que normalmente fica escondida. A aula <a href="ponto-flutuante.html">float e double</a> explica em detalhe.</p>
+
+<p>A solução é comparar com uma <strong>tolerância</strong>: em vez de "são iguais?", pergunte "a distância entre eles é menor que um número bem pequeno?".</p>
+
+<dl class="anatomy">
+  <dt>a - b</dt><dd>A diferença entre os dois. Pode ser negativa.</dd>
+  <dt>std::abs( … )</dt><dd>O valor absoluto (o número sem o sinal), de <code>&lt;cmath&gt;</code>. Transforma −0.00000000000000005 em 0.00000000000000005, para a distância ser sempre positiva.</dd>
+  <dt>&lt; 1e-9</dt><dd><code>1e-9</code> é notação científica: 1 × 10<sup>−9</sup> = 0.000000001. É a tolerância: se a distância é menor que isso, consideramos iguais.</dd>
+</dl>
+
+<p>Qual tolerância usar depende do problema: para dinheiro em reais, <code>0.001</code> já basta; para medidas científicas, pode ser bem menor. Com <code>&lt;</code> e <code>&gt;</code> o problema é menor (0.30000000000000004 é mesmo "um pouquinho maior" que 0.3), mas a mesma desconfiança vale quando os valores estão muito próximos.</p>
+
+<div class="tip">
+<strong>Dinheiro sem vírgula</strong>
+<p>Uma alternativa muito usada em sistemas de lojas e bancos: guardar dinheiro em <strong>centavos</strong>, num inteiro. R$ 12,34 vira <code>1234</code>. Aí o <code>==</code> volta a ser exato.</p>
+</div>
+
+<hr>
+
+<h2>3. Comparar textos</h2>
+
+<h3>Com <code>std::string</code>: funciona como você espera</h3>
+<p>Os seis operadores funcionam com <code>std::string</code> (aula <a href="strings.html">Strings</a>). <code>==</code> compara o conteúdo, letra por letra; <code>&lt;</code> e <code>&gt;</code> comparam em <strong>ordem de dicionário</strong>:</p>
+
+<pre class="file" data-file="textos.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string a = "Ana";
+    std::string b = "Ana";
+    std::string c = "Bruno";
+    std::string d = "ana";
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; (a == b) &lt;&lt; '\n';
+    std::cout &lt;&lt; (a &lt; c) &lt;&lt; '\n';
+    std::cout &lt;&lt; (d &lt; c) &lt;&lt; '\n';
+    std::cout &lt;&lt; (a == "Ana") &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra textos.cpp -o textos
+$ ./textos
+true     « mesmo conteúdo
+true     « "Ana" vem antes de "Bruno"
+false    « "ana" NÃO vem antes de "Bruno"!
+true     « string comparada com texto entre aspas: funciona</pre>
+
+<p>A terceira linha surpreende. A "ordem de dicionário" do C++ é, na verdade, a ordem dos <strong>códigos dos caracteres</strong> (a tabela ASCII, veja <a href="char.html">Caracteres</a>). Nela, <strong>todas as maiúsculas vêm antes de todas as minúsculas</strong>: <code>'B'</code> é 66 e <code>'a'</code> é 97. Então <code>"ana" &lt; "Bruno"</code> é falso, e <code>"Zebra" &lt; "abacate"</code> é verdadeiro. Pelo mesmo motivo, <code>"Ana" == "ana"</code> é <code>false</code>: maiúscula e minúscula são caracteres diferentes.</p>
+
+<p>Outra consequência: textos com números são comparados caractere por caractere, e não pelo valor. <code>std::string("10") &lt; std::string("9")</code> é <strong>verdadeiro</strong>, porque o primeiro caractere, <code>'1'</code>, vem antes de <code>'9'</code>. Para comparar como números, converta antes (aula <a href="string-numero.html">Texto ↔ Número</a>).</p>
+
+<h3>Com textos do C (<code>char[]</code>): compara o lugar, não o conteúdo</h3>
+<p>Antes do <code>std::string</code>, textos eram guardados em <strong>arrays de char</strong>, herança da linguagem C (aula <a href="arrays.html">Arrays</a>). Você ainda vai encontrá-los em código antigo. Com eles, o <code>==</code> <strong>não compara as letras</strong>:</p>
+
+<pre class="file" data-file="ponteiros.cpp">#include &lt;iostream&gt;
+
+int main() {
+    char a[] = "Ana";
+    char b[] = "Ana";
+    std::cout &lt;&lt; std::boolalpha &lt;&lt; (a == b) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ponteiros.cpp -o ponteiros
+ponteiros.cpp: In function ‘int main()’:
+ponteiros.cpp:6:39: warning: comparison between two arrays is deprecated in C++20 [-Warray-compare]
+    6 |     std::cout &lt;&lt; std::boolalpha &lt;&lt; (a == b) &lt;&lt; '\n';
+      |                                     ~~^~~~
+ponteiros.cpp:6:39: note: use unary ‘+’ which decays operands to pointers or ‘&amp;a[0] == &amp;b[0]’ to compare the addresses
+$ ./ponteiros
+false    « mesmo texto, mas "diferentes"</pre>
+
+<p>A ideia, por enquanto, é só esta: <code>a</code> e <code>b</code> são <strong>duas caixas diferentes</strong> na memória, cada uma com sua cópia de "Ana". O <code>==</code> perguntou "é a mesma caixa?" (o mesmo <strong>endereço</strong>), e não "o conteúdo é igual?". O aviso diz que "comparar dois arrays está obsoleto no C++20", e a nota explica que isso compara "os endereços". Você vai entender endereços na aula <a href="ponteiros.html">Ponteiros</a>. A solução prática: <strong>use <code>std::string</code></strong>, e o <code>==</code> compara o conteúdo.</p>
+
+<hr>
+
+<h2>4. A armadilha: números com e sem sinal</h2>
+<p>O C++ tem inteiros <strong>com sinal</strong> (<code>int</code>, que aceita negativos) e <strong>sem sinal</strong> (<code>unsigned int</code>, só 0 e positivos; veja <a href="inteiros.html">Inteiros</a>). Um número escrito com <code>u</code> no fim, como <code>1u</code>, é <code>unsigned</code>. Quando você compara um com o outro, acontece isto:</p>
+
+<pre class="file" data-file="sinal.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int saldo = -1;
+    unsigned int limite = 1;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; (saldo &lt; limite) &lt;&lt; '\n';
+    std::cout &lt;&lt; (-1 &lt; 1u) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sinal.cpp -o sinal
+sinal.cpp: In function ‘int main()’:
+sinal.cpp:7:25: warning: comparison of integer expressions of different signedness: ‘int’ and ‘unsigned int’ [-Wsign-compare]
+    7 |     std::cout &lt;&lt; (saldo &lt; limite) &lt;&lt; '\n';
+      |                   ~~~~~~^~~~~~~~
+sinal.cpp:8:22: warning: comparison of integer expressions of different signedness: ‘int’ and ‘unsigned int’ [-Wsign-compare]
+    8 |     std::cout &lt;&lt; (-1 &lt; 1u) &lt;&lt; '\n';
+      |                   ~~~^~~~
+$ ./sinal
+false    « -1 &lt; 1 é FALSO?!
+false</pre>
+
+<p>Menos um é menor que um, qualquer criança sabe. Mas o C++ respondeu <code>false</code> duas vezes. O motivo:</p>
+<ol class="passo">
+  <li>Para comparar, os dois lados precisam ter o <strong>mesmo tipo</strong>.</li>
+  <li>Quando um lado é <code>int</code> e o outro é <code>unsigned int</code>, a regra do C++ converte o <code>int</code> para <code>unsigned</code>.</li>
+  <li>Um <code>unsigned</code> não tem negativos: o −1 vira <strong>4294967295</strong>, o maior <code>unsigned int</code> (você viu isso em <a href="conversao-tipos.html">Conversão de Tipos</a>).</li>
+  <li><code>4294967295 &lt; 1</code> é falso.</li>
+</ol>
+
+<p>O aviso explica isso: "comparação de expressões inteiras com <strong>sinalização diferente</strong>: <code>int</code> e <code>unsigned int</code>". O <code>-Wsign-compare</code> vem com o <code>-Wall</code>. Mais um motivo para nunca desligar os avisos. (No editor do guia, o Clang só avisa na linha 7; na linha 8, com números escritos direto, ele fica quieto. O resultado é o mesmo <code>false</code>.)</p>
+
+<p>Você vai encontrar isso na prática quando comparar um <code>int</code> com o tamanho de um texto ou de uma lista (<code>texto.size()</code>), que é <code>unsigned</code>. As soluções:</p>
+<ul>
+  <li>Use o mesmo tipo dos dois lados sempre que puder.</li>
+  <li>No C++20, a biblioteca <code>&lt;utility&gt;</code> tem funções que comparam do jeito matemático, mesmo com tipos diferentes: <code>std::cmp_less(saldo, limite)</code> ("menor que") responde <code>true</code>. Existem também <code>std::cmp_equal</code>, <code>std::cmp_greater</code> e outras. <span class="versao">C++20</span></li>
+</ul>
+
+<pre class="term" data-cwd="~/cpp">$ cat cmp.cpp
+#include &lt;iostream&gt;
+#include &lt;utility&gt;
+
+int main() {
+    int saldo = -1;
+    unsigned int limite = 1;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; std::cmp_less(saldo, limite) &lt;&lt; '\n';
+}
+$ g++ -std=c++23 -Wall -Wextra cmp.cpp -o cmp
+$ ./cmp
+true</pre>
+
+<hr>
+
+<h2>5. <code>0 &lt;= nota &lt;= 10</code> não é o que parece</h2>
+<p>Na matemática, escrevemos 0 ≤ nota ≤ 10 para dizer "a nota está entre 0 e 10". Em C++, isso compila, mas significa outra coisa:</p>
+
+<pre class="file" data-file="faixa.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int nota = 15;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; (0 &lt;= nota &lt;= 10) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra faixa.cpp -o faixa
+faixa.cpp: In function ‘int main()’:
+faixa.cpp:6:29: warning: comparison of constant ‘10’ with boolean expression is always true [-Wbool-compare]
+    6 |     std::cout &lt;&lt; (0 &lt;= nota &lt;= 10) &lt;&lt; '\n';
+      |                   ~~~~~~~~~~^~~~~
+faixa.cpp:6:21: warning: comparisons like ‘X&lt;=Y&lt;=Z’ do not have their mathematical meaning [-Wparentheses]
+    6 |     std::cout &lt;&lt; (0 &lt;= nota &lt;= 10) &lt;&lt; '\n';
+      |                   ~~^~~~~~~
+$ ./faixa
+true     « 15 está entre 0 e 10?!</pre>
+
+<ol class="passo">
+  <li>O C++ faz uma comparação de cada vez, da esquerda para a direita: <code>(0 &lt;= nota) &lt;= 10</code>.</li>
+  <li><code>0 &lt;= 15</code> dá <code>true</code>.</li>
+  <li>Sobra <code>true &lt;= 10</code>. O <code>true</code> vira 1, e <code>1 &lt;= 10</code> é verdadeiro. Sempre.</li>
+</ol>
+<p>Os dois avisos dizem exatamente isso: "comparar a constante 10 com uma expressão booleana dá sempre verdadeiro" e "comparações como <code>X&lt;=Y&lt;=Z</code> não têm o significado da matemática". No editor do guia, o Clang 21 vai além e trata isso como <strong>erro</strong>: <code>chained comparison 'X &lt;= Y &lt;= Z' does not behave the same as a mathematical expression</code>.</p>
+<p>O jeito certo é fazer duas perguntas e juntá-las com "e": <code>0 &lt;= nota &amp;&amp; nota &lt;= 10</code>. O <code>&amp;&amp;</code> é assunto da próxima aula, <a href="operadores-logicos.html">Operadores Lógicos</a>.</p>
+
+<hr>
+
+<h2>6. O operador nave espacial: <code>&lt;=&gt;</code> <span class="versao">C++20</span></h2>
+<p>O C++20 trouxe um sétimo operador de comparação, o <code>&lt;=&gt;</code>, apelidado de <strong>nave espacial</strong> (<em>spaceship</em>) pelo formato. Ele faz as três perguntas de uma vez: "menor, igual ou maior?". A resposta não é um <code>bool</code>, e sim um resultado que você compara com zero:</p>
+
+<pre class="file" data-file="nave.cpp">#include &lt;compare&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    int a = 3;
+    int b = 5;
+    auto resultado = a &lt;=&gt; b;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; (resultado &lt; 0) &lt;&lt; '\n';
+    std::cout &lt;&lt; (resultado == 0) &lt;&lt; '\n';
+    std::cout &lt;&lt; (resultado &gt; 0) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra nave.cpp -o nave
+$ ./nave
+true     « resultado &lt; 0: a é menor que b
+false    « resultado == 0 seria "iguais"
+false    « resultado &gt; 0 seria "a é maior"</pre>
+
+<p>O <code>auto</code> deixa o compilador escolher o tipo da variável (aula <a href="auto.html">auto</a>); aqui o tipo é <code>std::strong_ordering</code>, que vem de <code>&lt;compare&gt;</code>. Esse resultado não pode ir direto para o <code>cout</code> (o g++ dá um erro <code>no match for ‘operator&lt;&lt;’</code>); por isso o comparamos com 0. Com <code>-std=c++17</code>, o <code>&lt;=&gt;</code> nem existe, e o g++ se perde: <code>error: expected primary-expression before ‘&gt;’ token</code>.</p>
+
+<p>Para comparar dois números no dia a dia, os seis operadores tradicionais são mais claros. O <code>&lt;=&gt;</code> brilha quando você cria seus próprios tipos e quer que eles possam ser comparados: escrevendo só ele, o C++ gera os outros seis automaticamente. Isso aparece em <a href="sobrecarga-operadores.html">Sobrecarga de Operadores</a>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: no match for ‘operator&lt;’</code> num <code>cout</code></strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semparen.cpp -o semparen
+semparen.cpp: In function ‘int main()’:
+semparen.cpp:5:24: error: no match for ‘operator&lt;’ (operand types are ‘std::basic_ostream&lt;char&gt;::__ostream_type’ {aka ‘std::basic_ostream&lt;char&gt;’} and ‘int’)
+    5 |     std::cout &lt;&lt; idade &lt; 18 &lt;&lt; '\n';
+      |     ~~~~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~
+      |               |             |
+      |               |             int
+      |               std::basic_ostream&lt;char&gt;::__ostream_type {aka std::basic_ostream&lt;char&gt;}
+semparen.cpp:5:24: note: there are 22 candidates          « seguem mais 170 linhas de "candidatos"</pre>
+<p><strong>O que aconteceu:</strong> faltaram os parênteses em volta da comparação. O <code>&lt;&lt;</code> tem prioridade maior que o <code>&lt;</code>, então o C++ leu <code>(std::cout &lt;&lt; idade) &lt; (18 &lt;&lt; '\n')</code>: "o <code>cout</code> é menor que um número?". Os tracinhos embaixo do código mostram exatamente essa divisão: tudo à esquerda do <code>&lt;</code> é o <code>cout</code> (<code>std::basic_ostream</code>), tudo à direita é um <code>int</code>. A aula <a href="precedencia.html">Precedência</a> explica essa ordem.</p>
+<p><strong>Como resolver:</strong> <code>std::cout &lt;&lt; (idade &lt; 18) &lt;&lt; '\n';</code>. Toda comparação dentro de um <code>cout</code> vai entre parênteses.</p>
+</div>
+
+<div class="cenario">
+<strong><code>warning: comparison of integer expressions of different signedness</code></strong>
+<p><strong>O que aconteceu:</strong> você comparou um <code>int</code> com um <code>unsigned</code>. Se o <code>int</code> for negativo, a resposta sai errada.</p>
+<p><strong>Como resolver:</strong> use o mesmo tipo dos dois lados, ou <code>std::cmp_less</code> e companhia (C++20). Não ignore esse aviso.</p>
+</div>
+
+<div class="cenario">
+<strong><code>warning: comparisons like ‘X&lt;=Y&lt;=Z’ do not have their mathematical meaning</code></strong>
+<p><strong>O que aconteceu:</strong> você escreveu uma faixa como na matemática. O resultado é quase sempre <code>true</code>.</p>
+<p><strong>Como resolver:</strong> <code>0 &lt;= nota &amp;&amp; nota &lt;= 10</code> (aula <a href="operadores-logicos.html">Operadores Lógicos</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>Dois <code>double</code> "iguais" dão <code>false</code></strong>
+<p><strong>O que aconteceu:</strong> erros pequenos de arredondamento do <code>double</code> deixaram os valores diferentes na última casa.</p>
+<p><strong>Como resolver:</strong> <code>std::abs(a - b) &lt; tolerancia</code>, ou trabalhe com inteiros (centavos).</p>
+</div>
+
+<div class="cenario">
+<strong>A comparação mudou a variável</strong>
+<p><strong>O que aconteceu:</strong> você escreveu <code>=</code> no lugar de <code>==</code>. O g++ avisa com <code>suggest parentheses around assignment used as truth value</code>.</p>
+<p><strong>Como resolver:</strong> veja a seção <a href="operadores-atribuicao.html">= × ==</a> da aula de atribuição.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operador</th><th>Pergunta</th><th>Funciona com</th><th>Cuidado</th></tr>
+<tr><td><code>a == b</code></td><td>Iguais?</td><td>números, <code>char</code>, <code>bool</code>, <code>std::string</code></td><td>Não use com <code>double</code> (tolerância); com <code>char[]</code> compara endereços.</td></tr>
+<tr><td><code>a != b</code></td><td>Diferentes?</td><td>idem</td><td>idem</td></tr>
+<tr><td><code>a &lt; b</code>, <code>a &gt; b</code></td><td>Menor? Maior?</td><td>idem</td><td>Textos: ordem dos códigos (maiúsculas antes). <code>int</code> × <code>unsigned</code>: resultado errado com negativos.</td></tr>
+<tr><td><code>a &lt;= b</code>, <code>a &gt;= b</code></td><td>Menor ou igual? Maior ou igual?</td><td>idem</td><td>O <code>=</code> vem por último.</td></tr>
+<tr><td><code>a &lt;=&gt; b</code></td><td>Menor, igual ou maior?</td><td>C++20, <code>#include &lt;compare&gt;</code></td><td>Compare o resultado com 0.</td></tr>
+<tr><td><code>std::abs(a - b) &lt; tol</code></td><td><code>double</code> "iguais"?</td><td><code>#include &lt;cmath&gt;</code></td><td>Escolha a tolerância pelo problema.</td></tr>
+<tr><td><code>std::cmp_less(a, b)</code></td><td>Menor, sem a armadilha do sinal</td><td>C++20, <code>#include &lt;utility&gt;</code>, só inteiros</td><td></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Diferente</h3>
+<p>Complete para perguntar se <code>senha</code> é <strong>diferente</strong> de 1234:</p>
+<div class="ex-code">bool errada = senha <input data-answer="!=" aria-label="operador"> 1234;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Maior ou igual</h3>
+<p>Complete para perguntar se <code>nota</code> é maior <strong>ou igual</strong> a 6:</p>
+<div class="ex-code">bool aprovado = nota <input data-answer="&gt;=" aria-label="operador"> 6;</div>
+</div>
+
+<div class="exercise">
+<h3>3. Mostrar por extenso</h3>
+<p>Complete para o <code>cout</code> mostrar <code>true</code>/<code>false</code> em vez de <code>1</code>/<code>0</code>:</p>
+<div class="ex-code">std::cout &lt;&lt; <input data-answer="std::boolalpha;|std::boolalpha" aria-label="ajuste do cout"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Com <code>int x = -5;</code> e <code>unsigned int y = 3;</code>, o que <code>(x &lt; y)</code> responde?</p>
+<label><input type="radio" name="q4"> <code>true</code>, porque −5 é menor que 3</label>
+<label><input type="radio" name="q4"> <code>false</code>, porque o −5 vira um <code>unsigned</code> enorme</label>
+<label><input type="radio" name="q4"> Não compila</label>
+<label><input type="radio" name="q4"> Depende do computador</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Com <code>std::string</code>, qual destas comparações é <code>true</code>?</p>
+<label><input type="radio" name="q5"> <code>"ana" == "Ana"</code></label>
+<label><input type="radio" name="q5"> <code>"banana" &lt; "Banana"</code></label>
+<label><input type="radio" name="q5"> <code>"9" &lt; "10"</code></label>
+<label><input type="radio" name="q5"> <code>"Carla" &lt; "carla"</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Por que <code>0.1 + 0.2 == 0.3</code> é <code>false</code>?</p>
+<label><input type="radio" name="q6"> Porque o <code>double</code> guarda valores aproximados, e os erros pequenos não se cancelam</label>
+<label><input type="radio" name="q6"> Porque o <code>==</code> não funciona com <code>double</code></label>
+<label><input type="radio" name="q6"> Porque falta <code>std::boolalpha</code></label>
+<label><input type="radio" name="q6"> Porque a soma é feita com inteiros</label>
+</div>
+
+<h3>Missão final: o boletim</h3>
+
+<div class="trycpp" data-stdin="7.5" data-goal="out:Aprovado: true,out:Nota máxima: false,src:&gt;=,src:==">
+<p class="try-task"><strong>Missão:</strong> o programa lê uma nota (a entrada preparada é <code>7.5</code>). Troque cada <code>false</code> por uma comparação: "aprovado" é nota maior ou igual a 6; "nota máxima" é nota igual a 10. A saída deve ser:</p>
+<pre class="out">Aprovado: true
+Nota máxima: false</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 0;
+    std::cin &gt;&gt; nota;
+    bool aprovado = false;     // troque false pela comparação
+    bool maxima = false;       // troque false pela comparação
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "Aprovado: " &lt;&lt; aprovado &lt;&lt; '\n';
+    std::cout &lt;&lt; "Nota máxima: " &lt;&lt; maxima &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 0;
+    std::cin &gt;&gt; nota;
+    bool aprovado = nota &gt;= 6;
+    bool maxima = nota == 10;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "Aprovado: " &lt;&lt; aprovado &lt;&lt; '\n';
+    std::cout &lt;&lt; "Nota máxima: " &lt;&lt; maxima &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Os seis operadores: <code>==</code> (igual), <code>!=</code> (diferente), <code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code>. Todos respondem um <code>bool</code>.</li>
+  <li>O <code>cout</code> mostra <code>bool</code> como 1/0; com <code>std::boolalpha</code>, como <code>true</code>/<code>false</code>. Comparações dentro do <code>cout</code> vão entre parênteses.</li>
+  <li><code>double</code>: não use <code>==</code>; use <code>std::abs(a - b) &lt; tolerancia</code>.</li>
+  <li><code>std::string</code> compara o conteúdo, em ordem de código: maiúsculas antes de minúsculas, <code>"10" &lt; "9"</code>. Arrays de <code>char</code> comparam endereços: use <code>std::string</code>.</li>
+  <li><code>int</code> × <code>unsigned</code>: o negativo vira um número enorme e <code>-1 &lt; 1u</code> dá <code>false</code>. O <code>-Wsign-compare</code> (do <code>-Wall</code>) avisa. No C++20, <code>std::cmp_less</code>.</li>
+  <li><code>0 &lt;= x &lt;= 10</code> não funciona como na matemática; use <code>0 &lt;= x &amp;&amp; x &lt;= 10</code>.</li>
+  <li><code>&lt;=&gt;</code> (C++20) responde menor/igual/maior de uma vez; compare o resultado com 0.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
