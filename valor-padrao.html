@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Valores Padrão — parâmetros opcionais | Guia C++</title>
+<meta name="description" content="Parâmetros com valor padrão em C++ para quem nunca programou: como tornar um parâmetro opcional, por que os padrões só podem ficar no fim (erro real default argument missing), por que não dá para pular um argumento, e onde escrever o padrão quando há protótipo (erro real default argument given for parameter … after previous specification). Com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Valores Padrão</span></h1>
+
+<p class="intro">Na aula <a href="parametros.html">Parâmetros e Argumentos</a>, cada chamada tinha de mandar <strong>todos</strong> os argumentos, senão vinha o erro <code>too few arguments</code>. Mas muitas vezes um parâmetro quase sempre tem o mesmo valor: a quantidade quase sempre é 1, a linha do recibo quase sempre tem 20 tracinhos. Para esses casos, o C++ deixa você dar ao parâmetro um <strong>valor padrão</strong>: se a chamada mandar o argumento, ele é usado; se não mandar, entra o padrão. Nesta aula você vai criar parâmetros opcionais e conhecer as duas regras que o compilador cobra: padrões só no fim, e padrão escrito num lugar só.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como dar um valor padrão a um parâmetro: <code>void saudar(std::string nome = "cliente")</code>.</li>
+  <li>Como o C++ decide qual argumento vai para qual parâmetro quando alguns faltam.</li>
+  <li>Por que os parâmetros com padrão precisam ficar <strong>no fim</strong> (e o erro <code>default argument missing for parameter</code>).</li>
+  <li>Por que não dá para "pular" um argumento no meio, e a armadilha de <code>linha('=')</code>.</li>
+  <li>Onde escrever o padrão quando a função tem protótipo (e o erro <code>default argument given for parameter … [-fpermissive]</code> com a nota <code>previous specification</code>).</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com o comando padrão do guia, <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: o pedido "do jeito de sempre"</h2>
+<p>Na padaria, a Ana pede "um café". O atendente não pergunta o tamanho nem se é com açúcar: ele faz o café <strong>de sempre</strong>, o médio sem açúcar. Se um dia ela quiser diferente, diz: "um café grande". O que ela não disser fica no padrão.</p>
+
+<p>Um parâmetro com valor padrão funciona assim: a função já sabe o que usar quando a chamada não disser nada. Quem chama só precisa falar o que for <strong>diferente</strong> do de sempre.</p>
+
+<hr>
+
+<h2>1. Um parâmetro opcional</h2>
+
+<pre class="file" data-file="saudar.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void saudar(std::string nome = "cliente") {
+    std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "!\n";
+}
+
+int main() {
+    saudar("Ana");
+    saudar();
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>std::string nome</dt><dd>O parâmetro, como nas aulas anteriores.</dd>
+  <dt>= "cliente"</dt><dd>O <strong>valor padrão</strong> (em inglês, <em>default argument</em>, "argumento padrão"): o valor que <code>nome</code> recebe quando a chamada não mandar nenhum. Escreve-se com <code>=</code>, como ao criar uma variável.</dd>
+  <dt>saudar("Ana");</dt><dd>A chamada mandou o argumento: <code>nome</code> vale <code>"Ana"</code>. O padrão é ignorado.</dd>
+  <dt>saudar();</dt><dd>A chamada não mandou nada: <code>nome</code> vale o padrão, <code>"cliente"</code>. Sem o padrão, esta linha daria <code>too few arguments to function</code>.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra saudar.cpp -o saudar
+$ ./saudar
+Olá, Ana!
+Olá, cliente!</pre>
+
+<p>Por dentro, é como se o compilador reescrevesse a segunda chamada como <code>saudar("cliente")</code>. A função em si não sabe se o valor veio da chamada ou do padrão.</p>
+
+<hr>
+
+<h2>2. Vários parâmetros com padrão</h2>
+<p>A linha do recibo da aula <a href="funcoes.html">Funções</a> sempre tinha 20 tracinhos. A Ana quer poder mudar o tamanho e o símbolo de vez em quando, sem ter de dizer os dois toda vez:</p>
+
+<pre class="file" data-file="linha.cpp">#include &lt;iostream&gt;
+
+void linha(int tamanho = 20, char simbolo = '-') {
+    for (int i = 0; i &lt; tamanho; i++) {
+        std::cout &lt;&lt; simbolo;
+    }
+    std::cout &lt;&lt; "\n";
+}
+
+int main() {
+    linha();
+    linha(10);
+    linha(10, '=');
+    linha(5, '*');
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra linha.cpp -o linha
+$ ./linha
+--------------------
+----------
+==========
+*****</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Chamada</th><th><code>tamanho</code></th><th><code>simbolo</code></th><th>Por quê</th></tr>
+<tr><td><code>linha()</code></td><td>20 (padrão)</td><td><code>'-'</code> (padrão)</td><td>Nenhum argumento: os dois padrões.</td></tr>
+<tr><td><code>linha(10)</code></td><td>10</td><td><code>'-'</code> (padrão)</td><td>Um argumento: vai para o <strong>primeiro</strong> parâmetro.</td></tr>
+<tr><td><code>linha(10, '=')</code></td><td>10</td><td><code>'='</code></td><td>Os dois argumentos: nenhum padrão é usado.</td></tr>
+</table>
+</div>
+
+<p>A regra é a da aula de parâmetros: os argumentos vão para os parâmetros <strong>pela posição, da esquerda para a direita</strong>. Os padrões só preenchem o que sobrou <strong>no fim</strong>.</p>
+
+<p>Mais um exemplo, com três parâmetros e todas as combinações possíveis:</p>
+
+<pre class="file" data-file="todos.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void cartao(std::string nome = "cliente", std::string loja = "Lojinha da Ana", int desconto = 5) {
+    std::cout &lt;&lt; loja &lt;&lt; ": " &lt;&lt; nome &lt;&lt; " ganhou " &lt;&lt; desconto &lt;&lt; "% de desconto\n";
+}
+
+int main() {
+    cartao();
+    cartao("Bruno");
+    cartao("Carla", "Papelaria Central");
+    cartao("Davi", "Lojinha da Ana", 10);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra todos.cpp -o todos
+$ ./todos
+Lojinha da Ana: cliente ganhou 5% de desconto
+Lojinha da Ana: Bruno ganhou 5% de desconto
+Papelaria Central: Carla ganhou 5% de desconto
+Lojinha da Ana: Davi ganhou 10% de desconto</pre>
+
+<p>Repare na última chamada: para dar 10% ao Davi, a Ana teve de escrever também a loja, <code>"Lojinha da Ana"</code>, mesmo sendo o padrão. É a próxima regra.</p>
+
+<div class="trycpp" data-goal="compila,outre:(^|\n)-{20}\n-{5}\n\*{3}\n">
+<p class="try-task"><strong>Missão:</strong> o <code>main</code> chama <code>linha()</code>, <code>linha(5)</code> e <code>linha(3, '*')</code>, mas a função exige os dois argumentos e o programa não compila. Sem mexer no <code>main</code>, dê valores padrão aos parâmetros (20 tracinhos <code>'-'</code>) para a saída ser:</p>
+<pre class="out">--------------------
+-----
+***</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+void linha(int tamanho, char simbolo) {
+    for (int i = 0; i &lt; tamanho; i++) {
+        std::cout &lt;&lt; simbolo;
+    }
+    std::cout &lt;&lt; "\n";
+}
+
+int main() {
+    linha();
+    linha(5);
+    linha(3, '*');
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+void linha(int tamanho = 20, char simbolo = '-') {
+    for (int i = 0; i &lt; tamanho; i++) {
+        std::cout &lt;&lt; simbolo;
+    }
+    std::cout &lt;&lt; "\n";
+}
+
+int main() {
+    linha();
+    linha(5);
+    linha(3, '*');
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Não dá para pular um argumento</h2>
+<p>E se a Ana quiser o tamanho padrão, mas com <code>=</code>? Em algumas linguagens dá para dizer "pule o primeiro". Em C++, não. A primeira tentativa é deixar o lugar vazio:</p>
+
+<pre class="file" data-file="pular2.cpp">#include &lt;iostream&gt;
+
+void linha(int tamanho = 20, char simbolo = '-') {
+    for (int i = 0; i &lt; tamanho; i++) {
+        std::cout &lt;&lt; simbolo;
+    }
+    std::cout &lt;&lt; "\n";
+}
+
+int main() {
+    linha(, '=');
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra pular2.cpp -o pular2
+pular2.cpp: In function ‘int main()’:
+pular2.cpp:11:11: error: expected primary-expression before ‘,’ token
+   11 |     linha(, '=');
+      |           ^</pre>
+
+<p><em>Expected primary-expression before ‘,’ token</em> = "esperava uma expressão antes da vírgula": um argumento vazio não existe em C++.</p>
+
+<p>A segunda tentativa é pior, porque <strong>compila</strong>:</p>
+
+<pre class="file" data-file="pular.cpp">#include &lt;iostream&gt;
+
+void linha(int tamanho = 20, char simbolo = '-') {
+    for (int i = 0; i &lt; tamanho; i++) {
+        std::cout &lt;&lt; simbolo;
+    }
+    std::cout &lt;&lt; "\n";
+}
+
+int main() {
+    linha('=');
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra pular.cpp -o pular        « nenhum aviso
+$ ./pular
+-------------------------------------------------------------</pre>
+
+<p>Saíram 61 tracinhos! O argumento <code>'='</code> foi para o <strong>primeiro</strong> parâmetro, <code>tamanho</code>, que é <code>int</code>. Um <code>char</code> é um número por dentro (o código do <code>=</code> é 61, veja <a href="char.html">Caracteres</a>), e a <a href="parametros.html">conversão implícita</a> fez o resto. O <code>simbolo</code> ficou com o padrão <code>'-'</code>.</p>
+
+<p>A única forma é escrever também o primeiro: <code>linha(20, '=');</code>. Por isso, ao criar a função, <strong>ponha por último o parâmetro que menos muda</strong>: quem chama vai querer trocar os primeiros sem precisar repetir os outros.</p>
+
+<hr>
+
+<h2>4. Os padrões só podem ficar no fim</h2>
+<p>Como os argumentos são distribuídos da esquerda para a direita, um parâmetro com padrão <strong>não pode</strong> ter, depois dele, um parâmetro sem padrão. A Ana tentou deixar a quantidade opcional no meio:</p>
+
+<pre class="file" data-file="meio.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void item(std::string produto, int quantidade = 1, double preco) {
+    std::cout &lt;&lt; quantidade &lt;&lt; " x " &lt;&lt; produto
+              &lt;&lt; " = R$ " &lt;&lt; quantidade * preco &lt;&lt; "\n";
+}
+
+int main() {
+    item("caneta", 2.5);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra meio.cpp -o meio
+meio.cpp:4:59: error: default argument missing for parameter 3 of ‘void item(std::string, int, double)’
+    4 | void item(std::string produto, int quantidade = 1, double preco) {
+      |                                                    ~~~~~~~^~~~~
+meio.cpp:4:36: note: ...following parameter 2 which has a default argument
+    4 | void item(std::string produto, int quantidade = 1, double preco) {
+      |                                ~~~~^~~~~~~~~~~~~~</pre>
+
+<dl class="anatomy">
+  <dt>default argument missing for parameter 3</dt><dd>"Falta o argumento padrão do parâmetro 3" (o <code>preco</code>).</dd>
+  <dt>note: ...following parameter 2 which has a default argument</dt><dd>"…que vem depois do parâmetro 2, que tem argumento padrão". Como a <code>quantidade</code> tem padrão, todo parâmetro depois dela também precisaria ter.</dd>
+</dl>
+
+<p>Pense na chamada <code>item("caneta", 2.5)</code>: o <code>2.5</code> deveria ir para a quantidade ou para o preço? Pela posição, iria para a quantidade, e o preço ficaria sem nada. O compilador corta o problema pela raiz. A correção é <strong>mudar a ordem</strong>, deixando o opcional no fim:</p>
+
+<pre class="file" data-file="fim.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void item(std::string produto, double preco, int quantidade = 1) {
+    std::cout &lt;&lt; quantidade &lt;&lt; " x " &lt;&lt; produto
+              &lt;&lt; " = R$ " &lt;&lt; quantidade * preco &lt;&lt; "\n";
+}
+
+int main() {
+    item("caneta", 2.5);
+    item("caderno", 10.0, 3);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra fim.cpp -o fim
+$ ./fim
+1 x caneta = R$ 2.5
+3 x caderno = R$ 30</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Cabeçalho</th><th>Vale?</th></tr>
+<tr><td><code>void f(int a, int b = 2, int c = 3)</code></td><td>Sim: os padrões estão no fim.</td></tr>
+<tr><td><code>void f(int a = 1, int b = 2, int c = 3)</code></td><td>Sim: todos têm padrão; <code>f()</code> funciona.</td></tr>
+<tr><td><code>void f(int a = 1, int b, int c)</code></td><td>Não: <code>b</code> e <code>c</code> vêm depois de um padrão.</td></tr>
+<tr><td><code>void f(int a, int b = 2, int c)</code></td><td>Não: <code>c</code> vem depois de um padrão.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>5. Com protótipo: o padrão vai num lugar só</h2>
+<p>Quando a função tem declaração antecipada (o protótipo, da aula <a href="funcoes.html">Funções</a>), o padrão aparece duas vezes? Não. A Ana tentou escrever nos dois lugares:</p>
+
+<pre class="file" data-file="duas.cpp">#include &lt;iostream&gt;
+
+void linha(int tamanho = 20, char simbolo = '-');
+
+int main() {
+    linha();
+}
+
+void linha(int tamanho = 20, char simbolo = '-') {
+    for (int i = 0; i &lt; tamanho; i++) {
+        std::cout &lt;&lt; simbolo;
+    }
+    std::cout &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra duas.cpp -o duas
+duas.cpp:9:6: error: default argument given for parameter 1 of ‘void linha(int, char)’ [-fpermissive]
+    9 | void linha(int tamanho = 20, char simbolo = '-') {
+      |      ^~~~~
+duas.cpp:3:6: note: previous specification in ‘void linha(int, char)’ here
+    3 | void linha(int tamanho = 20, char simbolo = '-');
+      |      ^~~~~
+duas.cpp:9:6: error: default argument given for parameter 2 of ‘void linha(int, char)’ [-fpermissive]
+    9 | void linha(int tamanho = 20, char simbolo = '-') {
+      |      ^~~~~
+duas.cpp:3:6: note: previous specification in ‘void linha(int, char)’ here
+    3 | void linha(int tamanho = 20, char simbolo = '-');
+      |      ^~~~~</pre>
+
+<dl class="anatomy">
+  <dt>default argument given for parameter 1</dt><dd>"Argumento padrão dado para o parâmetro 1" na linha 9, a definição. Um erro para cada parâmetro repetido (1 e 2).</dd>
+  <dt>note: previous specification … here</dt><dd>"Especificação anterior aqui": o padrão já tinha sido dado na linha 3, o protótipo. Mesmo sendo o <strong>mesmo</strong> valor, repetir é proibido.</dd>
+  <dt>[-fpermissive]</dt><dd>Ignore: é uma opção antiga que relaxaria a regra. Não use.</dd>
+</dl>
+
+<p>Então, deixar o padrão só na definição? Também não funciona, porque o <code>main</code> vem antes dela:</p>
+
+<pre class="file" data-file="sodef.cpp">#include &lt;iostream&gt;
+
+void linha(int tamanho, char simbolo);
+
+int main() {
+    linha();
+}
+
+void linha(int tamanho = 20, char simbolo = '-') {
+    for (int i = 0; i &lt; tamanho; i++) {
+        std::cout &lt;&lt; simbolo;
+    }
+    std::cout &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sodef.cpp -o sodef
+sodef.cpp: In function ‘int main()’:
+sodef.cpp:6:10: error: too few arguments to function ‘void linha(int, char)’
+    6 |     linha();
+      |     ~~~~~^~
+sodef.cpp:3:6: note: declared here
+    3 | void linha(int tamanho, char simbolo);
+      |      ^~~~~</pre>
+
+<p>Lembre: o compilador lê de cima para baixo. Na linha 6, ele só conhece o protótipo da linha 3, que não tem padrão nenhum; o padrão da linha 9 ainda não foi lido. O certo é <strong>o padrão no protótipo</strong>, que é o que quem chama enxerga, e a definição sem ele:</p>
+
+<pre class="file" data-file="certo.cpp">#include &lt;iostream&gt;
+
+void linha(int tamanho = 20, char simbolo = '-');
+
+int main() {
+    linha();
+    linha(8, '~');
+}
+
+void linha(int tamanho, char simbolo) {
+    for (int i = 0; i &lt; tamanho; i++) {
+        std::cout &lt;&lt; simbolo;
+    }
+    std::cout &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra certo.cpp -o certo
+$ ./certo
+--------------------
+~~~~~~~~</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Onde escrever o padrão</th></tr>
+<tr><td>Só a definição, acima do <code>main</code> (sem protótipo)</td><td>Na definição.</td></tr>
+<tr><td>Protótipo no topo e definição embaixo</td><td><strong>No protótipo</strong>. A definição fica sem.</td></tr>
+<tr><td>Protótipo num <code>.h</code> e definição num <code>.cpp</code></td><td><strong>No <code>.h</code></strong>, que é o que os outros arquivos incluem (<a href="headers.html">Arquivos .h e .cpp</a>).</td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>Um lembrete na definição</strong>
+<p>Muitos programadores deixam o padrão como comentário na definição, só para quem lê: <code>void linha(int tamanho /* = 20 */, char simbolo /* = '-' */) { … }</code>. Para o compilador, comentário não conta (aula <a href="comentarios.html">Comentários</a>).</p>
+</div>
+
+<hr>
+
+<h2>6. O que pode ser um valor padrão</h2>
+<p>Qualquer valor do tipo do parâmetro: um número, um texto, uma constante com nome. Uma constante deixa claro de onde veio o número e permite mudá-lo num lugar só (aula <a href="constantes.html">Constantes</a>):</p>
+
+<pre class="file" data-file="constante.cpp">#include &lt;iostream&gt;
+
+const double TAXA_PADRAO = 0.05;
+
+double comTaxa(double valor, double taxa = TAXA_PADRAO) {
+    return valor + valor * taxa;
+}
+
+int main() {
+    std::cout &lt;&lt; comTaxa(100) &lt;&lt; "\n";
+    std::cout &lt;&lt; comTaxa(100, 0.10) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra constante.cpp -o constante
+$ ./constante
+105                      « taxa padrão de 5%
+110                      « taxa de 10%, mandada na chamada</pre>
+
+<p>Repare que os valores padrão funcionam igual em funções que <a href="retorno.html">devolvem</a> um resultado, como esta.</p>
+
+<hr>
+
+<h2>Valor padrão ou outra forma?</h2>
+<p>Existe outro jeito de deixar uma função ser chamada com números diferentes de argumentos: escrever <strong>duas funções com o mesmo nome</strong>, a <a href="sobrecarga.html">sobrecarga</a>. Quando usar cada uma:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Use…</th><th>Quando</th><th>Exemplo</th></tr>
+<tr><td>Valor padrão</td><td>O comportamento é o mesmo; só um valor costuma se repetir.</td><td><code>linha(int tamanho = 20)</code></td></tr>
+<tr><td>Sobrecarga</td><td>O trabalho é diferente conforme o que chega (outro tipo, outro cálculo).</td><td><code>mostrar(int)</code> e <code>mostrar(std::string)</code></td></tr>
+<tr><td>Nenhum dos dois</td><td>O argumento é importante e quem chama sempre deve pensar nele.</td><td>O preço de um item: sem padrão.</td></tr>
+</table>
+</div>
+
+<p>Cuidado para não exagerar: uma função com cinco parâmetros opcionais fica difícil de chamar (lembre do Davi, que teve de repetir a loja). Se isso acontecer, talvez seja hora de agrupar as opções numa <a href="structs.html">struct</a>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: default argument missing for parameter 3 of …</code></strong>
+<p><strong>O que significa:</strong> um parâmetro sem padrão aparece <strong>depois</strong> de um parâmetro com padrão. A nota <code>...following parameter 2 which has a default argument</code> mostra qual tem o padrão.</p>
+<p><strong>Como consertar:</strong> mude a ordem, deixando os opcionais no fim (e ajuste as chamadas), ou dê padrão também aos que vêm depois.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: default argument given for parameter 1 of … [-fpermissive]</code> e <code>note: previous specification … here</code></strong>
+<p><strong>O que significa:</strong> o padrão foi escrito duas vezes: no protótipo e na definição.</p>
+<p><strong>Como consertar:</strong> deixe o padrão só no protótipo (no <code>.h</code>, se houver) e apague-o da definição. No editor do guia, o Clang diz <code>redefinition of default argument</code> ("redefinição do argumento padrão").</p>
+</div>
+
+<div class="cenario">
+<strong><code>too few arguments to function</code>, mas a função tem padrão</strong>
+<p><strong>O que significa:</strong> o padrão está só na definição, que fica <strong>depois</strong> da chamada; o compilador, na linha da chamada, só conhece o protótipo sem padrão.</p>
+<p><strong>Como consertar:</strong> mova o padrão para o protótipo.</p>
+</div>
+
+<div class="cenario">
+<strong>Chamei <code>linha('=')</code> e saiu uma linha enorme de tracinhos</strong>
+<p><strong>O que significa:</strong> o argumento foi para o <strong>primeiro</strong> parâmetro (o tamanho), não para o símbolo. Um <code>char</code> virou o número 61. Não houve erro nem aviso.</p>
+<p><strong>Como consertar:</strong> mande também os argumentos anteriores: <code>linha(20, '=')</code>. Se isso for comum, repense a ordem dos parâmetros.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>void f(int x = 5)</code></td><td><code>f()</code> usa 5; <code>f(9)</code> usa 9</td></tr>
+<tr><td><code>void f(int a, int b = 2, int c = 3)</code></td><td><code>f(1)</code>, <code>f(1, 7)</code> e <code>f(1, 7, 8)</code> valem</td></tr>
+<tr><td><code>f(1, , 8)</code></td><td>Não existe: não dá para pular um argumento</td></tr>
+<tr><td><code>void f(int x = 5);</code> + <code>void f(int x) { … }</code></td><td>Com protótipo: padrão só no protótipo</td></tr>
+<tr><td><code>void f(int x /* = 5 */) { … }</code></td><td>Lembrete opcional na definição, como comentário</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Tornar opcional</h3>
+<p>Complete para que <code>repetir()</code> sem argumento repita 3 vezes:</p>
+<div class="ex-code">void repetir(int vezes <input data-answer="= 3|=3" aria-label="padrão">) { … }</div>
+</div>
+
+<div class="exercise">
+<h3>2. Quanto vale?</h3>
+<p>Com <code>void linha(int tamanho = 20, char simbolo = '-')</code>, quantos caracteres a chamada <code>linha(7)</code> mostra (sem contar a quebra de linha)?</p>
+<div class="ex-code"><input data-answer="7" aria-label="quantidade"></div>
+</div>
+
+<div class="exercise">
+<h3>3. O protótipo</h3>
+<p>A definição é <code>void avisar(std::string msg, int vezes) { … }</code>, abaixo do <code>main</code>. Complete o protótipo para que <code>vezes</code> seja 1 por padrão:</p>
+<div class="ex-code">void avisar(std::string msg, int vezes <input data-answer="= 1);|=1);" aria-label="resto do protótipo"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Qual destes cabeçalhos é válido?</p>
+<label><input type="radio" name="q4"> <code>void f(int a = 1, int b)</code></label>
+<label><input type="radio" name="q4"> <code>void f(int a = 1, int b, int c = 3)</code></label>
+<label><input type="radio" name="q4"> <code>void f(int a, int b = 2, int c = 3)</code></label>
+<label><input type="radio" name="q4"> <code>void f(int a, int b = 2, int c)</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Com <code>void cartao(std::string nome = "cliente", int desconto = 5)</code>, o que acontece em <code>cartao(10)</code>?</p>
+<label><input type="radio" name="q5"> O 10 vai para <code>desconto</code>, porque é um número</label>
+<label><input type="radio" name="q5"> O 10 vai para <code>nome</code>, o primeiro parâmetro, e o compilador reclama (um <code>int</code> não vira <code>std::string</code>)</label>
+<label><input type="radio" name="q5"> Os dois padrões são usados e o 10 é ignorado</label>
+<label><input type="radio" name="q5"> Erro: <code>too many arguments</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. A função tem protótipo no topo e definição embaixo. Onde vai o valor padrão?</p>
+<label><input type="radio" name="q6"> Só no protótipo</label>
+<label><input type="radio" name="q6"> Só na definição</label>
+<label><input type="radio" name="q6"> Nos dois, com o mesmo valor</label>
+<label><input type="radio" name="q6"> Na chamada</label>
+</div>
+
+<h3>Missão final: etiquetas de preço</h3>
+
+<div class="trycpp" data-goal="out:caderno: R$ 30 à vista,out:mochila: 3x de R$ 30,out:estojo: R$ 12.5 à vista,src:void\s+etiqueta\s*\([^)]*=\s*1\s*\)\s*;,semaviso">
+<p class="try-task"><strong>Missão:</strong> a Ana quer o <code>main</code> no topo do arquivo. Escreva o <strong>protótipo</strong> de <code>etiqueta</code> acima do <code>main</code>, com <code>parcelas</code> valendo <code>1</code> por padrão, e a <strong>definição</strong> embaixo, sem repetir o padrão. A função mostra <code>produto: R$ preco à vista</code> se <code>parcelas</code> for 1, e <code>produto: Nx de R$ valor</code> se for mais (o valor de cada parcela é <code>preco / parcelas</code>). Saída esperada:</p>
+<pre class="out">caderno: R$ 30 à vista
+mochila: 3x de R$ 30
+estojo: R$ 12.5 à vista</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+// protótipo aqui
+
+int main() {
+    etiqueta("caderno", 30);
+    etiqueta("mochila", 90, 3);
+    etiqueta("estojo", 12.5);
+}
+
+// definição aqui
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+void etiqueta(std::string produto, double preco, int parcelas = 1);
+
+int main() {
+    etiqueta("caderno", 30);
+    etiqueta("mochila", 90, 3);
+    etiqueta("estojo", 12.5);
+}
+
+void etiqueta(std::string produto, double preco, int parcelas) {
+    if (parcelas == 1) {
+        std::cout &lt;&lt; produto &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; " à vista\n";
+    } else {
+        std::cout &lt;&lt; produto &lt;&lt; ": " &lt;&lt; parcelas &lt;&lt; "x de R$ " &lt;&lt; preco / parcelas &lt;&lt; "\n";
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>tipo nome = valor</code> na lista de parâmetros dá um <strong>valor padrão</strong>: se a chamada não mandar o argumento, ele é usado.</li>
+  <li>Os argumentos vão para os parâmetros da esquerda para a direita; os padrões preenchem o que faltou <strong>no fim</strong>.</li>
+  <li>Parâmetros com padrão ficam <strong>no fim</strong> da lista. Senão: <code>default argument missing for parameter N</code>.</li>
+  <li>Não dá para pular um argumento do meio. E cuidado: <code>linha('=')</code> manda o <code>'='</code> (61) para o primeiro parâmetro.</li>
+  <li>Com protótipo, o padrão vai <strong>só no protótipo</strong>. Nos dois lugares: <code>default argument given for parameter … previous specification</code>. Só na definição: <code>too few arguments</code> na chamada.</li>
+  <li>Próxima aula: <a href="passagem-referencia.html">Por Valor × Por Referência</a>, para a função poder mudar a variável de quem chama.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
