@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Ponteiros Inteligentes — unique_ptr, shared_ptr e weak_ptr | Guia C++</title>
+<meta name="description" content="Ponteiros inteligentes em C++ para quem nunca programou: std::unique_ptr com std::make_unique (dono único, não copia, std::move), std::shared_ptr com std::make_shared e use_count, a ideia do std::weak_ptr, e a prova com destrutores de que a memória é liberada sozinha, com saídas e erros reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Ponteiros Inteligentes</span></h1>
+
+<p class="intro">Na aula <a href="new-delete.html">new e delete</a>, você viu os três erros clássicos de quem cuida do heap à mão: esquecer de devolver, usar depois de devolver e devolver duas vezes. Os <strong>ponteiros inteligentes</strong> <span class="versao">C++11</span> acabam com os três. São objetos que guardam um ponteiro e fazem o <code>delete</code> <strong>sozinhos</strong>, na hora certa. Esta é a última aula do grupo Memória e a mais importante para o dia a dia: a regra do C++ moderno é <strong>usar ponteiros inteligentes em vez de <code>new</code> e <code>delete</code></strong>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li><code>std::unique_ptr</code> e <code>std::make_unique</code>: um único dono.</li>
+  <li>A prova, com um destrutor que imprime, de que a memória é liberada sozinha.</li>
+  <li>Por que um <code>unique_ptr</code> não pode ser copiado (o erro real) e como passar a posse com <code>std::move</code>.</li>
+  <li><code>std::shared_ptr</code> e <code>std::make_shared</code>: vários donos, contados por <code>use_count</code>.</li>
+  <li>A ideia do <code>std::weak_ptr</code>: olhar sem ser dono.</li>
+  <li>Qual usar em cada situação.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Tudo desta aula está no cabeçalho <code>&lt;memory&gt;</code>.</p>
+
+<hr>
+
+<h2>A ideia: a chave com dono</h2>
+<p>Volte ao depósito de boxes da aula anterior. O problema era que a chave (o ponteiro) passava de mão em mão e ninguém sabia quem tinha de devolvê-la. Os ponteiros inteligentes resolvem isso com uma regra de <strong>posse</strong>:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Ponteiro inteligente</th><th>Quando o box é devolvido</th></tr>
+<tr><td>A chave tem <strong>um único dono</strong>. Ele pode entregá-la a outra pessoa, mas não pode tirar cópia.</td><td><code>std::unique_ptr</code></td><td>Quando o dono deixa de existir.</td></tr>
+<tr><td>A chave tem <strong>várias cópias</strong>, e o balcão anota quantas existem.</td><td><code>std::shared_ptr</code></td><td>Quando a última cópia deixa de existir.</td></tr>
+<tr><td>Alguém só tem o <strong>número do box</strong> anotado, sem chave.</td><td><code>std::weak_ptr</code></td><td>Não decide nada: só pode perguntar se o box ainda está alugado.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. <code>std::unique_ptr</code>: um dono só</h2>
+
+<pre class="file" data-file="unique.cpp">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+
+int main() {
+    std::unique_ptr&lt;int&gt; p = std::make_unique&lt;int&gt;(42);
+
+    std::cout &lt;&lt; "*p = " &lt;&lt; *p &lt;&lt; "\n";
+    *p = *p + 1;
+    std::cout &lt;&lt; "*p = " &lt;&lt; *p &lt;&lt; "\n";
+}   // sem delete: o unique_ptr devolve a memória aqui
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;memory&gt;</dt><dd>O cabeçalho dos ponteiros inteligentes.</dd>
+  <dt>std::unique_ptr&lt;int&gt;</dt><dd>"Ponteiro <strong>único</strong> para <code>int</code>". Entre <code>&lt; &gt;</code> vai o tipo do que ele aponta, como em <code>std::vector&lt;int&gt;</code>.</dd>
+  <dt>std::make_unique&lt;int&gt;(42)</dt><dd>Faz o <code>new int(42)</code> por você e já entrega o resultado dentro de um <code>unique_ptr</code>. Os parênteses levam o valor inicial. <span class="versao">C++14</span></dd>
+  <dt>*p</dt><dd>Usa-se como um ponteiro comum: <code>*p</code> para o valor e <code>p-&gt;campo</code> para structs.</dd>
+  <dt>}</dt><dd>Quando o <code>p</code> morre, ele faz o <code>delete</code> sozinho. Não existe <code>delete</code> no código, então não existe como esquecer nem como repetir.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra unique.cpp -o unique
+$ ./unique
+*p = 42
+*p = 43</pre>
+
+<p>Na prática, quase sempre se escreve <code>auto p = std::make_unique&lt;int&gt;(42);</code>. O tipo já aparece no lado direito, então o <a href="auto.html"><code>auto</code></a> evita repetir.</p>
+
+<h3>A prova: um destrutor que imprime</h3>
+<p>Como saber que a memória foi mesmo devolvida? Uma struct pode ter um <strong>destrutor</strong>: uma função especial, escrita <code>~Nome()</code>, que roda sozinha no instante em que o objeto é destruído. Aqui ela só imprime uma mensagem. (Destrutores têm aula própria, <a href="destrutores-raii.html">Destrutores e RAII</a>; o mesmo vale para o construtor <code>Produto(std::string n)</code>, que roda quando o objeto nasce. Por enquanto, basta saber que as duas mensagens marcam o nascimento e a morte do objeto.)</p>
+
+<pre class="file" data-file="destrutor.cpp">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+
+    Produto(std::string n) : nome(n) {
+        std::cout &lt;&lt; "  [" &lt;&lt; nome &lt;&lt; " criado]\n";
+    }
+    ~Produto() {
+        std::cout &lt;&lt; "  [" &lt;&lt; nome &lt;&lt; " destruído]\n";
+    }
+};
+
+int main() {
+    std::cout &lt;&lt; "Início do main\n";
+    {
+        auto caneta = std::make_unique&lt;Produto&gt;("caneta");
+        std::cout &lt;&lt; "Usando: " &lt;&lt; caneta-&gt;nome &lt;&lt; "\n";
+        std::cout &lt;&lt; "Fim do bloco\n";
+    }
+    std::cout &lt;&lt; "Depois do bloco\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra destrutor.cpp -o destrutor
+$ ./destrutor
+Início do main
+  [caneta criado]               « o make_unique criou o Produto no heap
+Usando: caneta
+Fim do bloco
+  [caneta destruído]            « no }, o unique_ptr fez o delete sozinho
+Depois do bloco</pre>
+
+<p>Agora o mesmo programa com um ponteiro comum e <code>new</code>, esquecendo o <code>delete</code>:</p>
+
+<pre class="file" data-file="cru.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+
+    Produto(std::string n) : nome(n) {
+        std::cout &lt;&lt; "  [" &lt;&lt; nome &lt;&lt; " criado]\n";
+    }
+    ~Produto() {
+        std::cout &lt;&lt; "  [" &lt;&lt; nome &lt;&lt; " destruído]\n";
+    }
+};
+
+int main() {
+    std::cout &lt;&lt; "Início do main\n";
+    {
+        Produto* caneta = new Produto("caneta");
+        std::cout &lt;&lt; "Usando: " &lt;&lt; caneta-&gt;nome &lt;&lt; "\n";
+        std::cout &lt;&lt; "Fim do bloco\n";
+    }   // esqueceu o delete caneta;
+    std::cout &lt;&lt; "Depois do bloco\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra cru.cpp -o cru
+$ ./cru
+Início do main
+  [caneta criado]
+Usando: caneta
+Fim do bloco
+Depois do bloco                 « o "[caneta destruído]" nunca apareceu: vazou</pre>
+
+<p>O ponteiro cru morreu no <code>}</code>, mas o <code>Produto</code> do heap ficou lá, sem dono, até o fim do programa. Com o <code>unique_ptr</code>, a morte do ponteiro <strong>leva junto</strong> o objeto. É essa a "inteligência".</p>
+
+<div class="trycpp" data-goal="out:Pontos: 150,src:make_unique">
+<p class="try-task"><strong>Missão:</strong> reescreva o programa sem <code>new</code> e sem <code>delete</code>: troque o ponteiro cru por <code>auto pontos = std::make_unique&lt;int&gt;(100);</code> (não esqueça o <code>#include &lt;memory&gt;</code>) e apague a linha do <code>delete</code>. A saída continua <code>Pontos: 150</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int* pontos = new int(100);
+    *pontos = *pontos + 50;
+    std::cout &lt;&lt; "Pontos: " &lt;&lt; *pontos &lt;&lt; "\n";
+    delete pontos;
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+
+int main() {
+    auto pontos = std::make_unique&lt;int&gt;(100);
+    *pontos = *pontos + 50;
+    std::cout &lt;&lt; "Pontos: " &lt;&lt; *pontos &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. O <code>unique_ptr</code> não copia</h2>
+<p>Se fosse possível copiar um <code>unique_ptr</code>, haveria dois donos, e os dois fariam <code>delete</code> no fim: o "devolver duas vezes" da aula anterior. Por isso a cópia é <strong>proibida</strong>, e o compilador barra:</p>
+
+<pre class="file" data-file="copia.cpp">#include &lt;memory&gt;
+
+int main() {
+    auto a = std::make_unique&lt;int&gt;(10);
+    auto b = a;      // tentar copiar
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra copia.cpp -o copia
+copia.cpp: In function ‘int main()’:
+copia.cpp:5:14: error: use of deleted function ‘std::unique_ptr&lt;_Tp, _Dp&gt;::unique_ptr(const std::unique_ptr&lt;_Tp, _Dp&gt;&amp;) [with _Tp = int; _Dp = std::default_delete&lt;int&gt;]’
+    5 |     auto b = a;      // tentar copiar
+      |              ^
+In file included from /usr/include/c++/15/memory:80,
+                 from copia.cpp:1:
+/usr/include/c++/15/bits/unique_ptr.h:524:7: note: declared here
+  524 |       unique_ptr(const unique_ptr&amp;) = delete;
+      |       ^~~~~~~~~~
+copia.cpp:5:14: note: use ‘-fdiagnostics-all-candidates’ to display considered candidates
+    5 |     auto b = a;      // tentar copiar
+      |              ^</pre>
+
+<p>A mensagem é comprida, mas tem só uma ideia. Leia por partes:</p>
+<ul>
+  <li><strong>use of deleted function</strong> = "uso de uma função <strong>apagada</strong>". Em C++, uma classe pode marcar uma operação como proibida com <code>= delete</code>.</li>
+  <li><strong>‘std::unique_ptr&lt;…&gt;::unique_ptr(const std::unique_ptr&lt;…&gt;&amp;)’</strong> = o <strong>construtor de cópia</strong>: a função que criaria <code>b</code> como cópia de <code>a</code>. Os <code>_Tp</code> e <code>_Dp</code> são nomes internos; o <code>[with _Tp = int …]</code> diz que aqui eles valem <code>int</code>.</li>
+  <li><strong>note: declared here … unique_ptr(const unique_ptr&amp;) = delete;</strong> = a linha da biblioteca padrão onde a cópia foi proibida de propósito.</li>
+  <li>A última nota só sugere uma opção para ver mais detalhes; pode ignorar.</li>
+</ul>
+<p>No editor do guia (Clang), a mensagem começa com <code>call to deleted constructor</code> ou <code>call to implicitly-deleted copy constructor</code>: a mesma ideia.</p>
+
+<h3>Passar a posse: <code>std::move</code></h3>
+<p>Copiar não pode, mas <strong>entregar</strong> pode. O <code>std::move</code> (do cabeçalho <code>&lt;utility&gt;</code>) diz: "pode levar, eu não preciso mais". A chave muda de mão, e quem entregou fica de mãos vazias (<code>nullptr</code>):</p>
+
+<pre class="file" data-file="mover.cpp">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;utility&gt;
+
+int main() {
+    auto a = std::make_unique&lt;int&gt;(10);
+    std::cout &lt;&lt; "a aponta para " &lt;&lt; *a &lt;&lt; "\n";
+
+    auto b = std::move(a);       // passa a posse de a para b
+
+    if (a == nullptr) {
+        std::cout &lt;&lt; "a agora está vazio\n";
+    }
+    std::cout &lt;&lt; "b aponta para " &lt;&lt; *b &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra mover.cpp -o mover
+$ ./mover
+a aponta para 10
+a agora está vazio
+b aponta para 10</pre>
+
+<figure>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Momento</th><th><code>a</code></th><th><code>b</code></th><th>O <code>int</code> 10 no heap</th></tr>
+<tr><td>Depois do <code>make_unique</code></td><td>dono</td><td>(não existe)</td><td>1 dono: <code>a</code></td></tr>
+<tr><td>Depois do <code>std::move(a)</code></td><td><code>nullptr</code></td><td>dono</td><td>1 dono: <code>b</code></td></tr>
+<tr><td>No <code>}</code> do <code>main</code></td><td colspan="2">os dois morrem; só o <code>b</code> tinha algo a devolver</td><td>devolvido uma única vez</td></tr>
+</table>
+</div>
+<figcaption>O objeto no heap nunca muda de lugar e nunca é copiado: só a posse passa de <code>a</code> para <code>b</code>.</figcaption>
+</figure>
+
+<p>O <code>std::move</code> em si não move nada; ele só dá <strong>permissão</strong> para mover. O mecanismo completo é a <a href="move.html">Semântica de Movimento</a>, no Nível 3.</p>
+
+<h3><code>unique_ptr</code> e funções</h3>
+<p>Uma regra prática para funções:</p>
+
+<pre class="file" data-file="dono-funcao.cpp">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;string&gt;
+
+struct Produto {
+    std::string nome;
+    double preco;
+};
+
+void mostrar(const Produto&amp; p) {              // só usa: recebe referência
+    std::cout &lt;&lt; p.nome &lt;&lt; ": R$ " &lt;&lt; p.preco &lt;&lt; "\n";
+}
+
+void guardar(std::unique_ptr&lt;Produto&gt; p) {     // fica com a posse
+    std::cout &lt;&lt; "Guardei " &lt;&lt; p-&gt;nome &lt;&lt; "\n";
+}   // p morre aqui e o Produto é destruído
+
+int main() {
+    auto caderno = std::make_unique&lt;Produto&gt;(Produto{"caderno", 15.90});
+    mostrar(*caderno);
+    guardar(std::move(caderno));
+    std::cout &lt;&lt; "caderno está vazio? " &lt;&lt; (caderno == nullptr ? "sim" : "não") &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra dono-funcao.cpp -o dono-funcao
+$ ./dono-funcao
+caderno: R$ 15.9
+Guardei caderno
+caderno está vazio? sim</pre>
+
+<ul>
+  <li>A função só <strong>usa</strong> o objeto? Receba <code>const Produto&amp;</code> (ou <code>Produto&amp;</code> para mudar) e chame com <code>*caderno</code>. Ela nem fica sabendo que existe um ponteiro inteligente.</li>
+  <li>A função vai <strong>ficar com</strong> o objeto (guardar numa lista, por exemplo)? Receba <code>std::unique_ptr&lt;Produto&gt;</code> por valor e chame com <code>std::move</code>. Quem chama vê, no próprio código, que entregou a posse.</li>
+</ul>
+
+<hr>
+
+<h2>3. <code>std::shared_ptr</code>: vários donos</h2>
+<p>Às vezes um objeto precisa mesmo de vários donos, e não dá para saber qual deles vai terminar por último. Pense numa playlist compartilhada: a Ana criou, o Bruno e a Carla também seguem. A playlist só deve ser apagada quando <strong>ninguém</strong> mais a seguir. O <code>std::shared_ptr</code> faz isso <strong>contando os donos</strong>: cada cópia soma 1, cada cópia que morre subtrai 1, e quando a conta chega a zero, ele faz o <code>delete</code>.</p>
+
+<pre class="file" data-file="shared.cpp">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;string&gt;
+
+struct Playlist {
+    std::string nome;
+    Playlist(std::string n) : nome(n) { std::cout &lt;&lt; "  [playlist " &lt;&lt; nome &lt;&lt; " criada]\n"; }
+    ~Playlist() { std::cout &lt;&lt; "  [playlist " &lt;&lt; nome &lt;&lt; " destruída]\n"; }
+};
+
+int main() {
+    auto da_ana = std::make_shared&lt;Playlist&gt;("Viagem");
+    std::cout &lt;&lt; "donos: " &lt;&lt; da_ana.use_count() &lt;&lt; "\n";
+
+    auto do_bruno = da_ana;                 // copiar PODE: mais um dono
+    std::cout &lt;&lt; "donos: " &lt;&lt; da_ana.use_count() &lt;&lt; "\n";
+
+    {
+        auto da_carla = da_ana;             // mais um, só dentro do bloco
+        std::cout &lt;&lt; "donos: " &lt;&lt; da_ana.use_count() &lt;&lt; "\n";
+    }
+    std::cout &lt;&lt; "donos depois do bloco: " &lt;&lt; da_ana.use_count() &lt;&lt; "\n";
+
+    da_ana.reset();                         // a Ana larga a playlist
+    std::cout &lt;&lt; "donos: " &lt;&lt; do_bruno.use_count() &lt;&lt; " (só o Bruno)\n";
+
+    std::cout &lt;&lt; "Fim do main\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra shared.cpp -o shared
+$ ./shared
+  [playlist Viagem criada]
+donos: 1
+donos: 2                        « do_bruno é uma cópia: mais um dono
+donos: 3                        « da_carla, dentro do bloco
+donos depois do bloco: 2        « a da_carla morreu no }
+donos: 1 (só o Bruno)           « reset(): a Ana largou
+Fim do main
+  [playlist Viagem destruída]   « o último dono (do_bruno) morreu: delete</pre>
+
+<dl class="anatomy">
+  <dt>std::make_shared&lt;Playlist&gt;("Viagem")</dt><dd>Cria a <code>Playlist</code> no heap, junto com o "caderninho" onde a contagem fica anotada, e devolve um <code>std::shared_ptr&lt;Playlist&gt;</code>.</dd>
+  <dt>auto do_bruno = da_ana;</dt><dd>Copiar um <code>shared_ptr</code> é permitido: a cópia aponta para o <strong>mesmo</strong> objeto e soma 1 na contagem. A playlist não é copiada.</dd>
+  <dt>.use_count()</dt><dd>"Contagem de uso": quantos <code>shared_ptr</code> apontam para o objeto agora. Serve para estudar e depurar; programas raramente precisam dele.</dd>
+  <dt>.reset()</dt><dd>Este <code>shared_ptr</code> larga o objeto (fica vazio) e a contagem cai 1.</dd>
+</dl>
+
+<p>Repare que a playlist foi destruída <strong>depois</strong> do "Fim do main", quando o último dono, <code>do_bruno</code>, morreu no <code>}</code> final. Ninguém escreveu <code>delete</code>, e ela foi destruída exatamente uma vez.</p>
+
+<div class="tip">
+<strong>Prefira <code>unique_ptr</code></strong>
+<p>O <code>shared_ptr</code> é mais pesado: precisa manter a contagem (e de um jeito seguro para <a href="threads.html">threads</a>) e torna mais difícil saber quando o objeto morre. Comece sempre com <code>unique_ptr</code>; só troque por <code>shared_ptr</code> quando houver de verdade vários donos sem uma ordem clara. Um <code>unique_ptr</code> pode virar <code>shared_ptr</code> depois (<code>std::shared_ptr&lt;T&gt; s = std::move(u);</code>), o contrário não.</p>
+</div>
+
+<hr>
+
+<h2>4. <code>std::weak_ptr</code>: olhar sem ser dono (só a ideia)</h2>
+<p>O <code>std::weak_ptr</code> ("ponteiro fraco") aponta para um objeto de um <code>shared_ptr</code> <strong>sem entrar na contagem</strong>. Ele não mantém o objeto vivo; só pode perguntar "ainda existe?" e, se existir, pegar emprestado por um instante:</p>
+
+<pre class="file" data-file="weak.cpp">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+
+int main() {
+    auto dono = std::make_shared&lt;int&gt;(7);
+    std::weak_ptr&lt;int&gt; observador = dono;     // olha, mas não é dono
+
+    std::cout &lt;&lt; "donos: " &lt;&lt; dono.use_count() &lt;&lt; "\n";
+
+    if (auto p = observador.lock()) {         // ainda existe? pega emprestado
+        std::cout &lt;&lt; "ainda existe: " &lt;&lt; *p &lt;&lt; "\n";
+    }
+
+    dono.reset();                             // o único dono larga
+
+    if (observador.expired()) {
+        std::cout &lt;&lt; "o valor já foi destruído\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra weak.cpp -o weak
+$ ./weak
+donos: 1                        « o weak_ptr não contou
+ainda existe: 7
+o valor já foi destruído</pre>
+
+<ul>
+  <li><code>.lock()</code> devolve um <code>shared_ptr</code> temporário: vazio se o objeto já morreu, ou um dono a mais enquanto você o usa.</li>
+  <li><code>.expired()</code> ("expirou?") responde se o objeto já foi destruído.</li>
+</ul>
+<p>Para que serve? O caso clássico são dois objetos que apontam um para o outro com <code>shared_ptr</code> (um ciclo): cada um mantém o outro vivo, a contagem nunca chega a zero, e os dois vazam. Trocando um dos lados por <code>weak_ptr</code>, o ciclo se quebra. Você vai precisar disso raramente; por enquanto, basta saber que ele existe.</p>
+
+<hr>
+
+<h2>Qual usar</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th></tr>
+<tr><td>Uma lista de coisas</td><td><code>std::vector</code> (nem precisa de ponteiro)</td></tr>
+<tr><td>Um objeto que pode ficar na pilha</td><td>Uma variável comum: <code>Produto p{…};</code></td></tr>
+<tr><td>Um objeto no heap com <strong>um</strong> dono</td><td><code>auto p = std::make_unique&lt;T&gt;(…);</code></td></tr>
+<tr><td>Um objeto no heap com <strong>vários</strong> donos, sem ordem clara</td><td><code>auto p = std::make_shared&lt;T&gt;(…);</code></td></tr>
+<tr><td>Observar um objeto de <code>shared_ptr</code> sem mantê-lo vivo</td><td><code>std::weak_ptr&lt;T&gt;</code></td></tr>
+<tr><td>Uma função que só usa o objeto</td><td><code>const T&amp;</code> / <code>T&amp;</code> (ou <code>T*</code> se puder ser "nada")</td></tr>
+<tr><td><code>new</code> e <code>delete</code> escritos à mão</td><td>Quase nunca. Só dentro de classes que você mesmo cria para gerenciar memória (aula <a href="destrutores-raii.html">Destrutores e RAII</a>).</td></tr>
+</table>
+</div>
+
+<p>Um ponteiro cru (<code>T*</code>) continua tendo lugar no C++ moderno, mas com um papel limitado: <strong>apontar sem ser dono</strong>. Quem tem um <code>T*</code> nunca faz <code>delete</code> nele. O <code>.get()</code> de um ponteiro inteligente devolve esse ponteiro cru, quando uma função antiga pedir um.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"use of deleted function ‘std::unique_ptr …’"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra copia.cpp -o copia
+copia.cpp: In function ‘int main()’:
+copia.cpp:5:14: error: use of deleted function ‘std::unique_ptr&lt;_Tp, _Dp&gt;::unique_ptr(const std::unique_ptr&lt;_Tp, _Dp&gt;&amp;) [with _Tp = int; _Dp = std::default_delete&lt;int&gt;]’
+    5 |     auto b = a;      // tentar copiar
+      |              ^
+…</pre>
+<p><strong>O que aconteceu:</strong> você tentou copiar um <code>unique_ptr</code>: numa variável, num <code>push_back</code> para um vetor, ou passando por valor para uma função.</p>
+<p><strong>Como resolver:</strong> decida o que você quer. <strong>Entregar</strong> a posse: <code>std::move(a)</code>. Só <strong>usar</strong> o objeto: passe <code>*a</code> para um parâmetro <code>const T&amp;</code>. <strong>Vários donos</strong> de verdade: troque por <code>std::shared_ptr</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Usar o <code>unique_ptr</code> depois do <code>std::move</code></strong>
+<pre class="file" data-file="depois-move.cpp">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;utility&gt;
+
+int main() {
+    auto a = std::make_unique&lt;int&gt;(10);
+    auto b = std::move(a);
+    std::cout &lt;&lt; "Antes\n";
+    std::cout &lt;&lt; *a &lt;&lt; "\n";      // a está vazio!
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra depois-move.cpp -o depois-move
+$ ./depois-move
+Antes
+/usr/include/c++/15/bits/unique_ptr.h:455: constexpr typename std::add_lvalue_reference&lt;_Tp&gt;::type std::unique_ptr&lt;_Tp, _Dp&gt;::operator*() const [with _Tp = int; _Dp = std::default_delete&lt;int&gt;; typename std::add_lvalue_reference&lt;_Tp&gt;::type = int&amp;]: Assertion 'get() != pointer()' failed.
+Abortado                   (imagem do núcleo gravada) ./depois-move
+$ echo $?
+134</pre>
+<p><strong>O que aconteceu:</strong> depois do <code>std::move</code>, o <code>a</code> ficou com <code>nullptr</code>, e o <code>*a</code> tentou seguir um ponteiro nulo. A biblioteca padrão do g++ 15, quando o programa é compilado sem otimização (sem <code>-O2</code>), liga sozinha algumas conferências extras; uma delas (<code>Assertion 'get() != pointer()' failed</code>, "a afirmação <em>o ponteiro guardado não é nulo</em> falhou") parou o programa com <code>Abortado</code>, código 134. Com <code>-O2</code>, ou com outro compilador, essas conferências somem e o sintoma pode ser uma <code>Falha de segmentação</code> (veja <a href="nullptr.html">nullptr</a>).</p>
+<p><strong>Como resolver:</strong> depois de entregar com <code>std::move</code>, não use mais a variável antiga. Se não tiver certeza, confira antes: <code>if (a) { … }</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Dois <code>shared_ptr</code> que se apontam e nunca são destruídos</strong>
+<p><strong>O que aconteceu:</strong> um ciclo de <code>shared_ptr</code>: A guarda B e B guarda A. A contagem de cada um nunca chega a zero, o destrutor nunca roda e a memória vaza, mesmo sem nenhum <code>new</code> no código.</p>
+<p><strong>Como resolver:</strong> troque um dos lados (normalmente o que aponta "para trás", do filho para o pai) por <code>std::weak_ptr</code>. Para descobrir o vazamento, o <code>-fsanitize=address</code> da aula <a href="new-delete.html">new e delete</a> também funciona aqui.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>O que faz</th></tr>
+<tr><td><code>#include &lt;memory&gt;</code></td><td>Cabeçalho dos ponteiros inteligentes.</td></tr>
+<tr><td><code>auto p = std::make_unique&lt;T&gt;(args);</code></td><td>Cria um <code>T</code> no heap com um único dono. <span class="versao">C++14</span></td></tr>
+<tr><td><code>auto b = std::move(a);</code></td><td>Passa a posse de <code>a</code> para <code>b</code>; <code>a</code> fica <code>nullptr</code>.</td></tr>
+<tr><td><code>auto s = std::make_shared&lt;T&gt;(args);</code></td><td>Cria um <code>T</code> no heap com contagem de donos.</td></tr>
+<tr><td><code>s.use_count()</code></td><td>Quantos <code>shared_ptr</code> apontam para o objeto.</td></tr>
+<tr><td><code>p.reset()</code></td><td>Larga o objeto (no <code>unique_ptr</code>, destrói na hora).</td></tr>
+<tr><td><code>std::weak_ptr&lt;T&gt; w = s;</code></td><td>Observa sem contar; <code>w.lock()</code>, <code>w.expired()</code>.</td></tr>
+<tr><td><code>*p</code>, <code>p-&gt;campo</code>, <code>if (p)</code></td><td>Usa-se como um ponteiro comum.</td></tr>
+<tr><td><code>p.get()</code></td><td>O ponteiro cru, para quem só vai olhar (nunca faça <code>delete</code> nele).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Criar</h3>
+<p>Complete para criar um <code>double</code> no heap, com o valor 9.5, com um único dono:</p>
+<div class="ex-code">auto nota = std::<input data-answer="make_unique" aria-label="função">&lt;double&gt;(9.5);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Entregar a posse</h3>
+<p>Complete para passar a posse de <code>a</code> para <code>b</code>:</p>
+<div class="ex-code">auto b = std::<input data-answer="move" aria-label="função">(a);</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Por que <code>auto b = a;</code> não compila quando <code>a</code> é um <code>std::unique_ptr</code>?</p>
+<label><input type="radio" name="q3"> Porque faltou o <code>#include &lt;memory&gt;</code></label>
+<label><input type="radio" name="q3"> Porque <code>auto</code> não funciona com ponteiros</label>
+<label><input type="radio" name="q3"> Porque a cópia criaria dois donos, e a biblioteca proibiu a cópia (<code>= delete</code>)</label>
+<label><input type="radio" name="q3"> Porque o <code>unique_ptr</code> está vazio</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Três <code>shared_ptr</code> apontam para a mesma playlist. Dois deles morrem. O que acontece?</p>
+<label><input type="radio" name="q4"> A playlist é destruída duas vezes</label>
+<label><input type="radio" name="q4"> Nada: a contagem cai para 1 e a playlist continua viva</label>
+<label><input type="radio" name="q4"> A playlist é destruída na hora</label>
+<label><input type="radio" name="q4"> O programa cai</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Qual é a escolha padrão para um objeto no heap com um dono só?</p>
+<label><input type="radio" name="q5"> <code>new</code> e <code>delete</code></label>
+<label><input type="radio" name="q5"> <code>std::shared_ptr</code></label>
+<label><input type="radio" name="q5"> <code>std::weak_ptr</code></label>
+<label><input type="radio" name="q5"> <code>std::unique_ptr</code> com <code>std::make_unique</code></label>
+</div>
+
+<h3>Missão final: o bolo vai para a vitrine</h3>
+
+<div class="trycpp" data-goal="out:meu está vazio,out:vitrine: bolo,out:[bolo destruído],src:std::move">
+<p class="try-task"><strong>Missão:</strong> o programa não compila, porque tenta <strong>copiar</strong> um <code>unique_ptr</code>. Rode uma vez para ver o erro. Depois, conserte a linha da <code>vitrine</code> para <strong>passar a posse</strong> do bolo. A saída deve ser:</p>
+<pre class="out">meu está vazio
+vitrine: bolo
+[bolo destruído]</pre>
+<p class="try-task">Repare na última linha: ninguém escreveu <code>delete</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+
+struct Produto {
+    std::string nome;
+    Produto(std::string n) : nome(n) {}
+    ~Produto() { std::cout &lt;&lt; "[" &lt;&lt; nome &lt;&lt; " destruído]\n"; }
+};
+
+int main() {
+    auto meu = std::make_unique&lt;Produto&gt;("bolo");
+
+    auto vitrine = meu;     // não compila: unique_ptr não copia
+
+    if (meu == nullptr) {
+        std::cout &lt;&lt; "meu está vazio\n";
+    }
+    std::cout &lt;&lt; "vitrine: " &lt;&lt; vitrine-&gt;nome &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+
+struct Produto {
+    std::string nome;
+    Produto(std::string n) : nome(n) {}
+    ~Produto() { std::cout &lt;&lt; "[" &lt;&lt; nome &lt;&lt; " destruído]\n"; }
+};
+
+int main() {
+    auto meu = std::make_unique&lt;Produto&gt;("bolo");
+
+    auto vitrine = std::move(meu);
+
+    if (meu == nullptr) {
+        std::cout &lt;&lt; "meu está vazio\n";
+    }
+    std::cout &lt;&lt; "vitrine: " &lt;&lt; vitrine-&gt;nome &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Ponteiros inteligentes <span class="versao">C++11</span> fazem o <code>delete</code> sozinhos: sem vazamento, sem liberar duas vezes.</li>
+  <li><code>std::unique_ptr</code> (<code>std::make_unique</code>): um dono. Não copia (<code>use of deleted function</code>); passa a posse com <code>std::move</code>, e o antigo fica <code>nullptr</code>.</li>
+  <li><code>std::shared_ptr</code> (<code>std::make_shared</code>): vários donos; <code>use_count()</code> conta; o último a morrer destrói.</li>
+  <li><code>std::weak_ptr</code>: observa sem contar; serve para quebrar ciclos.</li>
+  <li>Funções que só usam o objeto recebem <code>const T&amp;</code>; as que ficam com ele recebem o <code>unique_ptr</code> por valor.</li>
+  <li><strong>Regra:</strong> no C++ moderno, use <code>std::vector</code>, variáveis comuns e ponteiros inteligentes em vez de <code>new</code>/<code>delete</code>.</li>
+  <li>Próximo grupo: <a href="structs.html">Structs</a>, para criar seus próprios tipos.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
