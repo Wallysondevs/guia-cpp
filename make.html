@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Make — Makefile, regras, dependências e make clean | Guia C++</title>
+<meta name="description" content="Make para quem nunca programou: o problema de recompilar tudo, um Makefile linha por linha (alvo, dependências, receita com TAB), o erro missing separator (faltando o separador), make recompilando só o que mudou com touch, variáveis CXX e CXXFLAGS, make clean e .PHONY, com saídas reais do GNU Make 4.4.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Make</span></h1>
+
+<p class="intro">Na aula <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>, a Ana descobriu que dá para recompilar só o arquivo que mudou e depois ligar de novo. Só que fazer isso à mão é chato e arriscado: qual arquivo mudou? Quem inclui aquele <code>.h</code>? Esqueceu um, e o programa sai com um pedaço velho. O <strong>Make</strong> é um programa que faz essa conta por você: você escreve uma vez, num arquivo chamado <code>Makefile</code>, <strong>o que depende de quê</strong> e <strong>como fazer cada coisa</strong>, e daí em diante só digita <code>make</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Que problema o Make resolve.</li>
+  <li>Como escrever um <code>Makefile</code>: <strong>alvo</strong>, <strong>dependências</strong> e <strong>receita</strong>.</li>
+  <li>Por que a receita tem que começar com <kbd>Tab</kbd>, e o erro <code>missing separator</code> ("faltando o separador").</li>
+  <li>Como o Make decide o que recompilar, testando com <code>touch</code>.</li>
+  <li>Como usar variáveis (<code>CXX</code>, <code>CXXFLAGS</code>), <code>make clean</code> e <code>.PHONY</code>.</li>
+</ul>
+</div>
+
+<p>Todos os comandos desta aula foram executados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), com o <strong>GNU Make 4.4.1</strong> e o <strong>g++ 15.2</strong>, no projeto da lojinha: <code>main.cpp</code>, <code>calculos.cpp</code> e <code>calculos.h</code>, os mesmos de <a href="headers.html">Arquivos .h e .cpp</a>. O Make vem junto com o g++ no pacote <code>build-essential</code> (veja <a href="instalar-linux.html">Instalar no Linux</a>); para conferir:</p>
+
+<pre class="term">$ make --version | head -1
+GNU Make 4.4.1</pre>
+
+<hr>
+
+<h2>A ideia: a lista de tarefas de um bolo</h2>
+<p>Pense numa receita de bolo com cobertura. O <strong>bolo pronto</strong> depende da <strong>massa assada</strong> e da <strong>cobertura</strong>. A massa depende de farinha, ovos e leite. Se você trocar o chocolate da cobertura, não precisa assar a massa de novo: basta refazer a cobertura e montar o bolo.</p>
+
+<p>O Make funciona com essa mesma lógica, escrita em <strong>regras</strong>:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parte da regra</th><th>No bolo</th><th>Na lojinha</th></tr>
+<tr><td><strong>Alvo</strong> (<em>target</em>): o que vai ser produzido</td><td>a cobertura</td><td><code>calculos.o</code></td></tr>
+<tr><td><strong>Dependências</strong> (<em>prerequisites</em>): do que ele é feito</td><td>chocolate, creme de leite</td><td><code>calculos.cpp</code>, <code>calculos.h</code></td></tr>
+<tr><td><strong>Receita</strong> (<em>recipe</em>): o comando que produz o alvo</td><td>"derreta e misture"</td><td><code>g++ … -c calculos.cpp</code></td></tr>
+</table>
+</div>
+
+<p>E como o Make sabe se "o chocolate mudou"? Pela <strong>data de modificação</strong> dos arquivos, a mesma que aparece no <code>ls -l</code>. A regra de ouro do Make é uma só:</p>
+<div class="tip">
+<strong>Se alguma dependência é mais nova que o alvo, o alvo está velho: rode a receita.</strong>
+<p>Se o alvo nem existe, ele também precisa ser feito.</p>
+</div>
+
+<hr>
+
+<h2>1. O primeiro <code>Makefile</code>, linha por linha</h2>
+<p>Na pasta do projeto, a Ana criou um arquivo de texto chamado exatamente <code>Makefile</code> (com <code>M</code> maiúsculo e sem extensão) e escreveu, num editor como o nano (veja <a href="editores.html">Editores e IDEs</a>):</p>
+
+<pre class="file" data-file="Makefile">loja: main.o calculos.o
+	g++ main.o calculos.o -o loja
+
+main.o: main.cpp calculos.h
+	g++ -std=c++23 -Wall -Wextra -c main.cpp
+
+calculos.o: calculos.cpp calculos.h
+	g++ -std=c++23 -Wall -Wextra -c calculos.cpp
+</pre>
+
+<dl class="anatomy">
+  <dt>loja:</dt><dd>O <strong>alvo</strong>, seguido de dois-pontos. A primeira regra do arquivo é a que o <code>make</code> faz quando você não diz nada, por isso o programa final vem primeiro.</dd>
+  <dt>main.o calculos.o</dt><dd>As <strong>dependências</strong> do <code>loja</code>, separadas por espaço: para ligar o programa, primeiro é preciso ter os dois <code>.o</code>.</dd>
+  <dt>(TAB) g++ main.o calculos.o -o loja</dt><dd>A <strong>receita</strong>: o comando que faz o alvo, exatamente como você digitaria no terminal. A linha <strong>tem que começar com um caractere TAB</strong> (a tecla <kbd>Tab</kbd>), não com espaços.</dd>
+  <dt>main.o: main.cpp calculos.h</dt><dd>O <code>main.o</code> depende do <code>main.cpp</code> e <strong>também</strong> do <code>calculos.h</code>, porque o <code>main.cpp</code> faz <code>#include "calculos.h"</code>. Esquecer um <code>.h</code> aqui é o erro mais comum de Makefile: o Make não recompila quando o cabeçalho muda.</dd>
+  <dt>linhas em branco</dt><dd>Só para separar as regras e facilitar a leitura.</dd>
+</dl>
+
+<p>As dependências formam uma árvore. O <code>make</code> começa pelo alvo de cima e desce até os arquivos que você escreveu:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Alvo</th><th>Depende de</th><th>Receita</th></tr>
+<tr><td><code>loja</code></td><td><code>main.o</code>, <code>calculos.o</code></td><td>ligar</td></tr>
+<tr><td>&nbsp;&nbsp;↳ <code>main.o</code></td><td><code>main.cpp</code>, <code>calculos.h</code></td><td>compilar <code>main.cpp</code></td></tr>
+<tr><td>&nbsp;&nbsp;↳ <code>calculos.o</code></td><td><code>calculos.cpp</code>, <code>calculos.h</code></td><td>compilar <code>calculos.cpp</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>2. Rodando o <code>make</code></h2>
+<p>Na primeira vez, nenhum alvo existe, e o <code>make</code> faz tudo. Ele mostra cada comando antes de rodá-lo:</p>
+
+<pre class="term">$ cd ~/cpp/make1
+$ make
+g++ -std=c++23 -Wall -Wextra -c main.cpp
+g++ -std=c++23 -Wall -Wextra -c calculos.cpp
+g++ main.o calculos.o -o loja
+$ ./loja
+Total: R$ 10
+Com 10% de desconto: R$ 9</pre>
+
+<p>Repare na ordem: primeiro os <code>.o</code>, depois a ligação, mesmo que no arquivo a regra do <code>loja</code> esteja em cima. O Make segue as dependências, não a ordem das linhas. Agora rode de novo, sem mudar nada:</p>
+
+<pre class="term">$ make
+make: 'loja' está atualizado.
+$ echo $?
+0</pre>
+
+<p>"‘loja’ está atualizado": nenhuma dependência é mais nova que o seu alvo, então não há nada a fazer. O código de saída <code>0</code> quer dizer sucesso. (O Make tem tradução para o português; em inglês, a mensagem é <code>make: 'loja' is up to date.</code>)</p>
+
+<h3>Só recompila o que mudou: o teste do <code>touch</code></h3>
+<p>O comando <code>touch</code> ("tocar") atualiza a data de modificação de um arquivo para agora, sem mexer no conteúdo. É o jeito de fingir que você editou um arquivo:</p>
+
+<pre class="term">$ touch calculos.cpp
+$ make
+g++ -std=c++23 -Wall -Wextra -c calculos.cpp      « só o calculos.cpp
+g++ main.o calculos.o -o loja                     « e a ligação</pre>
+
+<p>O <code>calculos.cpp</code> ficou mais novo que o <code>calculos.o</code>, então o <code>calculos.o</code> foi refeito. Aí o <code>calculos.o</code> ficou mais novo que o <code>loja</code>, e a ligação rodou. O <code>main.o</code> não foi tocado. Agora mude o cabeçalho, que os dois <code>.cpp</code> incluem:</p>
+
+<pre class="term">$ touch calculos.h
+$ make
+g++ -std=c++23 -Wall -Wextra -c main.cpp
+g++ -std=c++23 -Wall -Wextra -c calculos.cpp
+g++ main.o calculos.o -o loja</pre>
+
+<p>Os dois foram recompilados, porque os dois dependem do <code>calculos.h</code>. É exatamente a conta que a Ana teria de fazer de cabeça.</p>
+
+<h3>Ver sem fazer: <code>make -n</code></h3>
+<p>A opção <code>-n</code> (de <em>no-op</em>, "não execute") mostra o que <strong>seria</strong> feito, sem rodar nada. Ótima para conferir um Makefile:</p>
+
+<pre class="term">$ touch main.cpp
+$ make -n
+g++ -std=c++23 -Wall -Wextra -c main.cpp
+g++ main.o calculos.o -o loja</pre>
+
+<h3>Pedir um alvo específico</h3>
+<p>Escreva o nome do alvo depois de <code>make</code>. Sem nome, vale o primeiro do arquivo:</p>
+<pre class="term">$ make calculos.o
+make: 'calculos.o' está atualizado.</pre>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> o editor do guia não roda o <code>make</code>, mas dá para ver o <strong>raciocínio</strong> dele num programa C++. Abaixo, cada arquivo tem uma "hora" de modificação (número maior = mais novo), e a função <code>make()</code> aplica a regra de ouro. Rode. Depois troque o <code>touch("calculos.cpp")</code> por <code>touch("calculos.h")</code> e por <code>touch("main.cpp")</code>, e compare com as saídas reais acima. (O <code>std::map</code> é uma tabela "nome → valor", que você vai estudar em <a href="map.html">std::map</a>.)</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+// "hora" da última modificação de cada arquivo: maior = mais novo
+std::map&lt;std::string, int&gt; hora = {
+    {"main.cpp", 10}, {"calculos.cpp", 10}, {"calculos.h", 10},
+    {"main.o", 20}, {"calculos.o", 20}, {"loja", 30},
+};
+int relogio = 100;
+
+struct Regra {
+    std::string alvo;
+    std::vector&lt;std::string&gt; dependencias;
+    std::string receita;
+};
+
+// em ordem: primeiro os .o, depois o programa (o make de verdade descobre a ordem sozinho)
+std::vector&lt;Regra&gt; regras = {
+    {"main.o", {"main.cpp", "calculos.h"}, "g++ -std=c++23 -Wall -Wextra -c main.cpp"},
+    {"calculos.o", {"calculos.cpp", "calculos.h"}, "g++ -std=c++23 -Wall -Wextra -c calculos.cpp"},
+    {"loja", {"main.o", "calculos.o"}, "g++ main.o calculos.o -o loja"},
+};
+
+void touch(const std::string&amp; arquivo) {
+    hora[arquivo] = ++relogio;
+}
+
+void make() {
+    bool fezAlgo = false;
+    for (const Regra&amp; r : regras) {
+        bool refazer = false;
+        for (const std::string&amp; d : r.dependencias) {
+            if (hora[d] &gt; hora[r.alvo]) {
+                refazer = true;          // a dependência é mais nova que o alvo
+            }
+        }
+        if (refazer) {
+            std::cout &lt;&lt; r.receita &lt;&lt; '\n';
+            touch(r.alvo);               // o alvo acabou de ser refeito
+            fezAlgo = true;
+        }
+    }
+    if (!fezAlgo) {
+        std::cout &lt;&lt; "make: 'loja' está atualizado.\n";
+    }
+}
+
+int main() {
+    std::cout &lt;&lt; "$ make\n";
+    make();
+    std::cout &lt;&lt; "$ touch calculos.cpp\n";
+    touch("calculos.cpp");
+    std::cout &lt;&lt; "$ make\n";
+    make();
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. TAB, não espaços: <code>missing separator</code></h2>
+<p>A receita de cada regra precisa começar com o caractere <strong>TAB</strong>. Espaços, mesmo que pareçam iguais na tela, não servem. Muitos editores trocam o <kbd>Tab</kbd> por espaços sem avisar, e o resultado é este:</p>
+
+<div class="cenario">
+<strong>"*** faltando o separador.  Pare." (<code>missing separator</code>)</strong>
+<pre class="term">$ make
+Makefile:2: *** faltando o separador.  Pare.
+$ LANG=C make
+Makefile:2: *** missing separator.  Stop.</pre>
+<p><strong>O que significa:</strong> na linha 2 do <code>Makefile</code>, o Make esperava um "separador" e não achou: a linha não é uma regra (não tem <code>:</code>) e não começa com TAB, então ele não sabe o que ela é. <code>Pare</code> (<em>Stop</em>): nada foi feito.</p>
+<p><strong>Como confirmar:</strong> o <code>cat -A</code> mostra os caracteres invisíveis. TAB aparece como <code>^I</code>, e o fim de cada linha, como <code>$</code>. Compare o arquivo errado com o certo:</p>
+<pre class="term">$ cat -A Makefile | head -2
+loja: main.o calculos.o$
+    g++ main.o calculos.o -o loja$           « quatro espaços: errado
+$ cat -A Makefile | head -2
+loja: main.o calculos.o$
+^Ig++ main.o calculos.o -o loja$             « ^I é o TAB: certo</pre>
+<p>Se forem exatamente 8 espaços, o Make 4.4 até adivinha o problema:</p>
+<pre class="term">$ make -f Makefile.8esp
+Makefile.8esp:2: *** faltando separador  (você pensou em TAB ao invés de 8 espaços?).  Pare.</pre>
+<p>(A opção <code>-f</code> escolhe outro arquivo no lugar do <code>Makefile</code>.)</p>
+<p><strong>Como resolver:</strong> apague os espaços do começo da receita e aperte <kbd>Tab</kbd>. No nano, o <kbd>Tab</kbd> grava um TAB de verdade. No VS Code, abra o arquivo com o nome exato <code>Makefile</code>: ele reconhece o tipo e passa a usar TAB nesse arquivo.</p>
+</div>
+
+<div class="cenario">
+<strong>"Nenhum alvo indicado e nenhum arquivo make encontrado"</strong>
+<pre class="term">$ make
+make: *** Nenhum alvo indicado e nenhum arquivo make encontrado.  Pare.</pre>
+<p><strong>O que significa:</strong> não há <code>Makefile</code> na pasta atual (em inglês: <code>No targets specified and no makefile found</code>).</p>
+<p><strong>Como resolver:</strong> entre na pasta do projeto com <code>cd</code> e confira o nome do arquivo: <code>Makefile</code> ou <code>makefile</code>, sem <code>.txt</code> no fim.</p>
+</div>
+
+<div class="cenario">
+<strong>Erro de compilação no meio do <code>make</code></strong>
+<p>A Ana apagou sem querer o <code>;</code> de uma linha do <code>calculos.cpp</code>:</p>
+<pre class="term">$ make
+g++ -std=c++23 -Wall -Wextra -c calculos.cpp
+calculos.cpp: In function ‘double calcularTotal(double, int)’:
+calculos.cpp:5:30: error: expected ‘;’ before ‘}’ token
+    5 |     return preco * quantidade
+      |                              ^
+      |                              ;
+    6 | }
+      | ~
+make: *** [Makefile:12: calculos.o] Error 1
+$ echo $?
+2</pre>
+<p><strong>O que significa:</strong> as primeiras linhas são o erro do g++, do jeito de sempre (veja <a href="erros-compilacao.html">Lendo Erros do Compilador</a>). A última é do Make: "a receita da linha 12 do Makefile, que faz o <code>calculos.o</code>, terminou com o código 1". O Make para no primeiro erro e não tenta ligar, então o <code>loja</code> antigo continua lá, sem a mudança.</p>
+<p><strong>Como resolver:</strong> conserte o código e rode <code>make</code> de novo. Só o que falhou será refeito.</p>
+</div>
+
+<div class="cenario">
+<strong>"Sem regra para processar o alvo ‘calculos.h’"</strong>
+<pre class="term">$ make
+make: *** Sem regra para processar o alvo 'calculos.h', necessário por 'main.o'.  Pare.</pre>
+<p><strong>O que significa:</strong> o <code>main.o</code> depende de <code>calculos.h</code>, o arquivo não existe, e não há regra que o produza (em inglês: <code>No rule to make target</code>). Aqui, a Ana tinha renomeado o arquivo.</p>
+<p><strong>Como resolver:</strong> confira o nome com <code>ls</code>. Se o arquivo mudou de nome, corrija o <code>Makefile</code> (e os <code>#include</code>).</p>
+</div>
+
+<hr>
+
+<h2>4. Variáveis: <code>CXX</code> e <code>CXXFLAGS</code></h2>
+<p>No primeiro Makefile, <code>-std=c++23 -Wall -Wextra</code> aparece repetido. Para trocar uma opção, seria preciso mexer em todas as linhas. As <strong>variáveis</strong> do Make resolvem isso:</p>
+
+<pre class="file" data-file="Makefile"># Makefile da lojinha da Ana
+CXX = g++
+CXXFLAGS = -std=c++23 -Wall -Wextra
+
+loja: main.o calculos.o
+	$(CXX) main.o calculos.o -o loja
+
+main.o: main.cpp calculos.h
+	$(CXX) $(CXXFLAGS) -c main.cpp
+
+calculos.o: calculos.cpp calculos.h
+	$(CXX) $(CXXFLAGS) -c calculos.cpp
+
+clean:
+	rm -f loja *.o
+
+.PHONY: clean
+</pre>
+
+<dl class="anatomy">
+  <dt># Makefile da lojinha da Ana</dt><dd>Comentário: no Makefile, começa com <code>#</code> e vai até o fim da linha.</dd>
+  <dt>CXX = g++</dt><dd>Cria a variável <code>CXX</code> com o valor <code>g++</code>. O nome é uma convenção do Make: <code>CXX</code> é "o compilador de C++" (o <code>XX</code> são os <code>++</code> deitados).</dd>
+  <dt>CXXFLAGS = -std=c++23 -Wall -Wextra</dt><dd>As opções (<em>flags</em>) de compilação de C++. Outro nome de convenção.</dd>
+  <dt>$(CXX), $(CXXFLAGS)</dt><dd>Usa o valor da variável: o Make troca <code>$(CXX)</code> por <code>g++</code> antes de rodar o comando.</dd>
+  <dt>clean:</dt><dd>Uma regra sem dependências, cujo alvo não é um arquivo: é uma <strong>tarefa</strong>. A receita apaga o programa e os <code>.o</code>.</dd>
+  <dt>.PHONY: clean</dt><dd>Avisa que <code>clean</code> é um alvo "de mentira" (<em>phony</em>), explicado na seção 5.</dd>
+</dl>
+
+<pre class="term">$ cd ~/cpp/make2
+$ make
+g++ -std=c++23 -Wall -Wextra -c main.cpp
+g++ -std=c++23 -Wall -Wextra -c calculos.cpp
+g++ main.o calculos.o -o loja</pre>
+
+<p>Uma vantagem extra: dá para trocar o valor de uma variável na linha de comando, sem editar o arquivo. Por exemplo, para ligar as otimizações (<code>-O2</code>, veja <a href="compilar.html">Compilar com g++</a>):</p>
+
+<pre class="term">$ make clean
+rm -f loja *.o
+$ make CXXFLAGS="-std=c++23 -Wall -Wextra -O2"
+g++ -std=c++23 -Wall -Wextra -O2 -c main.cpp
+g++ -std=c++23 -Wall -Wextra -O2 -c calculos.cpp
+g++ main.o calculos.o -o loja</pre>
+
+<p>Do mesmo jeito, <code>make CXX=clang++</code> compila tudo com o Clang.</p>
+
+<hr>
+
+<h2>5. <code>make clean</code> e <code>.PHONY</code></h2>
+<p><code>make clean</code> ("limpar") apaga tudo o que o Make gerou, para recomeçar do zero. Todo Makefile costuma ter essa regra:</p>
+
+<pre class="term">$ make clean
+rm -f loja *.o</pre>
+
+<p>O <code>-f</code> do <code>rm</code> evita erro quando os arquivos já não existem. E para que serve o <code>.PHONY</code>? Lembre que o Make pensa em <strong>arquivos</strong>: para ele, <code>clean</code> é o nome de um arquivo que a receita deveria criar. Veja o que acontece se, por acaso, existir um arquivo chamado <code>clean</code> na pasta e o Makefile <strong>não</strong> tiver o <code>.PHONY</code>:</p>
+
+<pre class="term">$ touch clean
+$ make clean
+make: 'clean' está atualizado.        « não apagou nada!</pre>
+
+<p>O arquivo <code>clean</code> existe e não tem dependências, então para o Make ele "está atualizado", e a receita não roda. Com a linha <code>.PHONY: clean</code> no Makefile, o Make sabe que <code>clean</code> é uma tarefa, não um arquivo, e roda a receita sempre:</p>
+
+<pre class="term">$ make clean
+rm -f loja *.o</pre>
+
+<p>Ponha no <code>.PHONY</code> todo alvo que não é um arquivo. É comum ter também <code>all</code> (tudo), <code>run</code> (compilar e rodar) e <code>test</code> (rodar os <a href="testes.html">testes</a>): <code>.PHONY: all clean run test</code>.</p>
+
+<hr>
+
+<h2>6. Formas mais curtas (para reconhecer)</h2>
+<p>Em projetos maiores, escrever uma regra por <code>.cpp</code> cansa. O Make tem atalhos que você vai encontrar em Makefiles alheios:</p>
+
+<pre class="file" data-file="Makefile">CXX = g++
+CXXFLAGS = -std=c++23 -Wall -Wextra
+OBJS = main.o calculos.o
+
+loja: $(OBJS)
+	$(CXX) $^ -o $@
+
+%.o: %.cpp calculos.h
+	$(CXX) $(CXXFLAGS) -c $&lt; -o $@
+
+clean:
+	rm -f loja $(OBJS)
+
+.PHONY: clean
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Quer dizer</th><th>No exemplo</th></tr>
+<tr><td><code>%.o: %.cpp</code></td><td>regra-modelo: "qualquer <code>X.o</code> é feito de <code>X.cpp</code>"</td><td>vale para <code>main.o</code> e <code>calculos.o</code></td></tr>
+<tr><td><code>$@</code></td><td>o alvo da regra</td><td><code>loja</code>, ou <code>main.o</code></td></tr>
+<tr><td><code>$^</code></td><td>todas as dependências</td><td><code>main.o calculos.o</code></td></tr>
+<tr><td><code>$&lt;</code></td><td>só a primeira dependência</td><td><code>main.cpp</code></td></tr>
+</table>
+</div>
+
+<pre class="term">$ make
+g++ -std=c++23 -Wall -Wextra -c main.cpp -o main.o
+g++ -std=c++23 -Wall -Wextra -c calculos.cpp -o calculos.o
+g++ main.o calculos.o -o loja</pre>
+
+<p>O resultado é o mesmo. Use a forma explícita, uma regra por arquivo, enquanto estiver aprendendo: é mais fácil de ler e de achar erros. E quando o projeto crescer de verdade, a próxima ferramenta, o <a href="cmake.html">CMake</a>, escreve esse tipo de arquivo por você, inclusive descobrindo sozinho quais <code>.h</code> cada <code>.cpp</code> inclui.</p>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Comando</th><th>O que faz</th></tr>
+<tr><td><code>make</code></td><td>faz o primeiro alvo do <code>Makefile</code> (e o que ele precisar)</td></tr>
+<tr><td><code>make alvo</code></td><td>faz um alvo específico (<code>make calculos.o</code>, <code>make clean</code>)</td></tr>
+<tr><td><code>make -n</code></td><td>mostra o que faria, sem fazer</td></tr>
+<tr><td><code>make -f arquivo</code></td><td>usa outro arquivo no lugar do <code>Makefile</code></td></tr>
+<tr><td><code>make VAR=valor</code></td><td>troca o valor de uma variável só desta vez</td></tr>
+<tr><td><code>make -j4</code></td><td>roda até 4 receitas ao mesmo tempo (mais rápido em projetos grandes)</td></tr>
+<tr><td><code>touch arquivo</code></td><td>marca o arquivo como modificado agora</td></tr>
+<tr><td><code>cat -A Makefile</code></td><td>mostra TABs (<code>^I</code>) e fins de linha (<code>$</code>)</td></tr>
+</table>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No Makefile</th><th>O que é</th></tr>
+<tr><td><code>alvo: dep1 dep2</code></td><td>regra: o alvo depende dessas coisas</td></tr>
+<tr><td><code>(TAB)comando</code></td><td>receita: começa obrigatoriamente com TAB</td></tr>
+<tr><td><code>NOME = valor</code> e <code>$(NOME)</code></td><td>variável</td></tr>
+<tr><td><code>CXX</code>, <code>CXXFLAGS</code></td><td>compilador de C++ e suas opções (nomes de convenção)</td></tr>
+<tr><td><code>.PHONY: clean</code></td><td>alvos que não são arquivos</td></tr>
+<tr><td><code>#</code></td><td>comentário</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A regra do estoque</h3>
+<p>O <code>estoque.cpp</code> inclui o <code>estoque.h</code>. Complete a linha de dependências da regra do <code>estoque.o</code>:</p>
+<div class="ex-code">estoque.o: <input data-answer="estoque.cpp estoque.h|estoque.h estoque.cpp" aria-label="dependências"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Usar a variável</h3>
+<p>Complete a receita usando as variáveis de convenção (o TAB já está lá):</p>
+<div class="ex-code">&nbsp;&nbsp;&nbsp;&nbsp;<input data-answer="$(CXX) $(CXXFLAGS)|${CXX} ${CXXFLAGS}" aria-label="variáveis"> -c estoque.cpp</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Com o Makefile da seção 1 e tudo compilado, a Ana roda <code>touch main.cpp</code> e depois <code>make</code>. Quais comandos aparecem?</p>
+<label><input type="radio" name="q3"> Nenhum: <code>'loja' está atualizado</code>.</label>
+<label><input type="radio" name="q3"> Os três: compilar os dois <code>.cpp</code> e ligar.</label>
+<label><input type="radio" name="q3"> Compilar o <code>main.cpp</code> e ligar.</label>
+<label><input type="radio" name="q3"> Só a ligação.</label>
+</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O <code>make</code> respondeu <code>Makefile:5: *** faltando o separador.  Pare.</code>. Qual é a causa mais provável?</p>
+<label><input type="radio" name="q4"> Falta um <code>;</code> no <code>main.cpp</code>, linha 5.</label>
+<label><input type="radio" name="q4"> A receita na linha 5 do Makefile começa com espaços em vez de TAB.</label>
+<label><input type="radio" name="q4"> Falta o <code>.PHONY</code>.</label>
+<label><input type="radio" name="q4"> O g++ não está instalado.</label>
+</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Para que serve <code>.PHONY: clean</code>?</p>
+<label><input type="radio" name="q5"> Para a receita do <code>clean</code> rodar sempre, mesmo que exista um arquivo chamado <code>clean</code>.</label>
+<label><input type="radio" name="q5"> Para apagar os arquivos <code>.o</code>.</label>
+<label><input type="radio" name="q5"> Para o <code>clean</code> ser o alvo padrão.</label>
+<label><input type="radio" name="q5"> Para esconder o comando <code>rm</code> da saída.</label>
+</div>
+</div>
+
+<h3>Missão final: escreva a regra de ouro do Make</h3>
+
+<div class="trycpp" data-goal="out:-c main.cpp,out:-c calculos.cpp,out:-o loja,out:está atualizado">
+<p class="try-task"><strong>Missão:</strong> o mini-Make abaixo está quase pronto, mas a função <code>precisaRefazer</code> sempre responde <code>false</code>. Escreva o corpo dela: devolva <code>true</code> se <strong>alguma</strong> dependência da regra tiver hora <strong>maior</strong> que a do alvo. O <code>main</code> roda <code>make</code> (nada a fazer), depois <code>touch calculos.h</code> e <code>make</code> de novo. A saída deve ser igual à do Make de verdade:</p>
+<pre class="out">$ make
+make: 'loja' está atualizado.
+$ touch calculos.h
+$ make
+g++ -std=c++23 -Wall -Wextra -c main.cpp
+g++ -std=c++23 -Wall -Wextra -c calculos.cpp
+g++ main.o calculos.o -o loja</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+std::map&lt;std::string, int&gt; hora = {
+    {"main.cpp", 10}, {"calculos.cpp", 10}, {"calculos.h", 10},
+    {"main.o", 20}, {"calculos.o", 20}, {"loja", 30},
+};
+int relogio = 100;
+
+struct Regra {
+    std::string alvo;
+    std::vector&lt;std::string&gt; dependencias;
+    std::string receita;
+};
+
+std::vector&lt;Regra&gt; regras = {
+    {"main.o", {"main.cpp", "calculos.h"}, "g++ -std=c++23 -Wall -Wextra -c main.cpp"},
+    {"calculos.o", {"calculos.cpp", "calculos.h"}, "g++ -std=c++23 -Wall -Wextra -c calculos.cpp"},
+    {"loja", {"main.o", "calculos.o"}, "g++ main.o calculos.o -o loja"},
+};
+
+void touch(const std::string&amp; arquivo) {
+    hora[arquivo] = ++relogio;
+}
+
+bool precisaRefazer(const Regra&amp; r) {
+    // escreva aqui: percorra r.dependencias e compare hora[d] com hora[r.alvo]
+    (void)r;   // (esta linha só cala o aviso de parâmetro não usado; pode apagar)
+    return false;
+}
+
+void make() {
+    bool fezAlgo = false;
+    for (const Regra&amp; r : regras) {
+        if (precisaRefazer(r)) {
+            std::cout &lt;&lt; r.receita &lt;&lt; '\n';
+            touch(r.alvo);
+            fezAlgo = true;
+        }
+    }
+    if (!fezAlgo) {
+        std::cout &lt;&lt; "make: 'loja' está atualizado.\n";
+    }
+}
+
+int main() {
+    std::cout &lt;&lt; "$ make\n";
+    make();
+    std::cout &lt;&lt; "$ touch calculos.h\n";
+    touch("calculos.h");
+    std::cout &lt;&lt; "$ make\n";
+    make();
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+std::map&lt;std::string, int&gt; hora = {
+    {"main.cpp", 10}, {"calculos.cpp", 10}, {"calculos.h", 10},
+    {"main.o", 20}, {"calculos.o", 20}, {"loja", 30},
+};
+int relogio = 100;
+
+struct Regra {
+    std::string alvo;
+    std::vector&lt;std::string&gt; dependencias;
+    std::string receita;
+};
+
+std::vector&lt;Regra&gt; regras = {
+    {"main.o", {"main.cpp", "calculos.h"}, "g++ -std=c++23 -Wall -Wextra -c main.cpp"},
+    {"calculos.o", {"calculos.cpp", "calculos.h"}, "g++ -std=c++23 -Wall -Wextra -c calculos.cpp"},
+    {"loja", {"main.o", "calculos.o"}, "g++ main.o calculos.o -o loja"},
+};
+
+void touch(const std::string&amp; arquivo) {
+    hora[arquivo] = ++relogio;
+}
+
+bool precisaRefazer(const Regra&amp; r) {
+    for (const std::string&amp; d : r.dependencias) {
+        if (hora[d] &gt; hora[r.alvo]) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void make() {
+    bool fezAlgo = false;
+    for (const Regra&amp; r : regras) {
+        if (precisaRefazer(r)) {
+            std::cout &lt;&lt; r.receita &lt;&lt; '\n';
+            touch(r.alvo);
+            fezAlgo = true;
+        }
+    }
+    if (!fezAlgo) {
+        std::cout &lt;&lt; "make: 'loja' está atualizado.\n";
+    }
+}
+
+int main() {
+    std::cout &lt;&lt; "$ make\n";
+    make();
+    std::cout &lt;&lt; "$ touch calculos.h\n";
+    touch("calculos.h");
+    std::cout &lt;&lt; "$ make\n";
+    make();
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>O Make recompila <strong>só o que mudou</strong>, comparando datas: se uma dependência é mais nova que o alvo (ou o alvo não existe), a receita roda.</li>
+  <li>Uma regra é <code>alvo: dependências</code> e, na linha de baixo, a <strong>receita</strong>, que começa obrigatoriamente com <strong>TAB</strong>. Com espaços: <code>missing separator</code> ("faltando o separador"). Confira com <code>cat -A</code> (<code>^I</code> = TAB).</li>
+  <li>Liste os <code>.h</code> nas dependências dos <code>.o</code>, senão mudar um cabeçalho não recompila quem o inclui.</li>
+  <li><code>make</code> faz o primeiro alvo; <code>make -n</code> mostra sem fazer; <code>touch</code> simula uma edição.</li>
+  <li>Variáveis: <code>CXX = g++</code>, <code>CXXFLAGS = -std=c++23 -Wall -Wextra</code>, usadas com <code>$(CXX)</code>; troque na hora com <code>make CXXFLAGS="…"</code>.</li>
+  <li><code>make clean</code> apaga o que foi gerado; <code>.PHONY: clean</code> garante que ele rode mesmo com um arquivo chamado <code>clean</code> na pasta.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
