@@ -34,7 +34,7 @@
 
 <div class="note">
 <strong>No editor do guia, o UB costuma passar calado</strong>
-<p>O editor roda o programa como WebAssembly, dentro do navegador, onde a memória é organizada de outro jeito. Lá, usar um ponteiro nulo <strong>não</strong> derruba o programa (aparece <code>0</code> e ele segue), e índices fora do array e memória já liberada passam sem nenhum sinal. Por isso as falhas desta aula aparecem só nos terminais do laboratório. Nas missões, o objetivo é sempre <strong>corrigir</strong> o código, não ver o crash.</p>
+<p>O editor roda o programa como WebAssembly, dentro do navegador, onde a memória é organizada de outro jeito. Lá, usar um ponteiro nulo derruba o programa (<code>Falha de segmentação</code>, código 139, como no Linux), mas índices fora do array e memória já liberada passam sem nenhum sinal. Por isso as falhas desta aula aparecem só nos terminais do laboratório. Nas missões, o objetivo é sempre <strong>corrigir</strong> o código, não ver o crash.</p>
 </div>
 
 <hr>
