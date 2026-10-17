@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ std::string — referência dos métodos e funções | Guia C++</title>
+<meta name="description" content="Referência de std::string: size, empty, at, substr, find, rfind, replace, insert, erase, contains, starts_with, compare e as funções getline, stoi, stod, to_string e std::format, com assinatura simplificada, exemplo, resultado real do g++ 15 e a versão do C++ em que cada uma surgiu.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">std::string</span></h1>
+
+<p class="intro">Os métodos de <code>std::string</code> e as funções livres que trabalham com texto, agrupados pelo que fazem. Cada linha tem a assinatura simplificada, uma explicação curta, um exemplo e o <strong>resultado real</strong>: todos os 82 exemplos foram compilados juntos e executados com o g++ 15.2 (<code>-std=c++23</code>) na máquina da Ana. Para aprender com calma, veja as aulas <a href="strings.html">Strings</a>, <a href="funcoes-string.html">Funções de String</a> e <a href="string-numero.html">Texto ↔ Número</a>.</p>
+
+<div class="note">
+<strong>Como ler as tabelas</strong>
+<ul>
+  <li>Em todos os exemplos, <code>s</code> começa como <code>std::string s = "banana";</code>, a não ser que a célula mostre outra declaração. Cada exemplo começa do zero.</li>
+  <li>Nos métodos que <strong>mudam</strong> o texto, o resultado mostra como <code>s</code> ficou: <code>s</code> = <code>"bananas"</code>.</li>
+  <li>Índices começam em <strong>0</strong>: em <code>"banana"</code>, o <code>b</code> está na posição 0 e o último <code>a</code> na 5.</li>
+  <li><code>size_type</code> é <code>std::size_t</code>, um inteiro sem sinal. <code>npos</code> (<code>std::string::npos</code>) é o maior valor dele (18446744073709551615 aqui) e quer dizer "não achei" ou "até o fim".</li>
+  <li>As assinaturas estão simplificadas: a maioria dos métodos também aceita <code>const char*</code>, <code>std::string_view</code> ou um <code>char</code> no lugar de <code>const string&amp;</code>.</li>
+  <li><code>size()</code> e as posições contam <strong>bytes</strong>, não letras: um <code>é</code> ocupa 2 (veja <a href="acentos-utf8.html">Acentos e UTF-8</a>).</li>
+</ul>
+</div>
+
+<p>Atalhos: <a href="#tam">Tamanho</a> · <a href="#acesso">Acesso</a> · <a href="#mudar">Modificar</a> · <a href="#pedacos">Pedaços</a> · <a href="#procurar">Procurar</a> · <a href="#comparar">Comparar</a> · <a href="#conv">Texto ↔ número</a> · <a href="#livres">Funções livres</a> · <a href="#getline">getline</a> · <a href="#versoes">Por versão</a></p>
+
+<h3>Exemplo rápido</h3>
+<pre class="file" data-file="banana.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string s = "banana";
+    std::cout &lt;&lt; s.size() &lt;&lt; '\n';
+    std::cout &lt;&lt; s.find("na") &lt;&lt; '\n';
+    std::cout &lt;&lt; s.substr(1, 3) &lt;&lt; '\n';
+
+    s.replace(0, 1, "C");
+    std::cout &lt;&lt; s &lt;&lt; '\n';
+
+    if (s.find("x") == std::string::npos) {
+        std::cout &lt;&lt; "não tem x\n";
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/ref">$ g++ -std=c++23 -Wall -Wextra banana.cpp -o banana
+$ ./banana
+6
+2
+ana
+Canana
+não tem x</pre>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> qualquer exemplo das tabelas cabe aqui. Troque as linhas do <code>main</code> e rode.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string s = "banana";
+    std::cout &lt;&lt; s.size() &lt;&lt; '\n';
+    std::cout &lt;&lt; s.find("na") &lt;&lt; '\n';
+    std::cout &lt;&lt; s.substr(1, 3) &lt;&lt; '\n';
+
+    s.replace(0, 1, "C");
+    std::cout &lt;&lt; s &lt;&lt; '\n';
+
+    if (s.find("x") == std::string::npos) {
+        std::cout &lt;&lt; "não tem x\n";
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h3 id="tam">Tamanho e capacidade</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método ou função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>size_type size() const</code></td><td>Quantos <strong>bytes</strong> (<code>char</code>) o texto tem. Um <code>é</code> em UTF-8 conta 2. <a href="strings.html">Aula</a></td><td><code>s.size()</code><br><code>std::string t = "café";</code><br><code>t.size()</code></td><td><code>6</code><br><br><code>5</code></td></tr>
+<tr><td><code>size_type length() const</code></td><td>O mesmo que <code>size()</code>. <a href="strings.html">Aula</a></td><td><code>s.length()</code></td><td><code>6</code></td></tr>
+<tr><td><code>bool empty() const</code></td><td><code>true</code> se o tamanho é 0. Mais claro que <code>size() == 0</code>. <a href="funcoes-string.html">Aula</a></td><td><code>s.empty()</code><br><code>std::string{}.empty()</code></td><td><code>false</code><br><code>true</code></td></tr>
+<tr><td><code>void clear()</code></td><td>Apaga tudo: o texto fica vazio. <a href="funcoes-string.html">Aula</a></td><td><code>s.clear()</code></td><td><code>s</code> = <code>""</code></td></tr>
+<tr><td><code>void resize(size_type n, char c = '\0')</code></td><td>Muda o tamanho: corta o fim ou completa com <code>c</code>. <a href="funcoes-string.html">Aula</a></td><td><code>s.resize(3)</code><br><code>s.resize(8, '!')</code></td><td><code>s</code> = <code>"ban"</code><br><code>s</code> = <code>"banana!!"</code></td></tr>
+<tr><td><code>size_type capacity() const</code></td><td>Quantos bytes cabem sem pedir mais memória. Textos curtos cabem dentro do próprio objeto (15 bytes no g++). <a href="strings.html">Aula</a></td><td><code>s.capacity()</code></td><td><code>15</code></td></tr>
+<tr><td><code>void reserve(size_type n)</code></td><td>Reserva espaço para <code>n</code> bytes de uma vez, antes de muitos <code>+=</code>. <a href="strings.html">Aula</a></td><td><code>s.reserve(100); s.capacity()</code></td><td><code>100</code></td></tr>
+</table>
+</div>
+
+<h3 id="acesso">Acessar caracteres</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método ou função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>char&amp; operator[](size_type i)</code></td><td>O caractere na posição <code>i</code> (começa em 0). Fora do tamanho: <a href="comportamento-indefinido.html">comportamento indefinido</a>, sem aviso. <a href="acessar-caracteres.html">Aula</a></td><td><code>s[0]</code><br><code>s[5]</code></td><td><code>'b'</code><br><code>'a'</code></td></tr>
+<tr><td><code>char&amp; at(size_type i)</code></td><td>Igual, mas confere: fora do tamanho, lança <code>std::out_of_range</code>. <a href="acessar-caracteres.html">Aula</a></td><td><code>s.at(1)</code><br><code>s.at(10)</code></td><td><code>'a'</code><br>lança <code>std::out_of_range</code><br><small><code>what()</code>: <code>basic_string::at: __n (which is 10) &gt;= this-&gt;size() (which is 6)</code></small></td></tr>
+<tr><td><code>char&amp; front()</code> <span class="versao">C++11</span></td><td>O primeiro caractere (texto não pode estar vazio). <a href="acessar-caracteres.html">Aula</a></td><td><code>s.front()</code></td><td><code>'b'</code></td></tr>
+<tr><td><code>char&amp; back()</code> <span class="versao">C++11</span></td><td>O último caractere. <a href="acessar-caracteres.html">Aula</a></td><td><code>s.back()</code></td><td><code>'a'</code></td></tr>
+<tr><td><code>const char* c_str() const</code></td><td>Um ponteiro para o texto terminado em <code>'\0'</code>, para funções do C. <code>data()</code> é quase igual. <a href="strings.html">Aula</a></td><td><code>std::strlen(s.c_str())</code></td><td><code>6</code></td></tr>
+</table>
+</div>
+
+<h3 id="mudar">Juntar e modificar</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método ou função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>string&amp; operator+=(…)</code></td><td>Acrescenta no fim um texto, um <code>char</code> ou outra <code>string</code>. <a href="concatenacao.html">Aula</a></td><td><code>s += "s"</code><br><code>s += '!'</code></td><td><code>s</code> = <code>"bananas"</code><br><code>s</code> = <code>"banana!"</code></td></tr>
+<tr><td><code>string operator+(a, b)</code></td><td>Junta dois textos num novo. Um dos lados precisa ser <code>std::string</code>: <code>"a" + "b"</code> não compila. <a href="concatenacao.html">Aula</a></td><td><code>s + " madura"</code></td><td><code>"banana madura"</code></td></tr>
+<tr><td><code>string&amp; append(const string&amp; t)</code></td><td>Acrescenta <code>t</code> no fim (como <code>+=</code>). <a href="concatenacao.html">Aula</a></td><td><code>s.append("da")</code></td><td><code>s</code> = <code>"bananada"</code></td></tr>
+<tr><td><code>string&amp; append(size_type n, char c)</code></td><td>Acrescenta <code>n</code> cópias de <code>c</code>. <a href="concatenacao.html">Aula</a></td><td><code>s.append(3, '!')</code></td><td><code>s</code> = <code>"banana!!!"</code></td></tr>
+<tr><td><code>void push_back(char c)</code></td><td>Acrescenta um caractere. <a href="funcoes-string.html">Aula</a></td><td><code>s.push_back('s')</code></td><td><code>s</code> = <code>"bananas"</code></td></tr>
+<tr><td><code>void pop_back()</code> <span class="versao">C++11</span></td><td>Tira o último caractere. <a href="funcoes-string.html">Aula</a></td><td><code>s.pop_back()</code></td><td><code>s</code> = <code>"banan"</code></td></tr>
+<tr><td><code>string&amp; insert(size_type pos, const string&amp; t)</code></td><td>Insere <code>t</code> antes da posição <code>pos</code>. <a href="funcoes-string.html">Aula</a></td><td><code>s.insert(0, "uma ")</code><br><code>s.insert(3, "-")</code></td><td><code>s</code> = <code>"uma banana"</code><br><code>s</code> = <code>"ban-ana"</code></td></tr>
+<tr><td><code>string&amp; erase(size_type pos = 0, size_type n = npos)</code></td><td>Apaga <code>n</code> caracteres a partir de <code>pos</code>; sem <code>n</code>, até o fim. <a href="funcoes-string.html">Aula</a></td><td><code>s.erase(1, 2)</code><br><code>s.erase(3)</code></td><td><code>s</code> = <code>"bana"</code><br><code>s</code> = <code>"ban"</code></td></tr>
+<tr><td><code>string&amp; replace(size_type pos, size_type n, const string&amp; t)</code></td><td>Troca <code>n</code> caracteres a partir de <code>pos</code> por <code>t</code> (de qualquer tamanho). <a href="funcoes-string.html">Aula</a></td><td><code>s.replace(0, 1, "C")</code><br><code>s.replace(2, 4, "")</code></td><td><code>s</code> = <code>"Canana"</code><br><code>s</code> = <code>"ba"</code></td></tr>
+<tr><td><code>string&amp; assign(size_type n, char c)</code></td><td>Substitui o conteúdo por <code>n</code> cópias de <code>c</code>. Também aceita um texto: <code>s.assign("oi")</code>. <a href="strings.html">Aula</a></td><td><code>s.assign(3, 'z')</code></td><td><code>s</code> = <code>"zzz"</code></td></tr>
+<tr><td><code>void swap(string&amp; t)</code></td><td>Troca o conteúdo de duas strings (rápido: não copia o texto). <a href="strings.html">Aula</a></td><td><code>std::string s = "banana"; std::string t = "uva";</code><br><code>s.swap(t)</code></td><td><br><code>s</code> = <code>"uva"</code></td></tr>
+</table>
+</div>
+
+<h3 id="pedacos">Pedaços</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método ou função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>string substr(size_type pos = 0, size_type n = npos) const</code></td><td>Uma <strong>cópia</strong> de <code>n</code> caracteres a partir de <code>pos</code> (atenção: o segundo número é o <strong>tamanho</strong>, não a posição final). <code>pos</code> além do tamanho: <code>std::out_of_range</code>. <a href="funcoes-string.html">Aula</a></td><td><code>s.substr(2)</code><br><code>s.substr(1, 3)</code><br><code>s.substr(4, 100)</code><br><code>s.substr(7)</code></td><td><code>"nana"</code><br><code>"ana"</code><br><code>"na"</code><br>lança <code>std::out_of_range</code><br><small><code>what()</code>: <code>basic_string::substr: __pos (which is 7) &gt; this-&gt;size() (which is 6)</code></small></td></tr>
+</table>
+</div>
+
+<div class="warning">
+<strong><code>substr(início, tamanho)</code>, não <code>(início, fim)</code></strong>
+<p>Quem vem de Java, JavaScript ou Python espera que o segundo número seja a posição final. Em C++ é o <strong>tamanho</strong> do pedaço: <code>s.substr(1, 3)</code> são 3 caracteres a partir da posição 1. Tamanho além do fim não é erro (pega até onde der); <strong>início</strong> além do fim é.</p>
+</div>
+
+<h3 id="procurar">Procurar</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método ou função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>size_type find(const string&amp; t, size_type pos = 0) const</code></td><td>Posição da primeira ocorrência de <code>t</code> a partir de <code>pos</code>, ou <code>npos</code> se não achar. <a href="funcoes-string.html">Aula</a></td><td><code>s.find("na")</code><br><code>s.find("na", 3)</code><br><code>s.find("x")</code></td><td><code>2</code><br><code>4</code><br><code>npos</code></td></tr>
+<tr><td><code>size_type find(char c, size_type pos = 0) const</code></td><td>O mesmo para um caractere. <a href="funcoes-string.html">Aula</a></td><td><code>s.find('a')</code></td><td><code>1</code></td></tr>
+<tr><td><code>size_type rfind(const string&amp; t) const</code></td><td>A <strong>última</strong> ocorrência. <a href="funcoes-string.html">Aula</a></td><td><code>s.rfind("na")</code><br><code>s.rfind('a')</code></td><td><code>4</code><br><code>5</code></td></tr>
+<tr><td><code>size_type find_first_of(const string&amp; cs) const</code></td><td>Primeira posição de <strong>qualquer um</strong> dos caracteres de <code>cs</code>. <a href="funcoes-string.html">Aula</a></td><td><code>s.find_first_of("nb")</code><br><code>std::string t = "Ana;Bia,Caio";</code><br><code>t.find_first_of(",;")</code></td><td><code>0</code><br><br><code>3</code></td></tr>
+<tr><td><code>size_type find_last_of(const string&amp; cs) const</code></td><td>Última posição de qualquer um dos caracteres. <a href="funcoes-string.html">Aula</a></td><td><code>std::string t = "/home/ana/notas.txt";</code><br><code>t.find_last_of("/")</code></td><td><br><code>9</code></td></tr>
+<tr><td><code>size_type find_first_not_of(const string&amp; cs) const</code></td><td>Primeira posição de um caractere que <strong>não</strong> está em <code>cs</code>. Bom para pular espaços. <a href="funcoes-string.html">Aula</a></td><td><code>std::string t = "   oi  ";</code><br><code>t.find_first_not_of(" ")</code></td><td><br><code>3</code></td></tr>
+<tr><td><code>size_type find_last_not_of(const string&amp; cs) const</code></td><td>Última posição de um caractere fora de <code>cs</code>. <a href="funcoes-string.html">Aula</a></td><td><code>std::string t = "   oi  ";</code><br><code>t.find_last_not_of(" ")</code></td><td><br><code>4</code></td></tr>
+<tr><td><code>bool contains(const string&amp; t) const</code> <span class="versao">C++23</span></td><td><code>true</code> se <code>t</code> aparece em algum lugar. <a href="funcoes-string.html">Aula</a></td><td><code>s.contains("nan")</code><br><code>s.contains('x')</code></td><td><code>true</code><br><code>false</code></td></tr>
+<tr><td><code>bool starts_with(const string&amp; t) const</code> <span class="versao">C++20</span></td><td>Começa com <code>t</code>? <a href="funcoes-string.html">Aula</a></td><td><code>s.starts_with("ba")</code></td><td><code>true</code></td></tr>
+<tr><td><code>bool ends_with(const string&amp; t) const</code> <span class="versao">C++20</span></td><td>Termina com <code>t</code>? <a href="funcoes-string.html">Aula</a></td><td><code>s.ends_with("na")</code><br><code>std::string t = "notas.TXT";</code><br><code>t.ends_with(".txt")</code></td><td><code>true</code><br><br><code>false</code></td></tr>
+</table>
+</div>
+
+<div class="cenario">
+<strong>Sempre compare com <code>npos</code></strong>
+<p><code>find</code> devolve um <code>size_t</code>, nunca −1. Escreva <code>if (s.find("x") != std::string::npos)</code>. Um <code>if (s.find("x"))</code> está errado duas vezes: <code>npos</code> é "verdadeiro" e a posição 0, "falso". Se a pergunta é só "tem ou não tem?", use <code>contains</code> (C++23).</p>
+</div>
+
+<h3 id="comparar">Comparar</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método ou função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>==  !=  &lt;  &lt;=  &gt;  &gt;=</code></td><td>Comparam o conteúdo, byte a byte (ordem de dicionário pelos códigos: maiúsculas antes das minúsculas, acentuadas depois de tudo). <a href="strings.html">Aula</a></td><td><code>s == "banana"</code><br><code>s &lt; "bala"</code><br><code>std::string("Zebra") &lt; "abacate"</code></td><td><code>true</code><br><code>false</code><br><code>true</code></td></tr>
+<tr><td><code>int compare(const string&amp; t) const</code></td><td>Negativo se <code>s</code> vem antes, 0 se igual, positivo se vem depois. <a href="funcoes-string.html">Aula</a></td><td><code>s.compare("banana")</code><br><code>s.compare("uva") &lt; 0</code></td><td><code>0</code><br><code>true</code></td></tr>
+<tr><td><code>auto operator&lt;=&gt;(…)</code> <span class="versao">C++20</span></td><td>A “nave espacial”: compara de uma vez (devolve <code>std::strong_ordering</code>). <a href="sobrecarga-operadores.html">Aula</a></td><td><code>(s &lt;=&gt; "uva") &lt; 0</code></td><td><code>true</code></td></tr>
+</table>
+</div>
+
+<h3 id="conv">Texto ↔ número (funções livres, &lt;string&gt;)</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método ou função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>int stoi(const string&amp; s, size_t* pos = nullptr, int base = 10)</code> <span class="versao">C++11</span></td><td>Texto → <code>int</code>. Pula espaços no começo e para no primeiro caractere que não é dígito. Nada aproveitável: <code>std::invalid_argument</code>; grande demais: <code>std::out_of_range</code>. <a href="string-numero.html">Aula</a></td><td><code>std::stoi("42")</code><br><code>std::stoi("  42 reais")</code><br><code>std::stoi("ff", nullptr, 16)</code><br><code>std::stoi("abc")</code><br><code>std::stoi("99999999999")</code></td><td><code>42</code><br><code>42</code><br><code>255</code><br>lança <code>std::invalid_argument</code><br><small><code>what()</code>: <code>stoi</code></small><br>lança <code>std::out_of_range</code><br><small><code>what()</code>: <code>stoi</code></small></td></tr>
+<tr><td><code>long stol(…) · long long stoll(…)</code> <span class="versao">C++11</span></td><td>O mesmo para <code>long</code> e <code>long long</code>. <a href="string-numero.html">Aula</a></td><td><code>std::stoll("99999999999")</code></td><td><code>99999999999</code></td></tr>
+<tr><td><code>unsigned long stoul(…) · stoull(…)</code> <span class="versao">C++11</span></td><td>Para sem sinal. Cuidado: <code>"-1"</code> não dá erro, dá a volta. <a href="string-numero.html">Aula</a></td><td><code>std::stoul("-1")</code></td><td><code>18446744073709551615</code></td></tr>
+<tr><td><code>double stod(const string&amp; s, size_t* pos = nullptr)</code> <span class="versao">C++11</span></td><td>Texto → <code>double</code>. Também <code>stof</code> (<code>float</code>) e <code>stold</code>. Usa ponto decimal. <a href="string-numero.html">Aula</a></td><td><code>std::stod("3.14")</code><br><code>std::stod("2,5")</code><br><code>std::stod("1e3")</code></td><td><code>3.14</code><br><code>2</code><br><code>1000</code></td></tr>
+<tr><td><code>string to_string(número)</code> <span class="versao">C++11</span></td><td>Número → texto. Com <code>double</code>, sempre 6 casas. <a href="string-numero.html">Aula</a></td><td><code>std::to_string(42)</code><br><code>std::to_string(3.14)</code><br><code>std::to_string(0.1 + 0.2)</code></td><td><code>"42"</code><br><code>"3.140000"</code><br><code>"0.300000"</code></td></tr>
+<tr><td><code>string format("…{}…", args…)</code> <span class="versao">C++20</span></td><td>Monta um texto com marcadores <code>{}</code>. Precisa de <code>-std=c++20</code> ou mais. Veja a tabela de máscaras na aula. <a href="format-print.html">Aula</a></td><td><code>std::format("{} tem {} anos", "Ana", 30)</code><br><code>std::format("{:.2f}", 3.14159)</code><br><code>std::format("[{:&gt;6}]", "oi")</code><br><code>std::format("{:05}", 42)</code><br><code>std::format("{}", 0.1 + 0.2)</code></td><td><code>"Ana tem 30 anos"</code><br><code>"3.14"</code><br><code>"[    oi]"</code><br><code>"00042"</code><br><code>"0.30000000000000004"</code></td></tr>
+</table>
+</div>
+
+<h3 id="livres">Outras funções livres</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método ou função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>istream&amp; getline(istream&amp; in, string&amp; s, char delim = '\n')</code></td><td>Lê até o fim da linha (ou até <code>delim</code>), sem guardá-lo. Devolve o fluxo, que vale <code>false</code> no fim da entrada. Exemplo completo <a href="#getline">abaixo</a>. <a href="getline.html">Aula</a></td><td><code>std::istringstream entrada{"Ana;Bia;Caio"}; std::string t;</code><br><code>std::getline(entrada, t, ';'); t</code></td><td><br><code>"Ana"</code></td></tr>
+<tr><td><code>size_t erase(string&amp; s, char c)</code> <span class="versao">C++20</span></td><td>Apaga <strong>todas</strong> as ocorrências de <code>c</code>; devolve quantas apagou. <code>std::erase_if(s, condição)</code> apaga por condição. <a href="funcoes-string.html">Aula</a></td><td><code>std::erase(s, 'a')</code></td><td><code>s</code> = <code>"bnn"</code></td></tr>
+<tr><td><code>ranges::transform(s, s.begin(), f)</code> <span class="versao">C++20</span></td><td>Aplica <code>f</code> a cada caractere (com <code>&lt;algorithm&gt;</code> e <code>&lt;cctype&gt;</code>). Só muda as letras sem acento. <a href="algoritmos.html">Aula</a></td><td><code>std::ranges::transform(s, s.begin(), [](unsigned char c) { return std::toupper(c); })</code></td><td><code>s</code> = <code>"BANANA"</code></td></tr>
+<tr><td><code>ranges::reverse(s)</code> <span class="versao">C++20</span></td><td>Inverte o texto (byte a byte: estraga acentos). <a href="algoritmos.html">Aula</a></td><td><code>std::ranges::reverse(s)</code></td><td><code>s</code> = <code>"ananab"</code></td></tr>
+<tr><td><code>string(size_type n, char c)</code></td><td>Construtor: <code>n</code> cópias de <code>c</code>. <a href="strings.html">Aula</a></td><td><code>std::string(5, '-')</code></td><td><code>"-----"</code></td></tr>
+<tr><td><code>"…"s</code> <span class="versao">C++14</span></td><td>Literal de <code>std::string</code> (com <code>using namespace std::literals;</code>). Permite <code>"a"s + "b"</code>. <a href="strings.html">Aula</a></td><td><code>"ba"s + "na"</code></td><td><code>"bana"</code></td></tr>
+</table>
+</div>
+
+<h3 id="getline">getline × &gt;&gt;</h3>
+<p>O <code>&gt;&gt;</code> lê <strong>uma palavra</strong> (para no espaço); o <code>getline</code> lê <strong>a linha inteira</strong>:</p>
+<pre class="file" data-file="nome.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome;
+    std::cout &lt;&lt; "Nome completo: ";
+    std::getline(std::cin, nome);
+    std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "! (" &lt;&lt; nome.size() &lt;&lt; " bytes)\n";
+
+    std::string primeiro;
+    std::cout &lt;&lt; "De novo: ";
+    std::cin &gt;&gt; primeiro;
+    std::cout &lt;&lt; "Com &gt;&gt;: " &lt;&lt; primeiro &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/ref">$ g++ -std=c++23 -Wall -Wextra nome.cpp -o nome
+$ ./nome
+Nome completo: Ana Maria Souza
+Olá, Ana Maria Souza! (15 bytes)
+De novo: Bruno Lima
+Com &gt;&gt;: Bruno</pre>
+<p>Cuidado ao misturar os dois na ordem contrária: depois de um <code>std::cin &gt;&gt; idade;</code>, o <code>Enter</code> fica esperando, e o próximo <code>getline</code> lê uma linha vazia. A aula <a href="getline.html">getline</a> mostra o problema e o <code>std::ws</code> que resolve.</p>
+
+<div class="trycpp" data-goal="out:notas.txt,src:substr">
+<p class="try-task"><strong>Missão:</strong> o programa deve mostrar só o nome do arquivo, <code>notas.txt</code>, a partir do caminho. Ache a <strong>última</strong> barra com um método da tabela <a href="#procurar">Procurar</a> e pegue o resto com <code>substr</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string caminho = "/home/ana/notas.txt";
+    // seu código aqui
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string caminho = "/home/ana/notas.txt";
+    std::size_t barra = caminho.find_last_of('/');
+    std::string arquivo = caminho.substr(barra + 1);
+    std::cout &lt;&lt; arquivo &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<h3 id="versoes">Por versão do C++</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Versão</th><th>O que chegou para texto</th></tr>
+<tr><td>C++98</td><td><code>std::string</code> com <code>size</code>, <code>find</code>, <code>substr</code>, <code>replace</code>, <code>insert</code>, <code>erase</code>, <code>compare</code>, <code>getline</code>…</td></tr>
+<tr><td>C++11</td><td><code>front</code>, <code>back</code>, <code>pop_back</code>, <code>stoi</code>/<code>stod</code> e família, <code>to_string</code>, <code>u8"…"</code>, raw strings <code>R"(…)"</code>, <code>std::u16string</code>/<code>std::u32string</code>.</td></tr>
+<tr><td>C++14</td><td>Literal <code>"…"s</code>.</td></tr>
+<tr><td>C++17</td><td><a href="string-view.html">std::string_view</a>, <code>std::from_chars</code>/<code>std::to_chars</code> (conversão rápida, sem exceções).</td></tr>
+<tr><td>C++20</td><td><code>starts_with</code>, <code>ends_with</code>, <code>std::format</code>, <code>std::erase</code>/<code>std::erase_if</code>, <code>&lt;=&gt;</code>, <code>char8_t</code> e <code>std::u8string</code>.</td></tr>
+<tr><td>C++23</td><td><code>contains</code>, <code>std::print</code>/<code>std::println</code>, <code>resize_and_overwrite</code>.</td></tr>
+</table>
+</div>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
