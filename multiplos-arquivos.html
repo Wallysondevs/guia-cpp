@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Compilar Vários Arquivos — g++ -c, arquivos .o e ligação | Guia C++</title>
+<meta name="description" content="Compilar um programa C++ de vários arquivos para quem nunca programou: g++ main.cpp calculos.cpp, compilar separado com -c, arquivos .o, ligar, por que isso acelera projetos grandes, o erro undefined reference to (referência não definida), nm e a ordem dos arquivos, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Compilar Vários Arquivos</span></h1>
+
+<p class="intro">Na aula anterior, a Ana dividiu a lojinha em <code>calculos.h</code>, <code>calculos.cpp</code> e <code>main.cpp</code>. Agora vem a pergunta prática: <strong>como transformar vários arquivos em um programa só?</strong> Nesta aula você vai compilar tudo de uma vez, depois compilar cada parte separada e juntar no final, e vai entender por que projetos grandes trabalham assim. No caminho aparece o erro de ligação mais comum do C++, o <code>undefined reference to</code>, e você vai aprender a investigá-lo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como compilar vários <code>.cpp</code> num comando só.</li>
+  <li>O que são as duas fases, <strong>compilação</strong> e <strong>ligação</strong>, e o arquivo <code>.o</code> que fica no meio.</li>
+  <li>Como compilar cada arquivo separado com <code>g++ -c</code> e ligar depois.</li>
+  <li>Por que isso deixa projetos grandes muito mais rápidos de recompilar.</li>
+  <li>Como ler e consertar <code>undefined reference to</code> (em português, "referência não definida para").</li>
+  <li>Se a ordem dos arquivos no comando importa.</li>
+</ul>
+</div>
+
+<p>Todos os comandos desta aula foram executados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), com o <strong>g++ 15.2</strong>, na pasta <code>~/cpp/loja</code> com os três arquivos da aula <a href="headers.html">Arquivos .h e .cpp</a>. Para relembrar, o <code>calculos.h</code> declara duas funções:</p>
+
+<pre class="file" data-file="calculos.h">#pragma once
+
+// Declarações: o "cardápio" do que existe em calculos.cpp
+double calcularTotal(double preco, int quantidade);
+double aplicarDesconto(double valor, double porcento);
+</pre>
+
+<p>O <code>calculos.cpp</code> tem o corpo das duas, e o <code>main.cpp</code> as usa para mostrar o total de 4 itens de R$ 2,50 e o total com 10% de desconto.</p>
+
+<hr>
+
+<h2>A ideia: a fábrica de móveis</h2>
+<p>Uma fábrica de móveis não monta um guarda-roupa inteiro numa bancada só. Uma equipe faz as portas, outra faz as gavetas, outra faz a estrutura. Cada equipe trabalha sozinha, só precisando saber as <strong>medidas</strong> combinadas (onde vai cada parafuso). No fim, a <strong>montagem</strong> junta as peças.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na fábrica</th><th>No C++</th></tr>
+<tr><td>As medidas combinadas</td><td>o <code>.h</code>: as declarações</td></tr>
+<tr><td>Cada equipe fazendo a sua peça</td><td>a <strong>compilação</strong>: cada <code>.cpp</code> vira um <code>.o</code>, sozinho</td></tr>
+<tr><td>A peça pronta, esperando a montagem</td><td>o arquivo <code>.o</code> (<em>objeto</em>)</td></tr>
+<tr><td>A montagem final</td><td>a <strong>ligação</strong> (<em>linking</em>): o ligador junta os <code>.o</code> num programa</td></tr>
+<tr><td>Se a porta mudar, só a equipe da porta trabalha de novo</td><td>se só o <code>calculos.cpp</code> mudar, só ele é recompilado</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. O jeito simples: todos os <code>.cpp</code> num comando</h2>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra main.cpp calculos.cpp -o loja
+$ ./loja
+Total: R$ 10
+Com 10% de desconto: R$ 9</pre>
+
+<dl class="anatomy">
+  <dt>main.cpp calculos.cpp</dt><dd>Todos os arquivos <code>.cpp</code> do programa, separados por espaço. O g++ compila cada um e junta no final.</dd>
+  <dt>(sem o calculos.h)</dt><dd>O <code>.h</code> <strong>não</strong> vai no comando: ele já é colado dentro dos <code>.cpp</code> pelo <code>#include</code>.</dd>
+  <dt>-o loja</dt><dd>O nome do programa final, como sempre.</dd>
+</dl>
+
+<h3>A ordem não importa</h3>
+<p>Para arquivos <code>.cpp</code> (e <code>.o</code>), tanto faz quem vem primeiro. O <code>main</code> não precisa estar no primeiro arquivo:</p>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra calculos.cpp main.cpp -o loja &amp;&amp; ./loja
+Total: R$ 10
+Com 10% de desconto: R$ 9</pre>
+
+<p>O ligador lê todas as peças antes de montar. (Com <strong>bibliotecas</strong>, passadas com <code>-l</code>, a ordem importa; isso fica para <a href="bibliotecas.html">Usar Bibliotecas Externas</a>.)</p>
+
+<h3>Todos os <code>.cpp</code> da pasta: <code>*.cpp</code></h3>
+<p>O curinga <code>*.cpp</code> do terminal vira a lista de todos os arquivos terminados em <code>.cpp</code> da pasta:</p>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra *.cpp -o loja &amp;&amp; ./loja
+Total: R$ 10
+Com 10% de desconto: R$ 9</pre>
+
+<p>É prático, mas pega <strong>tudo</strong>, inclusive um arquivo de teste esquecido na pasta. Veja o que aconteceu quando a Ana tinha deixado lá um <code>teste.cpp</code> com outro <code>main</code>:</p>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra *.cpp -o loja
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccnTvS9K.o: na função "main":
+teste.cpp:(.text+0x0): múltiplas definições de "main"; /tmp/ccY9WJOj.o:main.cpp:(.text+0x0): definido primeiro aqui
+collect2: error: ld returned 1 exit status</pre>
+
+<p>Um programa tem <strong>um</strong> <code>main</code>, e agora havia dois (no <code>teste.cpp</code> e no <code>main.cpp</code>). É o mesmo erro "múltiplas definições" da <a href="headers.html">aula anterior</a>. Ela apagou o <code>teste.cpp</code> e tudo voltou a funcionar.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> o editor do guia faz o mesmo que <code>g++ *.cpp</code>: compila todas as abas <code>.cpp</code> juntas. Rode. Depois acrescente uma terceira função, <code>double calcularFrete(double total)</code>, que devolve <code>0</code> se o total passar de 50 e <code>8.9</code> se não passar: declare no <code>calculos.h</code>, defina no <code>calculos.cpp</code> e mostre o frete no <code>main.cpp</code>.</p>
+<pre class="script" data-file="main.cpp">#include &lt;iostream&gt;
+#include "calculos.h"
+
+int main() {
+    double total = calcularTotal(2.50, 4);
+    std::cout &lt;&lt; "Total: R$ " &lt;&lt; total &lt;&lt; '\n';
+    std::cout &lt;&lt; "Com 10% de desconto: R$ " &lt;&lt; aplicarDesconto(total, 10) &lt;&lt; '\n';
+}
+</pre>
+<pre class="script" data-file="calculos.h">#pragma once
+
+double calcularTotal(double preco, int quantidade);
+double aplicarDesconto(double valor, double porcento);
+</pre>
+<pre class="script" data-file="calculos.cpp">#include "calculos.h"
+
+double calcularTotal(double preco, int quantidade) {
+    return preco * quantidade;
+}
+
+double aplicarDesconto(double valor, double porcento) {
+    return valor - valor * porcento / 100;
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. As duas fases, uma de cada vez</h2>
+<p>Quando você passa vários <code>.cpp</code> ao g++, ele faz por trás:</p>
+<ol class="passo">
+  <li><strong>Compila</strong> cada <code>.cpp</code> separado, sem olhar os outros, e gera um arquivo <strong>objeto</strong> (<code>.o</code>) com o código de máquina daquele arquivo. Nesse momento, as chamadas para funções de outros arquivos ficam "em aberto".</li>
+  <li><strong>Liga</strong> os <code>.o</code>: o ligador (<code>ld</code>) junta as peças, preenche cada chamada em aberto com o endereço da função certa e grava o programa.</li>
+</ol>
+
+<p>Dá para fazer as duas fases à mão. A opção <code>-c</code> (de <em>compile</em>, "só compile") para depois da fase 1:</p>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra -c calculos.cpp
+$ g++ -std=c++23 -Wall -Wextra -c main.cpp
+$ ls -l *.o
+-rw-rw-r-- 1 ana ana 1608 out 16 21:48 calculos.o
+-rw-rw-r-- 1 ana ana 2336 out 16 21:48 main.o</pre>
+
+<dl class="anatomy">
+  <dt>-c</dt><dd>Compila o arquivo e para, sem ligar. Não precisa de <code>-o</code>: o resultado ganha o mesmo nome com <code>.o</code> no lugar de <code>.cpp</code>.</dd>
+  <dt>calculos.o, main.o</dt><dd>Arquivos <strong>objeto</strong>: código de máquina, mas ainda não um programa. Não dá para rodar um <code>.o</code>.</dd>
+  <dt>-std=c++23 -Wall -Wextra</dt><dd>As opções de linguagem e de avisos valem na compilação, então vão em cada <code>-c</code>. Use as <strong>mesmas</strong> em todos os arquivos do projeto.</dd>
+</dl>
+
+<p>O comando <code>file</code> confirma o que é um <code>.o</code>:</p>
+<pre class="term">$ file calculos.o
+calculos.o: ELF 64-bit LSB relocatable, x86-64, version 1 (SYSV), not stripped</pre>
+<p><em>ELF</em> é o formato de programas do Linux; <em>relocatable</em> ("realocável") quer dizer "peça para montagem", com os endereços ainda por decidir. Agora a fase 2, a ligação: passe os <code>.o</code> ao g++, sem <code>-c</code>:</p>
+
+<pre class="term">$ g++ main.o calculos.o -o loja
+$ ./loja
+Total: R$ 10
+Com 10% de desconto: R$ 9</pre>
+
+<p>Para guardar os <code>.o</code> em outra pasta e não misturar com o código, use <code>-o</code> junto com <code>-c</code>:</p>
+<pre class="term">$ mkdir -p build
+$ g++ -std=c++23 -Wall -Wextra -c calculos.cpp -o build/calculos.o</pre>
+
+<hr>
+
+<h2>3. Por que separar acelera projetos grandes</h2>
+<p>A Ana mediu o tempo de cada etapa com o comando <code>time</code> (que mostra quanto um comando demorou; olhe a linha <code>real</code>):</p>
+
+<pre class="term">$ time g++ -std=c++23 -Wall -Wextra main.cpp calculos.cpp -o loja
+
+real	0m1,342s           « tudo de uma vez: 1,3 segundo
+user	0m1,218s
+sys	0m0,123s
+$ time g++ -std=c++23 -Wall -Wextra -c main.cpp
+
+real	0m1,189s           « o main.cpp sozinho: quase tudo
+user	0m1,103s
+sys	0m0,086s
+$ time g++ -std=c++23 -Wall -Wextra -c calculos.cpp
+
+real	0m0,026s           « o calculos.cpp sozinho: 26 milésimos
+user	0m0,018s
+sys	0m0,008s
+$ time g++ main.o calculos.o -o loja
+
+real	0m0,084s           « a ligação: 84 milésimos
+user	0m0,063s
+sys	0m0,021s</pre>
+
+<p>O <code>main.cpp</code> demora porque inclui o <code>&lt;iostream&gt;</code> (lembra das 68 mil linhas da aula <a href="preprocessador.html">O Pré-processador</a>?). Se a Ana mudar só o desconto, no <code>calculos.cpp</code>, ela não precisa compilar o <code>main.cpp</code> de novo: o <code>main.o</code> antigo continua valendo.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mudou só o <code>calculos.cpp</code></th><th>Comandos</th><th>Tempo</th></tr>
+<tr><td>Recompilar tudo</td><td><code>g++ … main.cpp calculos.cpp -o loja</code></td><td>cerca de 1,3 s</td></tr>
+<tr><td>Recompilar só o que mudou</td><td><code>g++ … -c calculos.cpp</code> + <code>g++ main.o calculos.o -o loja</code></td><td>cerca de 0,1 s</td></tr>
+</table>
+</div>
+
+<p>Com dois arquivos, a diferença é de um segundo. Um projeto profissional tem centenas ou milhares de <code>.cpp</code>, e recompilar tudo pode levar minutos ou horas. Por isso <strong>ninguém</strong> recompila tudo a cada mudança: compila-se só o que mudou e liga-se de novo.</p>
+
+<div class="warning">
+<strong>Se o <code>.h</code> mudar, todos que o incluem precisam ser recompilados</strong>
+<p>O <code>.h</code> é colado dentro dos <code>.cpp</code>. Se a Ana mudar o <code>calculos.h</code>, tanto o <code>main.o</code> quanto o <code>calculos.o</code> ficam velhos. Lembrar disso à mão é chato e fácil de errar; é exatamente o trabalho que o <a href="make.html">Make</a> faz por você, e é o assunto da aula seguinte.</p>
+</div>
+
+<hr>
+
+<h2>4. <code>undefined reference to</code>: a peça que faltou na montagem</h2>
+<p>A Ana compilou o <code>main.cpp</code> sozinho, esquecendo o <code>calculos.cpp</code>:</p>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra main.cpp -o loja
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccnBpmNV.o: na função "main":
+main.cpp:(.text+0x1f): referência não definida para "calcularTotal(double, int)"
+/usr/bin/x86_64-linux-gnu-ld.bfd: main.cpp:(.text+0x98): referência não definida para "aplicarDesconto(double, double)"
+collect2: error: ld returned 1 exit status
+$ echo $?
+1</pre>
+
+<dl class="anatomy">
+  <dt>/usr/bin/x86_64-linux-gnu-ld.bfd</dt><dd>Quem fala é o <strong>ligador</strong>. O <code>main.cpp</code> <strong>compilou</strong> sem erro: o <code>calculos.h</code> prometeu que as funções existem, e o compilador acreditou.</dd>
+  <dt>/tmp/ccnBpmNV.o: na função "main"</dt><dd>O <code>.o</code> temporário do <code>main.cpp</code>; o problema está dentro da função <code>main</code>.</dd>
+  <dt>main.cpp:(.text+0x1f)</dt><dd>Um endereço dentro do código de máquina do <code>main.cpp</code>, não um número de linha. Para você, basta saber que é no <code>main.cpp</code>.</dd>
+  <dt>referência não definida para "calcularTotal(double, int)"</dt><dd>O <code>main</code> chama <code>calcularTotal(double, int)</code>, mas nenhuma peça entregue ao ligador tem o corpo dela. A promessa do <code>.h</code> não foi cumprida.</dd>
+  <dt>collect2: error: ld returned 1 exit status</dt><dd>A ligação falhou, e nenhum programa foi gravado.</dd>
+</dl>
+
+<p>Como na aula anterior, a mensagem está em português porque vem do ligador, que tem tradução no Ubuntu. É a mensagem que você mais vai encontrar em inglês nos fóruns, então vale conhecer a versão original:</p>
+
+<pre class="term">$ LANG=C g++ -std=c++23 -Wall -Wextra main.cpp -o loja
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccUwwVgg.o: in function `main':
+main.cpp:(.text+0x1f): undefined reference to `calcularTotal(double, int)'
+/usr/bin/x86_64-linux-gnu-ld.bfd: main.cpp:(.text+0x98): undefined reference to `aplicarDesconto(double, double)'
+collect2: error: ld returned 1 exit status</pre>
+
+<p>No editor do guia (Clang com o ligador <code>wasm-ld</code>), o mesmo problema aparece como <code>undefined symbol</code> ("símbolo indefinido").</p>
+
+<h3>Investigando com <code>nm</code></h3>
+<p>O comando <code>nm</code> lista os <strong>símbolos</strong> (nomes de funções e variáveis) de um <code>.o</code>. A opção <code>-C</code> mostra os nomes do jeito que você escreveu (sem ela, aparecem nomes codificados como <code>_Z13calcularTotaldi</code>):</p>
+
+<pre class="term">$ nm -C calculos.o
+0000000000000000 T calcularTotal(double, int)
+0000000000000020 T aplicarDesconto(double, double)
+$ nm -C main.o | grep -i calcular
+                 U calcularTotal(double, int)</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Letra</th><th>Quer dizer</th><th>Na fábrica</th></tr>
+<tr><td><code>T</code></td><td>o corpo da função está <strong>aqui</strong> (<em>text</em>, a parte do código)</td><td>"eu fabrico esta peça"</td></tr>
+<tr><td><code>U</code></td><td>usado aqui, mas <strong>não definido</strong> (<em>undefined</em>); alguém tem que fornecer</td><td>"eu preciso desta peça"</td></tr>
+</table>
+</div>
+
+<p>Ligar é casar cada <code>U</code> com um <code>T</code> do mesmo nome. Se um <code>U</code> fica sem par, é <code>undefined reference</code>. Ligando só o <code>main.o</code>, o erro é o mesmo:</p>
+
+<pre class="term">$ g++ main.o -o loja
+/usr/bin/x86_64-linux-gnu-ld.bfd: main.o: na função "main":
+main.cpp:(.text+0x1f): referência não definida para "calcularTotal(double, int)"
+/usr/bin/x86_64-linux-gnu-ld.bfd: main.cpp:(.text+0x98): referência não definida para "aplicarDesconto(double, double)"
+collect2: error: ld returned 1 exit status</pre>
+
+<div class="cenario">
+<strong>"Referência não definida", mas o <code>.cpp</code> está no comando!</strong>
+<p>Na pasta <code>~/cpp/errada</code>, a Ana passou os dois arquivos e mesmo assim:</p>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra main.cpp calculos.cpp -o loja
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccT46yI7.o: na função "main":
+main.cpp:(.text+0x1f): referência não definida para "calcularTotal(double, int)"
+collect2: error: ld returned 1 exit status</pre>
+<p><strong>O que aconteceu:</strong> olhe o <code>calculos.cpp</code> dela:</p>
+<pre class="file" data-file="calculos.cpp">#include "calculos.h"
+
+double calcularTotal(double preco, double quantidade) {
+    return preco * quantidade;
+}
+…</pre>
+<p>O <code>.h</code> promete <code>calcularTotal(double, <strong>int</strong>)</code>, mas o <code>.cpp</code> define <code>calcularTotal(double, <strong>double</strong>)</code>. Para o C++, são duas funções diferentes (é a <a href="sobrecarga.html">sobrecarga</a>): o <code>main</code> pede a com <code>int</code>, e só existe a com <code>double</code>. O ligador procura pelo nome <strong>e</strong> pelos tipos dos parâmetros, que aparecem na mensagem: <code>"calcularTotal(double, int)"</code>.</p>
+<p><strong>Como resolver:</strong> deixe a declaração e a definição idênticas. Compare a mensagem com o <code>.cpp</code>, letra por letra.</p>
+</div>
+
+<h3>Lista de suspeitos do <code>undefined reference</code></h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Suspeito</th><th>Como conferir</th></tr>
+<tr><td>Esqueceu um <code>.cpp</code> no comando</td><td>o arquivo com o corpo da função está na linha do <code>g++</code>?</td></tr>
+<tr><td>Declaração e definição com tipos diferentes</td><td>compare os tipos da mensagem com a definição</td></tr>
+<tr><td>Nome diferente (<code>calcularTotal</code> × <code>calculaTotal</code>)</td><td><code>nm -C arquivo.o</code> mostra o nome que foi gerado</td></tr>
+<tr><td>A função foi declarada, mas ninguém escreveu o corpo</td><td>procure a definição (com <code>{</code>) no projeto</td></tr>
+<tr><td>Falta uma biblioteca (<code>-l…</code>)</td><td>veja <a href="bibliotecas.html">Usar Bibliotecas Externas</a></td></tr>
+</table>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Erro</th><th>Fase</th><th>Tem <code>arquivo:linha</code>?</th><th>Significa</th></tr>
+<tr><td><code>‘x’ was not declared in this scope</code></td><td>compilação</td><td>sim</td><td>faltou a <strong>declaração</strong> (o <code>#include</code>)</td></tr>
+<tr><td><code>undefined reference to</code> / <code>referência não definida para</code></td><td>ligação</td><td>não</td><td>faltou a <strong>definição</strong> (o corpo)</td></tr>
+<tr><td><code>multiple definition of</code> / <code>múltiplas definições de</code></td><td>ligação</td><td>não</td><td>tem definição <strong>demais</strong></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Formas de compilar: qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Quando usar</th></tr>
+<tr><td>Tudo num comando</td><td><code>g++ … main.cpp calculos.cpp -o loja</code></td><td>projetos pequenos, testes rápidos</td></tr>
+<tr><td>Curinga</td><td><code>g++ … *.cpp -o loja</code></td><td>uma pasta que só tem o programa (cuidado com sobras)</td></tr>
+<tr><td>Separado: <code>-c</code> e depois ligar</td><td><code>g++ … -c x.cpp</code> + <code>g++ *.o -o loja</code></td><td>entender o processo; base para o Make</td></tr>
+<tr><td><a href="make.html">Make</a></td><td><code>make</code></td><td>projetos com vários arquivos: recompila só o que mudou, sozinho</td></tr>
+<tr><td><a href="cmake.html">CMake</a></td><td><code>cmake --build build</code></td><td>projetos de verdade, em vários sistemas e IDEs</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Comando</th><th>O que faz</th></tr>
+<tr><td><code>g++ a.cpp b.cpp -o prog</code></td><td>compila e liga tudo</td></tr>
+<tr><td><code>g++ -c a.cpp</code></td><td>só compila: gera <code>a.o</code></td></tr>
+<tr><td><code>g++ -c a.cpp -o build/a.o</code></td><td>só compila, com outro nome ou pasta</td></tr>
+<tr><td><code>g++ a.o b.o -o prog</code></td><td>só liga</td></tr>
+<tr><td><code>nm -C a.o</code></td><td>lista os símbolos (<code>T</code> = definido aqui, <code>U</code> = precisa de fora)</td></tr>
+<tr><td><code>file a.o</code></td><td>diz o tipo do arquivo</td></tr>
+<tr><td><code>LANG=C comando</code></td><td>roda o comando com as mensagens em inglês</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Só compilar</h3>
+<p>Complete para gerar o <code>estoque.o</code>, sem ligar:</p>
+<div class="ex-code">g++ -std=c++23 -Wall -Wextra <input data-answer="-c" aria-label="opção" size="4"> estoque.cpp</div>
+</div>
+
+<div class="exercise">
+<h3>2. Só ligar</h3>
+<p>Complete para ligar <code>main.o</code> e <code>estoque.o</code> num programa chamado <code>loja</code>:</p>
+<div class="ex-code">g++ <input data-answer="main.o estoque.o|estoque.o main.o" aria-label="arquivos"> -o loja</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Em que fase aparece <code>undefined reference to `calcularTotal(double, int)'</code>?</p>
+<label><input type="radio" name="q3"> No pré-processamento.</label>
+<label><input type="radio" name="q3"> Na ligação.</label>
+<label><input type="radio" name="q3"> Na compilação do <code>main.cpp</code>.</label>
+<label><input type="radio" name="q3"> Quando o programa roda.</label>
+</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Num projeto com 200 arquivos <code>.cpp</code>, a Ana mudou só o <code>frete.cpp</code>. O que precisa ser feito?</p>
+<label><input type="radio" name="q4"> Recompilar os 200 arquivos.</label>
+<label><input type="radio" name="q4"> Só ligar de novo, sem compilar nada.</label>
+<label><input type="radio" name="q4"> Recompilar o <code>frete.cpp</code> e ligar de novo.</label>
+<label><input type="radio" name="q4"> Recompilar o <code>main.cpp</code>, porque o <code>main</code> chama tudo.</label>
+</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="1">
+<p class="mc-q">5. O que o <code>U</code> quer dizer em <code>U calcularTotal(double, int)</code>, na saída do <code>nm -C main.o</code>?</p>
+<label><input type="radio" name="q5"> O <code>main.o</code> usa essa função, mas o corpo dela está em outro lugar.</label>
+<label><input type="radio" name="q5"> A função foi definida no <code>main.o</code>.</label>
+<label><input type="radio" name="q5"> A função não é usada.</label>
+<label><input type="radio" name="q5"> A função tem um erro.</label>
+</div>
+</div>
+
+<h3>Missão: provoque o erro de ligação</h3>
+
+<div class="trycpp" data-goal="erro:/undefined symbol|undefined reference|referência não definida/">
+<p class="try-task"><strong>Missão:</strong> no editor não existe "esquecer um arquivo no comando", porque todas as abas <code>.cpp</code> entram. Simule o esquecimento: <strong>apague a função <code>aplicarDesconto</code> inteira do <code>calculos.cpp</code></strong> (deixe a declaração no <code>.h</code>) e rode. Repare que o erro não aponta uma linha: é a ligação reclamando da peça que faltou.</p>
+<pre class="script" data-file="main.cpp">#include &lt;iostream&gt;
+#include "calculos.h"
+
+int main() {
+    double total = calcularTotal(2.50, 4);
+    std::cout &lt;&lt; "Total: R$ " &lt;&lt; total &lt;&lt; '\n';
+    std::cout &lt;&lt; "Com 10% de desconto: R$ " &lt;&lt; aplicarDesconto(total, 10) &lt;&lt; '\n';
+}
+</pre>
+<pre class="script" data-file="calculos.h">#pragma once
+
+double calcularTotal(double preco, int quantidade);
+double aplicarDesconto(double valor, double porcento);
+</pre>
+<pre class="script" data-file="calculos.cpp">#include "calculos.h"
+
+double calcularTotal(double preco, int quantidade) {
+    return preco * quantidade;
+}
+
+double aplicarDesconto(double valor, double porcento) {
+    return valor - valor * porcento / 100;
+}
+</pre>
+<pre class="solucao" data-file="calculos.cpp">#include "calculos.h"
+
+double calcularTotal(double preco, int quantidade) {
+    return preco * quantidade;
+}
+</pre>
+</div>
+
+<h3>Missão final: cumpra a promessa do <code>.h</code></h3>
+
+<div class="trycpp" data-goal="compila,out:Total: R$ 30,out:Troco: R$ 20">
+<p class="try-task"><strong>Missão:</strong> o <code>calculos.h</code> promete duas funções, mas o projeto não liga. Leia a mensagem: qual função falta e com que tipos? Uma delas foi escrita com o tipo errado no <code>calculos.cpp</code>, e a outra nem foi escrita. Conserte <strong>só o <code>calculos.cpp</code></strong> (o troco é <code>pago - total</code>). A saída deve ser:</p>
+<pre class="out">Total: R$ 30
+Troco: R$ 20</pre>
+<pre class="script" data-file="main.cpp">#include &lt;iostream&gt;
+#include "calculos.h"
+
+int main() {
+    double total = calcularTotal(7.50, 4);
+    std::cout &lt;&lt; "Total: R$ " &lt;&lt; total &lt;&lt; '\n';
+    std::cout &lt;&lt; "Troco: R$ " &lt;&lt; calcularTroco(50, total) &lt;&lt; '\n';
+}
+</pre>
+<pre class="script" data-file="calculos.h">#pragma once
+
+double calcularTotal(double preco, int quantidade);
+double calcularTroco(double pago, double total);
+</pre>
+<pre class="script" data-file="calculos.cpp">#include "calculos.h"
+
+double calcularTotal(double preco, double quantidade) {
+    return preco * quantidade;
+}
+</pre>
+<pre class="solucao" data-file="calculos.cpp">#include "calculos.h"
+
+double calcularTotal(double preco, int quantidade) {
+    return preco * quantidade;
+}
+
+double calcularTroco(double pago, double total) {
+    return pago - total;
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Para um programa de vários arquivos, passe <strong>todos os <code>.cpp</code></strong> ao g++ (nunca o <code>.h</code>). A ordem dos <code>.cpp</code> não importa.</li>
+  <li>Por trás, são duas fases: <strong>compilação</strong> (cada <code>.cpp</code> vira um <code>.o</code>, sozinho) e <strong>ligação</strong> (o <code>ld</code> junta os <code>.o</code>).</li>
+  <li><code>g++ -c x.cpp</code> só compila; <code>g++ a.o b.o -o prog</code> só liga. Assim, quando um arquivo muda, só ele é recompilado.</li>
+  <li><code>undefined reference to</code> ("referência não definida para") é do ligador: uma função foi declarada e usada, mas o corpo não chegou. Suspeitos: <code>.cpp</code> esquecido, tipos diferentes entre <code>.h</code> e <code>.cpp</code>, nome diferente, biblioteca faltando.</li>
+  <li><code>nm -C arquivo.o</code> mostra o que cada peça fornece (<code>T</code>) e o que ela precisa (<code>U</code>).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
