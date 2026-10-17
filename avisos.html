@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Avisos (-Wall -Wextra) — os warnings que salvam programas | Guia C++</title>
+<meta name="description" content="Avisos do compilador C++ para quem nunca programou: aviso × erro, -Wall e -Wextra, variável não usada, = no lugar de == no if, comparação entre int e unsigned, variável sem valor (e o aviso que só aparece com -O2), -Werror e por que nunca ignorar um warning, com mensagens e resultados reais do g++ 15 e do Clang 21.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Avisos</span> (-Wall -Wextra)</h1>
+
+<p class="intro">Um <strong>erro</strong> impede o programa de existir. Um <strong>aviso</strong> (<em>warning</em>) deixa o programa ser criado, mas o compilador comenta: "isto aqui está com cara de engano". Muitos iniciantes ignoram os avisos, porque "o programa rodou". Nesta aula você vai ver, com resultados reais, programas que compilam, rodam e <strong>dão a resposta errada</strong>, e como o compilador avisou de cada um deles, se alguém tivesse pedido.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A diferença entre aviso e erro, e como reconhecer um aviso na tela.</li>
+  <li>O que <code>-Wall</code> e <code>-Wextra</code> ligam, e por que não vêm ligados de fábrica.</li>
+  <li>Quatro avisos que salvam programas: variável não usada, <code>=</code> no lugar de <code>==</code>, comparação entre <code>int</code> e <code>unsigned</code> e variável sem valor.</li>
+  <li>Por que alguns avisos só aparecem com <code>-O2</code>.</li>
+  <li>O <code>-Werror</code>, que transforma avisos em erros.</li>
+  <li>Por que a meta é sempre <strong>zero avisos</strong>.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados na máquina da Ana com o g++ 15.2 e o clang++ 21.1. Alguns usam recursos das próximas aulas (variáveis, <code>if</code>); para esta aula, basta entender a ideia de cada um, que está explicada ao lado.</p>
+
+<hr>
+
+<h2>A ideia: a luz do painel do carro</h2>
+<p>Quando a luz do óleo acende no painel, o carro continua andando. Dá para ir trabalhar, voltar, passar a semana assim. Até o dia em que o motor funde. A luz não era o problema: era o aviso do problema.</p>
+
+<p>Os avisos do compilador são essas luzes. E, por padrão, o g++ vem com quase todas elas <strong>desligadas</strong>, para não incomodar quem compila código antigo. As opções <code>-Wall</code> e <code>-Wextra</code>, que você conheceu em <a href="compilar.html">Compilar com g++</a>, acendem o painel.</p>
+
+<hr>
+
+<h2>1. Aviso × erro</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Erro (<code>error:</code>)</th><th>Aviso (<code>warning:</code>)</th></tr>
+<tr><td>O código segue as regras do C++?</td><td>Não</td><td>Sim</td></tr>
+<tr><td>O programa é criado?</td><td>Não</td><td>Sim</td></tr>
+<tr><td>Quer dizer que…</td><td>"Não entendi o que você escreveu."</td><td>"Entendi, mas duvido que você quisesse isso."</td></tr>
+<tr><td>No fim da mensagem</td><td>(nada)</td><td>O nome do aviso entre colchetes, como <code>[-Wunused-variable]</code></td></tr>
+</table>
+</div>
+
+<p>Um aviso tem o mesmo formato de um erro (aula <a href="erros-compilacao.html">Lendo Erros do Compilador</a>), com <code>warning:</code> no lugar de <code>error:</code>:</p>
+
+<pre class="file" data-file="compras.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int itens = 3;
+    std::cout &lt;&lt; "Lista de compras da Ana\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/avisos">$ g++ -std=c++23 compras.cpp -o compras
+$                        « sem -Wall: silêncio
+$ g++ -std=c++23 -Wall -Wextra compras.cpp -o compras
+compras.cpp: In function ‘int main()’:
+compras.cpp:4:9: warning: unused variable ‘itens’ [-Wunused-variable]
+    4 |     int itens = 3;
+      |         ^~~~~</pre>
+
+<dl class="anatomy">
+  <dt>compras.cpp:4:9:</dt><dd>Arquivo, linha e coluna, como num erro.</dd>
+  <dt>warning:</dt><dd>"Aviso". O programa <strong>foi</strong> criado.</dd>
+  <dt>unused variable ‘itens’</dt><dd>"Variável não usada: <code>itens</code>." A Ana guardou o número 3 e nunca mais olhou para ele.</dd>
+  <dt>[-Wunused-variable]</dt><dd>O nome do aviso. É a opção que o liga (e o termo para pesquisar, se a mensagem não ficar clara). Ele faz parte do grupo <code>-Wall</code>.</dd>
+</dl>
+
+<p>Uma variável não usada não quebra nada. Mas ela é uma pista: ou sobrou de uma versão antiga do código (apague), ou você <strong>esqueceu</strong> de usá-la (a Ana queria mostrar "3 itens"). O aviso apontou o esquecimento.</p>
+
+<hr>
+
+<h2>2. O que <code>-Wall</code> e <code>-Wextra</code> ligam</h2>
+<ul>
+  <li><strong><code>-Wall</code></strong> (<em>all</em>, "todos"): liga os avisos que quase sempre indicam um problema real. Apesar do nome, não são todos.</li>
+  <li><strong><code>-Wextra</code></strong> (<em>extra</em>): liga mais alguns, um pouco mais exigentes.</li>
+</ul>
+
+<p>Um exemplo do <code>-Wextra</code>: a <code>main</code> pode receber as palavras digitadas depois do nome do programa (<code>argc</code> e <code>argv</code>). Declarar e não usar dá aviso:</p>
+
+<pre class="term" data-cwd="~/avisos">$ g++ -std=c++23 -Wall -Wextra args.cpp -o args          « int main(int argc, char* argv[]) {
+args.cpp: In function ‘int main(int, char**)’:
+args.cpp:3:14: warning: unused parameter ‘argc’ [-Wunused-parameter]
+    3 | int main(int argc, char* argv[]) {
+      |          ~~~~^~~~
+args.cpp:3:26: warning: unused parameter ‘argv’ [-Wunused-parameter]
+    3 | int main(int argc, char* argv[]) {
+      |                    ~~~~~~^~~~~~</pre>
+
+<p><strong>Correção:</strong> se a <code>main</code> não usa os argumentos, escreva só <code>int main()</code>.</p>
+
+<p>O Clang, o compilador do editor do guia, reconhece as mesmas opções e dá os avisos com os mesmos nomes entre colchetes. O editor compila sempre com <code>-Wall -Wextra</code> e mostra os avisos em cima da saída do programa.</p>
+
+<hr>
+
+<h2>3. Avisos que salvam programas</h2>
+
+<h3>3.1. <code>=</code> no lugar de <code>==</code></h3>
+<p>Em C++, <code>=</code> <strong>guarda</strong> um valor (atribuição) e <code>==</code> <strong>compara</strong> dois valores (aulas <a href="operadores-atribuicao.html">Atribuição</a> e <a href="operadores-comparacao.html">Comparação</a>). Trocar um pelo outro é um dos erros mais comuns da programação. A Ana tirou 4 e quer parabenizar só quem tirou 10:</p>
+
+<pre class="file" data-file="igual.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int nota = 4;
+    if (nota = 10) {
+        std::cout &lt;&lt; "Nota máxima!\n";
+    }
+    std::cout &lt;&lt; "A nota é " &lt;&lt; nota &lt;&lt; "\n";
+}
+</pre>
+
+<p>O <code>if</code> ("se") executa o bloco só se a condição for verdadeira (aula <a href="if-else.html">if e else</a>). Ela queria escrever "se a nota <strong>for igual a</strong> 10", mas escreveu "<strong>guarde</strong> 10 na nota":</p>
+
+<pre class="term" data-cwd="~/avisos">$ g++ -std=c++23 igual.cpp -o igual &amp;&amp; ./igual
+Nota máxima!             « errado: a nota era 4!
+A nota é 10              « e pior: o 4 foi apagado e virou 10</pre>
+
+<p>Compila em silêncio, roda, e as duas linhas estão erradas. Com <code>-Wall</code>:</p>
+
+<pre class="term" data-cwd="~/avisos">$ g++ -std=c++23 -Wall -Wextra igual.cpp -o igual &amp;&amp; ./igual
+igual.cpp: In function ‘int main()’:
+igual.cpp:5:14: warning: suggest parentheses around assignment used as truth value [-Wparentheses]
+    5 |     if (nota = 10) {
+      |         ~~~~~^~~~
+Nota máxima!
+A nota é 10</pre>
+
+<p>"Sugiro parênteses em volta da atribuição usada como valor de verdade." Em outras palavras: "você usou uma atribuição (<code>=</code>) como condição; se era isso mesmo, ponha parênteses extras para eu saber". Quase nunca era. O Clang é ainda mais claro e oferece as duas saídas:</p>
+
+<pre class="term" data-cwd="~/avisos">$ clang++ -std=c++23 -Wall -Wextra igual.cpp -o igual
+igual.cpp:5:14: warning: using the result of an assignment as a condition without parentheses [-Wparentheses]
+    5 |     if (nota = 10) {
+      |         ~~~~~^~~~
+igual.cpp:5:14: note: place parentheses around the assignment to silence this warning
+    5 |     if (nota = 10) {
+      |              ^
+      |         (        )
+igual.cpp:5:14: note: use '==' to turn this assignment into an equality comparison
+    5 |     if (nota = 10) {
+      |              ^
+      |              ==
+1 warning generated.</pre>
+
+<p>A segunda nota: "use <code>==</code> para transformar esta atribuição numa comparação de igualdade". <strong>Correção:</strong> <code>if (nota == 10)</code>.</p>
+
+<div class="trycpp" data-goal="out:A nota é 4,semaviso">
+<p class="try-task"><strong>Missão:</strong> rode e veja o aviso (o editor compila com <code>-Wall -Wextra</code>). Corrija o programa para que ele não mostre "Nota máxima!" para uma nota 4 e compile <strong>sem nenhum aviso</strong>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int nota = 4;
+    if (nota = 10) {
+        std::cout &lt;&lt; "Nota máxima!\n";
+    }
+    std::cout &lt;&lt; "A nota é " &lt;&lt; nota &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int nota = 4;
+    if (nota == 10) {
+        std::cout &lt;&lt; "Nota máxima!\n";
+    }
+    std::cout &lt;&lt; "A nota é " &lt;&lt; nota &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<h3>3.2. Comparar <code>int</code> com <code>unsigned</code></h3>
+<p>O C++ tem números inteiros <strong>com sinal</strong> (<code>int</code>, que aceita negativos) e <strong>sem sinal</strong> (<code>unsigned int</code>, só zero e positivos). Misturar os dois numa comparação dá um resultado surpreendente. A Ana está com o saldo negativo, −1, e o limite é 10:</p>
+
+<pre class="file" data-file="sinal.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int saldo = -1;
+    unsigned int limite = 10;
+    if (saldo &lt; limite) {
+        std::cout &lt;&lt; "Saldo abaixo do limite\n";
+    } else {
+        std::cout &lt;&lt; "Saldo OK\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/avisos">$ g++ -std=c++23 sinal.cpp -o sinal &amp;&amp; ./sinal
+Saldo OK                 « −1 não é menor que 10?!</pre>
+
+<p>−1 é menor que 10, mas o programa disse que não. O que aconteceu: para comparar, o C++ converteu o <code>-1</code> para <code>unsigned</code>, e −1 sem sinal vira um número enorme (4294967295). E esse número não é menor que 10. Os detalhes estão em <a href="inteiros.html">Inteiros</a>; o que importa aqui é que o <code>-Wall</code> avisa:</p>
+
+<pre class="term" data-cwd="~/avisos">$ g++ -std=c++23 -Wall -Wextra sinal.cpp -o sinal &amp;&amp; ./sinal
+sinal.cpp: In function ‘int main()’:
+sinal.cpp:6:15: warning: comparison of integer expressions of different signedness: ‘int’ and ‘unsigned int’ [-Wsign-compare]
+    6 |     if (saldo &lt; limite) {
+      |         ~~~~~~^~~~~~~~
+Saldo OK
+$ clang++ -std=c++23 -Wall -Wextra sinal.cpp -o sinal
+sinal.cpp:6:15: warning: comparison of integers of different signs: 'int' and 'unsigned int' [-Wsign-compare]
+    6 |     if (saldo &lt; limite) {
+      |         ~~~~~ ^ ~~~~~~
+1 warning generated.</pre>
+
+<p>"Comparação de expressões inteiras com sinais diferentes: <code>int</code> e <code>unsigned int</code>." <strong>Correção:</strong> compare valores do mesmo tipo (aqui, <code>int limite = 10;</code>). Você vai reencontrar esse aviso ao percorrer um <a href="vector.html">std::vector</a> com <code>int</code>.</p>
+
+<h3>3.3. Variável sem valor</h3>
+<p>Em C++, uma variável criada sem valor inicial (<code>int pontos;</code>) não vale zero: ela contém o que estiver naquele pedaço da memória, um valor "lixo". Usá-la antes de dar um valor é <a href="comportamento-indefinido.html">comportamento indefinido</a>: o programa pode fazer qualquer coisa.</p>
+
+<pre class="file" data-file="semvalor.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int pontos;
+    std::cout &lt;&lt; "Pontos: " &lt;&lt; pontos &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/avisos">$ g++ -std=c++23 semvalor.cpp -o semvalor &amp;&amp; ./semvalor
+Pontos: 0                « deu 0 por sorte; não conte com isso
+$ g++ -std=c++23 -Wall -Wextra semvalor.cpp -o semvalor
+semvalor.cpp: In function ‘int main()’:
+semvalor.cpp:5:32: warning: ‘pontos’ is used uninitialized [-Wuninitialized]
+    5 |     std::cout &lt;&lt; "Pontos: " &lt;&lt; pontos &lt;&lt; "\n";
+      |                                ^~~~~~
+semvalor.cpp:4:9: note: ‘pontos’ was declared here
+    4 |     int pontos;
+      |         ^~~~~~
+$ clang++ -std=c++23 -Wall -Wextra semvalor.cpp -o semvalor
+semvalor.cpp:5:32: warning: variable 'pontos' is uninitialized when used here [-Wuninitialized]
+    5 |     std::cout &lt;&lt; "Pontos: " &lt;&lt; pontos &lt;&lt; "\n";
+      |                                ^~~~~~
+semvalor.cpp:4:15: note: initialize the variable 'pontos' to silence this warning
+    4 |     int pontos;
+      |               ^
+      |                = 0
+1 warning generated.</pre>
+
+<p>"<code>pontos</code> é usada sem ter sido inicializada" (sem valor inicial), e a nota diz onde ela foi criada. O Clang sugere a correção, <code>= 0</code>. <strong>Correção:</strong> dê sempre um valor ao criar a variável: <code>int pontos = 0;</code>. É uma regra deste guia desde a aula <a href="variaveis.html">Variáveis</a>.</p>
+
+<h3>3.4. O aviso que só aparece com <code>-O2</code></h3>
+<p>No caso acima, a variável nunca recebe valor, e o g++ percebe isso de cara. Mas quando ela recebe valor <strong>às vezes</strong>, perceber exige uma análise mais funda do programa, que o g++ só faz quando otimiza (<code>-O2</code>, aula <a href="compilar.html">Compilar</a>). Neste programa (o <code>std::cin</code> lê um número do teclado e o <code>switch</code> escolhe um caso; aulas <a href="entrada-cin.html">Entrada com cin</a> e <a href="switch.html">switch</a>), o desconto só recebe valor para os tipos 1 e 2:</p>
+
+<pre class="file" data-file="v1.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int tipo = 0;
+    std::cin &gt;&gt; tipo;
+    int desconto;
+    switch (tipo) {
+        case 1: desconto = 5; break;
+        case 2: desconto = 10; break;
+    }
+    std::cout &lt;&lt; "Desconto: " &lt;&lt; desconto &lt;&lt; "%\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/avisos">$ g++ -std=c++23 -Wall -Wextra v1.cpp -o v1
+$                        « sem -O2: nenhum aviso
+$ g++ -std=c++23 -Wall -Wextra -O2 v1.cpp -o v1
+v1.cpp: In function ‘int main()’:
+v1.cpp:11:34: warning: ‘desconto’ may be used uninitialized [-Wmaybe-uninitialized]
+   11 |     std::cout &lt;&lt; "Desconto: " &lt;&lt; desconto &lt;&lt; "%\n";
+      |                                  ^~~~~~~~
+v1.cpp:6:9: note: ‘desconto’ was declared here
+    6 |     int desconto;
+      |         ^~~~~~~~
+$ echo 1 | ./v1          « o echo … | digita o número para o programa
+Desconto: 5%
+$ echo 3 | ./v1
+Desconto: 5%             « tipo 3 não tem desconto, mas o programa deu 5%!</pre>
+
+<p>"<code>desconto</code> <strong>pode</strong> ser usada sem valor" (<em>may be</em>: em alguns caminhos, sim). E o resultado mostra o perigo: para o tipo 3, o programa inventou um desconto de 5%. Sem <code>-O2</code>, a mesma entrada deu <code>Desconto: 0%</code>: o lixo muda conforme a compilação. Por isso, de vez em quando, compile também com <code>-O2</code> só para ver se aparecem avisos novos. (O Clang 21 não avisa neste caso, nem com <code>-O2</code>: cada compilador enxerga coisas diferentes.)</p>
+
+<p><strong>Correção:</strong> <code>int desconto = 0;</code>. Com um valor inicial, todos os caminhos ficam cobertos.</p>
+
+<h3>3.5. Outros avisos que você vai encontrar</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Aviso (g++)</th><th>Exemplo</th><th>O que quer dizer</th></tr>
+<tr><td><code>statement has no effect [-Wunused-value]</code></td><td><code>total == 20;</code></td><td>Uma comparação solta, que não faz nada. Provavelmente era <code>total = 20;</code>. (Clang: <code>equality comparison result unused</code>, e sugere o <code>=</code>.)</td></tr>
+<tr><td><code>right operand of comma operator has no effect</code></td><td><code>std::cout &lt;&lt; "a", "b";</code></td><td>Vírgula no lugar de <code>&lt;&lt;</code> (aula <a href="saida-cout.html">Saída com cout</a>).</td></tr>
+<tr><td><code>multi-line comment [-Wcomment]</code></td><td><code>// C:\fotos\</code></td><td>A linha seguinte virou comentário (aula <a href="comentarios.html">Comentários</a>).</td></tr>
+<tr><td><code>no return statement in function returning non-void [-Wreturn-type]</code></td><td>Função que promete devolver um valor e não devolve</td><td>Esse vem ligado até sem <code>-Wall</code>, de tão grave (aula <a href="retorno.html">Retorno</a>).</td></tr>
+<tr><td><code>unused parameter [-Wunused-parameter]</code></td><td><code>int main(int argc, char* argv[])</code> sem usar</td><td>Parâmetro recebido e ignorado (<code>-Wextra</code>).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>4. <code>-Werror</code>: avisos viram erros</h2>
+<p>Com <code>-Werror</code>, todo aviso passa a ser tratado como erro, e o programa <strong>não</strong> é criado:</p>
+
+<pre class="term" data-cwd="~/avisos">$ g++ -std=c++23 -Wall -Wextra -Werror igual.cpp -o igual
+igual.cpp: In function ‘int main()’:
+igual.cpp:5:14: error: suggest parentheses around assignment used as truth value [-Werror=parentheses]
+    5 |     if (nota = 10) {
+      |         ~~~~~^~~~
+cc1plus: all warnings being treated as errors
+$ echo $?
+1
+$ g++ -std=c++23 -Wall -Wextra -Werror compras.cpp -o compras
+compras.cpp: In function ‘int main()’:
+compras.cpp:4:9: error: unused variable ‘itens’ [-Werror=unused-variable]
+    4 |     int itens = 3;
+      |         ^~~~~
+cc1plus: all warnings being treated as errors</pre>
+
+<p>Repare: <code>warning:</code> virou <code>error:</code>, o nome entre colchetes virou <code>[-Werror=…]</code>, e a última linha explica: "todos os avisos estão sendo tratados como erros". O Clang marca assim: <code>[-Werror,-Wunused-variable]</code>.</p>
+
+<p><strong>Quando usar?</strong> Em projetos sérios, o <code>-Werror</code> costuma estar ligado no sistema de compilação (<a href="make.html">Make</a>, <a href="cmake.html">CMake</a>) e nos servidores que testam cada mudança: ninguém consegue entregar código com aviso. Para quem está aprendendo, é uma ótima disciplina: ligue-o e o compilador não deixa você "deixar para depois".</p>
+
+<hr>
+
+<h2>5. Por que nunca ignorar avisos</h2>
+<ol>
+  <li><strong>Os avisos apontam bugs reais.</strong> Os quatro exemplos da seção 3 compilavam e rodavam, e todos davam resultado errado.</li>
+  <li><strong>Avisos se acumulam.</strong> Um aviso "inofensivo" hoje vira dez amanhã, e o aviso importante se perde no meio deles. Com zero avisos, qualquer aviso novo salta aos olhos.</li>
+  <li><strong>O compilador sabe mais que você</strong> sobre as armadilhas da linguagem. O C++ tem muitas, e os avisos são décadas de experiência resumidas.</li>
+  <li><strong>Corrigir na hora é barato.</strong> O mesmo engano, achado depois que o programa está nas mãos de alguém, custa muito mais.</li>
+</ol>
+
+<div class="warning">
+<strong>Não "conserte" calando o compilador</strong>
+<p>Existe a opção <code>-w</code> (minúsculo), que <strong>desliga todos os avisos</strong>:</p>
+<pre class="term" data-cwd="~/avisos">$ g++ -std=c++23 -w igual.cpp -o igual
+$                        « o aviso sumiu; o erro do programa continua lá</pre>
+<p>É apagar a luz do óleo em vez de pôr óleo. Não use. A correção de um aviso é sempre mudar o <strong>código</strong>.</p>
+</div>
+
+<p>A regra do guia: <strong>compile sempre com <code>-Wall -Wextra</code> e só considere o programa pronto quando a compilação estiver em silêncio</strong>. As missões do editor muitas vezes exigem isso (a meta "sem avisos").</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"O programa rodou, mas o resultado está errado"</strong>
+<p><strong>O que significa:</strong> muitas vezes, o compilador sabia. Você compilou sem <code>-Wall -Wextra</code>, ou viu o aviso e ignorou.</p>
+<p><strong>Como consertar:</strong> compile de novo com <code>-Wall -Wextra</code> (e, para garantir, com <code>-O2</code> também) e leia cada <code>warning:</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>suggest parentheses around assignment used as truth value</code></strong>
+<p><strong>O que significa:</strong> um <code>=</code> dentro de um <code>if</code> (ou <code>while</code>). Quase sempre era <code>==</code>.</p>
+<p><strong>Como consertar:</strong> troque por <code>==</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>comparison of integer expressions of different signedness</code></strong>
+<p><strong>O que significa:</strong> você está comparando um número que aceita negativos com um que não aceita. Se o primeiro for negativo, o resultado sai errado.</p>
+<p><strong>Como consertar:</strong> use o mesmo tipo dos dois lados.</p>
+</div>
+
+<div class="cenario">
+<strong><code>is used uninitialized</code> / <code>may be used uninitialized</code></strong>
+<p><strong>O que significa:</strong> uma variável é lida antes de receber valor (sempre, ou em algum caminho).</p>
+<p><strong>Como consertar:</strong> dê um valor inicial na criação: <code>int x = 0;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>cc1plus: all warnings being treated as errors</code></strong>
+<p><strong>O que significa:</strong> o comando tem <code>-Werror</code>; um aviso impediu a criação do programa.</p>
+<p><strong>Como consertar:</strong> corrija o aviso indicado acima dessa linha. (Tirar o <code>-Werror</code> só esconde o problema.)</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Opção</th><th>O que faz</th></tr>
+<tr><td><code>-Wall</code></td><td>Liga os avisos principais (sempre use)</td></tr>
+<tr><td><code>-Wextra</code></td><td>Liga avisos extras (sempre use)</td></tr>
+<tr><td><code>-O2</code></td><td>Otimiza; de quebra, revela avisos como <code>-Wmaybe-uninitialized</code></td></tr>
+<tr><td><code>-Werror</code></td><td>Trata avisos como erros: o programa não é criado</td></tr>
+<tr><td><code>-w</code></td><td>Desliga todos os avisos (não use)</td></tr>
+</table>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Aviso</th><th>Grupo</th><th>Correção típica</th></tr>
+<tr><td><code>unused variable</code></td><td><code>-Wall</code></td><td>Use a variável ou apague-a</td></tr>
+<tr><td><code>unused parameter</code></td><td><code>-Wextra</code></td><td>Tire o parâmetro ou use-o</td></tr>
+<tr><td><code>suggest parentheses around assignment</code></td><td><code>-Wall</code></td><td><code>=</code> → <code>==</code></td></tr>
+<tr><td><code>different signedness</code></td><td><code>-Wall</code> (no C++)</td><td>Mesmo tipo dos dois lados</td></tr>
+<tr><td><code>is used uninitialized</code></td><td><code>-Wall</code></td><td>Valor inicial: <code>int x = 0;</code></td></tr>
+<tr><td><code>may be used uninitialized</code></td><td><code>-Wall</code> + <code>-O2</code></td><td>Valor inicial: <code>int x = 0;</code></td></tr>
+<tr><td><code>statement has no effect</code></td><td><code>-Wall</code></td><td>Provavelmente <code>==</code> → <code>=</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Ligar os avisos</h3>
+<p>Complete o comando padrão do guia:</p>
+<div class="ex-code">g++ -std=c++23 <input data-answer="-Wall" aria-label="opção 1" size="6"> <input data-answer="-Wextra" aria-label="opção 2" size="8"> jogo.cpp -o jogo</div>
+</div>
+
+<div class="exercise">
+<h3>2. Avisos como erros</h3>
+<p>Que opção faz qualquer aviso impedir a criação do programa?</p>
+<div class="ex-code">g++ -std=c++23 -Wall -Wextra <input data-answer="-Werror" aria-label="opção" size="8"> jogo.cpp -o jogo</div>
+</div>
+
+<div class="exercise">
+<h3>3. Corrija a condição</h3>
+<p>Complete para comparar, e não guardar:</p>
+<div class="ex-code">if (pontos <input data-answer="==" aria-label="operador" size="3"> 100) {</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O que acontece quando a compilação dá só um <code>warning:</code>?</p>
+<label><input type="radio" name="q4"> O programa não é criado</label>
+<label><input type="radio" name="q4"> O programa é criado, mas o compilador apaga a linha do aviso</label>
+<label><input type="radio" name="q4"> O programa é criado; o aviso aponta um provável engano que você deve corrigir</label>
+<label><input type="radio" name="q4"> O computador fica mais lento</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Por que <code>if (saldo &lt; limite)</code>, com <code>saldo = -1</code> (<code>int</code>) e <code>limite = 10</code> (<code>unsigned</code>), deu falso?</p>
+<label><input type="radio" name="q5"> Porque −1 é maior que 10</label>
+<label><input type="radio" name="q5"> Porque o −1 foi convertido para <code>unsigned</code> e virou um número enorme</label>
+<label><input type="radio" name="q5"> Porque faltou o <code>-O2</code></label>
+<label><input type="radio" name="q5"> Porque o <code>if</code> não aceita números negativos</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Qual é a forma certa de lidar com um aviso?</p>
+<label><input type="radio" name="q6"> Compilar com <code>-w</code> para ele sumir</label>
+<label><input type="radio" name="q6"> Ignorar, já que o programa rodou</label>
+<label><input type="radio" name="q6"> Tirar o <code>-Wall</code> do comando</label>
+<label><input type="radio" name="q6"> Entender a mensagem e mudar o código até a compilação ficar em silêncio</label>
+</div>
+
+<h3>Missão final: zero avisos</h3>
+
+<div class="trycpp" data-goal="out:Estoque da lojinha,out:Canetas: 0,out:Repor canetas!,semaviso">
+<p class="try-task"><strong>Missão:</strong> este programa da lojinha compila com <strong>três avisos</strong> e mostra coisas erradas. Corrija o código (não use <code>-w</code>!) até a compilação ficar sem nenhum aviso e a saída ser:</p>
+<pre class="out">Estoque da lojinha
+Canetas: 0
+Repor canetas!</pre>
+<p class="try-task">Dicas: uma variável sobrando, uma variável sem valor (as canetas começam em 0) e um <code>=</code> que deveria ser <code>==</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int cadernos = 12;
+    int canetas;
+    std::cout &lt;&lt; "Estoque da lojinha\n";
+    std::cout &lt;&lt; "Canetas: " &lt;&lt; canetas &lt;&lt; "\n";
+    if (canetas = 0) {
+        std::cout &lt;&lt; "Repor canetas!\n";
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int canetas = 0;
+    std::cout &lt;&lt; "Estoque da lojinha\n";
+    std::cout &lt;&lt; "Canetas: " &lt;&lt; canetas &lt;&lt; "\n";
+    if (canetas == 0) {
+        std::cout &lt;&lt; "Repor canetas!\n";
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um aviso (<code>warning:</code>) não impede a criação do programa, mas quase sempre aponta um engano real.</li>
+  <li>O g++ vem com quase todos os avisos desligados. <code>-Wall -Wextra</code> os ligam: use sempre.</li>
+  <li>Avisos que salvam programas: <code>=</code> no lugar de <code>==</code>, <code>int</code> comparado com <code>unsigned</code>, variável sem valor, variável não usada.</li>
+  <li>Alguns avisos (<code>may be used uninitialized</code>) só aparecem com <code>-O2</code>; compile com ele de vez em quando.</li>
+  <li><code>-Werror</code> transforma avisos em erros; <code>-w</code> esconde todos (não use).</li>
+  <li>A meta é <strong>zero avisos</strong>: a correção é sempre mudar o código.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
