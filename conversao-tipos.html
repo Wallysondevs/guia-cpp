@@ -508,7 +508,8 @@ texto.cpp:4:17: error: invalid conversion from ‘const char*’ to ‘int’ [-
 <div class="cenario">
 <strong>A média deu 8, mas deveria dar 8.5</strong>
 <pre class="term" data-cwd="~/cpp">$ ./media
-Errada: 8</pre>
+Errada: 8          « a média sem static_cast
+Certa: 8.5</pre>
 <p><strong>O que aconteceu:</strong> a divisão <code>soma / provas</code> foi feita entre dois <code>int</code>, então foi inteira. Guardar o resultado num <code>double</code> não recupera o que já foi cortado. Nenhum compilador avisa, porque a divisão inteira é uma operação válida.</p>
 <p><strong>Como resolver:</strong> converta um dos lados <strong>antes</strong> da divisão: <code>static_cast&lt;double&gt;(soma) / provas</code>. Cuidado para não escrever <code>static_cast&lt;double&gt;(soma / provas)</code>, que converte depois.</p>
 </div>

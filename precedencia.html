@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Precedência — a ordem dos operadores e os parênteses | Guia C++</title>
+<meta name="description" content="Precedência e associatividade dos operadores em C++ para quem nunca programou: a tabela completa, exemplos reais como 2 + 3 * 4, a &lt; b == c, !a == b e o erro de cout &lt;&lt; a &amp; b, os avisos -Wparentheses do g++ 15 e a regra de ouro: use parênteses.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Precedência</span></h1>
+
+<p class="intro">Nas aulas anteriores você conheceu muitos operadores: aritméticos, de atribuição, de comparação, lógicos, <code>++</code>. Numa expressão com vários deles, como <code>a + b * c &gt; d &amp;&amp; !e</code>, quem é calculado primeiro? A resposta está em duas regras: a <strong>precedência</strong> (quais operadores "têm prioridade") e a <strong>associatividade</strong> (o que fazer quando dois operadores têm a mesma prioridade). Esta aula reúne essas regras numa tabela, mostra os enganos clássicos com saídas e mensagens reais e termina com o conselho mais importante: <strong>na dúvida, use parênteses</strong>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que são precedência e associatividade.</li>
+  <li>A tabela de precedência do C++, com os operadores que você já conhece destacados.</li>
+  <li>Por que <code>a &lt; b == c</code>, <code>!a == b</code> e <code>n &amp; 1 == 0</code> não fazem o que parecem, e os avisos do g++ para cada um.</li>
+  <li>Por que <code>std::cout &lt;&lt; a &amp; b</code> dá erro de compilação.</li>
+  <li>Como misturar <code>&amp;&amp;</code> e <code>||</code> sem surpresas.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: a ordem das operações da escola</h2>
+<p>Na escola você aprendeu que, em 2 + 3 × 4, a multiplicação vem antes da soma, e a resposta é 14, não 20. Também aprendeu que os parênteses mudam a ordem: (2 + 3) × 4 = 20. O C++ segue a mesma ideia, só que com <strong>muito mais operadores</strong>, e por isso precisa de uma tabela.</p>
+<p>Pense numa fila de prioridade no hospital: quem tem prioridade maior é atendido primeiro, não importa a posição na fila. Entre pacientes de mesma prioridade, vale a ordem de chegada. No C++:</p>
+<ul>
+  <li><strong>Precedência</strong> = a prioridade. O operador de precedência maior "pega" seus operandos primeiro. <code>*</code> tem precedência maior que <code>+</code>.</li>
+  <li><strong>Associatividade</strong> = o desempate entre operadores de mesma prioridade. A maioria é da <strong>esquerda para a direita</strong> (<code>10 - 4 - 3</code> é <code>(10 - 4) - 3</code>); alguns são da <strong>direita para a esquerda</strong> (<code>a = b = 0</code> é <code>a = (b = 0)</code>).</li>
+</ul>
+<p>O efeito da precedência é <strong>agrupar</strong>: é como se o C++ colocasse parênteses invisíveis na sua expressão. Entender a precedência é saber onde ele colocaria esses parênteses.</p>
+
+<hr>
+
+<h2>1. Exemplos com contas</h2>
+
+<pre class="file" data-file="ordem.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; 2 + 3 * 4 &lt;&lt; '\n';
+    std::cout &lt;&lt; (2 + 3) * 4 &lt;&lt; '\n';
+    std::cout &lt;&lt; 10 - 4 - 3 &lt;&lt; '\n';
+    std::cout &lt;&lt; 100 / 10 * 2 &lt;&lt; '\n';
+    std::cout &lt;&lt; 7 / 2 * 2 &lt;&lt; '\n';
+    std::cout &lt;&lt; 7 * 2 / 2 &lt;&lt; '\n';
+    std::cout &lt;&lt; -3 * -2 &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ordem.cpp -o ordem
+$ ./ordem
+14       « 2 + (3 * 4): precedência
+20       « parênteses mandam
+3        « (10 - 4) - 3: associatividade da esquerda para a direita
+20       « (100 / 10) * 2, e não 100 / (10 * 2)
+6        « (7 / 2) * 2 = 3 * 2: a divisão inteira veio primeiro
+7        « (7 * 2) / 2 = 14 / 2
+6        « (-3) * (-2): o menos unário vem antes de tudo</pre>
+
+<p>Os parênteses invisíveis que o C++ colocou estão nas anotações. Nas linhas 5 e 6 a associatividade muda o resultado, porque a divisão de inteiros corta (veja <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>).</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> antes de rodar, calcule cada linha de cabeça. Depois coloque parênteses em lugares diferentes (por exemplo, <code>20 - (5 - 2)</code> ou <code>2 * (3 + 4) * 5</code>) e veja como o resultado muda.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; 20 - 5 - 2 &lt;&lt; '\n';
+    std::cout &lt;&lt; 2 * 3 + 4 * 5 &lt;&lt; '\n';
+    std::cout &lt;&lt; 30 / 5 / 3 &lt;&lt; '\n';
+    std::cout &lt;&lt; 17 % 5 * 2 &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. A tabela de precedência</h2>
+<p>Da prioridade <strong>mais alta</strong> (calculada primeiro) para a <strong>mais baixa</strong>. Operadores na mesma linha têm a mesma prioridade, e a coluna "Associatividade" diz como desempatar. Os operadores marcados com ★ já apareceram no guia; os outros vêm em aulas futuras, e estão aqui para a tabela ficar completa.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Nível</th><th>Operadores</th><th>O que são</th><th>Associatividade</th></tr>
+<tr><td>1</td><td><code>::</code></td><td>Escopo (<code>std::cout</code>) ★</td><td>esquerda → direita</td></tr>
+<tr><td>2</td><td><code>x++ x--</code> <code>f()</code> <code>a[i]</code> <code>.</code> <code>-&gt;</code></td><td>Pós-incremento ★, chamada de função, índice, membro</td><td>esquerda → direita</td></tr>
+<tr><td>3</td><td><code>++x --x</code> <code>+x -x</code> <code>!</code> <code>~</code> <code>(tipo)</code> <code>*p</code> <code>&amp;x</code> <code>sizeof</code> <code>new</code> <code>delete</code></td><td>Pré-incremento ★, sinal ★, "não" ★, cast estilo C ★, ponteiros</td><td><strong>direita → esquerda</strong></td></tr>
+<tr><td>4</td><td><code>.*</code> <code>-&gt;*</code></td><td>Ponteiro para membro (raro)</td><td>esquerda → direita</td></tr>
+<tr><td>5</td><td><code>*</code> <code>/</code> <code>%</code></td><td>Multiplicação, divisão, resto ★</td><td>esquerda → direita</td></tr>
+<tr><td>6</td><td><code>+</code> <code>-</code></td><td>Soma, subtração ★</td><td>esquerda → direita</td></tr>
+<tr><td>7</td><td><code>&lt;&lt;</code> <code>&gt;&gt;</code></td><td>Deslocamento de bits; no <code>cout</code>/<code>cin</code>, saída e entrada ★</td><td>esquerda → direita</td></tr>
+<tr><td>8</td><td><code>&lt;=&gt;</code></td><td>Nave espacial (C++20) ★</td><td>esquerda → direita</td></tr>
+<tr><td>9</td><td><code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code></td><td>Comparação ★</td><td>esquerda → direita</td></tr>
+<tr><td>10</td><td><code>==</code> <code>!=</code></td><td>Igualdade ★</td><td>esquerda → direita</td></tr>
+<tr><td>11</td><td><code>&amp;</code></td><td>E de bits ★</td><td>esquerda → direita</td></tr>
+<tr><td>12</td><td><code>^</code></td><td>Ou exclusivo de bits ★</td><td>esquerda → direita</td></tr>
+<tr><td>13</td><td><code>|</code></td><td>Ou de bits ★</td><td>esquerda → direita</td></tr>
+<tr><td>14</td><td><code>&amp;&amp;</code></td><td>E lógico ★</td><td>esquerda → direita</td></tr>
+<tr><td>15</td><td><code>||</code></td><td>Ou lógico ★</td><td>esquerda → direita</td></tr>
+<tr><td>16</td><td><code>? :</code> <code>=</code> <code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code> <code>%=</code> <code>&lt;&lt;=</code> <code>&gt;&gt;=</code> <code>&amp;=</code> <code>^=</code> <code>|=</code> <code>throw</code></td><td>Ternário, atribuições ★</td><td><strong>direita → esquerda</strong></td></tr>
+<tr><td>17</td><td><code>,</code></td><td>Vírgula</td><td>esquerda → direita</td></tr>
+</table>
+</div>
+
+<p>As palavras <code>and</code>, <code>or</code> e <code>not</code> têm exatamente a precedência de <code>&amp;&amp;</code>, <code>||</code> e <code>!</code>. O ternário <code>? :</code> tem aula própria: <a href="ternario.html">Operador Ternário</a>.</p>
+
+<h3>Não precisa decorar: grave o desenho geral</h3>
+<ol>
+  <li><strong>Unários</strong> (<code>!</code>, <code>-x</code>, <code>++</code>) grudam no valor e vêm antes de tudo.</li>
+  <li>Depois, as <strong>contas</strong>: <code>* / %</code>, depois <code>+ -</code>.</li>
+  <li>Depois o <code>&lt;&lt;</code> / <code>&gt;&gt;</code> do <code>cout</code>/<code>cin</code>.</li>
+  <li>Depois as <strong>comparações</strong>: primeiro <code>&lt; &gt; &lt;= &gt;=</code>, depois <code>== !=</code>.</li>
+  <li>Depois os de <strong>bits</strong> <code>&amp; ^ |</code> (sim, abaixo das comparações: isso causa problemas).</li>
+  <li>Depois a <strong>lógica</strong>: <code>&amp;&amp;</code> antes de <code>||</code>.</li>
+  <li>Por último, a <strong>atribuição</strong>: tudo à direita do <code>=</code> é calculado antes de guardar.</li>
+</ol>
+<p>Em frase: <em>"unário, conta, cout, compara, bits, lógica, guarda"</em>. Essa ordem permite escrever sem parênteses coisas muito comuns, como <code>bool ok = a + b &gt; 10 &amp;&amp; c != 0;</code>, que o C++ lê como <code>bool ok = (((a + b) &gt; 10) &amp;&amp; (c != 0));</code>.</p>
+
+<hr>
+
+<h2>3. Onde a precedência engana</h2>
+<p>Agora os casos em que a ordem do C++ <strong>não</strong> é a que a gente espera. Em quase todos, o g++ dá um aviso da família <code>-Wparentheses</code> (que vem com o <code>-Wall</code>): ele desconfia que você quis outra coisa e sugere parênteses.</p>
+
+<h3><code>a &lt; b == c</code></h3>
+
+<pre class="file" data-file="prec1.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int a = 5;
+    int b = 3;
+    int c = 0;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; (a &lt; b == c) &lt;&lt; '\n';
+    std::cout &lt;&lt; ((a &lt; b) == c) &lt;&lt; '\n';
+    std::cout &lt;&lt; (a &lt; (b == c)) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra prec1.cpp -o prec1
+prec1.cpp: In function ‘int main()’:
+prec1.cpp:8:21: warning: suggest parentheses around comparison in operand of ‘==’ [-Wparentheses]
+    8 |     std::cout &lt;&lt; (a &lt; b == c) &lt;&lt; '\n';
+      |                   ~~^~~
+$ ./prec1
+true     « sem parênteses: igual à linha de baixo
+true     « (5 &lt; 3) == 0 → false == 0 → true
+false    « 5 &lt; (3 == 0) → 5 &lt; false → 5 &lt; 0 → false</pre>
+
+<p>O <code>&lt;</code> (nível 9) vem antes do <code>==</code> (nível 10). Então <code>a &lt; b == c</code> é <code>(a &lt; b) == c</code>: o resultado <code>bool</code> da primeira comparação é comparado com um número. Quem escreve isso raramente quer dizer isso. O aviso: "sugiro parênteses em volta da comparação no operando de <code>==</code>". Escreva os parênteses que você quer, e ele some.</p>
+
+<h3><code>!a == b</code></h3>
+
+<pre class="file" data-file="prec2.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int estoque = 0;
+    int minimo = 5;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; (!estoque == minimo) &lt;&lt; '\n';
+    std::cout &lt;&lt; !(estoque == minimo) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra prec2.cpp -o prec2
+prec2.cpp: In function ‘int main()’:
+prec2.cpp:7:28: warning: logical not is only applied to the left hand side of comparison [-Wlogical-not-parentheses]
+    7 |     std::cout &lt;&lt; (!estoque == minimo) &lt;&lt; '\n';
+      |                            ^~
+prec2.cpp:7:19: note: add parentheses around left hand side expression to silence this warning
+    7 |     std::cout &lt;&lt; (!estoque == minimo) &lt;&lt; '\n';
+      |                   ^~~~~~~~
+      |                   (       )
+$ ./prec2
+false    « (!0) == 5 → true == 5 → 1 == 5 → false
+true     « !(0 == 5) → !false → true</pre>
+
+<p>A intenção era "o estoque <strong>não</strong> é igual ao mínimo?". Mas o <code>!</code> é unário (nível 3) e gruda só no <code>estoque</code>: o C++ calculou <code>!estoque</code> (estoque 0 vira <code>true</code>) e comparou com 5. O aviso explica isso com todas as letras: "o não lógico só é aplicado ao lado esquerdo da comparação", e mostra onde ficariam os parênteses do jeito que o C++ entendeu. Para perguntar "diferente", o mais simples é o operador próprio: <code>estoque != minimo</code>.</p>
+
+<h3><code>n &amp; 1 == 0</code></h3>
+<p>Um teste de par com bits (<code>n &amp; 1</code> é o último bit: 0 para par, 1 para ímpar). Os operadores de bits ficam <strong>abaixo</strong> das comparações:</p>
+
+<pre class="file" data-file="prec4.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int n = 4;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; (n &amp; 1 == 0) &lt;&lt; '\n';
+    std::cout &lt;&lt; ((n &amp; 1) == 0) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra prec4.cpp -o prec4
+prec4.cpp: In function ‘int main()’:
+prec4.cpp:6:25: warning: suggest parentheses around comparison in operand of ‘&amp;’ [-Wparentheses]
+    6 |     std::cout &lt;&lt; (n &amp; 1 == 0) &lt;&lt; '\n';
+      |                       ~~^~~~
+$ ./prec4
+0        « n &amp; (1 == 0) → 4 &amp; false → 4 &amp; 0 → 0 (um número, nem é bool!)
+true     « (4 &amp; 1) == 0 → 0 == 0 → true</pre>
+
+<p>Essa ordem estranha é herança do C dos anos 1970, em que <code>&amp;</code> e <code>|</code> faziam o papel de <code>&amp;&amp;</code> e <code>||</code>. Foi mantida para não quebrar programas antigos. Moral: com <code>&amp;</code>, <code>|</code> e <code>^</code>, <strong>sempre</strong> parênteses.</p>
+
+<h3>Misturando <code>&amp;&amp;</code> e <code>||</code></h3>
+<p>O <code>&amp;&amp;</code> (nível 14) vem antes do <code>||</code> (nível 15), assim como a multiplicação vem antes da soma. A regra da loja: "ganha desconto quem é VIP <strong>ou</strong> tem cupom, <strong>e</strong> a compra passa de 100". Escrevendo como se fala:</p>
+
+<pre class="file" data-file="prec6.cpp">#include &lt;iostream&gt;
+
+int main() {
+    bool cliente_vip = true;
+    bool tem_cupom = false;
+    int total = 50;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; (cliente_vip || tem_cupom &amp;&amp; total &gt; 100) &lt;&lt; '\n';
+    std::cout &lt;&lt; (cliente_vip || (tem_cupom &amp;&amp; total &gt; 100)) &lt;&lt; '\n';
+    std::cout &lt;&lt; ((cliente_vip || tem_cupom) &amp;&amp; total &gt; 100) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra prec6.cpp -o prec6
+prec6.cpp: In function ‘int main()’:
+prec6.cpp:8:44: warning: suggest parentheses around ‘&amp;&amp;’ within ‘||’ [-Wparentheses]
+    8 |     std::cout &lt;&lt; (cliente_vip || tem_cupom &amp;&amp; total &gt; 100) &lt;&lt; '\n';
+      |                                  ~~~~~~~~~~^~~~~~~~~~~~~~
+$ ./prec6
+true     « sem parênteses: VIP ganha desconto mesmo comprando 50
+true     « é assim que o C++ leu: vip || (cupom &amp;&amp; total &gt; 100)
+false    « a regra da loja: (vip || cupom) &amp;&amp; total &gt; 100</pre>
+
+<p>Sem parênteses, o C++ juntou <code>tem_cupom &amp;&amp; total &gt; 100</code> primeiro, e o VIP ganhou desconto numa compra de 50 reais. O aviso "sugiro parênteses em volta do <code>&amp;&amp;</code> dentro do <code>||</code>" aparece justamente porque essa mistura costuma ser engano. Mesmo quando a ordem do C++ é a que você quer, coloque os parênteses: o aviso some e quem lê não precisa lembrar da tabela.</p>
+
+<hr>
+
+<h2>4. O <code>&lt;&lt;</code> do <code>cout</code> e a precedência</h2>
+<p>O <code>&lt;&lt;</code> foi criado para deslocar bits, e o <code>cout</code> "pegou ele emprestado" para mostrar valores. A precedência, porém, continua a de deslocamento (nível 7): <strong>abaixo</strong> das contas, mas <strong>acima</strong> das comparações, dos operadores de bits e da lógica. Por isso:</p>
+
+<pre class="file" data-file="prec5.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int a = 6;
+    int b = 3;
+    std::cout &lt;&lt; a + b &lt;&lt; '\n';
+    std::cout &lt;&lt; (a &amp; b) &lt;&lt; '\n';
+    std::cout &lt;&lt; (a &gt; b) &lt;&lt; '\n';
+    std::cout &lt;&lt; (a &gt; b &amp;&amp; b &gt; 0) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra prec5.cpp -o prec5
+$ ./prec5
+9        « a + b sem parênteses funciona: + vem antes de &lt;&lt;
+2        « 6 &amp; 3 (110 &amp; 011 = 010)
+1
+1</pre>
+
+<p>A conta <code>a + b</code> funciona sem parênteses. As outras três <strong>precisam</strong> deles. Veja o que acontece sem os parênteses do <code>&amp;</code>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat prec3.cpp
+#include &lt;iostream&gt;
+
+int main() {
+    int a = 6;
+    int b = 3;
+    std::cout &lt;&lt; a &amp; b;
+    std::cout &lt;&lt; '\n';
+}
+$ g++ -std=c++23 -Wall -Wextra prec3.cpp -o prec3
+prec3.cpp: In function ‘int main()’:
+prec3.cpp:6:20: error: no match for ‘operator&amp;’ (operand types are ‘std::basic_ostream&lt;char&gt;::__ostream_type’ {aka ‘std::basic_ostream&lt;char&gt;’} and ‘int’)
+    6 |     std::cout &lt;&lt; a &amp; b;
+      |     ~~~~~~~~~~~~~~ ^ ~
+      |               |      |
+      |               |      int
+      |               std::basic_ostream&lt;char&gt;::__ostream_type {aka std::basic_ostream&lt;char&gt;}
+prec3.cpp:6:20: note: there are 6 candidates
+    6 |     std::cout &lt;&lt; a &amp; b;
+      |     ~~~~~~~~~~~~~~~^~~
+prec3.cpp:6:20: note: candidate 1: ‘operator&amp;(int, int)’ (built-in)
+prec3.cpp:6:20: note: no known conversion for argument 1 from ‘std::basic_ostream&lt;char&gt;::__ostream_type’ {aka ‘std::basic_ostream&lt;char&gt;’} to ‘int’
+In file included from /usr/include/c++/15/bits/memory_resource.h:40,
+                 from /usr/include/c++/15/string:72,
+                 from /usr/include/c++/15/bits/locale_classes.h:42,
+                 from /usr/include/c++/15/bits/ios_base.h:43,
+                 from /usr/include/c++/15/ios:46,
+                 from /usr/include/c++/15/bits/ostream.h:43,
+                 from /usr/include/c++/15/ostream:42,
+                 from /usr/include/c++/15/iostream:43,
+                 from prec3.cpp:1:
+/usr/include/c++/15/cstddef:146:3: note: candidate 2: ‘constexpr std::byte std::operator&amp;(byte, byte)’
+  146 |   operator&amp;(byte __l, byte __r) noexcept
+      |   ^~~~~~~~
+/usr/include/c++/15/cstddef:146:18: note: no known conversion for argument 1 from ‘std::basic_ostream&lt;char&gt;::__ostream_type’ {aka ‘std::basic_ostream&lt;char&gt;’} to ‘std::byte’
+  146 |   operator&amp;(byte __l, byte __r) noexcept
+      |             ~~~~~^~~
+/usr/include/c++/15/bits/ios_base.h:86:3: note: candidate 3: ‘constexpr std::_Ios_Fmtflags std::operator&amp;(_Ios_Fmtflags, _Ios_Fmtflags)’
+   86 |   operator&amp;(_Ios_Fmtflags __a, _Ios_Fmtflags __b) _GLIBCXX_NOTHROW
+      |   ^~~~~~~~
+/usr/include/c++/15/bits/ios_base.h:86:27: note: no known conversion for argument 1 from ‘std::basic_ostream&lt;char&gt;::__ostream_type’ {aka ‘std::basic_ostream&lt;char&gt;’} to ‘std::_Ios_Fmtflags’
+   86 |   operator&amp;(_Ios_Fmtflags __a, _Ios_Fmtflags __b) _GLIBCXX_NOTHROW
+      |             ~~~~~~~~~~~~~~^~~
+/usr/include/c++/15/bits/ios_base.h:145:3: note: candidate 4: ‘constexpr std::_Ios_Openmode std::operator&amp;(_Ios_Openmode, _Ios_Openmode)’
+  145 |   operator&amp;(_Ios_Openmode __a, _Ios_Openmode __b) _GLIBCXX_NOTHROW
+      |   ^~~~~~~~
+/usr/include/c++/15/bits/ios_base.h:145:27: note: no known conversion for argument 1 from ‘std::basic_ostream&lt;char&gt;::__ostream_type’ {aka ‘std::basic_ostream&lt;char&gt;’} to ‘std::_Ios_Openmode’
+  145 |   operator&amp;(_Ios_Openmode __a, _Ios_Openmode __b) _GLIBCXX_NOTHROW
+      |             ~~~~~~~~~~~~~~^~~
+/usr/include/c++/15/bits/ios_base.h:192:3: note: candidate 5: ‘constexpr std::_Ios_Iostate std::operator&amp;(_Ios_Iostate, _Ios_Iostate)’
+  192 |   operator&amp;(_Ios_Iostate __a, _Ios_Iostate __b) _GLIBCXX_NOTHROW
+      |   ^~~~~~~~
+/usr/include/c++/15/bits/ios_base.h:192:26: note: no known conversion for argument 1 from ‘std::basic_ostream&lt;char&gt;::__ostream_type’ {aka ‘std::basic_ostream&lt;char&gt;’} to ‘std::_Ios_Iostate’
+  192 |   operator&amp;(_Ios_Iostate __a, _Ios_Iostate __b) _GLIBCXX_NOTHROW
+      |             ~~~~~~~~~~~~~^~~
+In file included from /usr/include/c++/15/format:46,
+                 from /usr/include/c++/15/ostream:44:
+/usr/include/c++/15/charconv:637:3: note: candidate 6: ‘constexpr std::chars_format std::operator&amp;(chars_format, chars_format)’
+  637 |   operator&amp;(chars_format __lhs, chars_format __rhs) noexcept
+      |   ^~~~~~~~
+/usr/include/c++/15/charconv:637:26: note: no known conversion for argument 1 from ‘std::basic_ostream&lt;char&gt;::__ostream_type’ {aka ‘std::basic_ostream&lt;char&gt;’} to ‘std::chars_format’
+  637 |   operator&amp;(chars_format __lhs, chars_format __rhs) noexcept
+      |             ~~~~~~~~~~~~~^~~~~</pre>
+
+<p>Uma mensagem enorme para um problema de dois parênteses. Ela assusta, mas tem uma estrutura:</p>
+<dl class="anatomy">
+  <dt>error: no match for ‘operator&amp;’</dt><dd><strong>A única linha que importa.</strong> "Não existe <code>&amp;</code> para estes operandos." E diz quais são: à esquerda, um <code>std::basic_ostream&lt;char&gt;</code> (é o tipo do <code>cout</code>); à direita, um <code>int</code>.</dd>
+  <dt>os tracinhos <code>~~~~~~~~~~~~~~ ^ ~</code></dt><dd>Mostram como o C++ agrupou: tudo de <code>std::cout</code> até <code>a</code> é o operando esquerdo, o <code>b</code> é o direito. Ou seja, ele leu <code>(std::cout &lt;&lt; a) &amp; b</code>: primeiro mostrou o <code>a</code>, depois tentou fazer "<code>cout</code> &amp; 3".</dd>
+  <dt>note: there are 6 candidates</dt><dd>Daqui em diante, o g++ lista os 6 <code>&amp;</code> que ele conhece (para <code>int</code>, para <code>std::byte</code>, para opções internas do <code>cout</code>…) e explica por que nenhum serve. É informação para quem cria seus próprios tipos; para você, agora, pode pular.</dd>
+</dl>
+<p>A correção: <code>std::cout &lt;&lt; (a &amp; b);</code>. O mesmo erro, com <code>operator&lt;</code> no lugar de <code>operator&amp;</code>, aparece com <code>std::cout &lt;&lt; idade &lt; 18</code> (veja <a href="operadores-comparacao.html">Operadores de Comparação</a>). <strong>Regra:</strong> dentro do <code>cout</code>, contas (<code>+ - * / %</code>) podem ir sem parênteses; qualquer outra coisa (comparação, lógica, bits, ternário, atribuição) vai entre parênteses.</p>
+
+<hr>
+
+<h2>5. Associatividade da direita para a esquerda</h2>
+<p>Dois grupos da tabela são agrupados ao contrário:</p>
+<ul>
+  <li><strong>Unários</strong> (nível 3): <code>!!x</code> é <code>!(!x)</code>, e <code>- -x</code> é <code>-(-x)</code>. Faz sentido: o operador mais perto do valor age primeiro.</li>
+  <li><strong>Atribuições</strong> (nível 16): <code>a = b = c = 0</code> é <code>a = (b = (c = 0))</code>, e <code>x += y -= 2</code> seria <code>x += (y -= 2)</code>. É isso que permite a atribuição encadeada da aula <a href="operadores-atribuicao.html">Operadores de Atribuição</a>.</li>
+</ul>
+<p>E como a atribuição tem uma das prioridades mais baixas, em <code>total = preco * quantidade + frete;</code> toda a conta é feita antes de guardar. Por isso nunca é preciso escrever <code>total = (preco * quantidade + frete);</code>.</p>
+
+<div class="warning">
+<strong>Precedência não é ordem de execução</strong>
+<p>A precedência diz como os operandos são <strong>agrupados</strong>, não em que ordem as partes são <strong>calculadas</strong>. Em <code>f() + g() * h()</code>, a precedência garante que <code>g() * h()</code> será multiplicado antes de somar, mas não diz se <code>f()</code> é chamada antes ou depois de <code>g()</code>. Só alguns operadores garantem a ordem (o <code>&amp;&amp;</code> e o <code>||</code> avaliam a esquerda primeiro, por exemplo; veja o curto-circuito em <a href="operadores-logicos.html">Operadores Lógicos</a>). É por isso que <code>i++ + i++</code> é um problema mesmo com a precedência bem definida (aula <a href="incremento.html">++ e --</a>).</p>
+</div>
+
+<hr>
+
+<h2>Formas diferentes: com ou sem parênteses?</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Expressão</th><th>Precisa de parênteses?</th><th>Por quê</th></tr>
+<tr><td><code>a + b * c</code></td><td>Não (se é o que você quer)</td><td>Todo mundo conhece a regra da escola.</td></tr>
+<tr><td><code>(a + b) / 2</code></td><td><strong>Sim</strong></td><td>Sem eles, só o <code>b</code> é dividido.</td></tr>
+<tr><td><code>x &gt; 0 &amp;&amp; y &gt; 0</code></td><td>Não</td><td>Comparações vêm antes da lógica, e isso é natural de ler.</td></tr>
+<tr><td><code>a || b &amp;&amp; c</code></td><td><strong>Sim</strong>, sempre</td><td>O g++ avisa; deixe claro o que vai junto.</td></tr>
+<tr><td><code>n &amp; 1 == 0</code></td><td><strong>Sim</strong>, sempre</td><td>Bits ficam abaixo das comparações.</td></tr>
+<tr><td><code>!a == b</code></td><td><strong>Sim</strong> (ou use <code>a != b</code>)</td><td>O <code>!</code> gruda só no <code>a</code>.</td></tr>
+<tr><td><code>std::cout &lt;&lt; a + b</code></td><td>Não</td><td>Contas vêm antes do <code>&lt;&lt;</code>.</td></tr>
+<tr><td><code>std::cout &lt;&lt; (a &gt; b)</code></td><td><strong>Sim</strong></td><td>Comparações, lógica e bits vêm depois do <code>&lt;&lt;</code>.</td></tr>
+</table>
+</div>
+<p><strong>Regra de ouro:</strong> se você precisou pensar na tabela para saber o resultado, coloque parênteses. Eles não deixam o programa mais lento e poupam o próximo leitor (que pode ser você daqui a um mês).</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: no match for ‘operator&amp;’</code> (ou <code>operator&lt;</code>, <code>operator&amp;&amp;</code>…) com <code>std::basic_ostream</code></strong>
+<p><strong>O que aconteceu:</strong> uma comparação, operação lógica ou de bits dentro de um <code>cout</code> sem parênteses. O <code>&lt;&lt;</code> pegou o operando antes, e o resto ficou "sobrando" contra o <code>cout</code>.</p>
+<p><strong>Como resolver:</strong> parênteses em volta da expressão: <code>std::cout &lt;&lt; (a &amp; b);</code>. Ignore a lista de candidatos e leia só a primeira linha <code>error:</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>warning: suggest parentheses around …</code> [-Wparentheses]</strong>
+<p><strong>O que aconteceu:</strong> você misturou operadores numa ordem que costuma ser engano: <code>&amp;&amp;</code> dentro de <code>||</code>, comparação dentro de <code>&amp;</code>, comparação dentro de <code>==</code>, atribuição como condição.</p>
+<p><strong>Como resolver:</strong> coloque parênteses mostrando o agrupamento que você quer. Se o resultado mudar, o aviso acabou de achar um defeito.</p>
+</div>
+
+<div class="cenario">
+<strong><code>warning: logical not is only applied to the left hand side of comparison</code></strong>
+<p><strong>O que aconteceu:</strong> <code>!x == y</code>. O <code>!</code> foi aplicado só ao <code>x</code>.</p>
+<p><strong>Como resolver:</strong> <code>x != y</code>, ou <code>!(x == y)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A média saiu maior do que todas as notas</strong>
+<p><strong>O que aconteceu:</strong> <code>n1 + n2 + n3 / 3</code> divide só o <code>n3</code>. Nenhum aviso aparece, porque a expressão é perfeitamente comum.</p>
+<p><strong>Como resolver:</strong> <code>(n1 + n2 + n3) / 3</code> (e, para ter casas decimais, <code>/ 3.0</code>; veja <a href="conversao-tipos.html">Conversão de Tipos</a>).</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ordem</th><th>Grupo</th><th>Operadores</th></tr>
+<tr><td>1º</td><td>Unários</td><td><code>x++ x--</code>, depois <code>++x --x -x !</code></td></tr>
+<tr><td>2º</td><td>Multiplicativos</td><td><code>* / %</code></td></tr>
+<tr><td>3º</td><td>Aditivos</td><td><code>+ -</code></td></tr>
+<tr><td>4º</td><td>Deslocamento / cout</td><td><code>&lt;&lt; &gt;&gt;</code></td></tr>
+<tr><td>5º</td><td>Comparação</td><td><code>&lt;=&gt;</code>, depois <code>&lt; &lt;= &gt; &gt;=</code>, depois <code>== !=</code></td></tr>
+<tr><td>6º</td><td>Bits</td><td><code>&amp;</code>, depois <code>^</code>, depois <code>|</code></td></tr>
+<tr><td>7º</td><td>Lógicos</td><td><code>&amp;&amp;</code>, depois <code>||</code></td></tr>
+<tr><td>8º</td><td>Ternário e atribuição</td><td><code>?: = += -= *= /= %=</code> (direita → esquerda)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Quanto dá?</h3>
+<p>Qual é o resultado de <code>2 + 3 * 4 - 1</code>?</p>
+<div class="ex-code"><input data-answer="13" aria-label="resultado"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Da esquerda para a direita</h3>
+<p>Qual é o resultado de <code>40 / 4 / 2</code> (inteiros)?</p>
+<div class="ex-code"><input data-answer="5" aria-label="resultado"></div>
+</div>
+
+<div class="exercise">
+<h3>3. A média certa</h3>
+<p>Complete com os parênteses para dividir a soma inteira por 2:</p>
+<div class="ex-code">int media = <input data-answer="(a + b)|(a+b)" aria-label="expressão"> / 2;</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Como o C++ agrupa <code>a || b &amp;&amp; c</code>?</p>
+<label><input type="radio" name="q4"> <code>(a || b) &amp;&amp; c</code></label>
+<label><input type="radio" name="q4"> Da esquerda para a direita, como está escrito</label>
+<label><input type="radio" name="q4"> <code>a || (b &amp;&amp; c)</code></label>
+<label><input type="radio" name="q4"> Não compila</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Qual destas linhas compila e mostra o resultado da comparação?</p>
+<label><input type="radio" name="q5"> <code>std::cout &lt;&lt; x &gt; 5;</code></label>
+<label><input type="radio" name="q5"> <code>std::cout &lt;&lt; (x &gt; 5);</code></label>
+<label><input type="radio" name="q5"> <code>std::cout (&lt;&lt; x &gt; 5);</code></label>
+<label><input type="radio" name="q5"> <code>(std::cout &lt;&lt; x) &gt; 5;</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Com <code>int x = 0;</code>, quanto vale <code>!x == 2</code>?</p>
+<label><input type="radio" name="q6"> <code>false</code>, porque vira <code>(!0) == 2</code>, ou seja, <code>1 == 2</code></label>
+<label><input type="radio" name="q6"> <code>true</code>, porque 0 é diferente de 2</label>
+<label><input type="radio" name="q6"> <code>2</code></label>
+<label><input type="radio" name="q6"> Não compila</label>
+</div>
+
+<h3>Missão final: conserte as prioridades</h3>
+
+<div class="trycpp" data-goal="out:Média: 8,out:Desconto: false,semaviso">
+<p class="try-task"><strong>Missão:</strong> o programa tem dois defeitos de precedência. A média de 7, 8 e 9 deveria ser 8, e o desconto só vale para quem é VIP <strong>ou</strong> tem cupom, <strong>e</strong> comprou mais de 100. Coloque os parênteses certos: a saída deve ser a de baixo, e o compilador não pode dar <strong>nenhum aviso</strong>.</p>
+<pre class="out">Média: 8
+Desconto: false</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int n1 = 7;
+    int n2 = 8;
+    int n3 = 9;
+    int media = n1 + n2 + n3 / 3;
+    std::cout &lt;&lt; "Média: " &lt;&lt; media &lt;&lt; '\n';
+
+    bool vip = true;
+    bool cupom = false;
+    int total = 80;
+    bool desconto = vip || cupom &amp;&amp; total &gt; 100;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "Desconto: " &lt;&lt; desconto &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int n1 = 7;
+    int n2 = 8;
+    int n3 = 9;
+    int media = (n1 + n2 + n3) / 3;
+    std::cout &lt;&lt; "Média: " &lt;&lt; media &lt;&lt; '\n';
+
+    bool vip = true;
+    bool cupom = false;
+    int total = 80;
+    bool desconto = (vip || cupom) &amp;&amp; total &gt; 100;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "Desconto: " &lt;&lt; desconto &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>Precedência</strong> decide quem pega os operandos primeiro; <strong>associatividade</strong> desempata operadores do mesmo nível. Juntas, elas dizem onde o C++ coloca os "parênteses invisíveis".</li>
+  <li>Ordem geral: unários → <code>* / %</code> → <code>+ -</code> → <code>&lt;&lt; &gt;&gt;</code> → comparações → bits → <code>&amp;&amp;</code> → <code>||</code> → atribuição.</li>
+  <li>Quase tudo é da esquerda para a direita; unários e atribuições são da direita para a esquerda.</li>
+  <li>Armadilhas: <code>a &lt; b == c</code>, <code>!a == b</code>, <code>n &amp; 1 == 0</code>, <code>a || b &amp;&amp; c</code>. O g++ avisa com <code>-Wparentheses</code> e <code>-Wlogical-not-parentheses</code>.</li>
+  <li>No <code>cout</code>, só contas vão sem parênteses: <code>std::cout &lt;&lt; a &amp; b</code> dá <code>error: no match for ‘operator&amp;’</code>.</li>
+  <li>Precedência agrupa, mas não define a ordem em que as partes são calculadas.</li>
+  <li><strong>Na dúvida, parênteses.</strong></li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
