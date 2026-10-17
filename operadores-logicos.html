@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Operadores Lógicos — &amp;&amp;, || e ! (and, or, not) | Guia C++</title>
+<meta name="description" content="Operadores lógicos em C++ para quem nunca programou: e (&amp;&amp;), ou (||), não (!), as palavras and, or e not, a tabela-verdade, o curto-circuito com demonstração, a diferença entre &amp; e &amp;&amp; e o engano x == 1 || 2, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Operadores Lógicos</span></h1>
+
+<p class="intro">Na aula anterior, cada comparação fazia <strong>uma</strong> pergunta: "a idade é maior ou igual a 18?". Mas as regras da vida real costumam ter várias condições: "pode entrar <strong>se</strong> for maior de idade <strong>e</strong> tiver ingresso"; "ganha desconto <strong>se</strong> for estudante <strong>ou</strong> idoso"; "o alarme toca <strong>se não</strong> houver senha". Os <strong>operadores lógicos</strong> juntam perguntas de sim ou não numa pergunta maior. São só três, mas aparecem em quase todo programa.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Os três operadores: <code>&amp;&amp;</code> ("e"), <code>||</code> ("ou") e <code>!</code> ("não").</li>
+  <li>As palavras equivalentes <code>and</code>, <code>or</code> e <code>not</code>.</li>
+  <li>A <strong>tabela-verdade</strong>: a resposta de cada operador para cada combinação.</li>
+  <li>O <strong>curto-circuito</strong>: por que o C++ às vezes nem olha o lado direito, e como isso evita uma divisão por zero.</li>
+  <li>A diferença entre <code>&amp;</code> e <code>&amp;&amp;</code> (a ideia).</li>
+  <li>Por que <code>opcao == 1 || 2</code> é sempre verdadeiro.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Os programas usam <code>std::boolalpha</code> para mostrar <code>true</code>/<code>false</code> em vez de <code>1</code>/<code>0</code> (veja <a href="operadores-comparacao.html">Operadores de Comparação</a>).</p>
+
+<hr>
+
+<h2>A ideia: o porteiro da festa</h2>
+<p>A Ana vai dar uma festa e deixou três instruções para o porteiro:</p>
+<ul>
+  <li><strong>E</strong>: "Só entra quem é maior de idade <strong>e</strong> tem convite." As duas coisas precisam ser verdade. Faltou uma, não entra.</li>
+  <li><strong>OU</strong>: "Ganha bebida grátis quem fizer aniversário hoje <strong>ou</strong> trouxer um prato." Basta uma das duas (e, se tiver as duas, ganha também).</li>
+  <li><strong>NÃO</strong>: "Entra quem <strong>não</strong> estiver na lista de bloqueados." Inverte a resposta: estar na lista (sim) vira não entrar.</li>
+</ul>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operador</th><th>Palavra</th><th>Nome</th><th>Verdadeiro quando…</th></tr>
+<tr><td><code>a &amp;&amp; b</code></td><td><code>a and b</code></td><td>E lógico</td><td><strong>os dois</strong> são verdadeiros</td></tr>
+<tr><td><code>a || b</code></td><td><code>a or b</code></td><td>OU lógico</td><td><strong>pelo menos um</strong> é verdadeiro</td></tr>
+<tr><td><code>!a</code></td><td><code>not a</code></td><td>NÃO lógico (negação)</td><td><code>a</code> é <strong>falso</strong></td></tr>
+</table>
+</div>
+
+<p>O <code>&amp;&amp;</code> são dois "e comercial" grudados. O <code>||</code> são duas barras verticais (no teclado brasileiro ABNT2, a barra vertical fica na tecla à esquerda do <kbd>Z</kbd>, com <kbd>Shift</kbd>). O <code>!</code> é a exclamação, que você já viu no <code>!=</code> ("não igual").</p>
+
+<hr>
+
+<h2>1. Os três operadores</h2>
+
+<pre class="file" data-file="logicos.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 20;
+    bool tem_ingresso = false;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; (idade &gt;= 18 &amp;&amp; tem_ingresso) &lt;&lt; '\n';
+    std::cout &lt;&lt; (idade &gt;= 18 || tem_ingresso) &lt;&lt; '\n';
+    std::cout &lt;&lt; !tem_ingresso &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra logicos.cpp -o logicos
+$ ./logicos
+false    « maior de idade (true) E tem ingresso (false): falta um, false
+true     « maior de idade (true) OU tem ingresso (false): basta um, true
+true     « NÃO tem ingresso: o false virou true</pre>
+
+<dl class="anatomy">
+  <dt>idade &gt;= 18 &amp;&amp; tem_ingresso</dt><dd>Duas perguntas ligadas pelo "e". A comparação <code>idade &gt;= 18</code> é feita primeiro (comparações têm prioridade maior que <code>&amp;&amp;</code> e <code>||</code>), e o resultado (<code>true</code>) é combinado com <code>tem_ingresso</code> (<code>false</code>).</dd>
+  <dt>tem_ingresso</dt><dd>Uma variável <code>bool</code> já é uma resposta de sim ou não. Não precisa escrever <code>tem_ingresso == true</code>: só o nome basta.</dd>
+  <dt>!tem_ingresso</dt><dd>O <code>!</code> vai <strong>na frente</strong> do valor que ele inverte, grudado.</dd>
+  <dt>os parênteses de fora</dt><dd>Necessários por causa do <code>cout</code> (o <code>&lt;&lt;</code> é mais forte que <code>&amp;&amp;</code> e <code>||</code>). Fora do <code>cout</code>, como em <code>bool pode = idade &gt;= 18 &amp;&amp; tem_ingresso;</code>, não precisa.</dd>
+</dl>
+
+<h3>A faixa de valores, do jeito certo</h3>
+<p>Na aula de comparação você viu que <code>0 &lt;= nota &lt;= 10</code> não funciona. Com o <code>&amp;&amp;</code>, você faz as duas perguntas separadas e exige as duas:</p>
+
+<pre class="file" data-file="faixa2.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int nota = 15;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; (0 &lt;= nota &amp;&amp; nota &lt;= 10) &lt;&lt; '\n';
+    nota = 7;
+    std::cout &lt;&lt; (0 &lt;= nota &amp;&amp; nota &lt;= 10) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra faixa2.cpp -o faixa2
+$ ./faixa2
+false    « 15 não está entre 0 e 10
+true     « 7 está</pre>
+
+<p>Escrever o menor valor à esquerda e o maior à direita (<code>0 &lt;= nota &amp;&amp; nota &lt;= 10</code>) deixa a expressão parecida com a da matemática, com a <code>nota</code> "no meio". Para o contrário, "fora da faixa", use o <code>||</code>: <code>nota &lt; 0 || nota &gt; 10</code>.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> mude a <code>idade</code> e o <code>convite</code> e veja quem entra na festa. Tente achar uma combinação em que entra, uma em que não entra e uma em que ganha desconto sem poder entrar.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 16;
+    bool convite = true;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "Entra na festa? " &lt;&lt; (idade &gt;= 18 &amp;&amp; convite) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Desconto (menor que 18 ou 60+)? " &lt;&lt; (idade &lt; 18 || idade &gt;= 60) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Sem convite? " &lt;&lt; !convite &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. A tabela-verdade</h2>
+<p>Como cada lado só pode ser <code>true</code> ou <code>false</code>, existem só quatro combinações possíveis. A <strong>tabela-verdade</strong> mostra a resposta de cada operador para todas elas. Este programa monta a tabela de verdade (com saída real):</p>
+
+<pre class="file" data-file="tabela.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "A     B     | A &amp;&amp; B  A || B\n";
+    std::cout &lt;&lt; false &lt;&lt; ' ' &lt;&lt; false &lt;&lt; " | " &lt;&lt; (false &amp;&amp; false) &lt;&lt; "   " &lt;&lt; (false || false) &lt;&lt; '\n';
+    std::cout &lt;&lt; false &lt;&lt; ' ' &lt;&lt; true  &lt;&lt; "  | " &lt;&lt; (false &amp;&amp; true)  &lt;&lt; "   " &lt;&lt; (false || true)  &lt;&lt; '\n';
+    std::cout &lt;&lt; true  &lt;&lt; "  " &lt;&lt; false &lt;&lt; " | " &lt;&lt; (true &amp;&amp; false)  &lt;&lt; "   " &lt;&lt; (true || false)  &lt;&lt; '\n';
+    std::cout &lt;&lt; true  &lt;&lt; "  " &lt;&lt; true  &lt;&lt; "  | " &lt;&lt; (true &amp;&amp; true)   &lt;&lt; "    " &lt;&lt; (true || true)   &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tabela.cpp -o tabela
+$ ./tabela
+A     B     | A &amp;&amp; B  A || B
+false false | false   false
+false true  | false   true
+true  false | false   true
+true  true  | true    true</pre>
+
+<p>Para decorar:</p>
+<ul>
+  <li><code>&amp;&amp;</code> só dá <code>true</code> numa linha: quando <strong>tudo</strong> é <code>true</code>. Um <code>false</code> estraga tudo.</li>
+  <li><code>||</code> só dá <code>false</code> numa linha: quando <strong>tudo</strong> é <code>false</code>. Um <code>true</code> salva tudo.</li>
+  <li><code>!</code> é o mais simples: <code>!true</code> é <code>false</code> e <code>!false</code> é <code>true</code>.</li>
+</ul>
+
+<div class="note">
+<strong>O "ou" do C++ inclui o "os dois"</strong>
+<p>No português, "café ou chá?" costuma querer dizer "um <strong>ou</strong> outro, não os dois". O <code>||</code> não é assim: quando os dois lados são verdadeiros, ele dá <code>true</code> (última linha da tabela). Se você precisa do "um ou outro, mas não os dois" (o "ou exclusivo"), compare os dois <code>bool</code> com <code>!=</code>: <code>a != b</code>.</p>
+</div>
+
+<h3>Negar uma pergunta composta</h3>
+<p>Para inverter uma pergunta inteira, coloque-a entre parênteses e o <code>!</code> na frente: <code>!(chovendo || frio)</code> é "<strong>nem</strong> chovendo <strong>nem</strong> frio". Existe uma regra (as <strong>leis de De Morgan</strong>) que diz como "abrir" esse parêntese: o <code>!</code> entra em cada pedaço e o operador troca (<code>||</code> vira <code>&amp;&amp;</code> e vice-versa):</p>
+
+<pre class="file" data-file="morgan.cpp">#include &lt;iostream&gt;
+
+int main() {
+    bool chovendo = false;
+    bool frio = true;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; !(chovendo || frio) &lt;&lt; '\n';
+    std::cout &lt;&lt; (!chovendo &amp;&amp; !frio) &lt;&lt; '\n';
+    std::cout &lt;&lt; !(chovendo &amp;&amp; frio) &lt;&lt; '\n';
+    std::cout &lt;&lt; (!chovendo || !frio) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra morgan.cpp -o morgan
+$ ./morgan
+false    « !(chovendo || frio)
+false    « !chovendo &amp;&amp; !frio: mesma resposta
+true     « !(chovendo &amp;&amp; frio)
+true     « !chovendo || !frio: mesma resposta</pre>
+
+<p>Você não precisa decorar a regra; o importante é saber que <code>!(a || b)</code> <strong>não é</strong> <code>!a || !b</code>. Na dúvida, escreva com parênteses e teste.</p>
+
+<hr>
+
+<h2>3. As palavras <code>and</code>, <code>or</code> e <code>not</code></h2>
+<p>O C++ aceita palavras no lugar dos símbolos. Elas são <strong>exatamente</strong> o mesmo operador, só com outra grafia:</p>
+
+<pre class="file" data-file="palavras.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 20;
+    bool tem_ingresso = false;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; (idade &gt;= 18 and tem_ingresso) &lt;&lt; '\n';
+    std::cout &lt;&lt; (idade &gt;= 18 or tem_ingresso) &lt;&lt; '\n';
+    std::cout &lt;&lt; (not tem_ingresso) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra palavras.cpp -o palavras
+$ ./palavras
+false
+true
+true</pre>
+
+<p>Mesmas respostas do <code>logicos.cpp</code>. As palavras existem desde o primeiro padrão do C++ (C++98) e são palavras reservadas: não precisam de <code>#include</code> e não podem ser nomes de variável (veja <a href="identificadores.html">Nomes de Variáveis</a>). Elas foram criadas para teclados antigos que não tinham <code>&amp;</code> ou <code>|</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Prós</th><th>Contras</th></tr>
+<tr><td><code>&amp;&amp; || !</code></td><td>É o que você vai ver em 99% do código C++ (e em C, Java, JavaScript…).</td><td>O <code>!</code> é pequeno e passa despercebido; <code>&amp;&amp;</code> se confunde com <code>&amp;</code>.</td></tr>
+<tr><td><code>and or not</code></td><td>Lê como português/inglês; <code>not</code> é difícil de não ver.</td><td>Pouco comum; algumas equipes estranham.</td></tr>
+</table>
+</div>
+
+<p><strong>Qual usar:</strong> este guia usa os símbolos, por serem o padrão que você vai encontrar em todo lugar. As palavras não estão erradas: escolha uma forma e mantenha no programa inteiro.</p>
+
+<hr>
+
+<h2>4. Curto-circuito: o lado direito pode nem ser olhado</h2>
+<p>Olhe de novo a tabela-verdade. Se o lado <strong>esquerdo</strong> de um <code>&amp;&amp;</code> é <code>false</code>, a resposta já é <code>false</code>, não importa o lado direito. E se o lado esquerdo de um <code>||</code> é <code>true</code>, a resposta já é <code>true</code>. O C++ aproveita isso: nesses casos, ele <strong>nem calcula</strong> o lado direito. Isso se chama <strong>avaliação em curto-circuito</strong>.</p>
+
+<h3>Vendo o curto-circuito acontecer</h3>
+<p>Para ver o que é calculado, vamos usar uma pequena <strong>função</strong> "espiã" que mostra uma mensagem toda vez que é chamada e devolve a resposta que mandarmos. Funções têm aula própria (<a href="funcoes.html">Funções</a>); por enquanto, basta saber que <code>pergunta("A", false)</code> escreve <code>(avaliei: A)</code> na tela e responde <code>false</code>.</p>
+
+<pre class="file" data-file="espiao.cpp">#include &lt;iostream&gt;
+
+bool pergunta(const char* texto, bool resposta) {
+    std::cout &lt;&lt; "  (avaliei: " &lt;&lt; texto &lt;&lt; ")\n";
+    return resposta;
+}
+
+int main() {
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "Teste 1, &amp;&amp;:\n";
+    bool r1 = pergunta("A", false) &amp;&amp; pergunta("B", true);
+    std::cout &lt;&lt; "resultado: " &lt;&lt; r1 &lt;&lt; '\n';
+
+    std::cout &lt;&lt; "Teste 2, ||:\n";
+    bool r2 = pergunta("A", true) || pergunta("B", false);
+    std::cout &lt;&lt; "resultado: " &lt;&lt; r2 &lt;&lt; '\n';
+
+    std::cout &lt;&lt; "Teste 3, &amp;&amp;:\n";
+    bool r3 = pergunta("A", true) &amp;&amp; pergunta("B", false);
+    std::cout &lt;&lt; "resultado: " &lt;&lt; r3 &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra espiao.cpp -o espiao
+$ ./espiao
+Teste 1, &amp;&amp;:
+  (avaliei: A)          « A é false: com &amp;&amp;, a resposta já é false
+resultado: false        « o B nunca foi avaliado!
+Teste 2, ||:
+  (avaliei: A)          « A é true: com ||, a resposta já é true
+resultado: true         « o B de novo foi pulado
+Teste 3, &amp;&amp;:
+  (avaliei: A)          « A é true: com &amp;&amp;, ainda depende do B
+  (avaliei: B)          « então o B foi avaliado
+resultado: false</pre>
+
+<p>A ordem também é garantida: o lado <strong>esquerdo</strong> sempre é avaliado primeiro.</p>
+
+<h3>Para que serve: a guarda</h3>
+<p>O curto-circuito permite escrever uma <strong>guarda</strong>: uma pergunta à esquerda que protege uma conta perigosa à direita. Na aula de <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>, dividir um inteiro por zero quebrou o programa. Veja:</p>
+
+<pre class="file" data-file="curto.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int pessoas = 0;
+    int pizzas = 8;
+    std::cout &lt;&lt; std::boolalpha;
+    bool sobra = pessoas != 0 &amp;&amp; pizzas / pessoas &gt; 2;
+    std::cout &lt;&lt; sobra &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra curto.cpp -o curto
+$ ./curto
+false    « pessoas != 0 deu false, e a divisão nunca aconteceu</pre>
+
+<p>Agora a mesma pergunta, com os lados trocados (<code>curto2.cpp</code>):</p>
+
+<pre class="term" data-cwd="~/cpp">$ grep sobra curto2.cpp
+    bool sobra = pizzas / pessoas &gt; 2 &amp;&amp; pessoas != 0;
+    std::cout &lt;&lt; sobra &lt;&lt; '\n';
+$ g++ -std=c++23 -Wall -Wextra curto2.cpp -o curto2
+$ ./curto2
+Exceção de ponto flutuante (imagem do núcleo gravada) ./curto2
+$ echo $?
+136</pre>
+
+<p>Para o <code>&amp;&amp;</code>, as duas versões são "a mesma pergunta" (na matemática, a ordem do "e" não importa). Para o programa, não: na segunda, a divisão por zero acontece <strong>antes</strong> de a guarda ser consultada, e o programa quebra com SIGFPE. <strong>Regra:</strong> a guarda vem sempre à esquerda.</p>
+
+<hr>
+
+<h2>5. <code>&amp;</code> × <code>&amp;&amp;</code> (e <code>|</code> × <code>||</code>)</h2>
+<p>O C++ também tem <code>&amp;</code> e <code>|</code>, com um caractere só. Eles são operadores <strong>de bits</strong>: trabalham com cada bit (cada 0 e 1 interno) dos números. A ideia, sem entrar nos bits:</p>
+
+<pre class="file" data-file="ecomercial.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int a = 2;
+    int b = 1;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; (a &amp;&amp; b) &lt;&lt; '\n';
+    std::cout &lt;&lt; (a &amp; b) &lt;&lt; '\n';
+    std::cout &lt;&lt; (a || b) &lt;&lt; '\n';
+    std::cout &lt;&lt; (a | b) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ecomercial.cpp -o ecomercial
+$ ./ecomercial
+true     « 2 e 1 são diferentes de zero (verdadeiros): true &amp;&amp; true
+0        « &amp; compara bit a bit: 2 (binário 10) &amp; 1 (binário 01) = 0
+true
+3        « | junta os bits: 10 | 01 = 11, que é 3</pre>
+
+<p>Repare que <code>&amp;&amp;</code> e <code>||</code> sempre respondem um <code>bool</code>, enquanto <code>&amp;</code> e <code>|</code> respondem um <strong>número</strong>. Com <code>&amp;&amp;</code>, 2 e 1 são "verdadeiro e verdadeiro"; com <code>&amp;</code>, deram 0, que significa "falso". Trocar um pelo outro dá respostas erradas sem nenhum erro de compilação.</p>
+
+<p>Mesmo com <code>bool</code>, onde a resposta coincide, há outra diferença: <code>&amp;</code> e <code>|</code> <strong>não</strong> fazem curto-circuito. A mesma espiã do teste 1, com <code>&amp;</code>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ grep 'bool r' espiao2.cpp
+bool pergunta(const char* texto, bool resposta) {
+    bool r = pergunta("A", false) &amp; pergunta("B", true);   « a linha que mudou
+$ g++ -std=c++23 -Wall -Wextra espiao2.cpp -o espiao2
+$ ./espiao2
+Com &amp;:
+  (avaliei: A)
+  (avaliei: B)          « o B foi avaliado mesmo com A falso
+resultado: false</pre>
+
+<p>O g++ não avisou nada; o Clang do editor do guia avisa: <code>use of bitwise '&amp;' with boolean operands [-Wbitwise-instead-of-logical]</code>, "uso do <code>&amp;</code> de bits com operandos booleanos", e sugere <code>&amp;&amp;</code>. <strong>Para condições, use sempre <code>&amp;&amp;</code> e <code>||</code>.</strong> Os operadores de bits têm usos próprios (guardar várias opções num número só, por exemplo) que não aparecem neste nível.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>opcao == 1 || 2</code> é sempre verdadeiro</strong>
+<pre class="term" data-cwd="~/cpp">$ cat ouerrado.cpp
+#include &lt;iostream&gt;
+
+int main() {
+    int opcao = 5;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; (opcao == 1 || 2) &lt;&lt; '\n';
+    std::cout &lt;&lt; (opcao == 1 || opcao == 2) &lt;&lt; '\n';
+}
+$ g++ -std=c++23 -Wall -Wextra ouerrado.cpp -o ouerrado
+$ ./ouerrado
+true     « 5 é 1 ou 2? o programa diz que sim!
+false    « agora sim</pre>
+<p><strong>O que aconteceu:</strong> em português, "a opção é 1 ou 2" subentende "a opção é 2". O C++ não subentende nada: ele leu <code>(opcao == 1) || 2</code>. O lado direito é o número <code>2</code> sozinho, e qualquer número diferente de zero conta como <code>true</code>. Então a pergunta inteira é sempre verdadeira. Nem o g++ nem o Clang avisam.</p>
+<p><strong>Como resolver:</strong> repita a variável em cada comparação: <code>opcao == 1 || opcao == 2</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O programa quebrou numa conta que tinha uma "guarda"</strong>
+<p><strong>O que aconteceu:</strong> a guarda estava do lado direito, como em <code>pizzas / pessoas &gt; 2 &amp;&amp; pessoas != 0</code>. O lado esquerdo é avaliado primeiro, então a conta perigosa rodou antes da conferência.</p>
+<p><strong>Como resolver:</strong> coloque a conferência à esquerda: <code>pessoas != 0 &amp;&amp; pizzas / pessoas &gt; 2</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Resultado estranho com <code>&amp;</code> ou <code>|</code></strong>
+<p><strong>O que aconteceu:</strong> você usou o operador de bits (um caractere) em vez do lógico (dois caracteres). Com números, a resposta é outra (<code>2 &amp; 1</code> é 0); com funções, o curto-circuito some.</p>
+<p><strong>Como resolver:</strong> <code>&amp;&amp;</code> e <code>||</code>, sempre dobrados, em condições.</p>
+</div>
+
+<div class="cenario">
+<strong><code>warning: suggest parentheses around ‘&amp;&amp;’ within ‘||’</code></strong>
+<p><strong>O que aconteceu:</strong> você misturou <code>&amp;&amp;</code> e <code>||</code> sem parênteses, como em <code>vip || cupom &amp;&amp; total &gt; 100</code>. O <code>&amp;&amp;</code> é feito primeiro, o que nem sempre é o que você queria.</p>
+<p><strong>Como resolver:</strong> coloque parênteses mostrando o que vai junto. A aula <a href="precedencia.html">Precedência</a> mostra esse caso com saídas.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operador</th><th>Palavra</th><th>Resultado</th><th>Curto-circuito</th></tr>
+<tr><td><code>a &amp;&amp; b</code></td><td><code>and</code></td><td><code>true</code> só se os dois forem <code>true</code></td><td>Se <code>a</code> é <code>false</code>, não avalia <code>b</code></td></tr>
+<tr><td><code>a || b</code></td><td><code>or</code></td><td><code>false</code> só se os dois forem <code>false</code></td><td>Se <code>a</code> é <code>true</code>, não avalia <code>b</code></td></tr>
+<tr><td><code>!a</code></td><td><code>not</code></td><td>O contrário de <code>a</code></td><td>—</td></tr>
+<tr><td><code>a &amp; b</code>, <code>a | b</code></td><td><code>bitand</code>, <code>bitor</code></td><td>Um número (bit a bit)</td><td>Não fazem curto-circuito</td></tr>
+</table>
+</div>
+
+<p><strong>Prioridade:</strong> <code>!</code> antes de tudo; depois as comparações (<code>&lt; &gt; == …</code>); depois <code>&amp;&amp;</code>; por último <code>||</code>. Tabela completa em <a href="precedencia.html">Precedência</a>.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. E</h3>
+<p>Complete para <code>pode_dirigir</code> ser verdadeiro só quando a idade for pelo menos 18 <strong>e</strong> a pessoa tiver carteira:</p>
+<div class="ex-code">bool pode_dirigir = idade &gt;= 18 <input data-answer="&amp;&amp;|and" aria-label="operador"> tem_carteira;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Ou</h3>
+<p>Complete para <code>fim_de_semana</code> ser verdadeiro se <code>dia</code> for 6 <strong>ou</strong> 7 (repita a variável!):</p>
+<div class="ex-code">bool fim_de_semana = dia == 6 <input data-answer="\|\| dia == 7|or dia == 7|\|\|dia==7|\|\| dia==7" aria-label="resto da condição">;</div>
+</div>
+
+<div class="exercise">
+<h3>3. Não</h3>
+<p>Complete com o símbolo que inverte a resposta, para <code>aberto</code> ser o contrário de <code>fechado</code>:</p>
+<div class="ex-code">bool aberto = <input data-answer="!" aria-label="operador">fechado;</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Quanto vale <code>(true || false) &amp;&amp; !true</code>?</p>
+<label><input type="radio" name="q4"> <code>true</code></label>
+<label><input type="radio" name="q4"> Não compila</label>
+<label><input type="radio" name="q4"> <code>false</code></label>
+<label><input type="radio" name="q4"> <code>1</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Em <code>x != 0 &amp;&amp; 100 / x &gt; 5</code>, com <code>x</code> valendo 0, o que acontece?</p>
+<label><input type="radio" name="q5"> O programa quebra por dividir por zero</label>
+<label><input type="radio" name="q5"> A resposta é <code>false</code> e a divisão nem é feita</label>
+<label><input type="radio" name="q5"> A resposta é <code>true</code></label>
+<label><input type="radio" name="q5"> Não compila</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Com <code>int cor = 3;</code>, quanto vale <code>(cor == 1 || 2)</code>?</p>
+<label><input type="radio" name="q6"> <code>false</code>, porque cor não é 1 nem 2</label>
+<label><input type="radio" name="q6"> <code>2</code></label>
+<label><input type="radio" name="q6"> Não compila</label>
+<label><input type="radio" name="q6"> <code>true</code>, porque o <code>2</code> sozinho conta como verdadeiro</label>
+</div>
+
+<h3>Missão final: a bilheteria do cinema</h3>
+
+<div class="trycpp" data-goal="out:Meia-entrada: true,out:Entrada proibida: false,src:\|\||\bor\b,src:&amp;&amp;|\band\b,src:!|\bnot\b">
+<p class="try-task"><strong>Missão:</strong> troque cada <code>false</code> pela condição certa. <strong>Meia-entrada</strong>: menores de 18 <strong>ou</strong> pessoas com 60 anos ou mais <strong>ou</strong> estudantes. <strong>Entrada proibida</strong>: menores de 12 <strong>e não</strong> acompanhados. Com os valores do programa, a saída deve ser:</p>
+<pre class="out">Meia-entrada: true
+Entrada proibida: false</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 10;
+    bool estudante = false;
+    bool acompanhado = true;
+    bool meia = false;        // troque pela condição
+    bool proibida = false;    // troque pela condição
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "Meia-entrada: " &lt;&lt; meia &lt;&lt; '\n';
+    std::cout &lt;&lt; "Entrada proibida: " &lt;&lt; proibida &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 10;
+    bool estudante = false;
+    bool acompanhado = true;
+    bool meia = idade &lt; 18 || idade &gt;= 60 || estudante;
+    bool proibida = idade &lt; 12 &amp;&amp; !acompanhado;
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "Meia-entrada: " &lt;&lt; meia &lt;&lt; '\n';
+    std::cout &lt;&lt; "Entrada proibida: " &lt;&lt; proibida &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>&amp;&amp;</code> (e, <code>and</code>): verdadeiro só se <strong>tudo</strong> for verdadeiro. <code>||</code> (ou, <code>or</code>): verdadeiro se <strong>pelo menos um</strong> for. <code>!</code> (não, <code>not</code>): inverte.</li>
+  <li>Faixa de valores: <code>0 &lt;= x &amp;&amp; x &lt;= 10</code>. Fora da faixa: <code>x &lt; 0 || x &gt; 10</code>.</li>
+  <li>O <code>||</code> inclui "os dois". Para "um ou outro, não os dois", compare <code>bool</code> com <code>!=</code>.</li>
+  <li><code>!(a || b)</code> é <code>!a &amp;&amp; !b</code>; <code>!(a &amp;&amp; b)</code> é <code>!a || !b</code>.</li>
+  <li><strong>Curto-circuito:</strong> o lado esquerdo é avaliado primeiro; se ele já decide a resposta, o direito é pulado. Use isso para guardas: <code>x != 0 &amp;&amp; 100 / x &gt; 5</code>.</li>
+  <li><code>&amp;</code> e <code>|</code> (um caractere) são de bits: dão números e não fazem curto-circuito. Em condições, use <code>&amp;&amp;</code> e <code>||</code>.</li>
+  <li><code>x == 1 || 2</code> é sempre verdadeiro; escreva <code>x == 1 || x == 2</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
