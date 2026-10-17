@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ STL — containers, iteradores e algoritmos | Guia C++</title>
+<meta name="description" content="O que é a STL do C++ para quem nunca programou: as três partes (containers, iteradores e algoritmos) e como se encaixam, qual container usar em cada situação (vector, array, list, deque, map, unordered_map, set, stack, queue) e os cabeçalhos de cada um, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">STL</span>: a biblioteca de containers e algoritmos</h1>
+
+<p class="intro">Você já usou <code>std::vector</code>, <code>std::array</code> e <code>std::string</code>. Eles fazem parte de um conjunto maior, que todo programador C++ usa todo dia: a <strong>STL</strong>. Ela traz prontas as estruturas para guardar dados (listas, filas, dicionários) e dezenas de algoritmos para trabalhar com eles (ordenar, procurar, contar). Esta aula é o mapa: as três peças da STL, como elas se encaixam e qual "caixa" escolher para cada problema. As próximas aulas visitam cada peça com calma.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que quer dizer STL e de onde ela veio.</li>
+  <li>As três partes: <strong>containers</strong>, <strong>iteradores</strong> e <strong>algoritmos</strong>, e por que elas são separadas.</li>
+  <li>Que o mesmo algoritmo funciona com containers diferentes.</li>
+  <li>O que todos os containers têm em comum (<code>size</code>, <code>empty</code>, <code>clear</code>…).</li>
+  <li>Uma tabela de <strong>qual container usar quando</strong>: <code>vector</code>, <code>array</code>, <code>list</code>, <code>deque</code>, <code>map</code>, <code>unordered_map</code>, <code>set</code>, <code>stack</code>, <code>queue</code>.</li>
+  <li>Qual cabeçalho (<code>#include</code>) cada um pede, e o erro real quando você esquece.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp/stl</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. É bom já conhecer <a href="vector.html">std::vector</a> e <a href="templates-classe.html">Templates de Classe</a>.</p>
+
+<hr>
+
+<h2>O nome: Standard Template Library</h2>
+<p><strong>STL</strong> é a sigla de <em>Standard Template Library</em>, "biblioteca padrão de templates". Ela foi criada nos anos 1990 por Alexander Stepanov e Meng Lee, e entrou no primeiro padrão do C++, o <strong>C++98</strong> (aula <a href="versoes.html">Versões do C++</a>). Hoje ela é uma parte da <strong>biblioteca padrão</strong> do C++, que também tem <code>std::string</code>, <code>std::cout</code>, <code>&lt;cmath&gt;</code> e muito mais. Na prática, as pessoas dizem "STL" querendo dizer "os containers e os algoritmos da biblioteca padrão", e é nesse sentido que o guia usa o nome.</p>
+
+<p>"De templates" porque <strong>tudo</strong> nela é template: <code>std::vector&lt;int&gt;</code>, <code>std::map&lt;std::string, int&gt;</code>. É por isso que você estudou <a href="templates-funcao.html">templates</a> antes: agora os <code>&lt;…&gt;</code> fazem sentido.</p>
+
+<hr>
+
+<h2>A ideia: a cozinha</h2>
+<p>Pense numa cozinha. Há <strong>potes</strong> de vários formatos (pote de vidro, saco, caixa de ovos). Há <strong>receitas</strong> (bater, separar, contar). E há as <strong>mãos</strong>, que pegam as coisas de dentro de qualquer pote, uma por uma, e entregam para a receita. A receita "contar quantos ovos estão quebrados" não depende do pote: funciona na caixa de ovos e na tigela, porque as mãos sabem tirar os ovos dos dois.</p>
+
+<p>A STL é organizada exatamente assim:</p>
+
+<figure>
+<svg viewBox="0 0 640 230" role="img" aria-labelledby="stl-tit" style="width:100%;max-width:640px;height:auto;display:block">
+  <title id="stl-tit">Containers ligados a algoritmos por meio de iteradores</title>
+  <g style="fill:none;stroke:var(--accent);stroke-width:2">
+    <rect x="10" y="40" width="180" height="150" rx="10"/>
+    <rect x="450" y="40" width="180" height="150" rx="10"/>
+  </g>
+  <g style="fill:var(--text);font-family:sans-serif;font-size:15px;text-anchor:middle">
+    <text x="100" y="66" style="font-weight:bold">CONTAINERS</text>
+    <text x="100" y="88" style="fill:var(--muted);font-size:13px">os potes: guardam</text>
+    <text x="100" y="116">vector  array</text>
+    <text x="100" y="138">list  deque  map</text>
+    <text x="100" y="160">set  unordered_map</text>
+    <text x="540" y="66" style="font-weight:bold">ALGORITMOS</text>
+    <text x="540" y="88" style="fill:var(--muted);font-size:13px">as receitas: trabalham</text>
+    <text x="540" y="116">sort  find</text>
+    <text x="540" y="138">count  reverse</text>
+    <text x="540" y="160">max_element …</text>
+    <text x="320" y="92" style="font-weight:bold">ITERADORES</text>
+    <text x="320" y="114" style="fill:var(--muted);font-size:13px">as mãos: apontam um</text>
+    <text x="320" y="132" style="fill:var(--muted);font-size:13px">item de cada vez</text>
+    <text x="320" y="176" style="font-family:monospace;font-size:14px">begin()  end()</text>
+  </g>
+  <g style="stroke:var(--accent);stroke-width:2;fill:none">
+    <line x1="195" y1="150" x2="440" y2="150"/>
+    <polyline points="430,143 442,150 430,157"/>
+  </g>
+</svg>
+<figcaption>Os containers guardam os dados; os algoritmos trabalham com eles; os iteradores ligam um ao outro. Um algoritmo nunca mexe direto no container: ele recebe dois iteradores (o começo e o fim) e anda por eles.</figcaption>
+</figure>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parte</th><th>Na cozinha</th><th>O que é</th><th>Exemplos</th></tr>
+<tr><td><strong>Containers</strong></td><td>os potes</td><td>Classes que <strong>guardam</strong> vários valores. Cada uma organiza os valores de um jeito.</td><td><code>std::vector</code>, <code>std::map</code>, <code>std::set</code></td></tr>
+<tr><td><strong>Iteradores</strong></td><td>as mãos</td><td>"Dedos" que apontam um item do container e sabem andar para o próximo.</td><td><code>notas.begin()</code>, <code>notas.end()</code></td></tr>
+<tr><td><strong>Algoritmos</strong></td><td>as receitas</td><td>Funções (templates) que <strong>fazem</strong> algo com uma faixa de itens, do começo ao fim.</td><td><code>std::sort</code>, <code>std::find</code>, <code>std::count</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. As três partes num programa só</h2>
+<p>A Ana tem as notas da turma num vetor. Ela quer ordenar e contar quantos tiraram 10:</p>
+
+<pre class="file" data-file="tres-partes.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 10, 4, 9, 10, 6};
+
+    std::sort(notas.begin(), notas.end());
+
+    for (int n : notas) {
+        std::cout &lt;&lt; n &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+
+    auto dez = std::count(notas.begin(), notas.end(), 10);
+    std::cout &lt;&lt; "Notas 10: " &lt;&lt; dez &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;algorithm&gt;</dt><dd>O cabeçalho dos algoritmos (<code>sort</code>, <code>count</code>, <code>find</code>…).</dd>
+  <dt>std::vector&lt;int&gt; notas{…};</dt><dd>O <strong>container</strong>: o pote com seis notas.</dd>
+  <dt>notas.begin(), notas.end()</dt><dd>Dois <strong>iteradores</strong>: um aponta a primeira nota, o outro aponta o lugar <strong>depois</strong> da última (aula <a href="iteradores.html">Iteradores</a>). Juntos, dizem "do começo ao fim".</dd>
+  <dt>std::sort(…)</dt><dd>Um <strong>algoritmo</strong>: ordena a faixa que você deu, do menor para o maior.</dd>
+  <dt>std::count(…, 10)</dt><dd>Outro algoritmo: conta quantos itens da faixa são iguais a <code>10</code>.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/stl">$ g++ -std=c++23 -Wall -Wextra tres-partes.cpp -o tres-partes
+$ ./tres-partes
+4 6 7 9 10 10
+Notas 10: 2</pre>
+
+<p>Repare: o <code>std::sort</code> não é um método do vetor (não é <code>notas.sort()</code>). Ele é uma função solta, que recebe o começo e o fim. Os algoritmos têm aula própria: <a href="algoritmos.html">Algoritmos</a>.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> troque as notas, acrescente outras, e mude o <code>10</code> do <code>std::count</code> para contar outra nota. Depois tente ordenar só os três primeiros itens, com <code>std::sort(notas.begin(), notas.begin() + 3);</code>.</p>
+<pre class="script">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 10, 4, 9, 10, 6};
+
+    std::sort(notas.begin(), notas.end());
+
+    for (int n : notas) {
+        std::cout &lt;&lt; n &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+
+    auto dez = std::count(notas.begin(), notas.end(), 10);
+    std::cout &lt;&lt; "Notas 10: " &lt;&lt; dez &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Por que separar em três partes: um algoritmo, vários containers</h2>
+<p>A grande ideia da STL: o algoritmo não sabe (nem quer saber) em que container os dados estão. Ele só precisa de iteradores. O mesmo <code>std::count</code> funciona num <code>vector</code>, numa <code>list</code> e num <code>array</code>:</p>
+
+<pre class="file" data-file="mesmo-algoritmo.cpp">#include &lt;algorithm&gt;
+#include &lt;array&gt;
+#include &lt;iostream&gt;
+#include &lt;list&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; compras{"arroz", "café", "leite"};
+    std::list&lt;std::string&gt; tarefas{"lavar", "café", "estudar"};
+    std::array&lt;std::string, 3&gt; cores{"azul", "verde", "café"};
+
+    std::cout &lt;&lt; std::count(compras.begin(), compras.end(), "café") &lt;&lt; '\n';
+    std::cout &lt;&lt; std::count(tarefas.begin(), tarefas.end(), "café") &lt;&lt; '\n';
+    std::cout &lt;&lt; std::count(cores.begin(), cores.end(), "café") &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/stl">$ g++ -std=c++23 -Wall -Wextra mesmo-algoritmo.cpp -o mesmo-algoritmo
+$ ./mesmo-algoritmo
+1
+1
+1</pre>
+
+<p>Pense na conta: são uns 10 containers e mais de 100 algoritmos. Se cada container tivesse seu próprio "contar", "procurar", "ordenar"…, seriam mais de mil funções. Com os iteradores no meio, cada algoritmo é escrito <strong>uma vez</strong> e serve para todos. E se você criar o seu próprio container com iteradores, ganha os 100 algoritmos de graça.</p>
+
+<div class="note">
+<strong>Nem todo algoritmo serve para todo container</strong>
+<p>Os iteradores não são todos iguais. O de <code>std::vector</code> pode pular direto para qualquer posição; o de <code>std::list</code> só anda um passo de cada vez. O <code>std::sort</code> precisa pular, e por isso não aceita <code>std::list</code> (que tem o seu próprio <code>.sort()</code>). Você vê o erro real em <a href="list-deque.html">list e deque</a>.</p>
+</div>
+
+<hr>
+
+<h2>3. O que todos os containers têm em comum</h2>
+<p>Os containers foram desenhados para se parecerem. Aprendeu num, sabe o básico de todos:</p>
+
+<pre class="file" data-file="comum.cpp">#include &lt;iostream&gt;
+#include &lt;list&gt;
+#include &lt;map&gt;
+#include &lt;set&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 9, 10};
+    std::list&lt;std::string&gt; fila{"Ana", "Bruno"};
+    std::set&lt;char&gt; letras{'a', 'b', 'a', 'c'};
+    std::map&lt;std::string, int&gt; estoque{{"maçã", 12}, {"pera", 5}};
+
+    std::cout &lt;&lt; notas.size() &lt;&lt; ' ' &lt;&lt; fila.size() &lt;&lt; ' '
+              &lt;&lt; letras.size() &lt;&lt; ' ' &lt;&lt; estoque.size() &lt;&lt; '\n';
+
+    notas.clear();
+    std::cout &lt;&lt; std::boolalpha &lt;&lt; notas.empty() &lt;&lt; ' ' &lt;&lt; fila.empty() &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/stl">$ g++ -std=c++23 -Wall -Wextra comum.cpp -o comum
+$ ./comum
+3 2 3 2                  « o set guardou só a, b, c: ele não aceita repetidos
+true false</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método</th><th>O que faz</th><th>Existe em</th></tr>
+<tr><td><code>.size()</code></td><td>Quantos itens há</td><td>todos</td></tr>
+<tr><td><code>.empty()</code></td><td><code>true</code> se não há nenhum item</td><td>todos</td></tr>
+<tr><td><code>.clear()</code></td><td>Apaga todos os itens</td><td>todos, menos <code>array</code> (tamanho fixo), <code>stack</code> e <code>queue</code></td></tr>
+<tr><td><code>.begin()</code> / <code>.end()</code></td><td>Iteradores do começo e do fim</td><td>todos, menos <code>stack</code> e <code>queue</code></td></tr>
+<tr><td><code>for (auto x : c)</code></td><td>Percorre os itens (aula <a href="for-range.html">range-for</a>)</td><td>todos que têm <code>begin</code>/<code>end</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>4. Os containers: qual usar quando</h2>
+<p>A STL organiza os containers em três famílias:</p>
+<ul>
+  <li><strong>Sequências</strong>: guardam os itens na ordem em que você os pôs, como uma fila de pessoas. <code>vector</code>, <code>array</code>, <code>list</code>, <code>deque</code>.</li>
+  <li><strong>Associativos</strong>: guardam os itens organizados por uma <strong>chave</strong>, para achar rápido. <code>map</code>, <code>set</code> e as versões <code>unordered_</code>.</li>
+  <li><strong>Adaptadores</strong>: uma "capa" sobre outro container, que deixa usar só algumas operações. <code>stack</code>, <code>queue</code>.</li>
+</ul>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Container</th><th>Como imaginar</th><th>Use quando…</th><th>Cabeçalho</th><th>Aula</th></tr>
+<tr><td><code>std::vector&lt;T&gt;</code></td><td>Uma fileira de caixas coladas, que cresce no fim</td><td><strong>Quase sempre.</strong> É o padrão: rápido para ler por posição (<code>v[3]</code>) e para pôr ou tirar no fim.</td><td><code>&lt;vector&gt;</code></td><td><a href="vector.html">std::vector</a></td></tr>
+<tr><td><code>std::array&lt;T, N&gt;</code></td><td>Uma fileira de tamanho fixo</td><td>O número de itens é conhecido e nunca muda (os 7 dias da semana, 3 notas).</td><td><code>&lt;array&gt;</code></td><td><a href="std-array.html">std::array</a></td></tr>
+<tr><td><code>std::list&lt;T&gt;</code></td><td>Vagões de trem engatados</td><td>Você insere e remove muito <strong>no meio</strong>, e quase nunca precisa do item número tal. Raro.</td><td><code>&lt;list&gt;</code></td><td><a href="list-deque.html">list e deque</a></td></tr>
+<tr><td><code>std::deque&lt;T&gt;</code></td><td>Uma fila que cresce dos dois lados</td><td>Você põe e tira <strong>no começo e no fim</strong>.</td><td><code>&lt;deque&gt;</code></td><td><a href="list-deque.html">list e deque</a></td></tr>
+<tr><td><code>std::map&lt;Chave, Valor&gt;</code></td><td>Um dicionário em ordem alfabética</td><td>Você procura um valor por um nome (produto → quantidade) e quer os itens <strong>em ordem</strong> de chave.</td><td><code>&lt;map&gt;</code></td><td><a href="map.html">std::map</a></td></tr>
+<tr><td><code>std::unordered_map&lt;Chave, Valor&gt;</code></td><td>Um fichário com gavetas numeradas por um cálculo</td><td>Igual ao <code>map</code>, mas a ordem não importa e você quer a busca mais rápida.</td><td><code>&lt;unordered_map&gt;</code></td><td><a href="unordered-map.html">std::unordered_map</a></td></tr>
+<tr><td><code>std::set&lt;T&gt;</code></td><td>Uma coleção de figurinhas sem repetidas, arrumada</td><td>Você quer itens <strong>sem repetidos</strong> e perguntar "tem este?". Existe também <code>std::unordered_set</code>.</td><td><code>&lt;set&gt;</code></td><td><a href="set.html">std::set</a></td></tr>
+<tr><td><code>std::stack&lt;T&gt;</code></td><td>Uma pilha de pratos</td><td>Só importa o <strong>último</strong> que entrou (desfazer, voltar).</td><td><code>&lt;stack&gt;</code></td><td><a href="stack-queue.html">stack e queue</a></td></tr>
+<tr><td><code>std::queue&lt;T&gt;</code></td><td>A fila do banco</td><td>Quem chega primeiro é atendido primeiro.</td><td><code>&lt;queue&gt;</code></td><td><a href="stack-queue.html">stack e queue</a></td></tr>
+</table>
+</div>
+
+<h3>Um roteiro para escolher</h3>
+<p>Na dúvida, faça estas perguntas, nesta ordem:</p>
+<ol class="passo">
+  <li><strong>Vou procurar valores por um nome ou código</strong> (como "quantas maçãs tem no estoque?")? Use <code>std::map</code>. Se a ordem não importa, <code>std::unordered_map</code>.</li>
+  <li><strong>Só preciso saber se algo está na coleção, sem repetidos</strong>? Use <code>std::set</code> (ou <code>std::unordered_set</code>).</li>
+  <li><strong>Só uso o último que entrou, ou o primeiro que entrou</strong>? Use <code>std::stack</code> ou <code>std::queue</code>.</li>
+  <li><strong>O tamanho é fixo e conhecido</strong>? Use <code>std::array</code>.</li>
+  <li><strong>Nenhum dos casos acima?</strong> Use <code>std::vector</code>. Só troque por <code>list</code> ou <code>deque</code> se tiver um motivo claro.</li>
+</ol>
+
+<div class="tip">
+<strong>"Na dúvida, vector"</strong>
+<p>É o conselho dos próprios criadores do C++. O <code>std::vector</code> guarda os itens colados na memória (aula <a href="memoria.html">Como a Memória Funciona</a>), e o processador lê memória colada muito depressa. Mesmo em situações em que a teoria favorece a <code>list</code>, o <code>vector</code> costuma ganhar na prática com até alguns milhares de itens.</p>
+</div>
+
+<hr>
+
+<h2>5. Os cabeçalhos</h2>
+<p>Cada container mora no seu cabeçalho, com o mesmo nome. Os algoritmos ficam quase todos em <code>&lt;algorithm&gt;</code>; os de conta (somar tudo, por exemplo) ficam em <code>&lt;numeric&gt;</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Cabeçalho</th><th>O que traz</th></tr>
+<tr><td><code>&lt;vector&gt;</code>, <code>&lt;array&gt;</code>, <code>&lt;list&gt;</code>, <code>&lt;deque&gt;</code></td><td>As sequências</td></tr>
+<tr><td><code>&lt;map&gt;</code></td><td><code>std::map</code> e <code>std::multimap</code></td></tr>
+<tr><td><code>&lt;unordered_map&gt;</code></td><td><code>std::unordered_map</code> e <code>std::unordered_multimap</code></td></tr>
+<tr><td><code>&lt;set&gt;</code></td><td><code>std::set</code> e <code>std::multiset</code></td></tr>
+<tr><td><code>&lt;unordered_set&gt;</code></td><td><code>std::unordered_set</code> e <code>std::unordered_multiset</code></td></tr>
+<tr><td><code>&lt;stack&gt;</code></td><td><code>std::stack</code></td></tr>
+<tr><td><code>&lt;queue&gt;</code></td><td><code>std::queue</code> e <code>std::priority_queue</code></td></tr>
+<tr><td><code>&lt;algorithm&gt;</code></td><td><code>sort</code>, <code>find</code>, <code>count</code>, <code>reverse</code>, <code>max_element</code>… (aula <a href="algoritmos.html">Algoritmos</a>)</td></tr>
+<tr><td><code>&lt;numeric&gt;</code></td><td><code>accumulate</code> (somar tudo), <code>iota</code> (preencher com 1, 2, 3…)</td></tr>
+<tr><td><code>&lt;iterator&gt;</code></td><td>Ferramentas de iteradores: <code>std::next</code>, <code>std::distance</code>…</td></tr>
+<tr><td><code>&lt;ranges&gt;</code></td><td>Os ranges do C++20 (aula <a href="ranges.html">Ranges</a>)</td></tr>
+</table>
+</div>
+
+<p>Esquecer o cabeçalho é um erro comum. A boa notícia: o g++ 15 costuma dizer qual falta.</p>
+
+<pre class="file" data-file="sem-include.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::list&lt;int&gt; fila{1, 2, 3};
+    std::cout &lt;&lt; fila.size() &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/stl">$ g++ -std=c++23 -Wall -Wextra sem-include.cpp -o sem-include
+sem-include.cpp: In function ‘int main()’:
+sem-include.cpp:4:10: error: ‘list’ is not a member of ‘std’
+    4 |     std::list&lt;int&gt; fila{1, 2, 3};
+      |          ^~~~
+sem-include.cpp:2:1: note: ‘std::list’ is defined in header ‘&lt;list&gt;’; this is probably fixable by adding ‘#include &lt;list&gt;’
+    1 | #include &lt;iostream&gt;
+  +++ |+#include &lt;list&gt;
+    2 |
+sem-include.cpp:4:15: error: expected primary-expression before ‘int’
+    4 |     std::list&lt;int&gt; fila{1, 2, 3};
+      |               ^~~
+sem-include.cpp:5:18: error: ‘fila’ was not declared in this scope
+    5 |     std::cout &lt;&lt; fila.size() &lt;&lt; '\n';
+      |                  ^~~~</pre>
+
+<dl class="anatomy">
+  <dt>error: ‘list’ is not a member of ‘std’</dt><dd>"<code>list</code> não é membro de <code>std</code>": o compilador não conhece <code>std::list</code>, porque ninguém incluiu o cabeçalho dela.</dd>
+  <dt>note: ‘std::list’ is defined in header ‘&lt;list&gt;’</dt><dd>A dica de ouro: "<code>std::list</code> fica no cabeçalho <code>&lt;list&gt;</code>; provavelmente se conserta com <code>#include &lt;list&gt;</code>". As linhas com <code>+++ |+</code> mostram onde ele colocaria.</dd>
+  <dt>os outros dois erros</dt><dd>Consequência do primeiro. Conserte o primeiro e compile de novo.</dd>
+</dl>
+
+<p>No editor do guia, o Clang diz <code>no member named 'list' in namespace 'std'</code> ("não há membro chamado <code>list</code> no namespace <code>std</code>"), sem a dica do cabeçalho. Use a tabela acima.</p>
+
+<div class="warning">
+<strong>"Funcionou sem o include!"</strong>
+<p>Às vezes um programa usa <code>std::vector</code> sem <code>#include &lt;vector&gt;</code> e compila assim mesmo, porque outro cabeçalho (como <code>&lt;string&gt;</code> ou <code>&lt;map&gt;</code>) incluiu o <code>&lt;vector&gt;</code> por dentro. Não conte com isso: em outra versão do compilador, ou em outro sistema, quebra. <strong>Inclua o cabeçalho de tudo o que você usa.</strong></p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: ‘list’ is not a member of ‘std’</code></strong>
+<p><strong>O que significa:</strong> faltou o <code>#include</code> do container (ou o nome está errado: <code>std::List</code>, <code>std::vetor</code>).</p>
+<p><strong>Como consertar:</strong> leia a <code>note:</code> do g++ (ela diz o cabeçalho) ou procure na tabela da seção 5.</p>
+</div>
+
+<div class="cenario">
+<strong>O programa ficou lento com muitos itens</strong>
+<p><strong>O que significa:</strong> talvez o container não combine com o uso. Exemplos: procurar um nome num <code>vector</code> de 1 milhão de itens, um por um, quando um <code>map</code> acharia direto; inserir sempre no começo de um <code>vector</code>, que empurra todos os outros.</p>
+<p><strong>Como consertar:</strong> refaça o roteiro da seção 4 pensando na operação que o programa mais faz.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Termo</th><th>Quer dizer</th></tr>
+<tr><td>STL</td><td><em>Standard Template Library</em>: os containers, iteradores e algoritmos da biblioteca padrão</td></tr>
+<tr><td>Container</td><td>Objeto que guarda vários valores (<code>vector</code>, <code>map</code>…)</td></tr>
+<tr><td>Iterador</td><td>Objeto que aponta um item e anda para o próximo (<code>begin()</code>, <code>end()</code>)</td></tr>
+<tr><td>Algoritmo</td><td>Função que trabalha numa faixa <code>[begin, end)</code> (<code>sort</code>, <code>find</code>, <code>count</code>)</td></tr>
+<tr><td>Sequência</td><td>Container que guarda na ordem de inserção: <code>vector</code>, <code>array</code>, <code>list</code>, <code>deque</code></td></tr>
+<tr><td>Associativo</td><td>Container organizado por chave: <code>map</code>, <code>set</code>, <code>unordered_map</code>, <code>unordered_set</code></td></tr>
+<tr><td>Adaptador</td><td>"Capa" sobre outro container: <code>stack</code>, <code>queue</code>, <code>priority_queue</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O cabeçalho</h3>
+<p>Qual <code>#include</code> traz o <code>std::sort</code>?</p>
+<div class="ex-code">#include &lt;<input data-answer="algorithm" aria-label="cabeçalho">&gt;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Do começo ao fim</h3>
+<p>Complete para contar quantos <code>3</code> existem no vetor <code>v</code>:</p>
+<div class="ex-code">std::count(v.<input data-answer="begin()" aria-label="começo">, v.<input data-answer="end()" aria-label="fim">, 3)</div>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">3. A Ana quer guardar o estoque da lojinha: para cada nome de produto, a quantidade. E quer listar os produtos em ordem alfabética. Qual container?</p>
+<label><input type="radio" name="q3"> <code>std::map&lt;std::string, int&gt;</code></label>
+<label><input type="radio" name="q3"> <code>std::stack&lt;int&gt;</code></label>
+<label><input type="radio" name="q3"> <code>std::array&lt;int, 10&gt;</code></label>
+<label><input type="radio" name="q3"> <code>std::queue&lt;std::string&gt;</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O que liga os algoritmos aos containers na STL?</p>
+<label><input type="radio" name="q4"> Herança: todo container herda de uma classe <code>Container</code></label>
+<label><input type="radio" name="q4"> Cada container tem seus próprios métodos <code>sort</code>, <code>find</code>, <code>count</code></label>
+<label><input type="radio" name="q4"> Os iteradores</label>
+<label><input type="radio" name="q4"> Os cabeçalhos</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Você não sabe qual container escolher e nenhum caso especial se aplica. Qual é a escolha padrão?</p>
+<label><input type="radio" name="q5"> <code>std::list</code></label>
+<label><input type="radio" name="q5"> <code>std::deque</code></label>
+<label><input type="radio" name="q5"> <code>std::set</code></label>
+<label><input type="radio" name="q5"> <code>std::vector</code></label>
+</div>
+
+<h3>Missão final: a lista de compras arrumada</h3>
+
+<div class="trycpp" data-goal="out:arroz café café feijão leite,out:café aparece 2 vezes,src:std::sort,src:std::count">
+<p class="try-task"><strong>Missão:</strong> a lista de compras da Ana está bagunçada e repetida. Use <code>std::sort</code> para ordenar e mostre a lista; depois use <code>std::count</code> para contar quantas vezes aparece <code>"café"</code>. Saída esperada:</p>
+<pre class="out">arroz café café feijão leite
+café aparece 2 vezes</pre>
+<pre class="script">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; compras{"leite", "café", "arroz", "feijão", "café"};
+
+    // ordene aqui
+
+    for (const auto&amp; item : compras) {
+        std::cout &lt;&lt; item &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+
+    // conte os cafés aqui e mostre "café aparece N vezes"
+}
+</pre>
+<pre class="solucao">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; compras{"leite", "café", "arroz", "feijão", "café"};
+
+    std::sort(compras.begin(), compras.end());
+
+    for (const auto&amp; item : compras) {
+        std::cout &lt;&lt; item &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+
+    auto cafes = std::count(compras.begin(), compras.end(), "café");
+    std::cout &lt;&lt; "café aparece " &lt;&lt; cafes &lt;&lt; " vezes\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>A <strong>STL</strong> (<em>Standard Template Library</em>) é a parte da biblioteca padrão com containers, iteradores e algoritmos. Tudo nela é template.</li>
+  <li><strong>Containers</strong> guardam; <strong>algoritmos</strong> trabalham; <strong>iteradores</strong> ligam um ao outro. Por isso um algoritmo escrito uma vez serve para vários containers.</li>
+  <li>Todos os containers têm <code>size()</code> e <code>empty()</code>; quase todos têm <code>clear()</code>, <code>begin()</code> e <code>end()</code>.</li>
+  <li>Escolha: chave → valor, <code>map</code>/<code>unordered_map</code>; sem repetidos, <code>set</code>; último/primeiro que entrou, <code>stack</code>/<code>queue</code>; tamanho fixo, <code>array</code>; o resto, <strong><code>vector</code></strong>.</li>
+  <li>Cada container tem seu cabeçalho com o mesmo nome; os algoritmos estão em <code>&lt;algorithm&gt;</code>. Inclua sempre o que usa.</li>
+  <li>Próximo passo: as "mãos" da STL, em <a href="iteradores.html">Iteradores</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
