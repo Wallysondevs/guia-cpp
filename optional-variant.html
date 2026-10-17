@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ optional e variant — "talvez um valor" e "um tipo ou outro" | Guia C++</title>
+<meta name="description" content="std::optional, std::variant e std::expected para quem está começando: buscar algo que pode não existir, has_value, value e value_or, bad_optional_access, guardar um tipo ou outro com holds_alternative, get e visit, bad_variant_access, e o std::expected do C++23, com saídas e erros reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">optional e variant</span> <span class="versao">C++17</span></h1>
+
+<p class="intro">A lojinha da Ana tem uma função que devolve o preço de um produto. E se o produto não existir? Devolver <code>0</code> mente ("é de graça?"); devolver <code>-1</code> é um código secreto que alguém vai esquecer de conferir. O C++17 trouxe uma resposta honesta: <code>std::optional</code>, uma caixa que <strong>pode estar vazia</strong>. Na mesma leva veio o <code>std::variant</code>, uma caixa que guarda <strong>um tipo ou outro</strong> (um número <em>ou</em> um texto, por exemplo). E o C++23 juntou as duas ideias no <code>std::expected</code>: "um resultado ou o motivo do erro".</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Devolver "talvez um valor" com <code>std::optional</code> e <code>std::nullopt</code>.</li>
+  <li>Conferir e ler: <code>has_value()</code>, <code>if (opt)</code>, <code>value()</code>, <code>*opt</code> e <code>value_or(…)</code>.</li>
+  <li>O que acontece quando você lê uma caixa vazia: <code>std::bad_optional_access</code> (o erro real).</li>
+  <li>Guardar um tipo ou outro com <code>std::variant</code>: <code>std::holds_alternative</code>, <code>std::get</code> e o erro <code>std::bad_variant_access</code>.</li>
+  <li>Tratar todos os tipos de uma vez com <code>std::visit</code> (o básico).</li>
+  <li>Conhecer o <code>std::expected</code> <span class="versao">C++23</span>.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Alguns exemplos usam <code>try</code> e <code>catch</code>, da aula <a href="excecoes.html">Exceções</a>.</p>
+
+<hr>
+
+<h2>A ideia: a caixa que pode estar vazia, e a caixa de duas formas</h2>
+<ul>
+  <li><strong><code>optional</code></strong> é como a caixinha de correio da Ana: ou tem uma carta, ou está vazia. Antes de ler a carta, ela olha se tem alguma.</li>
+  <li><strong><code>variant</code></strong> é como um pote com tampa onde cabe <strong>ou</strong> açúcar <strong>ou</strong> sal, nunca os dois. Antes de usar, ela confere a etiqueta para saber o que tem dentro.</li>
+</ul>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>std::optional&lt;T&gt;</code></th><th><code>std::variant&lt;A, B, …&gt;</code></th></tr>
+<tr><td>Pode conter</td><td>Um <code>T</code> <strong>ou nada</strong></td><td>Um <code>A</code> <strong>ou</strong> um <code>B</code> <strong>ou</strong> …</td></tr>
+<tr><td>Pergunta antes de usar</td><td>"Tem alguma coisa?"</td><td>"Qual dos tipos está aí?"</td></tr>
+<tr><td>Cabeçalho</td><td><code>&lt;optional&gt;</code></td><td><code>&lt;variant&gt;</code></td></tr>
+<tr><td>Uso típico</td><td>Busca que pode não achar, campo opcional de um cadastro</td><td>Célula de planilha (número ou texto), resposta de vários formatos</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. <code>std::optional</code>: talvez um valor</h2>
+
+<pre class="file" data-file="buscar.cpp">#include &lt;iostream&gt;
+#include &lt;optional&gt;
+#include &lt;string&gt;
+
+std::optional&lt;double&gt; preco_de(const std::string&amp; produto) {
+    if (produto == "pão") return 0.75;
+    if (produto == "leite") return 5.49;
+    return std::nullopt;
+}
+
+int main() {
+    std::optional&lt;double&gt; p1 = preco_de("leite");
+    std::optional&lt;double&gt; p2 = preco_de("caviar");
+
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "leite tem preço? " &lt;&lt; p1.has_value() &lt;&lt; '\n';
+    std::cout &lt;&lt; "caviar tem preço? " &lt;&lt; p2.has_value() &lt;&lt; '\n';
+
+    if (p1.has_value()) {
+        std::cout &lt;&lt; "Leite: R$ " &lt;&lt; p1.value() &lt;&lt; '\n';
+    }
+    if (p1) {
+        std::cout &lt;&lt; "Leite (com *): R$ " &lt;&lt; *p1 &lt;&lt; '\n';
+    }
+    if (!p2) {
+        std::cout &lt;&lt; "Caviar: não vendemos\n";
+    }
+
+    std::cout &lt;&lt; "Caviar ou 0: " &lt;&lt; p2.value_or(0.0) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra buscar.cpp -o buscar
+$ ./buscar
+leite tem preço? true
+caviar tem preço? false
+Leite: R$ 5.49
+Leite (com *): R$ 5.49
+Caviar: não vendemos
+Caviar ou 0: 0</pre>
+
+<dl class="anatomy">
+  <dt>std::optional&lt;double&gt;</dt><dd>"Talvez um <code>double</code>." É o tipo de retorno da função.</dd>
+  <dt>return 0.75;</dt><dd>Com valor: o <code>double</code> entra na caixa sozinho.</dd>
+  <dt>return std::nullopt;</dt><dd>Sem valor: devolve a caixa vazia (<em>null option</em>, "opção nula").</dd>
+  <dt>p1.has_value()</dt><dd>"Tem valor?" Responde <code>true</code> ou <code>false</code>.</dd>
+  <dt>if (p1)</dt><dd>Atalho para a mesma pergunta: o optional vira <code>true</code> quando tem valor. <code>if (!p2)</code> = "se está vazio".</dd>
+  <dt>p1.value()</dt><dd>Pega o valor. Se a caixa estiver vazia, <strong>lança uma exceção</strong> (seção seguinte).</dd>
+  <dt>*p1</dt><dd>Também pega o valor, sem conferir nada. Use só depois de ter conferido.</dd>
+  <dt>p2.value_or(0.0)</dt><dd>"O valor, ou então <code>0.0</code>": nunca falha, porque sempre há uma resposta.</dd>
+</dl>
+
+<p>A grande vantagem aparece em quem <strong>lê</strong> a função: o tipo <code>std::optional&lt;double&gt;</code> já avisa, na assinatura, "posso não ter resposta". Com um <code>double</code> comum e o código secreto <code>-1</code>, nada obriga quem chama a se lembrar disso.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode e veja os dois resultados. Depois acrescente um terceiro produto na função (por exemplo, <code>"café"</code> a 18.90) e busque por ele. Por fim, troque o <code>value_or(0.0)</code> por <code>value_or(-1.0)</code> e veja a diferença.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;optional&gt;
+#include &lt;string&gt;
+
+std::optional&lt;double&gt; preco_de(const std::string&amp; produto) {
+    if (produto == "pão") return 0.75;
+    if (produto == "leite") return 5.49;
+    return std::nullopt;
+}
+
+int main() {
+    for (std::string produto : {"pão", "chocolate"}) {
+        auto preco = preco_de(produto);
+        if (preco) {
+            std::cout &lt;&lt; produto &lt;&lt; ": R$ " &lt;&lt; *preco &lt;&lt; '\n';
+        } else {
+            std::cout &lt;&lt; produto &lt;&lt; ": não vendemos\n";
+        }
+    }
+    std::cout &lt;&lt; "Sem conferir: " &lt;&lt; preco_de("chocolate").value_or(0.0) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<h3>Ler uma caixa vazia: <code>std::bad_optional_access</code></h3>
+<p>O <code>value()</code> confere se há valor. Se não há, ele <strong>lança uma exceção</strong> do tipo <code>std::bad_optional_access</code> ("acesso ruim ao optional"). Se ninguém a capturar, o programa termina na hora:</p>
+
+<pre class="file" data-file="value_vazio.cpp">#include &lt;iostream&gt;
+#include &lt;optional&gt;
+
+int main() {
+    std::optional&lt;int&gt; idade;
+    std::cout &lt;&lt; "Antes\n";
+    std::cout &lt;&lt; idade.value() &lt;&lt; '\n';
+    std::cout &lt;&lt; "Depois\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra value_vazio.cpp -o value_vazio
+$ ./value_vazio
+Antes
+terminate called after throwing an instance of 'std::bad_optional_access'
+  what():  bad optional access
+Abortado                   (imagem do núcleo gravada) ./value_vazio
+$ echo $?
+134                                  « "Depois" nunca apareceu</pre>
+
+<dl class="anatomy">
+  <dt>std::optional&lt;int&gt; idade;</dt><dd>Um optional criado sem valor começa <strong>vazio</strong>.</dd>
+  <dt>terminate called after throwing an instance of 'std::bad_optional_access'</dt><dd>"<code>terminate</code> foi chamado depois que uma exceção do tipo <code>bad_optional_access</code> foi lançada": ninguém a capturou, e o programa foi encerrado.</dd>
+  <dt>what():  bad optional access</dt><dd>A mensagem que a exceção carrega.</dd>
+</dl>
+
+<p>Como toda exceção, ela pode ser capturada com <code>try</code>/<code>catch</code> (aula <a href="excecoes.html">Exceções</a>):</p>
+
+<pre class="file" data-file="value_catch.cpp">#include &lt;iostream&gt;
+#include &lt;optional&gt;
+
+int main() {
+    std::optional&lt;int&gt; idade;
+    try {
+        std::cout &lt;&lt; idade.value() &lt;&lt; '\n';
+    } catch (const std::bad_optional_access&amp; e) {
+        std::cout &lt;&lt; "Erro: " &lt;&lt; e.what() &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra value_catch.cpp -o value_catch
+$ ./value_catch
+Erro: bad optional access</pre>
+
+<p>Mas o normal é nem chegar aí: confira com <code>if (opt)</code> antes, ou use <code>value_or</code>. E o <code>*idade</code> numa caixa vazia? Ele não confere nada: é <a href="comportamento-indefinido.html">comportamento indefinido</a>. Sem otimização, o g++ 15 ainda pega o erro com uma asserção:</p>
+
+<pre class="term" data-cwd="~/cpp">$ ./estrela_vazio                    « std::cout &lt;&lt; *idade;  com idade vazio
+/usr/include/c++/15/optional:1186: constexpr _Tp&amp; std::optional&lt;_Tp&gt;::operator*() &amp; [with _Tp = int]: Assertion 'this-&gt;_M_is_engaged()' failed.
+Abortado                   (imagem do núcleo gravada) ./estrela_vazio</pre>
+
+<p><em>Engaged</em> = "ocupado": a biblioteca conferiu "a caixa está ocupada?" e a resposta foi não. Com <code>-O2</code> essa conferência some, e o programa mostraria lixo sem reclamar.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma de ler</th><th>Se estiver vazio</th><th>Quando usar</th></tr>
+<tr><td><code>opt.value()</code></td><td>Lança <code>std::bad_optional_access</code></td><td>Quando vazio seria um erro de verdade, a tratar com <code>catch</code></td></tr>
+<tr><td><code>*opt</code></td><td>Comportamento indefinido</td><td>Logo depois de um <code>if (opt)</code></td></tr>
+<tr><td><code>opt.value_or(padrão)</code></td><td>Devolve o padrão</td><td>Quando existe um valor razoável para "não tem"</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>2. <code>std::variant</code>: um tipo ou outro</h2>
+<p>Um <code>std::variant&lt;int, std::string&gt;</code> guarda <strong>em cada momento</strong> um <code>int</code> ou uma <code>std::string</code>. Ele sempre sabe qual dos dois tem dentro:</p>
+
+<pre class="file" data-file="variante.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;variant&gt;
+
+int main() {
+    std::variant&lt;int, std::string&gt; resposta = 42;
+
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "É int? " &lt;&lt; std::holds_alternative&lt;int&gt;(resposta) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Valor: " &lt;&lt; std::get&lt;int&gt;(resposta) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Índice: " &lt;&lt; resposta.index() &lt;&lt; '\n';
+
+    resposta = std::string("não sei");
+    std::cout &lt;&lt; "É string? " &lt;&lt; std::holds_alternative&lt;std::string&gt;(resposta) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Valor: " &lt;&lt; std::get&lt;std::string&gt;(resposta) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Índice: " &lt;&lt; resposta.index() &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra variante.cpp -o variante
+$ ./variante
+É int? true
+Valor: 42
+Índice: 0                            « int é o 1º tipo da lista (posição 0)
+É string? true
+Valor: não sei
+Índice: 1                            « string é o 2º (posição 1)</pre>
+
+<dl class="anatomy">
+  <dt>std::variant&lt;int, std::string&gt;</dt><dd>A lista de tipos possíveis, chamados de <strong>alternativas</strong>.</dd>
+  <dt>= 42;</dt><dd>Agora guarda um <code>int</code>. Atribuir outro valor troca o tipo: depois de <code>resposta = std::string("não sei");</code> ele guarda uma string, e o 42 foi jogado fora.</dd>
+  <dt>std::holds_alternative&lt;int&gt;(resposta)</dt><dd>"Está guardando um <code>int</code>?" (<em>holds</em> = "segura", "contém").</dd>
+  <dt>std::get&lt;int&gt;(resposta)</dt><dd>Pega o valor como <code>int</code>. Se o que está guardado for de outro tipo, lança uma exceção (veja abaixo).</dd>
+  <dt>resposta.index()</dt><dd>A posição, na lista, do tipo guardado agora.</dd>
+</dl>
+
+<p>Repare que se escreveu <code>std::string("não sei")</code> e não só <code>"não sei"</code>. Escrever o tipo deixa claro para o leitor (e para o compilador) qual alternativa você quer.</p>
+
+<h3>Pedir o tipo errado: <code>std::bad_variant_access</code></h3>
+
+<pre class="file" data-file="get_errado.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;variant&gt;
+
+int main() {
+    std::variant&lt;int, std::string&gt; resposta = std::string("não sei");
+    std::cout &lt;&lt; std::get&lt;int&gt;(resposta) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra get_errado.cpp -o get_errado
+$ ./get_errado
+terminate called after throwing an instance of 'std::bad_variant_access'
+  what():  std::get: wrong index for variant
+Abortado                   (imagem do núcleo gravada) ./get_errado</pre>
+
+<p><em>Wrong index for variant</em> = "índice errado para o variant": você pediu o <code>int</code> (posição 0), mas o que está lá é a string (posição 1). Com <code>try</code>/<code>catch (const std::bad_variant_access&amp; e)</code>, o programa mostraria <code>Erro: std::get: wrong index for variant</code> e continuaria. O jeito tranquilo é perguntar antes:</p>
+
+<pre class="file" data-file="resposta.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;variant&gt;
+
+void mostrar(const std::variant&lt;int, std::string&gt;&amp; r) {
+    if (std::holds_alternative&lt;int&gt;(r)) {
+        std::cout &lt;&lt; "Número: " &lt;&lt; std::get&lt;int&gt;(r) &lt;&lt; '\n';
+    } else {
+        std::cout &lt;&lt; "Texto: " &lt;&lt; std::get&lt;std::string&gt;(r) &lt;&lt; '\n';
+    }
+}
+
+int main() {
+    mostrar(42);
+    mostrar(std::string("não sei"));
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra resposta.cpp -o resposta
+$ ./resposta
+Número: 42
+Texto: não sei</pre>
+
+<h3><code>std::visit</code>: uma função para todos os tipos (o básico)</h3>
+<p>Quando há muitas alternativas, uma cadeia de <code>if (holds_alternative…)</code> fica longa. O <code>std::visit</code> ("visitar") chama uma função com o valor que estiver guardado, seja do tipo que for. A função mais simples para isso é uma <a href="lambdas.html">lambda</a> com parâmetro <code>auto</code>, que aceita qualquer tipo:</p>
+
+<pre class="file" data-file="visitar.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;variant&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::variant&lt;int, double, std::string&gt;&gt; celulas = {
+        10, 3.5, std::string("Ana"), 7
+    };
+
+    for (const auto&amp; c : celulas) {
+        std::visit([](const auto&amp; valor) {
+            std::cout &lt;&lt; "[" &lt;&lt; valor &lt;&lt; "] ";
+        }, c);
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra visitar.cpp -o visitar
+$ ./visitar
+[10] [3.5] [Ana] [7]</pre>
+
+<p>Imagine as células de uma planilha: cada uma tem um número inteiro, um número com vírgula ou um texto. O <code>std::visit</code> recebe a lambda e a célula <code>c</code>, olha qual tipo está guardado e chama a lambda com ele. Aqui funcionou porque o <code>cout &lt;&lt;</code> sabe mostrar os três tipos. Tratar cada tipo de um jeito diferente dentro do <code>visit</code> exige técnicas de <a href="templates-funcao.html">templates</a> (<code>if constexpr</code>, citado em <a href="constexpr.html">constexpr</a>); por enquanto, para tratamentos diferentes, use o <code>holds_alternative</code>.</p>
+
+<hr>
+
+<h2>3. <code>std::expected</code>: um resultado ou o motivo do erro <span class="versao">C++23</span></h2>
+<p>O <code>optional</code> diz "não achei", mas não diz <strong>por quê</strong>. O <code>std::expected&lt;T, E&gt;</code> ("esperado") guarda <strong>ou</strong> o resultado esperado (<code>T</code>) <strong>ou</strong> um erro (<code>E</code>), que pode ser uma mensagem. É uma alternativa às exceções para erros que acontecem com frequência, como um texto digitado errado:</p>
+
+<pre class="file" data-file="esperado.cpp">#include &lt;expected&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+std::expected&lt;int, std::string&gt; idade_de(const std::string&amp; texto) {
+    if (texto.empty()) {
+        return std::unexpected("texto vazio");
+    }
+    int idade = 0;
+    for (char c : texto) {
+        if (c &lt; '0' || c &gt; '9') {
+            return std::unexpected("não é número: " + texto);
+        }
+        idade = idade * 10 + (c - '0');
+    }
+    return idade;
+}
+
+int main() {
+    for (std::string t : {"29", "abc", ""}) {
+        auto r = idade_de(t);
+        if (r.has_value()) {
+            std::cout &lt;&lt; "Idade: " &lt;&lt; r.value() &lt;&lt; '\n';
+        } else {
+            std::cout &lt;&lt; "Erro: " &lt;&lt; r.error() &lt;&lt; '\n';
+        }
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra esperado.cpp -o esperado
+$ ./esperado
+Idade: 29
+Erro: não é número: abc
+Erro: texto vazio</pre>
+
+<dl class="anatomy">
+  <dt>std::expected&lt;int, std::string&gt;</dt><dd>"Espero um <code>int</code>; se der errado, você recebe uma <code>std::string</code> explicando."</dd>
+  <dt>return std::unexpected("…");</dt><dd>Devolve o lado do erro (<em>unexpected</em> = "inesperado").</dd>
+  <dt>return idade;</dt><dd>Devolve o lado do sucesso.</dd>
+  <dt>r.has_value() / r.value() / r.error()</dt><dd>Como no <code>optional</code>, mais o <code>error()</code> para ler o motivo.</dd>
+</dl>
+
+<p>Funciona no g++ 15 com <code>-std=c++23</code>. Com <code>-std=c++20</code>, o próprio g++ explica: <code>error: ‘expected’ in namespace ‘std’ does not name a template type</code> e logo abaixo <code>note: ‘std::expected’ is only available from C++23 onwards</code> ("só está disponível a partir do C++23"). Por ser recente, você vai ver pouco <code>expected</code> em código antigo; em projetos novos, ele é cada vez mais comum. (Para converter texto em número de verdade, use as funções da aula <a href="string-numero.html">Texto ↔ Número</a>; o laço acima é só para o exemplo.)</p>
+
+<hr>
+
+<h2>Qual usar?</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th></tr>
+<tr><td>A resposta pode simplesmente não existir, e o motivo é óbvio (não achei)</td><td><code>std::optional&lt;T&gt;</code></td></tr>
+<tr><td>Pode dar errado, e quem chama precisa saber o motivo</td><td><code>std::expected&lt;T, E&gt;</code> (C++23) ou uma <a href="excecoes.html">exceção</a></td></tr>
+<tr><td>Um erro raro e grave, que deve interromper tudo</td><td>Exceção</td></tr>
+<tr><td>O valor pode ser de tipos diferentes, todos válidos</td><td><code>std::variant&lt;A, B, …&gt;</code></td></tr>
+<tr><td>Vários valores ao mesmo tempo</td><td><code>struct</code>, <code>std::pair</code>, <code>std::tuple</code> (aula <a href="pair-tuple.html">pair e tuple</a>)</td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>E os ponteiros nulos?</strong>
+<p>Em código antigo, "talvez não exista" era feito com um ponteiro que podia ser <code>nullptr</code> (aula <a href="nullptr.html">nullptr</a>). Para devolver um valor, o <code>optional</code> é mais seguro: não há memória para gerenciar e o tipo diz claramente que pode estar vazio.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>terminate called after throwing an instance of 'std::bad_optional_access'</code></strong>
+<p><strong>O que significa:</strong> o programa chamou <code>.value()</code> num optional vazio e ninguém capturou a exceção.</p>
+<p><strong>Como consertar:</strong> confira com <code>if (opt)</code>/<code>has_value()</code> antes, use <code>value_or(padrão)</code>, ou capture com <code>catch (const std::bad_optional_access&amp;)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>terminate called after throwing an instance of 'std::bad_variant_access'</code> / <code>what():  std::get: wrong index for variant</code></strong>
+<p><strong>O que significa:</strong> <code>std::get&lt;T&gt;</code> pediu um tipo diferente do que está guardado.</p>
+<p><strong>Como consertar:</strong> pergunte antes com <code>std::holds_alternative&lt;T&gt;</code>, ou use <code>std::visit</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: conversion from ‘double’ to non-scalar type ‘std::variant&lt;int, …&gt;’ requested</code></strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra variant_tipo.cpp -o variant_tipo
+variant_tipo.cpp: In function ‘int main()’:
+variant_tipo.cpp:5:40: error: conversion from ‘double’ to non-scalar type ‘std::variant&lt;int, std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt; &gt;’ requested
+    5 |     std::variant&lt;int, std::string&gt; v = 3.5;
+      |                                        ^~~
+In file included from variant_tipo.cpp:2:
+/usr/include/c++/15/variant: In instantiation of ‘constexpr _Tp&amp; std::get(variant&lt;_Types ...&gt;&amp;) [with _Tp = double; _Types = {int, __cxx11::basic_string&lt;char, char_traits&lt;char&gt;, allocator&lt;char&gt; &gt;}]’:
+variant_tipo.cpp:6:28:   required from here
+    6 |     return std::get&lt;double&gt;(v);
+      |            ~~~~~~~~~~~~~~~~^~~
+/usr/include/c++/15/variant:1150:42: error: static assertion failed: T must occur exactly once in alternatives
+                                     « … e mais 280 linhas (a mensagem inteira tem 292)</pre>
+<p><strong>O que significa:</strong> dois erros. Na linha 5, o variant não aceita <code>3.5</code>: <code>double</code> não está na lista, e ele se recusa a cortar o número para caber no <code>int</code>. Na linha 6, <code>std::get&lt;double&gt;</code> pede um tipo que não é alternativa: <em>T must occur exactly once in alternatives</em> = "T precisa aparecer exatamente uma vez nas alternativas".</p>
+<p><strong>Como consertar:</strong> só use os tipos da lista. Se precisa de <code>double</code>, acrescente-o: <code>std::variant&lt;int, double, std::string&gt;</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>std::optional&lt;T&gt; o;</code></td><td>Optional vazio (<code>&lt;optional&gt;</code>)</td></tr>
+<tr><td><code>return valor;</code> / <code>return std::nullopt;</code></td><td>Devolve cheio / vazio</td></tr>
+<tr><td><code>o.has_value()</code>, <code>if (o)</code></td><td>Tem valor?</td></tr>
+<tr><td><code>o.value()</code></td><td>O valor, ou lança <code>std::bad_optional_access</code></td></tr>
+<tr><td><code>*o</code></td><td>O valor, sem conferir</td></tr>
+<tr><td><code>o.value_or(x)</code></td><td>O valor, ou <code>x</code></td></tr>
+<tr><td><code>o.reset();</code> / <code>o = std::nullopt;</code></td><td>Esvazia</td></tr>
+<tr><td><code>std::variant&lt;A, B&gt; v = a;</code></td><td>Guarda um <code>A</code> (<code>&lt;variant&gt;</code>)</td></tr>
+<tr><td><code>std::holds_alternative&lt;A&gt;(v)</code></td><td>Está guardando um <code>A</code>?</td></tr>
+<tr><td><code>std::get&lt;A&gt;(v)</code></td><td>O valor como <code>A</code>, ou lança <code>std::bad_variant_access</code></td></tr>
+<tr><td><code>v.index()</code></td><td>Posição do tipo guardado</td></tr>
+<tr><td><code>std::visit(f, v)</code></td><td>Chama <code>f</code> com o valor guardado</td></tr>
+<tr><td><code>std::expected&lt;T, E&gt;</code></td><td>Resultado ou erro (C++23, <code>&lt;expected&gt;</code>)</td></tr>
+<tr><td><code>return std::unexpected(erro);</code></td><td>Devolve o lado do erro</td></tr>
+<tr><td><code>r.error()</code></td><td>Lê o erro</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A caixa vazia</h3>
+<p>Complete para devolver um optional vazio:</p>
+<div class="ex-code">return std::<input data-answer="nullopt" aria-label="valor">;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Com valor padrão</h3>
+<p>Complete para mostrar o desconto, ou 0 se não houver:</p>
+<div class="ex-code">std::cout &lt;&lt; desconto.<input data-answer="value_or" aria-label="método">(0);</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. O que acontece em <code>std::optional&lt;int&gt; x; std::cout &lt;&lt; x.value();</code> se ninguém usar <code>try</code>/<code>catch</code>?</p>
+<label><input type="radio" name="q3"> Mostra 0</label>
+<label><input type="radio" name="q3"> O programa termina com <code>std::bad_optional_access</code></label>
+<label><input type="radio" name="q3"> Não compila</label>
+<label><input type="radio" name="q3"> Mostra <code>nullopt</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Quanto vale <code>v.index()</code> em <code>std::variant&lt;int, double, std::string&gt; v = 2.5;</code>?</p>
+<label><input type="radio" name="q4"> 0</label>
+<label><input type="radio" name="q4"> 2.5</label>
+<label><input type="radio" name="q4"> 2</label>
+<label><input type="radio" name="q4"> 1</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Uma função converte texto em data e quem chama precisa saber se o erro foi "mês inválido" ou "formato errado". Qual tipo de retorno combina melhor?</p>
+<label><input type="radio" name="q5"> <code>std::optional&lt;Data&gt;</code></label>
+<label><input type="radio" name="q5"> <code>std::variant&lt;int, double&gt;</code></label>
+<label><input type="radio" name="q5"> <code>std::expected&lt;Data, std::string&gt;</code></label>
+<label><input type="radio" name="q5"> <code>std::pair&lt;Data, Data&gt;</code></label>
+</div>
+
+<h3>Missão final: procurar na chamada</h3>
+
+<div class="trycpp" data-goal="out:Bruno está na posição 1,out:Zeca: não encontrado,src:std::nullopt">
+<p class="try-task"><strong>Missão:</strong> complete <code>posicao_de</code>: percorra a lista e, se achar o nome, devolva a posição <code>i</code>; se terminar o laço sem achar, devolva <code>std::nullopt</code>. A saída deve ser:</p>
+<pre class="out">Bruno está na posição 1
+Zeca: não encontrado</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;optional&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+std::optional&lt;int&gt; posicao_de(const std::vector&lt;std::string&gt;&amp; lista, const std::string&amp; nome) {
+    // percorra lista; achou? return i;
+    // não achou? return std::nullopt;
+    return 0;
+}
+
+int main() {
+    std::vector&lt;std::string&gt; turma = {"Ana", "Bruno", "Carla"};
+
+    for (std::string nome : {"Bruno", "Zeca"}) {
+        auto pos = posicao_de(turma, nome);
+        if (pos) {
+            std::cout &lt;&lt; nome &lt;&lt; " está na posição " &lt;&lt; *pos &lt;&lt; '\n';
+        } else {
+            std::cout &lt;&lt; nome &lt;&lt; ": não encontrado\n";
+        }
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;optional&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+std::optional&lt;int&gt; posicao_de(const std::vector&lt;std::string&gt;&amp; lista, const std::string&amp; nome) {
+    for (int i = 0; i &lt; static_cast&lt;int&gt;(lista.size()); ++i) {
+        if (lista[i] == nome) {
+            return i;
+        }
+    }
+    return std::nullopt;
+}
+
+int main() {
+    std::vector&lt;std::string&gt; turma = {"Ana", "Bruno", "Carla"};
+
+    for (std::string nome : {"Bruno", "Zeca"}) {
+        auto pos = posicao_de(turma, nome);
+        if (pos) {
+            std::cout &lt;&lt; nome &lt;&lt; " está na posição " &lt;&lt; *pos &lt;&lt; '\n';
+        } else {
+            std::cout &lt;&lt; nome &lt;&lt; ": não encontrado\n";
+        }
+    }
+}
+</pre>
+</div>
+
+<p>A solução, no laboratório:</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra posicao.cpp -o posicao
+$ ./posicao
+Bruno está na posição 1
+Zeca: não encontrado</pre>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>std::optional&lt;T&gt;</code>: um <code>T</code> ou nada. Devolva <code>std::nullopt</code> para "nada".</li>
+  <li>Confira com <code>if (opt)</code> ou <code>has_value()</code>; leia com <code>*opt</code> (depois de conferir), <code>value()</code> (lança <code>std::bad_optional_access</code> se vazio) ou <code>value_or(padrão)</code>.</li>
+  <li><code>std::variant&lt;A, B&gt;</code>: um <code>A</code> ou um <code>B</code>. Pergunte com <code>std::holds_alternative&lt;A&gt;</code>; leia com <code>std::get&lt;A&gt;</code> (lança <code>std::bad_variant_access</code> se for o outro).</li>
+  <li><code>std::visit(lambda, v)</code> trata o valor guardado, qualquer que seja o tipo.</li>
+  <li><code>std::expected&lt;T, E&gt;</code> (C++23): o resultado ou o motivo do erro, com <code>std::unexpected</code> e <code>error()</code>.</li>
+  <li>Os três deixam claro, no tipo, o que pode acontecer, em vez de códigos secretos como <code>-1</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
