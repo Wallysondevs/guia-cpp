@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Tipos de Dados — visão geral, sizeof e como escolher | Guia C++</title>
+<meta name="description" content="Tipos de dados em C++ para quem nunca programou: int, double, char, bool, std::string, float, long long e companhia, o tamanho real de cada um com sizeof, como escolher o tipo certo e a diferença entre tipos fundamentais e tipos da biblioteca, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Tipos de Dados</span></h1>
+
+<p class="intro">Toda variável em C++ tem um <strong>tipo</strong>, escolhido quando ela é criada: <code>int idade</code>, <code>double altura</code>. O tipo diz <strong>que espécie de valor</strong> cabe na caixa, <strong>quanto espaço</strong> ela ocupa na memória e <strong>o que dá para fazer</strong> com ela (somar, juntar textos, perguntar se é verdade). Esta aula é o mapa: mostra os tipos que você vai usar o tempo todo, o tamanho real de cada um e como escolher. Cada família tem depois a sua própria aula.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Os tipos do dia a dia: <code>int</code>, <code>double</code>, <code>char</code>, <code>bool</code> e <code>std::string</code>.</li>
+  <li>Os "parentes": <code>short</code>, <code>long</code>, <code>long long</code>, <code>float</code>, <code>long double</code>.</li>
+  <li>Como medir o tamanho de um tipo com <code>sizeof</code>, e os tamanhos reais no Linux da Ana.</li>
+  <li>Como escolher o tipo certo para cada informação.</li>
+  <li>A diferença entre tipos <strong>fundamentais</strong> (da linguagem) e tipos <strong>da biblioteca</strong> (como <code>std::string</code>).</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>, um PC comum de 64 bits), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: cada coisa no seu recipiente</h2>
+<p>Na cozinha, cada coisa tem o seu recipiente: ovos vão na caixa de ovos, leite vai na garrafa, açúcar vai no pote. Você até consegue pôr leite na caixa de ovos, mas vai dar errado. E ninguém guarda uma colher de sal num balde.</p>
+
+<p>Os tipos do C++ são esses recipientes. Escolher o tipo é responder três perguntas:</p>
+<ol>
+  <li><strong>Que espécie de informação?</strong> Número inteiro, número com vírgula, uma letra, sim/não, um texto.</li>
+  <li><strong>De que tamanho?</strong> A idade de uma pessoa cabe num recipiente pequeno; a população do mundo precisa de um grande.</li>
+  <li><strong>Com que precisão?</strong> Um preço precisa de centavos; o número de alunos, não.</li>
+</ol>
+
+<hr>
+
+<h2>1. Os cinco tipos do dia a dia</h2>
+
+<pre class="file" data-file="tipos.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    int idade = 29;
+    double altura = 1.65;
+    char inicial = 'A';
+    bool clienteVip = true;
+    std::string nome = "Ana";
+    std::cout &lt;&lt; "Idade: " &lt;&lt; idade &lt;&lt; "\n";
+    std::cout &lt;&lt; "Altura: " &lt;&lt; altura &lt;&lt; "\n";
+    std::cout &lt;&lt; "Inicial: " &lt;&lt; inicial &lt;&lt; "\n";
+    std::cout &lt;&lt; "VIP: " &lt;&lt; clienteVip &lt;&lt; "\n";
+    std::cout &lt;&lt; "Nome: " &lt;&lt; nome &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tipos.cpp -o tipos
+$ ./tipos
+Idade: 29
+Altura: 1.65
+Inicial: A
+VIP: 1                   « true aparece como 1 (a aula bool explica)
+Nome: Ana</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Nome vem de</th><th>Guarda</th><th>Como se escreve o valor</th><th>Aula</th></tr>
+<tr><td><code>int</code></td><td><em>integer</em>, "inteiro"</td><td>Números inteiros, positivos ou negativos</td><td><code>29</code>, <code>-7</code>, <code>0</code></td><td><a href="inteiros.html">Inteiros</a></td></tr>
+<tr><td><code>double</code></td><td><em>double precision</em>, "precisão dupla"</td><td>Números com vírgula (fração)</td><td><code>1.65</code>, <code>-0.5</code>, <code>3.0</code> (com <strong>ponto</strong>)</td><td><a href="ponto-flutuante.html">float e double</a></td></tr>
+<tr><td><code>char</code></td><td><em>character</em>, "caractere"</td><td><strong>Um</strong> caractere</td><td><code>'A'</code>, <code>'7'</code>, <code>'?'</code> (aspas <strong>simples</strong>)</td><td><a href="char.html">Caracteres</a></td></tr>
+<tr><td><code>bool</code></td><td>George Boole, matemático</td><td>Verdadeiro ou falso</td><td><code>true</code>, <code>false</code></td><td><a href="bool.html">Booleanos</a></td></tr>
+<tr><td><code>std::string</code></td><td>"cadeia" (de caracteres)</td><td>Texto de qualquer tamanho</td><td><code>"Ana"</code>, <code>""</code> (aspas <strong>duplas</strong>)</td><td><a href="strings.html">Strings</a></td></tr>
+</table>
+</div>
+
+<p>Com esses cinco você escreve quase todos os programas do Nível 1. Os outros tipos são variações de tamanho e de precisão dos mesmos números.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> mude os valores para os seus dados e rode. Depois tente pôr <code>"Ana"</code> (com aspas duplas) no <code>char inicial</code> e leia o erro: um <code>char</code> guarda <strong>um</strong> caractere, entre aspas simples.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana";
+    int idade = 29;
+    double altura = 1.65;
+    char inicial = 'A';
+    bool gostaDeCafe = true;
+    std::cout &lt;&lt; nome &lt;&lt; ", " &lt;&lt; idade &lt;&lt; " anos, " &lt;&lt; altura &lt;&lt; " m, inicial "
+              &lt;&lt; inicial &lt;&lt; ", gosta de café: " &lt;&lt; gostaDeCafe &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Medir o tamanho: <code>sizeof</code></h2>
+<p>A memória do computador é medida em <strong>bytes</strong>. Um byte é um pedacinho de memória com 8 <strong>bits</strong> (cada bit é um 0 ou 1) e consegue guardar 256 valores diferentes. Quanto mais bytes um tipo tem, maiores (ou mais precisos) os números que ele guarda.</p>
+
+<p>O operador <code>sizeof</code> ("tamanho de") responde quantos bytes um tipo ocupa:</p>
+
+<pre class="file" data-file="tamanhos.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::cout &lt;&lt; "bool:        " &lt;&lt; sizeof(bool) &lt;&lt; "\n";
+    std::cout &lt;&lt; "char:        " &lt;&lt; sizeof(char) &lt;&lt; "\n";
+    std::cout &lt;&lt; "short:       " &lt;&lt; sizeof(short) &lt;&lt; "\n";
+    std::cout &lt;&lt; "int:         " &lt;&lt; sizeof(int) &lt;&lt; "\n";
+    std::cout &lt;&lt; "long:        " &lt;&lt; sizeof(long) &lt;&lt; "\n";
+    std::cout &lt;&lt; "long long:   " &lt;&lt; sizeof(long long) &lt;&lt; "\n";
+    std::cout &lt;&lt; "float:       " &lt;&lt; sizeof(float) &lt;&lt; "\n";
+    std::cout &lt;&lt; "double:      " &lt;&lt; sizeof(double) &lt;&lt; "\n";
+    std::cout &lt;&lt; "long double: " &lt;&lt; sizeof(long double) &lt;&lt; "\n";
+    std::cout &lt;&lt; "std::string: " &lt;&lt; sizeof(std::string) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tamanhos.cpp -o tamanhos
+$ ./tamanhos
+bool:        1
+char:        1
+short:       2
+int:         4
+long:        8
+long long:   8
+float:       4
+double:      8
+long double: 16
+std::string: 32</pre>
+
+<p>Os espaços depois dos nomes (<code>"int:         "</code>) estão lá só para alinhar a saída em colunas.</p>
+
+<h3>A tabela completa</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Bytes no Linux 64 bits (g++ 15)</th><th>Guarda</th><th>Faixa aproximada</th></tr>
+<tr><td><code>bool</code></td><td>1</td><td>verdadeiro/falso</td><td><code>true</code> ou <code>false</code></td></tr>
+<tr><td><code>char</code></td><td>1</td><td>um caractere (um número pequeno por dentro)</td><td>-128 a 127</td></tr>
+<tr><td><code>short</code></td><td>2</td><td>inteiro pequeno</td><td>-32 768 a 32 767</td></tr>
+<tr><td><code>int</code></td><td>4</td><td>inteiro (o padrão)</td><td>cerca de ±2,1 bilhões</td></tr>
+<tr><td><code>long</code></td><td>8</td><td>inteiro grande</td><td>cerca de ±9,2 quintilhões</td></tr>
+<tr><td><code>long long</code></td><td>8</td><td>inteiro grande (8 bytes garantidos)</td><td>cerca de ±9,2 quintilhões</td></tr>
+<tr><td><code>float</code></td><td>4</td><td>número com vírgula, precisão simples</td><td>uns 6 a 7 dígitos certos</td></tr>
+<tr><td><code>double</code></td><td>8</td><td>número com vírgula, precisão dupla (o padrão)</td><td>uns 15 a 16 dígitos certos</td></tr>
+<tr><td><code>long double</code></td><td>16</td><td>número com vírgula, mais precisão</td><td>uns 18 dígitos certos</td></tr>
+<tr><td><code>std::string</code></td><td>32</td><td>texto</td><td>(qualquer tamanho; veja abaixo)</td></tr>
+</table>
+</div>
+
+<p>Os limites exatos de cada inteiro, com <code>std::numeric_limits</code>, estão em <a href="inteiros.html">Inteiros</a>; a precisão dos números com vírgula, em <a href="ponto-flutuante.html">float e double</a>. A <a href="ref-tipos.html">referência de tipos</a> junta tudo numa página de consulta.</p>
+
+<div class="warning">
+<strong>Os tamanhos não são iguais em todo computador</strong>
+<p>A norma do C++ só garante <strong>mínimos</strong>: <code>int</code> tem pelo menos 2 bytes, <code>long</code> pelo menos 4, <code>long long</code> pelo menos 8. Os números acima valem para o Linux 64 bits da Ana. No Windows, por exemplo, <code>long</code> tem 4 bytes. No <strong>editor do guia</strong>, que roda num computador "de 32 bits" simulado (WebAssembly), <code>long</code> também tem 4 bytes (conferido com o Clang para esse alvo), e <code>std::string</code> dá outro número, porque o editor usa outra biblioteca padrão. Quando o tamanho exato importa, use <code>long long</code> ou os tipos de tamanho fixo, como <code>std::int64_t</code> (aula <a href="inteiros.html">Inteiros</a>).</p>
+</div>
+
+<h3><code>sizeof</code> de uma variável, e o mistério do <code>std::string</code></h3>
+<p><code>sizeof</code> também mede uma variável. Com variável, os parênteses são opcionais:</p>
+
+<pre class="file" data-file="sizeofvar.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    int idade = 29;
+    std::string curto = "Ana";
+    std::string longo = "Ana Clara de Souza Albuquerque, moradora de Recife";
+    std::cout &lt;&lt; sizeof(idade) &lt;&lt; " " &lt;&lt; sizeof idade &lt;&lt; "\n";
+    std::cout &lt;&lt; sizeof(curto) &lt;&lt; " " &lt;&lt; sizeof(longo) &lt;&lt; "\n";
+    std::cout &lt;&lt; curto.size() &lt;&lt; " " &lt;&lt; longo.size() &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sizeofvar.cpp -o sizeofvar
+$ ./sizeofvar
+4 4
+32 32                    « o mesmo tamanho para 3 e para 50 letras?
+3 50                     « .size() conta as letras de verdade</pre>
+
+<p>Como um texto de 50 letras cabe em 32 bytes? Não cabe. O <code>std::string</code> é como uma <strong>ficha de biblioteca</strong>: a ficha tem sempre o mesmo tamanho (32 bytes) e diz onde está o livro. Textos curtos cabem na própria ficha; textos longos ficam guardados em outra parte da memória, e a ficha só aponta para lá. O <code>sizeof</code> mede a ficha; para saber quantas letras o texto tem, use <code>.size()</code> (aula <a href="funcoes-string.html">Funções de String</a>).</p>
+
+<h3>Os valores escritos também têm tipo</h3>
+<p>Um número escrito direto no código (um <strong>literal</strong>) também tem tipo. O C++ decide pelo jeito de escrever:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat literais.cpp
+#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; sizeof(42) &lt;&lt; " " &lt;&lt; sizeof(4.5) &lt;&lt; " " &lt;&lt; sizeof(4.5f) &lt;&lt; " "
+              &lt;&lt; sizeof('A') &lt;&lt; " " &lt;&lt; sizeof(true) &lt;&lt; "\n";
+}
+$ g++ -std=c++23 -Wall -Wextra literais.cpp -o literais
+$ ./literais
+4 8 4 1 1</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Literal</th><th>Tipo</th><th>Por quê</th></tr>
+<tr><td><code>42</code></td><td><code>int</code></td><td>Número sem ponto.</td></tr>
+<tr><td><code>4.5</code></td><td><code>double</code></td><td>Número com ponto.</td></tr>
+<tr><td><code>4.5f</code></td><td><code>float</code></td><td>O <code>f</code> no fim pede <code>float</code>.</td></tr>
+<tr><td><code>'A'</code></td><td><code>char</code></td><td>Aspas simples.</td></tr>
+<tr><td><code>true</code></td><td><code>bool</code></td><td>Palavra-chave de verdadeiro.</td></tr>
+<tr><td><code>"Ana"</code></td><td>texto "cru" do C (não é <code>std::string</code>!)</td><td>A aula <a href="auto.html">auto</a> mostra o tipo exato e o sufixo <code>s</code> que o transforma em <code>std::string</code>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>3. Escolher o tipo certo</h2>
+<p>Na dúvida, a pergunta é "o que eu quero guardar?". Esta tabela resolve quase todos os casos:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Quero guardar…</th><th>Use</th><th>Exemplo</th></tr>
+<tr><td>Uma contagem, uma idade, uma quantidade, uma nota de 0 a 10 sem fração</td><td><code>int</code></td><td><code>int alunos = 32;</code></td></tr>
+<tr><td>Um número que pode passar de 2 bilhões (população, bytes de um arquivo, milissegundos)</td><td><code>long long</code></td><td><code>long long habitantes = 8'100'000'000;</code></td></tr>
+<tr><td>Uma medida com fração (altura, peso, média, temperatura)</td><td><code>double</code></td><td><code>double media = 7.75;</code></td></tr>
+<tr><td>Um preço</td><td><code>double</code> no começo; em sistemas de dinheiro de verdade, centavos em <code>long long</code></td><td><code>long long precoCentavos = 1250;</code></td></tr>
+<tr><td>Uma única letra ou símbolo (uma opção de menu, uma tecla)</td><td><code>char</code></td><td><code>char opcao = 's';</code></td></tr>
+<tr><td>Sim ou não, ligado ou desligado</td><td><code>bool</code></td><td><code>bool pago = false;</code></td></tr>
+<tr><td>Um nome, uma frase, qualquer texto</td><td><code>std::string</code></td><td><code>std::string cidade = "Recife";</code></td></tr>
+<tr><td>Um número de telefone, CEP ou CPF</td><td><code>std::string</code> (!)</td><td><code>std::string cep = "01310-100";</code></td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>Telefone não é número</strong>
+<p>Você nunca vai somar dois telefones. E números assim têm zeros à esquerda (<code>01310</code>), traços e parênteses que um <code>int</code> jogaria fora. Regra: se você não faz <strong>contas</strong> com aquilo, guarde como texto.</p>
+</div>
+
+<h3>O que acontece com o tipo errado</h3>
+<p>O tipo errado raramente dá erro de compilação. Na maioria das vezes, o programa roda e dá a resposta errada:</p>
+
+<pre class="file" data-file="errado.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int preco = 4.99;
+    int pesoKg = 2.5;
+    double total = preco * pesoKg;
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra errado.cpp -o errado
+$ ./errado
+Total: 8                 « 4 × 2: os centavos e o meio quilo sumiram</pre>
+
+<p>O <code>int</code> jogou fora a parte depois do ponto (4.99 virou 4; 2.5 virou 2), e o g++ não avisou com <code>-Wall -Wextra</code>. A aula <a href="variaveis.html">Variáveis</a> mostra como a inicialização com chaves (<code>int preco{4.99};</code>) transforma esse silêncio em erro.</p>
+
+<div class="trycpp" data-goal="out:Total: 12.475">
+<p class="try-task"><strong>Missão:</strong> conserte os <strong>tipos</strong> (só os tipos, sem mudar os números) para o total da feira da Ana sair certo: <code>Total: 12.475</code>. (No editor, o Clang ainda mostra avisos sobre a conversão: leia-os, eles apontam exatamente as linhas a consertar.)</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int preco = 4.99;
+    int pesoKg = 2.5;
+    double total = preco * pesoKg;
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    double preco = 4.99;
+    double pesoKg = 2.5;
+    double total = preco * pesoKg;
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>4. Tipos fundamentais × tipos da biblioteca</h2>
+<p>Você deve ter reparado que quatro tipos são escritos "pelados" (<code>int</code>, <code>double</code>, <code>char</code>, <code>bool</code>) e um tem <code>std::</code> na frente e pede um <code>#include</code> (<code>std::string</code>). Não é por acaso.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Tipos fundamentais</th><th>Tipos da biblioteca padrão</th></tr>
+<tr><td>Exemplos</td><td><code>int</code>, <code>double</code>, <code>char</code>, <code>bool</code>, <code>float</code>, <code>long long</code>, <code>void</code></td><td><code>std::string</code>, <code>std::vector</code>, <code>std::array</code>, <code>std::map</code></td></tr>
+<tr><td>De onde vêm</td><td>Fazem parte da <strong>linguagem</strong>: são palavras-chave</td><td>Foram <strong>escritos em C++</strong> por quem fez a biblioteca, usando os fundamentais</td></tr>
+<tr><td>Precisam de <code>#include</code>?</td><td>Não</td><td>Sim: <code>&lt;string&gt;</code>, <code>&lt;vector&gt;</code>…</td></tr>
+<tr><td>Prefixo</td><td>Nenhum</td><td><code>std::</code> ("standard", padrão; veja <a href="namespaces.html">Namespaces</a>)</td></tr>
+<tr><td>Comparação</td><td>Os tijolos</td><td>Paredes prontas, feitas com os tijolos</td></tr>
+</table>
+</div>
+
+<p>O <code>void</code> ("vazio") é o tipo fundamental que quer dizer "nenhum valor"; ele aparece nas <a href="funcoes.html">funções</a> que não devolvem nada. E a partir do Nível 2 você vai criar os <strong>seus próprios</strong> tipos, com <a href="structs.html">structs</a> e <a href="classes-objetos.html">classes</a>, do mesmo jeito que a biblioteca criou o <code>std::string</code>.</p>
+
+<h3>Esquecer o <code>std::</code></h3>
+<pre class="file" data-file="semstd.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    string nome = "Ana";
+    std::cout &lt;&lt; nome &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semstd.cpp -o semstd
+semstd.cpp: In function ‘int main()’:
+semstd.cpp:5:5: error: ‘string’ was not declared in this scope
+    5 |     string nome = "Ana";
+      |     ^~~~~~
+semstd.cpp:5:5: note: suggested alternatives:
+In file included from /usr/include/c++/15/iosfwd:43,
+                 from /usr/include/c++/15/ios:42,
+                 from /usr/include/c++/15/bits/ostream.h:43,
+                 from /usr/include/c++/15/ostream:42,
+                 from /usr/include/c++/15/iostream:43,
+                 from semstd.cpp:1:
+/usr/include/c++/15/bits/stringfwd.h:79:33: note:   ‘std::string’
+   79 |   typedef basic_string&lt;char&gt;    string;
+      |                                 ^~~~~~
+In file included from /usr/include/c++/15/ostream:44:
+/usr/include/c++/15/format:5121:5: note:   ‘std::range_format::string’
+ 5121 |     string,
+      |     ^~~~~~
+In file included from /usr/include/c++/15/bits/locale_classes.h:42,
+                 from /usr/include/c++/15/bits/ios_base.h:43,
+                 from /usr/include/c++/15/ios:46:
+/usr/include/c++/15/string:80:11: note:   ‘std::pmr::string’
+   80 |     using string    = basic_string&lt;char&gt;;
+      |           ^~~~~~
+semstd.cpp:6:18: error: ‘nome’ was not declared in this scope
+    6 |     std::cout &lt;&lt; nome &lt;&lt; "\n";
+      |                  ^~~~</pre>
+
+<p>A mensagem é longa, mas só duas linhas importam:</p>
+<ul>
+  <li><code>error: ‘string’ was not declared in this scope</code>: sem o <code>std::</code>, o compilador não acha o nome <code>string</code>.</li>
+  <li><code>note:   ‘std::string’</code>: entre as "alternativas sugeridas" (<em>suggested alternatives</em>), a primeira é a certa. As linhas <code>In file included from…</code> só mostram <strong>onde</strong>, dentro da biblioteca, ele encontrou cada sugestão; pode pular.</li>
+  <li>O segundo erro (<code>‘nome’ was not declared</code>) é consequência do primeiro: como a declaração falhou, <code>nome</code> não existe. Conserte o primeiro erro e ele some.</li>
+</ul>
+
+<div class="note">
+<strong>E se eu esquecer o <code>#include &lt;string&gt;</code>?</strong>
+<p>No laboratório, um programa com <code>std::string</code> e só <code>#include &lt;iostream&gt;</code> compilou e rodou, no g++ e no Clang, porque o <code>&lt;iostream&gt;</code> da biblioteca de hoje já traz o <code>&lt;string&gt;</code> junto, "de carona". Mas a norma não garante essa carona, e outra versão do compilador pode recusar o mesmo arquivo. Regra do guia: <strong>usou, inclua</strong>.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>O programa compila, mas o número perde a parte depois do ponto</strong>
+<p><strong>O que significa:</strong> um valor com vírgula foi parar numa variável inteira (<code>int</code>, <code>long</code>…), e a fração foi jogada fora.</p>
+<p><strong>Como consertar:</strong> use <code>double</code> para medidas e preços. Inicialize com chaves (<code>{ }</code>) para o compilador barrar esse corte.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: ‘string’ was not declared in this scope</code></strong>
+<p><strong>O que significa:</strong> faltou o <code>std::</code> (ou o <code>#include &lt;string&gt;</code>).</p>
+<p><strong>Como consertar:</strong> escreva <code>std::string</code> e confira o <code>#include &lt;string&gt;</code> no topo.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: invalid conversion from ‘const char*’ to ‘char’</code> (ou <code>to ‘int’</code>)</strong>
+<p><strong>O que significa:</strong> um texto entre aspas <strong>duplas</strong> foi posto numa variável que não é de texto.</p>
+<p><strong>Como consertar:</strong> para texto, <code>std::string</code>. Para um único caractere, <code>char</code> com aspas <strong>simples</strong>: <code>'A'</code>. A diferença é explicada em <a href="char.html">Caracteres</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>O <code>sizeof</code> deu um número diferente do da tabela</strong>
+<p><strong>O que significa:</strong> você está em outro sistema (Windows, 32 bits, o editor do guia em WebAssembly). Os tamanhos dependem da plataforma.</p>
+<p><strong>Como consertar:</strong> nada a consertar. Se o seu programa depende de um tamanho exato, use <code>long long</code> ou os tipos de <code>&lt;cstdint&gt;</code>, como <code>std::int32_t</code> (aula <a href="inteiros.html">Inteiros</a>).</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>int x = 29;</code></td><td>Inteiro</td></tr>
+<tr><td><code>long long x = 8'100'000'000;</code></td><td>Inteiro grande (8 bytes)</td></tr>
+<tr><td><code>double x = 1.65;</code></td><td>Número com vírgula (o padrão)</td></tr>
+<tr><td><code>float x = 1.65f;</code></td><td>Número com vírgula, menos preciso</td></tr>
+<tr><td><code>char c = 'A';</code></td><td>Um caractere (aspas simples)</td></tr>
+<tr><td><code>bool b = true;</code></td><td>Verdadeiro ou falso</td></tr>
+<tr><td><code>std::string s = "Ana";</code></td><td>Texto (precisa de <code>#include &lt;string&gt;</code>)</td></tr>
+<tr><td><code>sizeof(tipo)</code> / <code>sizeof variavel</code></td><td>Quantos bytes ocupa</td></tr>
+<tr><td><code>texto.size()</code></td><td>Quantos caracteres um <code>std::string</code> tem</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O tipo da média</h3>
+<p>A média de um aluno pode ser 7.75. Complete com o tipo certo:</p>
+<div class="ex-code"><input data-answer="double|float" aria-label="tipo"> media = 7.75;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Quantos bytes?</h3>
+<p>No Linux 64 bits da Ana, <code>sizeof(int)</code> mostra:</p>
+<div class="ex-code"><input data-answer="4" aria-label="bytes"></div>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">3. Qual é o melhor tipo para guardar um CEP como <code>01310-100</code>?</p>
+<label><input type="radio" name="q3"> <code>int</code></label>
+<label><input type="radio" name="q3"> <code>double</code></label>
+<label><input type="radio" name="q3"> <code>char</code></label>
+<label><input type="radio" name="q3"> <code>std::string</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Um <code>std::string</code> com 3 letras e outro com 50 letras. O que <code>sizeof</code> mostra para cada um (g++ 15, Linux 64 bits)?</p>
+<label><input type="radio" name="q4"> 3 e 50</label>
+<label><input type="radio" name="q4"> 32 e 32</label>
+<label><input type="radio" name="q4"> 4 e 4</label>
+<label><input type="radio" name="q4"> 32 e 50</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Qual destes é um tipo da <strong>biblioteca</strong>, e não da linguagem?</p>
+<label><input type="radio" name="q5"> <code>std::string</code></label>
+<label><input type="radio" name="q5"> <code>double</code></label>
+<label><input type="radio" name="q5"> <code>bool</code></label>
+<label><input type="radio" name="q5"> <code>long long</code></label>
+</div>
+
+<h3>Missão final: a ficha do cliente</h3>
+
+<div class="trycpp" data-goal="out:Nome: Bruno,out:Idade: 31,out:Altura: 1.78,out:Inicial: B,out:Estudante: 0,src:std::string,src:\bbool\b,src:\bchar\b,src:\bdouble\b,semaviso">
+<p class="try-task"><strong>Missão:</strong> crie cinco variáveis, cada uma com o tipo certo: o nome <code>Bruno</code>, a idade <code>31</code>, a altura <code>1.78</code>, a inicial <code>B</code> e se ele é estudante (não é: <code>false</code>). Mostre a ficha exatamente assim (o <code>false</code> aparece como <code>0</code>):</p>
+<pre class="out">Nome: Bruno
+Idade: 31
+Altura: 1.78
+Inicial: B
+Estudante: 0</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    // crie as cinco variáveis aqui
+
+    // mostre a ficha aqui
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Bruno";
+    int idade = 31;
+    double altura = 1.78;
+    char inicial = 'B';
+    bool estudante = false;
+    std::cout &lt;&lt; "Nome: " &lt;&lt; nome &lt;&lt; "\n";
+    std::cout &lt;&lt; "Idade: " &lt;&lt; idade &lt;&lt; "\n";
+    std::cout &lt;&lt; "Altura: " &lt;&lt; altura &lt;&lt; "\n";
+    std::cout &lt;&lt; "Inicial: " &lt;&lt; inicial &lt;&lt; "\n";
+    std::cout &lt;&lt; "Estudante: " &lt;&lt; estudante &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>O tipo diz que valor cabe na variável, quanto espaço ela ocupa e o que dá para fazer com ela.</li>
+  <li>Os cinco do dia a dia: <code>int</code> (inteiro), <code>double</code> (com vírgula), <code>char</code> (um caractere, <code>'A'</code>), <code>bool</code> (<code>true</code>/<code>false</code>) e <code>std::string</code> (texto, <code>"Ana"</code>).</li>
+  <li><code>sizeof</code> mede bytes. No Linux 64 bits: <code>bool</code>/<code>char</code> 1, <code>short</code> 2, <code>int</code>/<code>float</code> 4, <code>long</code>/<code>long long</code>/<code>double</code> 8, <code>long double</code> 16, <code>std::string</code> 32. Outros sistemas podem diferir.</li>
+  <li>Escolha pelo que você guarda: contagem → <code>int</code>; medida → <code>double</code>; sim/não → <code>bool</code>; texto (inclusive telefone e CEP) → <code>std::string</code>.</li>
+  <li>Tipo errado quase sempre compila e dá resposta errada.</li>
+  <li>Fundamentais (<code>int</code>, <code>double</code>…) são da linguagem; os da biblioteca (<code>std::string</code>, <code>std::vector</code>) pedem <code>#include</code> e <code>std::</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
