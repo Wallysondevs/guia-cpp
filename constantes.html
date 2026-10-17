@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Constantes — const, constexpr e #define | Guia C++</title>
+<meta name="description" content="Constantes em C++ para quem nunca programou: const, constexpr (calculado na compilação), o erro assignment of read-only variable, static_assert, por que evitar #define e quando usar cada um, com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Constantes</span></h1>
+
+<p class="intro">Alguns valores <strong>nunca deveriam mudar</strong> enquanto o programa roda: uma semana tem 7 dias, um dia tem 86 400 segundos, o caderno da lojinha da Ana custa 12,50. Em C++ você pode trancar a caixa de uma variável depois de colocar o valor: ela vira uma <strong>constante</strong>, e o compilador recusa qualquer tentativa de mudá-la. Nesta aula você vai conhecer as duas formas modernas, <code>const</code> e <code>constexpr</code>, e a forma antiga, <code>#define</code>, que ainda aparece em muito código.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como criar uma constante com <code>const</code> e o erro real de quem tenta mudá-la.</li>
+  <li>O que <code>constexpr</code> tem de diferente: o valor é calculado <strong>na compilação</strong>.</li>
+  <li>Como conferir contas na compilação com <code>static_assert</code>.</li>
+  <li>O que é <code>#define</code>, por que ele engana e por que o C++ moderno o evita.</li>
+  <li>Quando usar cada um.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: a caixa lacrada</h2>
+<p>Lembre da caixa com etiqueta da aula <a href="variaveis.html">Variáveis</a>. Uma constante é uma caixa que você <strong>lacra com fita</strong> logo depois de pôr o valor dentro. Você ainda pode olhar o que tem lá (ler o valor) quantas vezes quiser, mas não pode trocar.</p>
+
+<p>Para que trancar? Por três motivos:</p>
+<ul>
+  <li><strong>Proteção contra engano</strong>: se, por descuido, uma linha tentar mudar o preço, o compilador avisa antes de o programa existir.</li>
+  <li><strong>Nome em vez de "número mágico"</strong>: <code>dias * horasPorDia</code> se explica sozinho; <code>dias * 8</code> obriga o leitor a adivinhar o que é o 8.</li>
+  <li><strong>Um lugar só para mudar</strong>: se o preço do caderno aumentar, você muda uma linha, e não cada conta do programa.</li>
+</ul>
+
+<hr>
+
+<h2>1. <code>const</code>: "esta variável não muda"</h2>
+<p>Basta escrever <code>const</code> (de <em>constant</em>, "constante") antes do tipo:</p>
+
+<pre class="file" data-file="const.cpp">#include &lt;iostream&gt;
+
+int main() {
+    const int diasDaSemana = 7;
+    const double precoCaderno = 12.5;
+    std::cout &lt;&lt; "Uma semana tem " &lt;&lt; diasDaSemana &lt;&lt; " dias.\n";
+    std::cout &lt;&lt; "3 cadernos custam " &lt;&lt; 3 * precoCaderno &lt;&lt; "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>const</dt><dd>A "fita adesiva": depois desta linha, o valor fica fixo.</dd>
+  <dt>int diasDaSemana = 7</dt><dd>Uma declaração comum, exatamente como você já conhece.</dd>
+  <dt>3 * precoCaderno</dt><dd>Ler uma constante é igual a ler uma variável. O <code>*</code> é "vezes" (aula <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>).</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra const.cpp -o const
+$ ./const
+Uma semana tem 7 dias.
+3 cadernos custam 37.5</pre>
+
+<h3>Tentar mudar uma constante</h3>
+<pre class="file" data-file="mudar.cpp">#include &lt;iostream&gt;
+
+int main() {
+    const int diasDaSemana = 7;
+    diasDaSemana = 8;
+    std::cout &lt;&lt; diasDaSemana &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra mudar.cpp -o mudar
+mudar.cpp: In function ‘int main()’:
+mudar.cpp:5:18: error: assignment of read-only variable ‘diasDaSemana’
+    5 |     diasDaSemana = 8;
+      |     ~~~~~~~~~~~~~^~~</pre>
+
+<dl class="anatomy">
+  <dt>assignment</dt><dd>"Atribuição": a operação <code>=</code> de guardar um valor.</dd>
+  <dt>of read-only variable</dt><dd>"De uma variável somente leitura": você pode ler, não pode escrever.</dd>
+  <dt>‘diasDaSemana’</dt><dd>Qual constante você tentou mudar. O <code>^</code> aponta para o <code>=</code> culpado, na linha 5.</dd>
+</dl>
+
+<p>É um <strong>error</strong>: o programa não foi gerado. Essa é a graça da constante: o engano é pego <strong>antes</strong> de o programa rodar, e não depois, por um cliente reclamando do preço. No editor do guia, o Clang diz o mesmo com outras palavras: <code>cannot assign to variable 'diasDaSemana' with const-qualified type 'const int'</code> ("não é possível atribuir a uma variável de tipo <code>const</code>").</p>
+
+<div class="trycpp" data-goal="erro:/read-only\|const-qualified/">
+<p class="try-task"><strong>Missão:</strong> provoque o erro. Rode o programa como está (funciona). Depois acrescente, antes do <code>std::cout</code>, uma linha que tente mudar as vidas do jogo para 5, e rode de novo: o compilador tem que recusar.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    const int vidasIniciais = 3;
+    std::cout &lt;&lt; "Você começa com " &lt;&lt; vidasIniciais &lt;&lt; " vidas.\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    const int vidasIniciais = 3;
+    vidasIniciais = 5;
+    std::cout &lt;&lt; "Você começa com " &lt;&lt; vidasIniciais &lt;&lt; " vidas.\n";
+}
+</pre>
+</div>
+
+<h3>Uma constante precisa nascer com valor</h3>
+<p>Uma caixa lacrada vazia nunca poderia ser preenchida. Por isso o C++ exige o valor na declaração:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat semvalor.cpp
+int main() {
+    const int limite;
+}
+$ g++ -std=c++23 -Wall -Wextra semvalor.cpp -o semvalor
+semvalor.cpp: In function ‘int main()’:
+semvalor.cpp:2:15: error: uninitialized ‘const limite’ [-fpermissive]
+    2 |     const int limite;
+      |               ^~~~~~
+semvalor.cpp:2:15: warning: unused variable ‘limite’ [-Wunused-variable]</pre>
+
+<p><em>Uninitialized ‘const limite’</em> = "constante <code>limite</code> sem valor inicial". O aviso de baixo (<em>unused variable</em>) só diz que ela também não foi usada.</p>
+
+<h3>O valor de um <code>const</code> pode vir de fora</h3>
+<p>O <code>const</code> não exige que você saiba o valor ao escrever o programa. Ele pode ser calculado com algo que o usuário digitou; o que ele garante é que, <strong>depois</strong> de calculado, não muda mais. (O <code>std::cin</code> lê do teclado; aula <a href="entrada-cin.html">Entrada com cin</a>.)</p>
+
+<pre class="file" data-file="runtime.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 0;
+    std::cout &lt;&lt; "Sua idade: ";
+    std::cin &gt;&gt; idade;
+    const int anoNascimento = 2026 - idade;
+    std::cout &lt;&lt; "Você nasceu em " &lt;&lt; anoNascimento &lt;&lt; " (ou no ano anterior).\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra runtime.cpp -o runtime
+$ ./runtime
+Sua idade: 29                « a Ana digitou 29 e apertou Enter
+Você nasceu em 1997 (ou no ano anterior).</pre>
+
+<p>Guarde essa ideia: o <code>const</code> é "não muda depois de pronto". A próxima seção mostra uma constante ainda mais exigente.</p>
+
+<hr>
+
+<h2>2. <code>constexpr</code>: calculado na compilação <span class="versao">C++11</span></h2>
+<p>Algumas contas não dependem de nada que aconteça quando o programa roda: quantos segundos tem um dia é sempre <code>24 * 60 * 60</code>. Para esses casos existe <code>constexpr</code> (de <em>constant expression</em>, "expressão constante"). Ele diz ao compilador: <strong>"faça esta conta agora, enquanto compila"</strong>. O programa final já nasce com o resultado pronto.</p>
+
+<pre class="file" data-file="constexpr.cpp">#include &lt;iostream&gt;
+
+int main() {
+    constexpr int segundosPorMinuto = 60;
+    constexpr int segundosPorDia = 24 * 60 * segundosPorMinuto;
+    constexpr int segundosPorAno = 365 * segundosPorDia;
+    std::cout &lt;&lt; "Um dia tem " &lt;&lt; segundosPorDia &lt;&lt; " segundos.\n";
+    std::cout &lt;&lt; "Um ano tem " &lt;&lt; segundosPorAno &lt;&lt; " segundos.\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra constexpr.cpp -o constexpr
+$ ./constexpr
+Um dia tem 86400 segundos.
+Um ano tem 31536000 segundos.</pre>
+
+<dl class="anatomy">
+  <dt>constexpr</dt><dd>Constante <strong>e</strong> conhecida na compilação. Todo <code>constexpr</code> também é <code>const</code>: não pode ser mudado.</dd>
+  <dt>24 * 60 * segundosPorMinuto</dt><dd>Uma conta feita só com números escritos no código e com outros <code>constexpr</code>. Tudo isso o compilador conhece, então ele mesmo calcula.</dd>
+</dl>
+
+<h3>Quando o compilador não consegue calcular</h3>
+<p>Se a conta depende de algo que só existe com o programa rodando (como o que o usuário digita), <code>constexpr</code> é recusado:</p>
+
+<pre class="file" data-file="constexpr-erro.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 0;
+    std::cin &gt;&gt; idade;
+    constexpr int anoNascimento = 2026 - idade;
+    std::cout &lt;&lt; anoNascimento &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra constexpr-erro.cpp -o constexpr-erro
+constexpr-erro.cpp: In function ‘int main()’:
+constexpr-erro.cpp:6:42: error: the value of ‘idade’ is not usable in a constant expression
+    6 |     constexpr int anoNascimento = 2026 - idade;
+      |                                          ^~~~~
+constexpr-erro.cpp:4:9: note: ‘int idade’ is not const
+    4 |     int idade = 0;
+      |         ^~~~~</pre>
+
+<p><em>The value of ‘idade’ is not usable in a constant expression</em> = "o valor de <code>idade</code> não pode ser usado numa expressão constante": o compilador não sabe quanto vale <code>idade</code>, porque ela vai ser digitada depois. A <em>note</em> explica: <code>idade</code> não é constante. Aqui, o certo é usar <code>const</code>, como na seção 1.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>const</code></th><th><code>constexpr</code></th></tr>
+<tr><td>Pode mudar depois?</td><td>Não</td><td>Não</td></tr>
+<tr><td>Quando o valor é conhecido</td><td>Na compilação <strong>ou</strong> com o programa rodando</td><td>Obrigatoriamente na compilação</td></tr>
+<tr><td>Valor que vem do teclado</td><td>Pode</td><td>Erro: <code>not usable in a constant expression</code></td></tr>
+<tr><td>Frase para lembrar</td><td>"não vou mudar isto"</td><td>"isto já se sabe antes de rodar"</td></tr>
+</table>
+</div>
+
+<h3>Conferir contas na compilação: <code>static_assert</code></h3>
+<p>Como o compilador conhece os valores <code>constexpr</code>, ele pode <strong>conferi-los</strong> para você. O <code>static_assert</code> ("afirmação estática", isto é, feita na compilação) recebe uma condição: se ela for verdadeira, nada acontece; se for falsa, a compilação falha com a sua mensagem.</p>
+
+<pre class="file" data-file="assert.cpp">int main() {
+    constexpr int segundosPorDia = 24 * 60 * 60;
+    static_assert(segundosPorDia == 86400);
+    static_assert(segundosPorDia == 86000, "a conta do dia está errada");
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra assert.cpp -o assert
+assert.cpp: In function ‘int main()’:
+assert.cpp:4:34: error: static assertion failed: a conta do dia está errada
+    4 |     static_assert(segundosPorDia == 86000, "a conta do dia está errada");
+      |                   ~~~~~~~~~~~~~~~^~~~~~~~
+assert.cpp:4:34: note: the comparison reduces to ‘(86400 == 86000)’</pre>
+
+<ul>
+  <li>A linha 3 passou em silêncio: 86400 é mesmo igual a 86400.</li>
+  <li>A linha 4 falhou: <em>static assertion failed</em> ("afirmação estática falhou") seguida da sua mensagem. A <em>note</em> mostra a conta que o compilador fez: <code>(86400 == 86000)</code>, falso. (O <code>==</code> compara dois valores; aula <a href="operadores-comparacao.html">Operadores de Comparação</a>.)</li>
+</ul>
+
+<p>Essa é a prova de que o valor existe na compilação: o <code>static_assert</code> só aceita valores que o compilador conhece. Com uma variável comum, ele recusa:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat assert2.cpp
+int main() {
+    int segundosPorDia = 24 * 60 * 60;
+    static_assert(segundosPorDia == 86400);
+}
+$ g++ -std=c++23 -Wall -Wextra assert2.cpp -o assert2
+assert2.cpp: In function ‘int main()’:
+assert2.cpp:3:34: error: non-constant condition for static assertion
+    3 |     static_assert(segundosPorDia == 86400);
+      |                   ~~~~~~~~~~~~~~~^~~~~~~~
+assert2.cpp:3:19: error: the value of ‘segundosPorDia’ is not usable in a constant expression
+    3 |     static_assert(segundosPorDia == 86400);
+      |                   ^~~~~~~~~~~~~~
+assert2.cpp:2:9: note: ‘int segundosPorDia’ is not const
+    2 |     int segundosPorDia = 24 * 60 * 60;
+      |         ^~~~~~~~~~~~~~</pre>
+
+<div class="note">
+<strong>Um detalhe histórico</strong>
+<p>Por uma regra antiga do C++, um <code>const int</code> com valor escrito no código (<code>const int segundosPorDia = 24 * 60 * 60;</code>) também é aceito pelo <code>static_assert</code>; conferido no g++ 15. Mas isso vale só para inteiros e confunde quem lê. Quando você <strong>quer</strong> um valor de compilação, escreva <code>constexpr</code>: a intenção fica clara e o compilador cobra.</p>
+</div>
+
+<p><code>constexpr</code> vai muito além de variáveis: funções inteiras podem rodar na compilação. Isso é assunto do Nível 3, em <a href="constexpr.html">constexpr e consteval</a>.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> calcule quantos minutos tem uma semana usando <code>constexpr</code> e mostre o resultado. Depois acrescente <code>static_assert(minutosPorSemana == 10080);</code> e rode. Troque o 10080 por outro número e veja a compilação falhar.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    constexpr int minutosPorHora = 60;
+    constexpr int horasPorDia = 24;
+    constexpr int minutosPorDia = minutosPorHora * horasPorDia;
+    std::cout &lt;&lt; "Minutos por dia: " &lt;&lt; minutosPorDia &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. <code>#define</code>: a forma antiga</h2>
+<p>Antes do <code>const</code> existir (na linguagem C dos anos 1970), constantes eram feitas com <code>#define</code>. Você vai encontrá-lo em muito código antigo e em bibliotecas em C:</p>
+
+<pre class="file" data-file="define-ok.cpp">#define PRECO_CADERNO 12.5
+</pre>
+
+<p>Repare: não tem tipo, não tem <code>=</code> e não tem <code>;</code>. Isso porque <code>#define</code> não é C++ de verdade: é uma ordem para o <strong>pré-processador</strong>, um programa que passa pelo arquivo <strong>antes</strong> do compilador e faz um "localizar e substituir" de texto. Toda vez que aparecer <code>PRECO_CADERNO</code>, ele cola <code>12.5</code> no lugar, sem entender nada de C++. (O pré-processador tem aula própria: <a href="preprocessador.html">O Pré-processador</a>. O <code>#include</code> é outra ordem dele.)</p>
+
+<p>Esse "copiar e colar cego" causa surpresas. Veja a taxa de entrega da lojinha:</p>
+
+<pre class="file" data-file="define.cpp">#include &lt;iostream&gt;
+
+#define TAXA_ENTREGA 10 + 5
+
+int main() {
+    int dobro = TAXA_ENTREGA * 2;
+    std::cout &lt;&lt; "Dobro da taxa: " &lt;&lt; dobro &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra define.cpp -o define
+$ ./define
+Dobro da taxa: 20                « a taxa é 15; o dobro deveria ser 30</pre>
+
+<p>Nenhum erro, nenhum aviso, resposta errada. O <code>g++ -E</code> mostra o arquivo <strong>depois</strong> do pré-processador (só o fim, com o <code>tail</code>):</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -E define.cpp | tail -5
+# 5 "define.cpp"
+int main() {
+    int dobro = 10 + 5 * 2;
+    std::cout &lt;&lt; "Dobro da taxa: " &lt;&lt; dobro &lt;&lt; "\n";
+}</pre>
+
+<p>O <code>TAXA_ENTREGA</code> virou o texto <code>10 + 5</code>, e a conta ficou <code>10 + 5 * 2</code>. Como a multiplicação vem antes da soma (aula <a href="precedencia.html">Precedência</a>), o resultado é <code>10 + 10 = 20</code>. Com <code>constexpr int taxaEntrega = 10 + 5;</code>, a constante vale 15 de verdade, e o dobro é 30.</p>
+
+<h3>Outras pegadinhas do <code>#define</code></h3>
+<p><strong>Um <code>;</code> a mais</strong> vira parte do texto colado:</p>
+<pre class="term" data-cwd="~/cpp">$ cat define2.cpp
+#include &lt;iostream&gt;
+
+#define LIMITE 100;
+
+int main() {
+    int maximo = LIMITE + 1;
+    std::cout &lt;&lt; maximo &lt;&lt; "\n";
+}
+$ g++ -std=c++23 -Wall -Wextra define2.cpp -o define2
+define2.cpp: In function ‘int main()’:
+define2.cpp:6:25: warning: statement has no effect [-Wunused-value]
+    6 |     int maximo = LIMITE + 1;
+      |                         ^~~
+$ ./define2
+100                              « deveria ser 101</pre>
+<p>A linha virou <code>int maximo = 100; + 1;</code>: o <code>;</code> colado terminou a declaração, e o <code>+ 1;</code> sobrou como uma instrução que não faz nada (<em>statement has no effect</em>, "a instrução não tem efeito").</p>
+
+<p><strong>Mensagens de erro confusas</strong>, porque o compilador nunca viu o nome, só o texto colado:</p>
+<pre class="term" data-cwd="~/cpp">$ cat define3.cpp
+#include &lt;iostream&gt;
+
+#define PRECO 9.99
+
+int main() {
+    std::cout &lt;&lt; "Preço: " &lt;&lt; PRECO &lt;&lt; "\n";
+    PRECO = 12.5;
+}
+$ g++ -std=c++23 -Wall -Wextra define3.cpp -o define3
+define3.cpp: In function ‘int main()’:
+define3.cpp:3:15: error: lvalue required as left operand of assignment
+    3 | #define PRECO 9.99
+      |               ^~~~
+define3.cpp:7:5: note: in expansion of macro ‘PRECO’
+    7 |     PRECO = 12.5;
+      |     ^~~~~</pre>
+<p>Compare com o <code>const</code>: lá a mensagem dizia "variável somente leitura ‘diasDaSemana’". Aqui, o compilador viu <code>9.99 = 12.5;</code> e reclamou que o lado esquerdo do <code>=</code> precisa ser algo que guarda valor (<em>lvalue required</em>), apontando primeiro para a linha do <code>#define</code>. A <em>note</em> "in expansion of macro" ("na expansão da macro") é a pista de que um <code>#define</code> está envolvido. (Um nome criado com <code>#define</code> se chama <strong>macro</strong>.)</p>
+
+<div class="warning">
+<strong>Por que o C++ moderno evita <code>#define</code> para constantes</strong>
+<ul>
+  <li><strong>Não tem tipo</strong>: o compilador não sabe se é inteiro, texto ou outra coisa.</li>
+  <li><strong>Copia texto, não valor</strong>: <code>10 + 5</code> continua sendo <code>10 + 5</code> no meio da conta.</li>
+  <li><strong>Não respeita escopo</strong>: vale do <code>#define</code> até o fim do arquivo, inclusive em outros arquivos que o incluírem, e pode trocar nomes que você nem imaginava.</li>
+  <li><strong>Erros piores</strong>: as mensagens falam do texto colado, não do nome.</li>
+</ul>
+<p>Por tradição, macros são escritas em <code>MAIUSCULAS</code>, justamente para avisar o leitor "cuidado, isto é substituição de texto". O <code>#define</code> ainda tem usos legítimos (veja <a href="preprocessador.html">O Pré-processador</a>), mas não para constantes.</p>
+</div>
+
+<hr>
+
+<h2>4. Qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th><th>Exemplo</th></tr>
+<tr><td>Valor conhecido ao escrever o programa (números fixos, contas com eles)</td><td><code>constexpr</code></td><td><code>constexpr int diasDaSemana = 7;</code></td></tr>
+<tr><td>Valor que só existe com o programa rodando, mas não deve mudar depois</td><td><code>const</code></td><td><code>const int anoNascimento = 2026 - idade;</code></td></tr>
+<tr><td>Texto fixo com <code>std::string</code></td><td><code>const</code></td><td><code>const std::string loja = "Lojinha da Ana";</code></td></tr>
+<tr><td>Valor que muda durante o programa</td><td>variável comum</td><td><code>int estoque = 40;</code></td></tr>
+<tr><td>Constante em código novo</td><td>nunca <code>#define</code></td><td>(só para entender código antigo)</td></tr>
+</table>
+</div>
+
+<p>Por que <code>const</code> com <code>std::string</code>? Um <code>std::string</code> guarda o texto numa área de memória que só existe com o programa rodando, então, para guardar um texto <code>constexpr</code>, o C++ usa outra ferramenta, o <code>std::string_view</code> (aula <a href="string-view.html">string_view</a>). Se você tentar <code>constexpr std::string loja = "Lojinha da Ana";</code>, o g++ 15 recusa com uma mensagem enorme, cheia de detalhes internos da biblioteca, que termina em <code>is not a constant expression</code> ("não é uma expressão constante"). Por enquanto, <code>const std::string</code> resolve:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat string.cpp
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    const std::string loja = "Lojinha da Ana";
+    std::cout &lt;&lt; loja &lt;&lt; "\n";
+}
+$ g++ -std=c++23 -Wall -Wextra string.cpp -o string
+$ ./string
+Lojinha da Ana</pre>
+
+<div class="tip">
+<strong>Regra de bolso</strong>
+<p>Comece toda constante com <code>constexpr</code>. Se o compilador reclamar de <code>not usable in a constant expression</code>, é porque o valor só existe com o programa rodando: troque por <code>const</code>. E qualquer variável que você não pretende mudar pode ganhar um <code>const</code>, que custa nada e evita enganos.</p>
+</div>
+
+<p>E o nome? Neste guia, constantes seguem o mesmo camelCase das variáveis (<code>diasDaSemana</code>), como faz boa parte da comunidade; <code>MAIUSCULAS</code> fica para as macros. Alguns projetos usam um <code>k</code> na frente (<code>kDiasDaSemana</code>). Veja <a href="identificadores.html">Nomes de Variáveis</a>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: assignment of read-only variable ‘x’</code></strong>
+<p><strong>O que significa:</strong> uma linha tenta mudar uma constante (<code>const</code> ou <code>constexpr</code>).</p>
+<p><strong>Como consertar:</strong> se o valor realmente precisa mudar, tire o <code>const</code> da declaração. Se não precisa, a linha que tenta mudar é o erro: apague-a ou use outra variável.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: uninitialized ‘const x’</code></strong>
+<p><strong>O que significa:</strong> a constante foi declarada sem valor.</p>
+<p><strong>Como consertar:</strong> dê o valor na mesma linha: <code>const int limite = 100;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: the value of ‘x’ is not usable in a constant expression</code></strong>
+<p><strong>O que significa:</strong> um <code>constexpr</code> (ou um <code>static_assert</code>) depende de um valor que só existe com o programa rodando.</p>
+<p><strong>Como consertar:</strong> use <code>const</code> em vez de <code>constexpr</code>; ou, se o valor era mesmo fixo, transforme também a variável de origem em <code>constexpr</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A conta com <code>#define</code> dá um resultado estranho</strong>
+<p><strong>O que significa:</strong> o pré-processador colou o texto da macro no meio da conta, e a precedência dos operadores mudou o resultado (ou um <code>;</code> colado cortou a linha).</p>
+<p><strong>Como consertar:</strong> troque o <code>#define</code> por <code>constexpr</code>. Para ver o que o pré-processador fez, use <code>g++ -E arquivo.cpp</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: lvalue required as left operand of assignment</code> + <code>note: in expansion of macro</code></strong>
+<p><strong>O que significa:</strong> uma linha tenta mudar o valor de uma macro. Depois da substituição, sobrou algo como <code>9.99 = 12.5;</code>.</p>
+<p><strong>Como consertar:</strong> macros não guardam valor. Se precisa mudar, use uma variável comum.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>const int x = 10;</code></td><td>Constante: o valor não muda depois desta linha</td></tr>
+<tr><td><code>const int x = conta;</code></td><td>Pode ser calculada com valores do programa rodando</td></tr>
+<tr><td><code>constexpr int x = 24 * 60;</code></td><td>Constante calculada na compilação</td></tr>
+<tr><td><code>static_assert(condição, "msg");</code></td><td>Confere a condição na compilação; falsa = erro com a mensagem</td></tr>
+<tr><td><code>#define NOME valor</code></td><td>Macro: substituição de texto antes da compilação (evite para constantes)</td></tr>
+<tr><td><code>g++ -E arquivo.cpp</code></td><td>Mostra o arquivo depois do pré-processador</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Lacrar a caixa</h3>
+<p>Complete para que <code>limite</code> não possa mais mudar:</p>
+<div class="ex-code"><input data-answer="const|constexpr" aria-label="palavra"> int limite = 100;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Calcular na compilação</h3>
+<p>Complete para que a conta seja feita pelo compilador:</p>
+<div class="ex-code"><input data-answer="constexpr" aria-label="palavra"> int horasPorSemana = 7 * 24;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Qual é o erro do g++ para <code>const int x = 1; x = 2;</code>?</p>
+<label><input type="radio" name="q3"> <code>redeclaration of ‘int x’</code></label>
+<label><input type="radio" name="q3"> <code>assignment of read-only variable ‘x’</code></label>
+<label><input type="radio" name="q3"> <code>uninitialized ‘const x’</code></label>
+<label><input type="radio" name="q3"> Nenhum: <code>x</code> passa a valer 2</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. A idade vem do teclado. Qual declaração compila?</p>
+<label><input type="radio" name="q4"> <code>constexpr int ano = 2026 - idade;</code></label>
+<label><input type="radio" name="q4"> <code>#define ano = 2026 - idade;</code></label>
+<label><input type="radio" name="q4"> <code>const int ano = 2026 - idade;</code></label>
+<label><input type="radio" name="q4"> <code>static_assert(ano = 2026 - idade);</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Com <code>#define TAXA 2 + 3</code>, quanto vale <code>TAXA * 10</code>?</p>
+<label><input type="radio" name="q5"> 32</label>
+<label><input type="radio" name="q5"> 50</label>
+<label><input type="radio" name="q5"> 23</label>
+<label><input type="radio" name="q5"> Erro de compilação</label>
+</div>
+
+<h3>Missão final: aposente os <code>#define</code></h3>
+
+<div class="trycpp" data-goal="out:Horas por semana: 54,src:constexpr,src:^(?![\s\S]*#define)">
+<p class="try-task"><strong>Missão:</strong> a lojinha da Ana abre 6 dias por semana, das 9h às 18h (9 horas por dia: 8 + 1). O programa diz <code>49</code> horas, mas o certo é <code>54</code>. Troque os dois <code>#define</code> por constantes <code>constexpr int</code> (dentro do <code>main</code>, com nomes em camelCase), apague os <code>#define</code> e confira a saída <code>Horas por semana: 54</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+#define DIAS_ABERTA 6
+#define HORAS_POR_DIA 8 + 1
+
+int main() {
+    int horasSemana = DIAS_ABERTA * HORAS_POR_DIA;
+    std::cout &lt;&lt; "Horas por semana: " &lt;&lt; horasSemana &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    constexpr int diasAberta = 6;
+    constexpr int horasPorDia = 8 + 1;
+    constexpr int horasSemana = diasAberta * horasPorDia;
+    std::cout &lt;&lt; "Horas por semana: " &lt;&lt; horasSemana &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Constante = caixa lacrada: lê-se à vontade, não se muda. Mudar dá <code>assignment of read-only variable</code>.</li>
+  <li><code>const</code>: "não muda depois de pronto". O valor pode vir do programa rodando. Precisa nascer com valor.</li>
+  <li><code>constexpr</code>: o valor é calculado <strong>na compilação</strong>. Se depender de algo que só existe rodando, dá <code>not usable in a constant expression</code>.</li>
+  <li><code>static_assert(condição, "mensagem")</code> confere contas na compilação.</li>
+  <li><code>#define</code> é substituição cega de texto feita pelo pré-processador: sem tipo, sem escopo, com surpresas (<code>10 + 5</code> virou 20 ao dobrar). Não use para constantes.</li>
+  <li>Regra de bolso: comece com <code>constexpr</code>; se não der, <code>const</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
