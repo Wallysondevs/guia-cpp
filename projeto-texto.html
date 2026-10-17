@@ -1,0 +1,1708 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Projeto Analisador de Texto — linhas, palavras, UTF-8 e frequência | Guia C++</title>
+<meta name="description" content="Projeto passo a passo em C++: um analisador de texto que lê um arquivo .txt com acentos, conta linhas, palavras, caracteres e bytes (UTF-8), ignora a pontuação, acha as palavras mais frequentes com std::map e std::sort e a palavra mais longa, e mostra um relatório com std::format. Conferido com o wc do Linux.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>Projeto <span class="hl">Analisador de Texto</span></h1>
+
+<p class="intro">Quantas palavras tem esse texto? Qual palavra eu mais repito? Neste projeto você vai escrever um programa que lê um arquivo de texto e responde a essas perguntas, em sete etapas. No caminho aparece uma surpresa que todo programador de língua portuguesa encontra um dia: para o computador, <code>café</code> tem <strong>5</strong> "letras". Você vai entender por quê, contar do jeito certo e conferir cada número com o <code>wc</code>, o contador de palavras do Linux.</p>
+
+<div class="note">
+<strong>Você vai praticar</strong>
+<ul>
+  <li>Ler um arquivo linha por linha (<a href="arquivos.html">arquivos</a> e <a href="getline.html">getline</a>) e tratar o arquivo que não existe.</li>
+  <li>A diferença entre <strong>bytes</strong> e <strong>caracteres</strong> no UTF-8 (<a href="acentos-utf8.html">Acentos e UTF-8</a>).</li>
+  <li>Separar palavras com <code>std::istringstream</code> e limpar a pontuação com <code>&lt;cctype&gt;</code>.</li>
+  <li>Contar cada palavra com <a href="map.html">std::map</a> e ordenar pela contagem com <a href="algoritmos.html">std::sort</a> e uma <a href="lambdas.html">lambda</a>.</li>
+  <li>Um relatório com <a href="format-print.html">std::format</a> e um programa que recebe o nome do arquivo na linha de comando.</li>
+</ul>
+</div>
+
+<p>Todos os programas foram compilados e executados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp/texto</code>, com o <strong>g++ 15.2</strong> e o comando padrão do guia. O programa fica num arquivo só, <code>analisar.cpp</code>. Nas caixas <em>Experimente</em>, o texto está numa aba ao lado do código: você pode trocá-lo pelo seu.</p>
+
+<hr>
+
+<h2>O que vamos construir</h2>
+
+<pre class="term" data-cwd="~/cpp/texto">$ g++ -std=c++23 -Wall -Wextra analisar.cpp -o analisar
+$ ./analisar
+Análise de texto.txt
+
+Linhas                   7
+Palavras                65
+Palavras diferentes     45
+Caracteres             332
+Bytes                  342
+
+Palavra mais longa: paciência (9 letras)
+
+Mais frequentes:
+ 1. a           6 ######
+ 2. um          4 ####
+ 3. ana         3 ###
+ 4. caderno     3 ###
+ 5. café        3 ###</pre>
+
+<ol class="passo">
+  <li><a href="#etapa1">Abrir o arquivo e contar as linhas</a>.</li>
+  <li><a href="#etapa2">Bytes × caracteres</a>: o UTF-8.</li>
+  <li><a href="#etapa3">Contar as palavras</a>.</li>
+  <li><a href="#etapa4">Contar cada palavra</a>, sem pontuação e sem maiúsculas.</li>
+  <li><a href="#etapa5">As mais frequentes</a>: ordenar pela contagem.</li>
+  <li><a href="#etapa6">A palavra mais longa</a>.</li>
+  <li><a href="#etapa7">O relatório</a> e o nome do arquivo na linha de comando.</li>
+</ol>
+
+<hr>
+
+<h2 id="etapa1">Etapa 1 · Abrir o arquivo e contar as linhas</h2>
+<p>Primeiro, o texto. A Ana escreveu sobre um dia na lojinha, com acentos, vírgulas, pontos e até uma exclamação, tudo o que vai dar trabalho. Ela criou o arquivo com um <em>here-document</em> do Bash (no seu computador, use qualquer editor de texto e salve em UTF-8):</p>
+
+<pre class="term">$ mkdir -p cpp/texto
+$ cd cpp/texto
+$ cat &gt; texto.txt &lt;&lt;'FIM'
+&gt; A lojinha da Ana abre cedo, antes do sol.
+&gt; O café está quente, e a Ana conta os cadernos.
+&gt; Um caderno azul, um caderno verde, um caderno sem cor.
+&gt; Às dez horas chega a primeira cliente: a avó do Bruno.
+&gt; Ela quer lápis, borracha e paciência.
+&gt; A Ana não vende paciência, mas oferece um café.
+&gt; No fim do dia, a lojinha fecha. O café acabou!
+&gt; FIM</pre>
+
+<p>O programa abre o arquivo, lê uma linha por vez e numera:</p>
+<pre class="file" data-file="analisar.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::ifstream arq{"texto.txt"};
+    if (!arq) {
+        std::cerr &lt;&lt; "Não consegui abrir texto.txt\n";
+        return 1;
+    }
+
+    int linhas = 0;
+    std::string linha;
+    while (std::getline(arq, linha)) {
+        ++linhas;
+        std::cout &lt;&lt; linhas &lt;&lt; ": " &lt;&lt; linha &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "Linhas: " &lt;&lt; linhas &lt;&lt; '\n';
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>std::ifstream arq{"texto.txt"};</code></td><td>Abre o arquivo para leitura (<em>input file stream</em>, "fluxo de entrada de arquivo"). O nome é procurado na pasta em que o programa roda.</td></tr>
+<tr><td><code>if (!arq)</code></td><td>"Se o arquivo não abriu." Um <code>ifstream</code> vale <code>false</code> quando algo deu errado (arquivo que não existe, sem permissão…).</td></tr>
+<tr><td><code>std::cerr</code></td><td>A saída de <strong>erros</strong> (<em>character error</em>). Aparece no terminal como o <code>cout</code>, mas pode ser separada dele (por exemplo, <code>2&gt; erros.txt</code>).</td></tr>
+<tr><td><code>return 1;</code></td><td>Termina o <code>main</code> com código de saída 1: "deu errado". Scripts e o Bash olham esse número.</td></tr>
+<tr><td><code>while (std::getline(arq, linha))</code></td><td>Lê a próxima linha (sem o <code>\n</code> do fim) para <code>linha</code>. Quando o arquivo acaba, o <code>getline</code> "falha" e o laço termina.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp/texto">$ cat texto.txt
+A lojinha da Ana abre cedo, antes do sol.
+O café está quente, e a Ana conta os cadernos.
+Um caderno azul, um caderno verde, um caderno sem cor.
+Às dez horas chega a primeira cliente: a avó do Bruno.
+Ela quer lápis, borracha e paciência.
+A Ana não vende paciência, mas oferece um café.
+No fim do dia, a lojinha fecha. O café acabou!
+$ g++ -std=c++23 -Wall -Wextra analisar.cpp -o analisar
+$ ./analisar
+1: A lojinha da Ana abre cedo, antes do sol.
+2: O café está quente, e a Ana conta os cadernos.
+3: Um caderno azul, um caderno verde, um caderno sem cor.
+4: Às dez horas chega a primeira cliente: a avó do Bruno.
+5: Ela quer lápis, borracha e paciência.
+6: A Ana não vende paciência, mas oferece um café.
+7: No fim do dia, a lojinha fecha. O café acabou!
+Linhas: 7</pre>
+
+<div class="cenario">
+<strong>Quando dá errado: o arquivo que não existe</strong>
+<p>Sem o <code>if (!arq)</code> e com o nome digitado errado (<code>"testo.txt"</code>), o programa não reclama de nada:</p>
+<pre class="term" data-cwd="~/cpp/texto">$ g++ -std=c++23 -Wall -Wextra analisar.cpp -o analisar
+$ ./analisar
+Linhas: 0
+$ echo $?
+0</pre>
+<p>"0 linhas" e código de saída 0, "sucesso". Um <code>ifstream</code> que não abriu <strong>não lança exceção</strong>: ele só fica em estado de falha, e o primeiro <code>getline</code> já devolve "acabou". O programa mente sem saber. Com a verificação (e o mesmo nome errado):</p>
+<pre class="term" data-cwd="~/cpp/texto">$ g++ -std=c++23 -Wall -Wextra analisar.cpp -o analisar
+$ ./analisar
+Não consegui abrir testo.txt
+$ echo $?
+1</pre>
+<p><strong>Regra:</strong> depois de abrir um arquivo, confira sempre se abriu.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Linhas: 8,out:Linhas em branco: 1">
+<p class="try-task"><strong>Missão (etapa 1):</strong> na aba <code>texto.txt</code> desta caixa há uma linha em branco entre a 3 e a 4. Conte também as linhas em branco (<code>linha.empty()</code> é <code>true</code> para uma linha vazia) e mostre no fim:</p>
+<pre class="out">Linhas: 8
+Linhas em branco: 1</pre>
+<pre class="script" data-file="analisar.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::ifstream arq{"texto.txt"};
+    if (!arq) {
+        std::cerr &lt;&lt; "Não consegui abrir texto.txt\n";
+        return 1;
+    }
+
+    int linhas = 0;
+    std::string linha;
+    while (std::getline(arq, linha)) {
+        ++linhas;
+        std::cout &lt;&lt; linhas &lt;&lt; ": " &lt;&lt; linha &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "Linhas: " &lt;&lt; linhas &lt;&lt; '\n';
+}
+</pre>
+<pre class="script" data-file="texto.txt">A lojinha da Ana abre cedo, antes do sol.
+O café está quente, e a Ana conta os cadernos.
+Um caderno azul, um caderno verde, um caderno sem cor.
+
+Às dez horas chega a primeira cliente: a avó do Bruno.
+Ela quer lápis, borracha e paciência.
+A Ana não vende paciência, mas oferece um café.
+No fim do dia, a lojinha fecha. O café acabou!
+</pre>
+<pre class="solucao" data-file="analisar.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::ifstream arq{"texto.txt"};
+    if (!arq) {
+        std::cerr &lt;&lt; "Não consegui abrir texto.txt\n";
+        return 1;
+    }
+
+    int linhas = 0;
+    int emBranco = 0;
+    std::string linha;
+    while (std::getline(arq, linha)) {
+        ++linhas;
+        if (linha.empty()) {
+            ++emBranco;
+        }
+        std::cout &lt;&lt; linhas &lt;&lt; ": " &lt;&lt; linha &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "Linhas: " &lt;&lt; linhas &lt;&lt; '\n';
+    std::cout &lt;&lt; "Linhas em branco: " &lt;&lt; emBranco &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa2">Etapa 2 · Bytes × caracteres</h2>
+<p>Quantas letras tem a palavra <code>café</code>? Quatro. Pergunte ao C++ com <code>std::string("café").size()</code> e ele responde <strong>5</strong>. Veja os bytes do arquivo com o <code>od</code> (<em>octal dump</em>, aqui em hexadecimal) e conte com o <code>wc</code>, que tem <code>-c</code> para bytes e <code>-m</code> para caracteres:</p>
+
+<pre class="term" data-cwd="~/cpp/texto">$ printf 'café' | od -An -tx1
+ 63 61 66 c3 a9
+$ printf 'café' | wc -c
+5
+$ printf 'café' | wc -m
+4</pre>
+
+<p><code>c</code>, <code>a</code> e <code>f</code> ocupam um byte cada (<code>63 61 66</code>). O <code>é</code> ocupa <strong>dois</strong>: <code>c3 a9</code>. É a codificação <strong>UTF-8</strong>, a do Linux, da web e deste guia. Ela guarda cada caractere em 1 a 4 bytes, e o primeiro byte diz quantos vêm:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Bits do byte</th><th>Teste em C++</th><th>Significa</th><th>Exemplo</th></tr>
+<tr><td><code>0xxxxxxx</code></td><td><code>c &lt; 0x80</code></td><td>Caractere de 1 byte (os do inglês, números, pontuação).</td><td><code>a</code> = <code>61</code></td></tr>
+<tr><td><code>110xxxxx</code></td><td><code>(c &amp; 0xE0) == 0xC0</code></td><td>Começo de um caractere de 2 bytes.</td><td><code>é</code> = <code>c3 a9</code></td></tr>
+<tr><td><code>1110xxxx</code></td><td><code>(c &amp; 0xF0) == 0xE0</code></td><td>Começo de um caractere de 3 bytes.</td><td><code>€</code> = <code>e2 82 ac</code></td></tr>
+<tr><td><code>11110xxx</code></td><td><code>(c &amp; 0xF8) == 0xF0</code></td><td>Começo de um caractere de 4 bytes (emojis).</td><td>😀 = <code>f0 9f 98 80</code></td></tr>
+<tr><td><code>10xxxxxx</code></td><td><code>(c &amp; 0xC0) == 0x80</code></td><td><strong>Continuação</strong>: o 2º, 3º ou 4º byte de um caractere.</td><td>o <code>a9</code> do <code>é</code></td></tr>
+</table>
+</div>
+
+<p>Daí a receita: <strong>para contar caracteres, conte os bytes que não são de continuação</strong>. O <code>&amp;</code> (E bit a bit) com <code>0xC0</code> (<code>11000000</code>) guarda só os dois primeiros bits do byte; se eles forem <code>10</code> (<code>0x80</code>), é continuação.</p>
+
+<pre class="file" data-file="analisar.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+// Quantos caracteres (não bytes) um texto em UTF-8 tem.
+std::size_t contarCaracteres(const std::string&amp; texto) {
+    std::size_t n = 0;
+    for (unsigned char c : texto) {
+        if ((c &amp; 0xC0) != 0x80) {     // não é byte de continuação
+            ++n;
+        }
+    }
+    return n;
+}
+
+int main() {
+    std::ifstream arq{"texto.txt"};
+    if (!arq) {
+        std::cerr &lt;&lt; "Não consegui abrir texto.txt\n";
+        return 1;
+    }
+
+    int linhas = 0;
+    std::size_t bytes = 0, caracteres = 0;
+    std::string linha;
+    while (std::getline(arq, linha)) {
+        ++linhas;
+        std::cout &lt;&lt; linhas &lt;&lt; ": " &lt;&lt; linha.size() &lt;&lt; " bytes, "
+                  &lt;&lt; contarCaracteres(linha) &lt;&lt; " caracteres\n";
+        bytes += linha.size() + 1;                    // +1: o '\n' que o getline tirou
+        caracteres += contarCaracteres(linha) + 1;
+    }
+    std::cout &lt;&lt; "Linhas: " &lt;&lt; linhas &lt;&lt; '\n';
+    std::cout &lt;&lt; "Caracteres: " &lt;&lt; caracteres &lt;&lt; '\n';
+    std::cout &lt;&lt; "Bytes: " &lt;&lt; bytes &lt;&lt; '\n';
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>for (unsigned char c : texto)</code></td><td>Percorre o texto byte a byte. <code>unsigned char</code> vê o byte como um número de 0 a 255; com <code>char</code> (que no Linux x86-64 tem sinal), o <code>c3</code> viraria −61. Veja <a href="char.html">char</a>.</td></tr>
+<tr><td><code>(c &amp; 0xC0) != 0x80</code></td><td>"Não é byte de continuação": começa um caractere novo.</td></tr>
+<tr><td><code>std::size_t</code></td><td>O tipo sem sinal que o C++ usa para tamanhos (o mesmo de <code>size()</code>).</td></tr>
+<tr><td><code>linha.size() + 1</code></td><td>O <code>getline</code> tira o <code>\n</code> do fim de cada linha, mas ele ocupa um byte (e é um caractere) no arquivo. Somamos de volta.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp/texto">$ g++ -std=c++23 -Wall -Wextra analisar.cpp -o analisar
+$ ./analisar
+1: 41 bytes, 41 caracteres
+2: 48 bytes, 46 caracteres
+3: 54 bytes, 54 caracteres
+4: 56 bytes, 54 caracteres
+5: 39 bytes, 37 caracteres
+6: 50 bytes, 47 caracteres
+7: 47 bytes, 46 caracteres
+Linhas: 7
+Caracteres: 332
+Bytes: 342
+$ wc -c texto.txt
+342 texto.txt
+$ wc -m texto.txt
+332 texto.txt</pre>
+
+<p>Os números batem com o <code>wc</code>: 342 bytes e 332 caracteres. A linha 1 não tem acento (41 = 41); a linha 2 tem dois, <code>café</code> e <code>está</code> (48 bytes, 46 caracteres). A diferença total, 10, é o número de letras acentuadas do texto.</p>
+
+<div class="warning">
+<strong>Caractere não é o mesmo que "letra que você vê"</strong>
+<p>Esta contagem é a de <strong>pontos de código</strong>, a mesma do <code>wc -m</code>. Na maioria dos textos em português ela coincide com as letras que você vê. Mas há casos em que não: um <code>é</code> pode ser gravado como <code>e</code> + um acento "solto" (dois pontos de código) e alguns emojis são vários pontos de código juntos. Para esses casos existem bibliotecas especializadas, como a ICU. Mais em <a href="acentos-utf8.html">Acentos e UTF-8</a>.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Caracteres: 332,out:Bytes: 342">
+<p class="try-task"><strong>Missão (etapa 2):</strong> a função <code>contarCaracteres</code> está "trapaceando": devolve o número de bytes, e o total de caracteres sai 342. Escreva-a de verdade, contando só os bytes que não são de continuação. A saída deve terminar com:</p>
+<pre class="out">Caracteres: 332
+Bytes: 342</pre>
+<pre class="script" data-file="analisar.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+// Quantos caracteres (não bytes) um texto em UTF-8 tem.
+std::size_t contarCaracteres(const std::string&amp; texto) {
+    // Missão: conte só os bytes que NÃO são de continuação.
+    return texto.size();
+}
+
+int main() {
+    std::ifstream arq{"texto.txt"};
+    if (!arq) {
+        std::cerr &lt;&lt; "Não consegui abrir texto.txt\n";
+        return 1;
+    }
+
+    int linhas = 0;
+    std::size_t bytes = 0, caracteres = 0;
+    std::string linha;
+    while (std::getline(arq, linha)) {
+        ++linhas;
+        std::cout &lt;&lt; linhas &lt;&lt; ": " &lt;&lt; linha.size() &lt;&lt; " bytes, "
+                  &lt;&lt; contarCaracteres(linha) &lt;&lt; " caracteres\n";
+        bytes += linha.size() + 1;                    // +1: o '\n' que o getline tirou
+        caracteres += contarCaracteres(linha) + 1;
+    }
+    std::cout &lt;&lt; "Linhas: " &lt;&lt; linhas &lt;&lt; '\n';
+    std::cout &lt;&lt; "Caracteres: " &lt;&lt; caracteres &lt;&lt; '\n';
+    std::cout &lt;&lt; "Bytes: " &lt;&lt; bytes &lt;&lt; '\n';
+}
+</pre>
+<pre class="script" data-file="texto.txt">A lojinha da Ana abre cedo, antes do sol.
+O café está quente, e a Ana conta os cadernos.
+Um caderno azul, um caderno verde, um caderno sem cor.
+Às dez horas chega a primeira cliente: a avó do Bruno.
+Ela quer lápis, borracha e paciência.
+A Ana não vende paciência, mas oferece um café.
+No fim do dia, a lojinha fecha. O café acabou!
+</pre>
+<pre class="solucao" data-file="analisar.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+// Quantos caracteres (não bytes) um texto em UTF-8 tem.
+std::size_t contarCaracteres(const std::string&amp; texto) {
+    std::size_t n = 0;
+    for (unsigned char c : texto) {
+        if ((c &amp; 0xC0) != 0x80) {     // não é byte de continuação
+            ++n;
+        }
+    }
+    return n;
+}
+
+int main() {
+    std::ifstream arq{"texto.txt"};
+    if (!arq) {
+        std::cerr &lt;&lt; "Não consegui abrir texto.txt\n";
+        return 1;
+    }
+
+    int linhas = 0;
+    std::size_t bytes = 0, caracteres = 0;
+    std::string linha;
+    while (std::getline(arq, linha)) {
+        ++linhas;
+        std::cout &lt;&lt; linhas &lt;&lt; ": " &lt;&lt; linha.size() &lt;&lt; " bytes, "
+                  &lt;&lt; contarCaracteres(linha) &lt;&lt; " caracteres\n";
+        bytes += linha.size() + 1;                    // +1: o '\n' que o getline tirou
+        caracteres += contarCaracteres(linha) + 1;
+    }
+    std::cout &lt;&lt; "Linhas: " &lt;&lt; linhas &lt;&lt; '\n';
+    std::cout &lt;&lt; "Caracteres: " &lt;&lt; caracteres &lt;&lt; '\n';
+    std::cout &lt;&lt; "Bytes: " &lt;&lt; bytes &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa3">Etapa 3 · Contar as palavras</h2>
+<p>O que é uma palavra? Para começar, a mesma definição do <code>wc</code>: um pedaço de texto entre espaços. O C++ já sabe separar assim: o <code>&gt;&gt;</code> de um fluxo pula os espaços e lê até o próximo espaço. Para usar o <code>&gt;&gt;</code> numa <code>std::string</code>, transformamos a linha num fluxo com <code>std::istringstream</code> (<em>input string stream</em>, de <code>&lt;sstream&gt;</code>):</p>
+
+<pre class="file" data-file="analisar.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+
+// Quantos caracteres (não bytes) um texto em UTF-8 tem.
+std::size_t contarCaracteres(const std::string&amp; texto) {
+    std::size_t n = 0;
+    for (unsigned char c : texto) {
+        if ((c &amp; 0xC0) != 0x80) {     // não é byte de continuação
+            ++n;
+        }
+    }
+    return n;
+}
+
+int main() {
+    std::ifstream arq{"texto.txt"};
+    if (!arq) {
+        std::cerr &lt;&lt; "Não consegui abrir texto.txt\n";
+        return 1;
+    }
+
+    int linhas = 0;
+    std::size_t bytes = 0, caracteres = 0, palavras = 0;
+    std::string linha;
+    while (std::getline(arq, linha)) {
+        ++linhas;
+        bytes += linha.size() + 1;
+        caracteres += contarCaracteres(linha) + 1;
+
+        std::istringstream fluxo{linha};
+        std::string palavra;
+        while (fluxo &gt;&gt; palavra) {
+            ++palavras;
+        }
+    }
+    std::cout &lt;&lt; "Linhas: " &lt;&lt; linhas &lt;&lt; '\n';
+    std::cout &lt;&lt; "Palavras: " &lt;&lt; palavras &lt;&lt; '\n';
+    std::cout &lt;&lt; "Caracteres: " &lt;&lt; caracteres &lt;&lt; '\n';
+    std::cout &lt;&lt; "Bytes: " &lt;&lt; bytes &lt;&lt; '\n';
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>std::istringstream fluxo{linha};</code></td><td>Um "<code>cin</code> de mentira" que lê de dentro da linha.</td></tr>
+<tr><td><code>while (fluxo &gt;&gt; palavra)</code></td><td>Lê a próxima palavra; quando a linha acaba, o laço termina. Espaços repetidos e tabulações são pulados.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp/texto">$ g++ -std=c++23 -Wall -Wextra analisar.cpp -o analisar
+$ ./analisar
+Linhas: 7
+Palavras: 65
+Caracteres: 332
+Bytes: 342
+$ wc texto.txt
+  7  65 342 texto.txt</pre>
+
+<p>As colunas do <code>wc</code> são linhas, palavras e bytes: 7, 65, 342, iguais às nossas. Mas repare que, para o <code>&gt;&gt;</code>, <code>cedo,</code> (com a vírgula) é uma palavra. Para <strong>contar</strong> palavras, tanto faz. Para saber <strong>quais</strong> palavras se repetem, vai fazer diferença.</p>
+
+<div class="trycpp" data-goal="out:Frases: 8">
+<p class="try-task"><strong>Missão (etapa 3):</strong> conte também as <strong>frases</strong>, contando os caracteres <code>.</code>, <code>!</code> e <code>?</code> de cada linha (um <code>for (char c : linha)</code>). Mostre <code>Frases: 8</code> logo depois das palavras.</p>
+<pre class="script" data-file="analisar.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+
+// Quantos caracteres (não bytes) um texto em UTF-8 tem.
+std::size_t contarCaracteres(const std::string&amp; texto) {
+    std::size_t n = 0;
+    for (unsigned char c : texto) {
+        if ((c &amp; 0xC0) != 0x80) {     // não é byte de continuação
+            ++n;
+        }
+    }
+    return n;
+}
+
+int main() {
+    std::ifstream arq{"texto.txt"};
+    if (!arq) {
+        std::cerr &lt;&lt; "Não consegui abrir texto.txt\n";
+        return 1;
+    }
+
+    int linhas = 0;
+    std::size_t bytes = 0, caracteres = 0, palavras = 0;
+    std::string linha;
+    while (std::getline(arq, linha)) {
+        ++linhas;
+        bytes += linha.size() + 1;
+        caracteres += contarCaracteres(linha) + 1;
+
+        std::istringstream fluxo{linha};
+        std::string palavra;
+        while (fluxo &gt;&gt; palavra) {
+            ++palavras;
+        }
+    }
+    std::cout &lt;&lt; "Linhas: " &lt;&lt; linhas &lt;&lt; '\n';
+    std::cout &lt;&lt; "Palavras: " &lt;&lt; palavras &lt;&lt; '\n';
+    std::cout &lt;&lt; "Caracteres: " &lt;&lt; caracteres &lt;&lt; '\n';
+    std::cout &lt;&lt; "Bytes: " &lt;&lt; bytes &lt;&lt; '\n';
+}
+</pre>
+<pre class="script" data-file="texto.txt">A lojinha da Ana abre cedo, antes do sol.
+O café está quente, e a Ana conta os cadernos.
+Um caderno azul, um caderno verde, um caderno sem cor.
+Às dez horas chega a primeira cliente: a avó do Bruno.
+Ela quer lápis, borracha e paciência.
+A Ana não vende paciência, mas oferece um café.
+No fim do dia, a lojinha fecha. O café acabou!
+</pre>
+<pre class="solucao" data-file="analisar.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+
+// Quantos caracteres (não bytes) um texto em UTF-8 tem.
+std::size_t contarCaracteres(const std::string&amp; texto) {
+    std::size_t n = 0;
+    for (unsigned char c : texto) {
+        if ((c &amp; 0xC0) != 0x80) {     // não é byte de continuação
+            ++n;
+        }
+    }
+    return n;
+}
+
+int main() {
+    std::ifstream arq{"texto.txt"};
+    if (!arq) {
+        std::cerr &lt;&lt; "Não consegui abrir texto.txt\n";
+        return 1;
+    }
+
+    int linhas = 0;
+    std::size_t bytes = 0, caracteres = 0, palavras = 0, frases = 0;
+    std::string linha;
+    while (std::getline(arq, linha)) {
+        ++linhas;
+        bytes += linha.size() + 1;
+        caracteres += contarCaracteres(linha) + 1;
+
+        for (char c : linha) {
+            if (c == '.' || c == '!' || c == '?') {
+                ++frases;
+            }
+        }
+
+        std::istringstream fluxo{linha};
+        std::string palavra;
+        while (fluxo &gt;&gt; palavra) {
+            ++palavras;
+        }
+    }
+    std::cout &lt;&lt; "Linhas: " &lt;&lt; linhas &lt;&lt; '\n';
+    std::cout &lt;&lt; "Palavras: " &lt;&lt; palavras &lt;&lt; '\n';
+    std::cout &lt;&lt; "Frases: " &lt;&lt; frases &lt;&lt; '\n';
+    std::cout &lt;&lt; "Caracteres: " &lt;&lt; caracteres &lt;&lt; '\n';
+    std::cout &lt;&lt; "Bytes: " &lt;&lt; bytes &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa4">Etapa 4 · Contar cada palavra</h2>
+<p>Para saber quantas vezes cada palavra aparece, um <a href="map.html">std::map</a> da palavra para a contagem: <code>std::map&lt;std::string, int&gt;</code>. O truque é <code>++contagem[palavra]</code>: se a palavra é nova, o <code>[]</code> a cria com 0 e o <code>++</code> faz 1; se já existe, soma 1. (Aqui o <code>[]</code> criar a chave é exatamente o que queremos, ao contrário do <a href="projeto-estoque.html#etapa2">estoque</a>.) Primeira tentativa, sem limpar nada:</p>
+
+<pre class="file" data-file="analisar.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::ifstream arq{"texto.txt"};
+    if (!arq) {
+        std::cerr &lt;&lt; "Não consegui abrir texto.txt\n";
+        return 1;
+    }
+
+    std::map&lt;std::string, int&gt; contagem;
+    std::string linha;
+    while (std::getline(arq, linha)) {
+        std::istringstream fluxo{linha};
+        std::string palavra;
+        while (fluxo &gt;&gt; palavra) {
+            ++contagem[palavra];
+        }
+    }
+
+    std::cout &lt;&lt; contagem.size() &lt;&lt; " palavras diferentes:\n";
+    int i = 0;
+    for (const auto&amp; [palavra, vezes] : contagem) {
+        std::cout &lt;&lt; palavra &lt;&lt; '=' &lt;&lt; vezes &lt;&lt; ' ';
+        if (++i % 8 == 0) {
+            std::cout &lt;&lt; '\n';
+        }
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/texto">$ g++ -std=c++23 -Wall -Wextra analisar.cpp -o analisar
+$ ./analisar
+49 palavras diferentes:
+A=2 Ana=3 Bruno.=1 Ela=1 No=1 O=2 Um=1 a=4 
+abre=1 acabou!=1 antes=1 avó=1 azul,=1 borracha=1 caderno=3 cadernos.=1 
+café=2 café.=1 cedo,=1 chega=1 cliente:=1 conta=1 cor.=1 da=1 
+dez=1 dia,=1 do=3 e=2 está=1 fecha.=1 fim=1 horas=1 
+lojinha=2 lápis,=1 mas=1 não=1 oferece=1 os=1 paciência,=1 paciência.=1 
+primeira=1 quente,=1 quer=1 sem=1 sol.=1 um=3 vende=1 verde,=1 
+Às=1</pre>
+
+<p>O map mostra tudo em ordem, e os problemas aparecem: <code>A</code> e <code>a</code> contados separados, <code>café</code> e <code>café.</code> também, assim como <code>paciência,</code> e <code>paciência.</code>. Precisamos <strong>limpar</strong> cada palavra antes de contar: tirar a pontuação e passar para minúsculas. As funções de <code>&lt;cctype&gt;</code> ajudam:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Pergunta ou faz</th><th>Exemplo</th></tr>
+<tr><td><code>std::isalnum(c)</code></td><td>É letra ou número? (<em>alphanumeric</em>)</td><td><code>'a'</code> sim, <code>','</code> não</td></tr>
+<tr><td><code>std::isalpha(c)</code></td><td>É letra?</td><td><code>'7'</code> não</td></tr>
+<tr><td><code>std::ispunct(c)</code></td><td>É pontuação?</td><td><code>'!'</code> sim</td></tr>
+<tr><td><code>std::tolower(c)</code></td><td>Devolve a minúscula.</td><td><code>'A'</code> → <code>'a'</code></td></tr>
+</table>
+</div>
+
+<p>Essas funções só entendem um byte por vez, e só os caracteres do inglês. Por isso a nossa <code>limpar</code> guarda as letras e números <strong>e</strong> todo byte de 0x80 para cima (os pedaços das letras acentuadas), sem tentar mexer neles:</p>
+
+<pre class="file" data-file="analisar.cpp">#include &lt;cctype&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+
+// Tira a pontuação e passa para minúsculas (só as letras sem acento).
+std::string limpar(const std::string&amp; palavra) {
+    std::string limpa;
+    for (unsigned char c : palavra) {
+        if (std::isalnum(c) || c &gt;= 0x80) {
+            limpa += static_cast&lt;char&gt;(std::tolower(c));
+        }
+    }
+    return limpa;
+}
+
+int main() {
+    std::ifstream arq{"texto.txt"};
+    if (!arq) {
+        std::cerr &lt;&lt; "Não consegui abrir texto.txt\n";
+        return 1;
+    }
+
+    std::map&lt;std::string, int&gt; contagem;
+    std::string linha;
+    while (std::getline(arq, linha)) {
+        std::istringstream fluxo{linha};
+        std::string palavra;
+        while (fluxo &gt;&gt; palavra) {
+            std::string limpa = limpar(palavra);
+            if (!limpa.empty()) {
+                ++contagem[limpa];
+            }
+        }
+    }
+
+    std::cout &lt;&lt; contagem.size() &lt;&lt; " palavras diferentes:\n";
+    int i = 0;
+    for (const auto&amp; [palavra, vezes] : contagem) {
+        std::cout &lt;&lt; palavra &lt;&lt; '=' &lt;&lt; vezes &lt;&lt; ' ';
+        if (++i % 8 == 0) {
+            std::cout &lt;&lt; '\n';
+        }
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>std::isalnum(c) || c &gt;= 0x80</code></td><td>Fica: letra ou número do inglês, ou byte de caractere acentuado. Sai: vírgula, ponto, dois-pontos, exclamação.</td></tr>
+<tr><td><code>static_cast&lt;char&gt;(std::tolower(c))</code></td><td><code>tolower</code> recebe e devolve <code>int</code>; convertemos de volta para <code>char</code>. Com bytes ≥ 0x80 ele não muda nada.</td></tr>
+<tr><td><code>if (!limpa.empty())</code></td><td>Um "!" ou um "-" sozinho vira texto vazio: não conta. (Um travessão "—" não: ele tem 3 bytes ≥ 0x80 e passaria. Fica para os desafios.)</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp/texto">$ g++ -std=c++23 -Wall -Wextra analisar.cpp -o analisar
+$ ./analisar
+45 palavras diferentes:
+a=6 abre=1 acabou=1 ana=3 antes=1 avó=1 azul=1 borracha=1 
+bruno=1 caderno=3 cadernos=1 café=3 cedo=1 chega=1 cliente=1 conta=1 
+cor=1 da=1 dez=1 dia=1 do=3 e=2 ela=1 está=1 
+fecha=1 fim=1 horas=1 lojinha=2 lápis=1 mas=1 no=1 não=1 
+o=2 oferece=1 os=1 paciência=2 primeira=1 quente=1 quer=1 sem=1 
+sol=1 um=4 vende=1 verde=1 Às=1</pre>
+
+<p>De 49 para 45 palavras diferentes: <code>a=6</code>, <code>café=3</code>, <code>paciência=2</code>. Duas coisas ficaram estranhas, e as duas são o UTF-8 de novo:</p>
+<ul>
+  <li><code>Às</code> continua com maiúscula: o <code>tolower</code> não sabe que <code>c3 80</code> é um "À". Se o texto tivesse <code>Às</code> e <code>às</code>, seriam contadas separadas (desafio no fim).</li>
+  <li><code>lápis</code> veio depois de <code>lojinha</code>, e <code>Às</code> no fim de tudo. O map ordena comparando <strong>bytes</strong>: o <code>á</code> começa com <code>c3</code>, que é maior que qualquer letra sem acento.</li>
+</ul>
+
+<div class="trycpp" data-goal="out:45 palavras diferentes,out:café=3">
+<p class="try-task"><strong>Missão (etapa 4):</strong> a <code>limpar</code> está devolvendo a palavra sem mudar nada, e o programa mostra 49 palavras diferentes. Escreva-a: monte um texto novo só com os bytes que são <code>std::isalnum</code> ou <code>&gt;= 0x80</code>, passando cada um por <code>std::tolower</code>. Devem aparecer <code>45 palavras diferentes</code> e <code>café=3</code>.</p>
+<pre class="script" data-file="analisar.cpp">#include &lt;cctype&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+
+// Tira a pontuação e passa para minúsculas (só as letras sem acento).
+std::string limpar(const std::string&amp; palavra) {
+    // Missão: monte um texto novo só com letras, números e bytes &gt;= 0x80,
+    // passando cada um por std::tolower.
+    return palavra;
+}
+
+int main() {
+    std::ifstream arq{"texto.txt"};
+    if (!arq) {
+        std::cerr &lt;&lt; "Não consegui abrir texto.txt\n";
+        return 1;
+    }
+
+    std::map&lt;std::string, int&gt; contagem;
+    std::string linha;
+    while (std::getline(arq, linha)) {
+        std::istringstream fluxo{linha};
+        std::string palavra;
+        while (fluxo &gt;&gt; palavra) {
+            std::string limpa = limpar(palavra);
+            if (!limpa.empty()) {
+                ++contagem[limpa];
+            }
+        }
+    }
+
+    std::cout &lt;&lt; contagem.size() &lt;&lt; " palavras diferentes:\n";
+    int i = 0;
+    for (const auto&amp; [palavra, vezes] : contagem) {
+        std::cout &lt;&lt; palavra &lt;&lt; '=' &lt;&lt; vezes &lt;&lt; ' ';
+        if (++i % 8 == 0) {
+            std::cout &lt;&lt; '\n';
+        }
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+<pre class="script" data-file="texto.txt">A lojinha da Ana abre cedo, antes do sol.
+O café está quente, e a Ana conta os cadernos.
+Um caderno azul, um caderno verde, um caderno sem cor.
+Às dez horas chega a primeira cliente: a avó do Bruno.
+Ela quer lápis, borracha e paciência.
+A Ana não vende paciência, mas oferece um café.
+No fim do dia, a lojinha fecha. O café acabou!
+</pre>
+<pre class="solucao" data-file="analisar.cpp">#include &lt;cctype&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+
+// Tira a pontuação e passa para minúsculas (só as letras sem acento).
+std::string limpar(const std::string&amp; palavra) {
+    std::string limpa;
+    for (unsigned char c : palavra) {
+        if (std::isalnum(c) || c &gt;= 0x80) {
+            limpa += static_cast&lt;char&gt;(std::tolower(c));
+        }
+    }
+    return limpa;
+}
+
+int main() {
+    std::ifstream arq{"texto.txt"};
+    if (!arq) {
+        std::cerr &lt;&lt; "Não consegui abrir texto.txt\n";
+        return 1;
+    }
+
+    std::map&lt;std::string, int&gt; contagem;
+    std::string linha;
+    while (std::getline(arq, linha)) {
+        std::istringstream fluxo{linha};
+        std::string palavra;
+        while (fluxo &gt;&gt; palavra) {
+            std::string limpa = limpar(palavra);
+            if (!limpa.empty()) {
+                ++contagem[limpa];
+            }
+        }
+    }
+
+    std::cout &lt;&lt; contagem.size() &lt;&lt; " palavras diferentes:\n";
+    int i = 0;
+    for (const auto&amp; [palavra, vezes] : contagem) {
+        std::cout &lt;&lt; palavra &lt;&lt; '=' &lt;&lt; vezes &lt;&lt; ' ';
+        if (++i % 8 == 0) {
+            std::cout &lt;&lt; '\n';
+        }
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa5">Etapa 5 · As mais frequentes</h2>
+<p>O map está em ordem de <strong>palavra</strong>; queremos em ordem de <strong>contagem</strong>. Como no <a href="projeto-estoque.html#etapa5">estoque</a>, copiamos para um vetor e ordenamos. Cada item do map é um par (palavra, contagem), então o vetor é de <code>std::pair&lt;std::string, int&gt;</code> (<a href="pair-tuple.html">pair</a>). No lugar da listagem da etapa 4, no fim do <code>main</code> (com <code>#include &lt;algorithm&gt;</code>, <code>&lt;utility&gt;</code> e <code>&lt;vector&gt;</code>):</p>
+
+<pre class="file" data-file="analisar.cpp (fim do main)">    std::vector&lt;std::pair&lt;std::string, int&gt;&gt; ranking(contagem.begin(), contagem.end());
+    std::sort(ranking.begin(), ranking.end(), [](const auto&amp; a, const auto&amp; b) {
+        if (a.second != b.second) {
+            return a.second &gt; b.second;               // mais vezes primeiro
+        }
+        return a.first &lt; b.first;                     // empate: ordem alfabética
+    });
+
+    for (std::size_t i = 0; i &lt; ranking.size() &amp;&amp; i &lt; 5; ++i) {
+        std::cout &lt;&lt; i + 1 &lt;&lt; ". " &lt;&lt; ranking[i].first &lt;&lt; ": " &lt;&lt; ranking[i].second &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>ranking(contagem.begin(), contagem.end())</code></td><td>Cria o vetor já com uma cópia de todos os pares do map, de uma vez.</td></tr>
+<tr><td><code>[](const auto&amp; a, const auto&amp; b)</code></td><td>Uma lambda com <code>auto</code> nos parâmetros: o compilador descobre que são pares. Evita escrever <code>std::pair&lt;std::string, int&gt;</code> duas vezes.</td></tr>
+<tr><td><code>a.second</code>, <code>a.first</code></td><td>A contagem e a palavra do par.</td></tr>
+<tr><td><code>if (a.second != b.second) return a.second &gt; b.second;</code></td><td>Contagens diferentes: a maior vem antes.</td></tr>
+<tr><td><code>return a.first &lt; b.first;</code></td><td>Empate: ordem alfabética. Sem esse desempate, palavras com a mesma contagem poderiam sair em qualquer ordem.</td></tr>
+<tr><td><code>i &lt; ranking.size() &amp;&amp; i &lt; 5</code></td><td>Até 5 palavras, sem passar do fim num texto com menos de 5.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp/texto">$ g++ -std=c++23 -Wall -Wextra analisar.cpp -o analisar
+$ ./analisar
+1. a: 6
+2. um: 4
+3. ana: 3
+4. caderno: 3
+5. café: 3</pre>
+
+<p>Num texto de verdade, o topo sempre é ocupado por palavras como "a", "o", "de", "que" (as <em>stopwords</em>, "palavras vazias"). Ignorá-las é um dos desafios.</p>
+
+<div class="trycpp" data-goal="out:10. paciência: 2,src:second\s*>=\s*2">
+<p class="try-task"><strong>Missão (etapa 5):</strong> em vez das 5 primeiras, mostre <strong>todas as palavras que aparecem 2 vezes ou mais</strong>. Só a condição do <code>for</code> muda (dica: <code>ranking[i].second &gt;= 2</code>). A última linha deve ser:</p>
+<pre class="out">10. paciência: 2</pre>
+<pre class="script" data-file="analisar.cpp">#include &lt;algorithm&gt;
+#include &lt;cctype&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+// Tira a pontuação e passa para minúsculas (só as letras sem acento).
+std::string limpar(const std::string&amp; palavra) {
+    std::string limpa;
+    for (unsigned char c : palavra) {
+        if (std::isalnum(c) || c &gt;= 0x80) {
+            limpa += static_cast&lt;char&gt;(std::tolower(c));
+        }
+    }
+    return limpa;
+}
+
+int main() {
+    std::ifstream arq{"texto.txt"};
+    if (!arq) {
+        std::cerr &lt;&lt; "Não consegui abrir texto.txt\n";
+        return 1;
+    }
+
+    std::map&lt;std::string, int&gt; contagem;
+    std::string linha;
+    while (std::getline(arq, linha)) {
+        std::istringstream fluxo{linha};
+        std::string palavra;
+        while (fluxo &gt;&gt; palavra) {
+            std::string limpa = limpar(palavra);
+            if (!limpa.empty()) {
+                ++contagem[limpa];
+            }
+        }
+    }
+
+    std::vector&lt;std::pair&lt;std::string, int&gt;&gt; ranking(contagem.begin(), contagem.end());
+    std::sort(ranking.begin(), ranking.end(), [](const auto&amp; a, const auto&amp; b) {
+        if (a.second != b.second) {
+            return a.second &gt; b.second;               // mais vezes primeiro
+        }
+        return a.first &lt; b.first;                     // empate: ordem alfabética
+    });
+
+    for (std::size_t i = 0; i &lt; ranking.size() &amp;&amp; i &lt; 5; ++i) {
+        std::cout &lt;&lt; i + 1 &lt;&lt; ". " &lt;&lt; ranking[i].first &lt;&lt; ": " &lt;&lt; ranking[i].second &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="script" data-file="texto.txt">A lojinha da Ana abre cedo, antes do sol.
+O café está quente, e a Ana conta os cadernos.
+Um caderno azul, um caderno verde, um caderno sem cor.
+Às dez horas chega a primeira cliente: a avó do Bruno.
+Ela quer lápis, borracha e paciência.
+A Ana não vende paciência, mas oferece um café.
+No fim do dia, a lojinha fecha. O café acabou!
+</pre>
+<pre class="solucao" data-file="analisar.cpp">#include &lt;algorithm&gt;
+#include &lt;cctype&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+// Tira a pontuação e passa para minúsculas (só as letras sem acento).
+std::string limpar(const std::string&amp; palavra) {
+    std::string limpa;
+    for (unsigned char c : palavra) {
+        if (std::isalnum(c) || c &gt;= 0x80) {
+            limpa += static_cast&lt;char&gt;(std::tolower(c));
+        }
+    }
+    return limpa;
+}
+
+int main() {
+    std::ifstream arq{"texto.txt"};
+    if (!arq) {
+        std::cerr &lt;&lt; "Não consegui abrir texto.txt\n";
+        return 1;
+    }
+
+    std::map&lt;std::string, int&gt; contagem;
+    std::string linha;
+    while (std::getline(arq, linha)) {
+        std::istringstream fluxo{linha};
+        std::string palavra;
+        while (fluxo &gt;&gt; palavra) {
+            std::string limpa = limpar(palavra);
+            if (!limpa.empty()) {
+                ++contagem[limpa];
+            }
+        }
+    }
+
+    std::vector&lt;std::pair&lt;std::string, int&gt;&gt; ranking(contagem.begin(), contagem.end());
+    std::sort(ranking.begin(), ranking.end(), [](const auto&amp; a, const auto&amp; b) {
+        if (a.second != b.second) {
+            return a.second &gt; b.second;               // mais vezes primeiro
+        }
+        return a.first &lt; b.first;                     // empate: ordem alfabética
+    });
+
+    for (std::size_t i = 0; i &lt; ranking.size() &amp;&amp; ranking[i].second &gt;= 2; ++i) {
+        std::cout &lt;&lt; i + 1 &lt;&lt; ". " &lt;&lt; ranking[i].first &lt;&lt; ": " &lt;&lt; ranking[i].second &lt;&lt; '\n';
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa6">Etapa 6 · A palavra mais longa</h2>
+<p>Para achar a mais longa, guardamos a "campeã" até agora e comparamos cada palavra limpa com ela. A pergunta é: comparar o quê? <code>size()</code> conta bytes. Já temos a função certa da etapa 2, <code>contarCaracteres</code> (copie-a para este arquivo). As linhas novas:</p>
+
+<pre class="file" data-file="analisar.cpp (o que é novo)">    std::string maisLonga;              // começa vazia: 0 letras
+    …
+            if (!limpa.empty()) {
+                ++contagem[limpa];
+                if (contarCaracteres(limpa) &gt; contarCaracteres(maisLonga)) {
+                    maisLonga = limpa;
+                }
+            }
+    …
+    std::cout &lt;&lt; "Palavra mais longa: " &lt;&lt; maisLonga &lt;&lt; " ("
+              &lt;&lt; contarCaracteres(maisLonga) &lt;&lt; " letras)\n";
+</pre>
+
+<pre class="term" data-cwd="~/cpp/texto">$ g++ -std=c++23 -Wall -Wextra analisar.cpp -o analisar
+$ ./analisar
+Palavra mais longa: paciência (9 letras)
+1. a: 6
+2. um: 4
+3. ana: 3
+4. caderno: 3
+5. café: 3</pre>
+
+<div class="cenario">
+<strong>Quando dá errado: medir com <code>size()</code></strong>
+<p>Troque as duas <code>contarCaracteres(…)</code> do teste e da frase por <code>.size()</code> (<code>limpa.size() &gt; maisLonga.size()</code>). Compila sem aviso e mostra:</p>
+<pre class="term" data-cwd="~/cpp/texto">$ g++ -std=c++23 -Wall -Wextra analisar.cpp -o analisar
+$ ./analisar
+Palavra mais longa: paciência (10 letras)
+1. a: 6
+2. um: 4
+3. ana: 3
+4. caderno: 3
+5. café: 3</pre>
+<p>"paciência" tem 9 letras, não 10: o <code>ê</code> ocupa 2 bytes. Aqui a palavra escolhida ainda foi a certa, por sorte. Num texto com "atenção" (7 letras, 9 bytes) e "primeiro" (8 letras, 8 bytes), o <code>size()</code> escolheria "atenção". <strong>Regra:</strong> em texto com acentos, <code>size()</code> responde "quantos bytes"; para "quantas letras", conte os caracteres.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Palavra mais curta: a">
+<p class="try-task"><strong>Missão (etapa 6):</strong> ache também a palavra <strong>mais curta</strong> e mostre <code>Palavra mais curta: a</code>. Cuidado: a <code>maisLonga</code> pode começar vazia (0 letras) porque qualquer palavra é maior; a <code>maisCurta</code> não. Dica: troque quando <code>maisCurta.empty()</code> <strong>ou</strong> quando a palavra for menor.</p>
+<pre class="script" data-file="analisar.cpp">#include &lt;algorithm&gt;
+#include &lt;cctype&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+// Quantos caracteres (não bytes) um texto em UTF-8 tem.
+std::size_t contarCaracteres(const std::string&amp; texto) {
+    std::size_t n = 0;
+    for (unsigned char c : texto) {
+        if ((c &amp; 0xC0) != 0x80) {     // não é byte de continuação
+            ++n;
+        }
+    }
+    return n;
+}
+
+// Tira a pontuação e passa para minúsculas (só as letras sem acento).
+std::string limpar(const std::string&amp; palavra) {
+    std::string limpa;
+    for (unsigned char c : palavra) {
+        if (std::isalnum(c) || c &gt;= 0x80) {
+            limpa += static_cast&lt;char&gt;(std::tolower(c));
+        }
+    }
+    return limpa;
+}
+
+int main() {
+    std::ifstream arq{"texto.txt"};
+    if (!arq) {
+        std::cerr &lt;&lt; "Não consegui abrir texto.txt\n";
+        return 1;
+    }
+
+    std::map&lt;std::string, int&gt; contagem;
+    std::string maisLonga;
+    std::string linha;
+    while (std::getline(arq, linha)) {
+        std::istringstream fluxo{linha};
+        std::string palavra;
+        while (fluxo &gt;&gt; palavra) {
+            std::string limpa = limpar(palavra);
+            if (!limpa.empty()) {
+                ++contagem[limpa];
+                if (contarCaracteres(limpa) &gt; contarCaracteres(maisLonga)) {
+                    maisLonga = limpa;
+                }
+            }
+        }
+    }
+
+    std::cout &lt;&lt; "Palavra mais longa: " &lt;&lt; maisLonga &lt;&lt; " ("
+              &lt;&lt; contarCaracteres(maisLonga) &lt;&lt; " letras)\n";
+
+    std::vector&lt;std::pair&lt;std::string, int&gt;&gt; ranking(contagem.begin(), contagem.end());
+    std::sort(ranking.begin(), ranking.end(), [](const auto&amp; a, const auto&amp; b) {
+        if (a.second != b.second) {
+            return a.second &gt; b.second;               // mais vezes primeiro
+        }
+        return a.first &lt; b.first;                     // empate: ordem alfabética
+    });
+
+    for (std::size_t i = 0; i &lt; ranking.size() &amp;&amp; i &lt; 5; ++i) {
+        std::cout &lt;&lt; i + 1 &lt;&lt; ". " &lt;&lt; ranking[i].first &lt;&lt; ": " &lt;&lt; ranking[i].second &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="script" data-file="texto.txt">A lojinha da Ana abre cedo, antes do sol.
+O café está quente, e a Ana conta os cadernos.
+Um caderno azul, um caderno verde, um caderno sem cor.
+Às dez horas chega a primeira cliente: a avó do Bruno.
+Ela quer lápis, borracha e paciência.
+A Ana não vende paciência, mas oferece um café.
+No fim do dia, a lojinha fecha. O café acabou!
+</pre>
+<pre class="solucao" data-file="analisar.cpp">#include &lt;algorithm&gt;
+#include &lt;cctype&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+// Quantos caracteres (não bytes) um texto em UTF-8 tem.
+std::size_t contarCaracteres(const std::string&amp; texto) {
+    std::size_t n = 0;
+    for (unsigned char c : texto) {
+        if ((c &amp; 0xC0) != 0x80) {     // não é byte de continuação
+            ++n;
+        }
+    }
+    return n;
+}
+
+// Tira a pontuação e passa para minúsculas (só as letras sem acento).
+std::string limpar(const std::string&amp; palavra) {
+    std::string limpa;
+    for (unsigned char c : palavra) {
+        if (std::isalnum(c) || c &gt;= 0x80) {
+            limpa += static_cast&lt;char&gt;(std::tolower(c));
+        }
+    }
+    return limpa;
+}
+
+int main() {
+    std::ifstream arq{"texto.txt"};
+    if (!arq) {
+        std::cerr &lt;&lt; "Não consegui abrir texto.txt\n";
+        return 1;
+    }
+
+    std::map&lt;std::string, int&gt; contagem;
+    std::string maisLonga;
+    std::string maisCurta;
+    std::string linha;
+    while (std::getline(arq, linha)) {
+        std::istringstream fluxo{linha};
+        std::string palavra;
+        while (fluxo &gt;&gt; palavra) {
+            std::string limpa = limpar(palavra);
+            if (!limpa.empty()) {
+                ++contagem[limpa];
+                if (contarCaracteres(limpa) &gt; contarCaracteres(maisLonga)) {
+                    maisLonga = limpa;
+                }
+                if (maisCurta.empty() || contarCaracteres(limpa) &lt; contarCaracteres(maisCurta)) {
+                    maisCurta = limpa;
+                }
+            }
+        }
+    }
+
+    std::cout &lt;&lt; "Palavra mais longa: " &lt;&lt; maisLonga &lt;&lt; " ("
+              &lt;&lt; contarCaracteres(maisLonga) &lt;&lt; " letras)\n";
+    std::cout &lt;&lt; "Palavra mais curta: " &lt;&lt; maisCurta &lt;&lt; '\n';
+
+    std::vector&lt;std::pair&lt;std::string, int&gt;&gt; ranking(contagem.begin(), contagem.end());
+    std::sort(ranking.begin(), ranking.end(), [](const auto&amp; a, const auto&amp; b) {
+        if (a.second != b.second) {
+            return a.second &gt; b.second;               // mais vezes primeiro
+        }
+        return a.first &lt; b.first;                     // empate: ordem alfabética
+    });
+
+    for (std::size_t i = 0; i &lt; ranking.size() &amp;&amp; i &lt; 5; ++i) {
+        std::cout &lt;&lt; i + 1 &lt;&lt; ". " &lt;&lt; ranking[i].first &lt;&lt; ": " &lt;&lt; ranking[i].second &lt;&lt; '\n';
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa7">Etapa 7 · O relatório</h2>
+<p>Falta juntar tudo num relatório bonito e deixar o programa analisar <strong>qualquer</strong> arquivo, não só o <code>texto.txt</code>. Quem diz qual é o usuário, na linha de comando: <code>./analisar outro.txt</code>. O <code>main</code> passa a receber dois parâmetros:</p>
+
+<pre class="file" data-file="analisar.cpp (começo do main)">int main(int argc, char* argv[]) {
+    std::string nome = argc &gt; 1 ? argv[1] : "texto.txt";
+    std::ifstream arq;
+    if (nome != "-") {                     // "-" quer dizer: ler do teclado
+        arq.open(nome);
+        if (!arq) {
+            std::cerr &lt;&lt; "Não consegui abrir " &lt;&lt; nome &lt;&lt; '\n';
+            return 1;
+        }
+    }
+    std::istream&amp; entrada = (nome == "-") ? std::cin : arq;
+
+    …
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>int main(int argc, char* argv[])</code></td><td>A forma do <code>main</code> que recebe a linha de comando. <code>argc</code> (<em>argument count</em>) é quantos pedaços ela tem; <code>argv</code> (<em>argument vector</em>) são os pedaços. Em <code>./analisar outro.txt</code>: <code>argc</code> = 2, <code>argv[0]</code> = <code>"./analisar"</code>, <code>argv[1]</code> = <code>"outro.txt"</code>.</td></tr>
+<tr><td><code>argc &gt; 1 ? argv[1] : "texto.txt"</code></td><td>Com argumento, usa ele; sem, o padrão (<a href="ternario.html">operador ternário</a>).</td></tr>
+<tr><td><code>arq.open(nome);</code></td><td>Abre depois de criado. Só abrimos se o nome não for <code>"-"</code>.</td></tr>
+<tr><td><code>std::istream&amp; entrada = … ? std::cin : arq;</code></td><td>Uma <a href="referencias.html">referência</a> para "de onde ler": o teclado (<code>std::cin</code>) ou o arquivo. Os dois são fluxos de entrada (<code>std::istream</code>), e o resto do programa usa <code>entrada</code> sem saber qual é. O <code>-</code> para "ler da entrada padrão" é um costume dos programas do Linux (o <code>cat -</code> faz o mesmo).</td></tr>
+</table>
+</div>
+
+<p>E o fim do <code>main</code>, com o relatório em colunas e uma barrinha para cada palavra frequente:</p>
+<pre class="file" data-file="analisar.cpp (fim do main)">    …
+    std::cout &lt;&lt; std::format("Análise de {}\n\n", nome);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Linhas", linhas);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Palavras", palavras);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Palavras diferentes", contagem.size());
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Caracteres", caracteres);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Bytes", bytes);
+    std::cout &lt;&lt; std::format("\nPalavra mais longa: {} ({} letras)\n", maisLonga,
+                             contarCaracteres(maisLonga));
+
+    std::cout &lt;&lt; "\nMais frequentes:\n";
+    for (std::size_t i = 0; i &lt; ranking.size() &amp;&amp; i &lt; 5; ++i) {
+        const auto&amp; [palavra, vezes] = ranking[i];
+        std::cout &lt;&lt; std::format("{:&gt;2}. {:&lt;10}{:&gt;3} {}\n", i + 1, palavra, vezes,
+                                 std::string(vezes, '#'));
+    }
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>"{:&lt;20}{:&gt;6}\n"</code></td><td>Rótulo em 20 colunas à esquerda, número em 6 à direita: os números se alinham.</td></tr>
+<tr><td><code>const auto&amp; [palavra, vezes] = ranking[i];</code></td><td>Desestrutura o par em dois nomes que dizem o que são (melhor que <code>.first</code> e <code>.second</code>).</td></tr>
+<tr><td><code>std::string(vezes, '#')</code></td><td>Um texto com <code>vezes</code> repetições de <code>#</code>: a barra do gráfico.</td></tr>
+</table>
+</div>
+
+<p>O resultado com o <code>texto.txt</code> está no começo da página. Com outro nome de arquivo, com um que não existe e lendo do teclado:</p>
+<pre class="term" data-cwd="~/cpp/texto">$ ./analisar texto.txt | head -3
+Análise de texto.txt
+
+Linhas                   7
+$ ./analisar nada.txt
+Não consegui abrir nada.txt
+$ echo $?
+1
+$ echo "Oi, oi, OI! Tudo bem? Tudo." | ./analisar -
+Análise de -
+
+Linhas                   1
+Palavras                 6
+Palavras diferentes      3
+Caracteres              28
+Bytes                   28
+
+Palavra mais longa: tudo (4 letras)
+
+Mais frequentes:
+ 1. oi          3 ###
+ 2. tudo        2 ##
+ 3. bem         1 #</pre>
+
+<p>Com <code>./analisar -</code> sozinho, o programa espera você digitar; termine com <kbd>Ctrl</kbd>+<kbd>D</kbd> numa linha vazia (o "fim da entrada") para ver o relatório.</p>
+
+<div class="trycpp" data-args="texto.txt" data-goal="outre:Letras por palavra +3\.9">
+<p class="try-task"><strong>Missão (etapa 7):</strong> a caixa roda <code>./analisar texto.txt</code>. Acrescente ao relatório a média de letras por palavra: some <code>contarCaracteres(limpa)</code> de cada palavra numa variável <code>letras</code> e mostre <code>letras / palavras</code> com uma casa decimal (<code>{:&gt;6.1f}</code>; converta para <code>double</code> antes de dividir, senão a divisão é inteira). A linha nova:</p>
+<pre class="out">Letras por palavra     3.9</pre>
+<pre class="script" data-file="analisar.cpp">#include &lt;algorithm&gt;
+#include &lt;cctype&gt;
+#include &lt;format&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+// Quantos caracteres (não bytes) um texto em UTF-8 tem.
+std::size_t contarCaracteres(const std::string&amp; texto) {
+    std::size_t n = 0;
+    for (unsigned char c : texto) {
+        if ((c &amp; 0xC0) != 0x80) {     // não é byte de continuação
+            ++n;
+        }
+    }
+    return n;
+}
+
+// Tira a pontuação e passa para minúsculas (só as letras sem acento).
+std::string limpar(const std::string&amp; palavra) {
+    std::string limpa;
+    for (unsigned char c : palavra) {
+        if (std::isalnum(c) || c &gt;= 0x80) {
+            limpa += static_cast&lt;char&gt;(std::tolower(c));
+        }
+    }
+    return limpa;
+}
+
+int main(int argc, char* argv[]) {
+    std::string nome = argc &gt; 1 ? argv[1] : "texto.txt";
+    std::ifstream arq;
+    if (nome != "-") {                     // "-" quer dizer: ler do teclado
+        arq.open(nome);
+        if (!arq) {
+            std::cerr &lt;&lt; "Não consegui abrir " &lt;&lt; nome &lt;&lt; '\n';
+            return 1;
+        }
+    }
+    std::istream&amp; entrada = (nome == "-") ? std::cin : arq;
+
+    int linhas = 0;
+    std::size_t bytes = 0, caracteres = 0, palavras = 0;
+    std::map&lt;std::string, int&gt; contagem;
+    std::string maisLonga;
+
+    std::string linha;
+    while (std::getline(entrada, linha)) {
+        ++linhas;
+        bytes += linha.size() + 1;                    // +1: o '\n' que o getline tirou
+        caracteres += contarCaracteres(linha) + 1;
+
+        std::istringstream fluxo{linha};
+        std::string palavra;
+        while (fluxo &gt;&gt; palavra) {
+            ++palavras;
+            std::string limpa = limpar(palavra);
+            if (limpa.empty()) {
+                continue;
+            }
+            ++contagem[limpa];
+            if (contarCaracteres(limpa) &gt; contarCaracteres(maisLonga)) {
+                maisLonga = limpa;
+            }
+        }
+    }
+
+    std::vector&lt;std::pair&lt;std::string, int&gt;&gt; ranking(contagem.begin(), contagem.end());
+    std::sort(ranking.begin(), ranking.end(), [](const auto&amp; a, const auto&amp; b) {
+        if (a.second != b.second) {
+            return a.second &gt; b.second;               // mais vezes primeiro
+        }
+        return a.first &lt; b.first;                     // empate: ordem alfabética
+    });
+
+    std::cout &lt;&lt; std::format("Análise de {}\n\n", nome);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Linhas", linhas);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Palavras", palavras);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Palavras diferentes", contagem.size());
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Caracteres", caracteres);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Bytes", bytes);
+    std::cout &lt;&lt; std::format("\nPalavra mais longa: {} ({} letras)\n", maisLonga,
+                             contarCaracteres(maisLonga));
+
+    std::cout &lt;&lt; "\nMais frequentes:\n";
+    for (std::size_t i = 0; i &lt; ranking.size() &amp;&amp; i &lt; 5; ++i) {
+        const auto&amp; [palavra, vezes] = ranking[i];
+        std::cout &lt;&lt; std::format("{:&gt;2}. {:&lt;10}{:&gt;3} {}\n", i + 1, palavra, vezes,
+                                 std::string(vezes, '#'));
+    }
+}
+</pre>
+<pre class="script" data-file="texto.txt">A lojinha da Ana abre cedo, antes do sol.
+O café está quente, e a Ana conta os cadernos.
+Um caderno azul, um caderno verde, um caderno sem cor.
+Às dez horas chega a primeira cliente: a avó do Bruno.
+Ela quer lápis, borracha e paciência.
+A Ana não vende paciência, mas oferece um café.
+No fim do dia, a lojinha fecha. O café acabou!
+</pre>
+<pre class="solucao" data-file="analisar.cpp">#include &lt;algorithm&gt;
+#include &lt;cctype&gt;
+#include &lt;format&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+// Quantos caracteres (não bytes) um texto em UTF-8 tem.
+std::size_t contarCaracteres(const std::string&amp; texto) {
+    std::size_t n = 0;
+    for (unsigned char c : texto) {
+        if ((c &amp; 0xC0) != 0x80) {     // não é byte de continuação
+            ++n;
+        }
+    }
+    return n;
+}
+
+// Tira a pontuação e passa para minúsculas (só as letras sem acento).
+std::string limpar(const std::string&amp; palavra) {
+    std::string limpa;
+    for (unsigned char c : palavra) {
+        if (std::isalnum(c) || c &gt;= 0x80) {
+            limpa += static_cast&lt;char&gt;(std::tolower(c));
+        }
+    }
+    return limpa;
+}
+
+int main(int argc, char* argv[]) {
+    std::string nome = argc &gt; 1 ? argv[1] : "texto.txt";
+    std::ifstream arq;
+    if (nome != "-") {                     // "-" quer dizer: ler do teclado
+        arq.open(nome);
+        if (!arq) {
+            std::cerr &lt;&lt; "Não consegui abrir " &lt;&lt; nome &lt;&lt; '\n';
+            return 1;
+        }
+    }
+    std::istream&amp; entrada = (nome == "-") ? std::cin : arq;
+
+    int linhas = 0;
+    std::size_t bytes = 0, caracteres = 0, palavras = 0;
+    std::map&lt;std::string, int&gt; contagem;
+    std::string maisLonga;
+    std::size_t letras = 0;
+
+    std::string linha;
+    while (std::getline(entrada, linha)) {
+        ++linhas;
+        bytes += linha.size() + 1;                    // +1: o '\n' que o getline tirou
+        caracteres += contarCaracteres(linha) + 1;
+
+        std::istringstream fluxo{linha};
+        std::string palavra;
+        while (fluxo &gt;&gt; palavra) {
+            ++palavras;
+            std::string limpa = limpar(palavra);
+            if (limpa.empty()) {
+                continue;
+            }
+            ++contagem[limpa];
+            letras += contarCaracteres(limpa);
+            if (contarCaracteres(limpa) &gt; contarCaracteres(maisLonga)) {
+                maisLonga = limpa;
+            }
+        }
+    }
+
+    std::vector&lt;std::pair&lt;std::string, int&gt;&gt; ranking(contagem.begin(), contagem.end());
+    std::sort(ranking.begin(), ranking.end(), [](const auto&amp; a, const auto&amp; b) {
+        if (a.second != b.second) {
+            return a.second &gt; b.second;               // mais vezes primeiro
+        }
+        return a.first &lt; b.first;                     // empate: ordem alfabética
+    });
+
+    std::cout &lt;&lt; std::format("Análise de {}\n\n", nome);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Linhas", linhas);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Palavras", palavras);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Palavras diferentes", contagem.size());
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Caracteres", caracteres);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Bytes", bytes);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6.1f}\n", "Letras por palavra",
+                             static_cast&lt;double&gt;(letras) / palavras);
+    std::cout &lt;&lt; std::format("\nPalavra mais longa: {} ({} letras)\n", maisLonga,
+                             contarCaracteres(maisLonga));
+
+    std::cout &lt;&lt; "\nMais frequentes:\n";
+    for (std::size_t i = 0; i &lt; ranking.size() &amp;&amp; i &lt; 5; ++i) {
+        const auto&amp; [palavra, vezes] = ranking[i];
+        std::cout &lt;&lt; std::format("{:&gt;2}. {:&lt;10}{:&gt;3} {}\n", i + 1, palavra, vezes,
+                                 std::string(vezes, '#'));
+    }
+}
+</pre>
+</div>
+
+<div class="trycpp" data-args="-" data-stdin="Oi, oi, OI! Tudo bem? Tudo.&#10;Bem, bem: tudo ótimo.&#10;">
+<p class="try-task"><strong>Experimente:</strong> esta caixa roda <code>./analisar -</code> e digita duas linhas para você. Troque o texto da entrada pelo seu (um parágrafo de um livro, uma letra de música) e veja o relatório.</p>
+<pre class="script" data-file="analisar.cpp">#include &lt;algorithm&gt;
+#include &lt;cctype&gt;
+#include &lt;format&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+// Quantos caracteres (não bytes) um texto em UTF-8 tem.
+std::size_t contarCaracteres(const std::string&amp; texto) {
+    std::size_t n = 0;
+    for (unsigned char c : texto) {
+        if ((c &amp; 0xC0) != 0x80) {     // não é byte de continuação
+            ++n;
+        }
+    }
+    return n;
+}
+
+// Tira a pontuação e passa para minúsculas (só as letras sem acento).
+std::string limpar(const std::string&amp; palavra) {
+    std::string limpa;
+    for (unsigned char c : palavra) {
+        if (std::isalnum(c) || c &gt;= 0x80) {
+            limpa += static_cast&lt;char&gt;(std::tolower(c));
+        }
+    }
+    return limpa;
+}
+
+int main(int argc, char* argv[]) {
+    std::string nome = argc &gt; 1 ? argv[1] : "texto.txt";
+    std::ifstream arq;
+    if (nome != "-") {                     // "-" quer dizer: ler do teclado
+        arq.open(nome);
+        if (!arq) {
+            std::cerr &lt;&lt; "Não consegui abrir " &lt;&lt; nome &lt;&lt; '\n';
+            return 1;
+        }
+    }
+    std::istream&amp; entrada = (nome == "-") ? std::cin : arq;
+
+    int linhas = 0;
+    std::size_t bytes = 0, caracteres = 0, palavras = 0;
+    std::map&lt;std::string, int&gt; contagem;
+    std::string maisLonga;
+
+    std::string linha;
+    while (std::getline(entrada, linha)) {
+        ++linhas;
+        bytes += linha.size() + 1;                    // +1: o '\n' que o getline tirou
+        caracteres += contarCaracteres(linha) + 1;
+
+        std::istringstream fluxo{linha};
+        std::string palavra;
+        while (fluxo &gt;&gt; palavra) {
+            ++palavras;
+            std::string limpa = limpar(palavra);
+            if (limpa.empty()) {
+                continue;
+            }
+            ++contagem[limpa];
+            if (contarCaracteres(limpa) &gt; contarCaracteres(maisLonga)) {
+                maisLonga = limpa;
+            }
+        }
+    }
+
+    std::vector&lt;std::pair&lt;std::string, int&gt;&gt; ranking(contagem.begin(), contagem.end());
+    std::sort(ranking.begin(), ranking.end(), [](const auto&amp; a, const auto&amp; b) {
+        if (a.second != b.second) {
+            return a.second &gt; b.second;               // mais vezes primeiro
+        }
+        return a.first &lt; b.first;                     // empate: ordem alfabética
+    });
+
+    std::cout &lt;&lt; std::format("Análise de {}\n\n", nome);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Linhas", linhas);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Palavras", palavras);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Palavras diferentes", contagem.size());
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Caracteres", caracteres);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Bytes", bytes);
+    std::cout &lt;&lt; std::format("\nPalavra mais longa: {} ({} letras)\n", maisLonga,
+                             contarCaracteres(maisLonga));
+
+    std::cout &lt;&lt; "\nMais frequentes:\n";
+    for (std::size_t i = 0; i &lt; ranking.size() &amp;&amp; i &lt; 5; ++i) {
+        const auto&amp; [palavra, vezes] = ranking[i];
+        std::cout &lt;&lt; std::format("{:&gt;2}. {:&lt;10}{:&gt;3} {}\n", i + 1, palavra, vezes,
+                                 std::string(vezes, '#'));
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>O código completo</h2>
+<p>Compile com <code>g++ -std=c++23 -Wall -Wextra analisar.cpp -o analisar</code> e rode com <code>./analisar</code>, <code>./analisar arquivo.txt</code> ou <code>./analisar -</code>.</p>
+<pre class="file" data-file="analisar.cpp">#include &lt;algorithm&gt;
+#include &lt;cctype&gt;
+#include &lt;format&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+// Quantos caracteres (não bytes) um texto em UTF-8 tem.
+std::size_t contarCaracteres(const std::string&amp; texto) {
+    std::size_t n = 0;
+    for (unsigned char c : texto) {
+        if ((c &amp; 0xC0) != 0x80) {     // não é byte de continuação
+            ++n;
+        }
+    }
+    return n;
+}
+
+// Tira a pontuação e passa para minúsculas (só as letras sem acento).
+std::string limpar(const std::string&amp; palavra) {
+    std::string limpa;
+    for (unsigned char c : palavra) {
+        if (std::isalnum(c) || c &gt;= 0x80) {
+            limpa += static_cast&lt;char&gt;(std::tolower(c));
+        }
+    }
+    return limpa;
+}
+
+int main(int argc, char* argv[]) {
+    std::string nome = argc &gt; 1 ? argv[1] : "texto.txt";
+    std::ifstream arq;
+    if (nome != "-") {                     // "-" quer dizer: ler do teclado
+        arq.open(nome);
+        if (!arq) {
+            std::cerr &lt;&lt; "Não consegui abrir " &lt;&lt; nome &lt;&lt; '\n';
+            return 1;
+        }
+    }
+    std::istream&amp; entrada = (nome == "-") ? std::cin : arq;
+
+    int linhas = 0;
+    std::size_t bytes = 0, caracteres = 0, palavras = 0;
+    std::map&lt;std::string, int&gt; contagem;
+    std::string maisLonga;
+
+    std::string linha;
+    while (std::getline(entrada, linha)) {
+        ++linhas;
+        bytes += linha.size() + 1;                    // +1: o '\n' que o getline tirou
+        caracteres += contarCaracteres(linha) + 1;
+
+        std::istringstream fluxo{linha};
+        std::string palavra;
+        while (fluxo &gt;&gt; palavra) {
+            ++palavras;
+            std::string limpa = limpar(palavra);
+            if (limpa.empty()) {
+                continue;
+            }
+            ++contagem[limpa];
+            if (contarCaracteres(limpa) &gt; contarCaracteres(maisLonga)) {
+                maisLonga = limpa;
+            }
+        }
+    }
+
+    std::vector&lt;std::pair&lt;std::string, int&gt;&gt; ranking(contagem.begin(), contagem.end());
+    std::sort(ranking.begin(), ranking.end(), [](const auto&amp; a, const auto&amp; b) {
+        if (a.second != b.second) {
+            return a.second &gt; b.second;               // mais vezes primeiro
+        }
+        return a.first &lt; b.first;                     // empate: ordem alfabética
+    });
+
+    std::cout &lt;&lt; std::format("Análise de {}\n\n", nome);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Linhas", linhas);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Palavras", palavras);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Palavras diferentes", contagem.size());
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Caracteres", caracteres);
+    std::cout &lt;&lt; std::format("{:&lt;20}{:&gt;6}\n", "Bytes", bytes);
+    std::cout &lt;&lt; std::format("\nPalavra mais longa: {} ({} letras)\n", maisLonga,
+                             contarCaracteres(maisLonga));
+
+    std::cout &lt;&lt; "\nMais frequentes:\n";
+    for (std::size_t i = 0; i &lt; ranking.size() &amp;&amp; i &lt; 5; ++i) {
+        const auto&amp; [palavra, vezes] = ranking[i];
+        std::cout &lt;&lt; std::format("{:&gt;2}. {:&lt;10}{:&gt;3} {}\n", i + 1, palavra, vezes,
+                                 std::string(vezes, '#'));
+    }
+}
+</pre>
+
+<hr>
+
+<h2>Desafios extras</h2>
+<ol>
+  <li><strong>Maiúsculas acentuadas.</strong> Faça <code>Às</code> virar <code>às</code>. Dica: em UTF-8, as maiúsculas acentuadas do português são <code>c3 80</code> a <code>c3 9d</code>, e a minúscula é o segundo byte + <code>0x20</code> (<code>À</code> = <code>c3 80</code>, <code>à</code> = <code>c3 a0</code>).</li>
+  <li><strong>Palavras vazias.</strong> Ignore "a", "o", "e", "de", "do", "da", "um" no ranking, guardando-as num <a href="set.html">std::set</a>.</li>
+  <li><strong>Palavras com hífen.</strong> "guarda-chuva" vira "guardachuva". Mantenha o hífen quando ele estiver <strong>entre</strong> letras.</li>
+  <li><strong>Arquivos do Windows.</strong> Linhas terminadas em <code>\r\n</code> deixam um <code>\r</code> no fim de cada linha lida pelo <code>getline</code>, e os bytes contados mudam. Detecte e remova.</li>
+  <li><strong>Vários arquivos.</strong> <code>./analisar a.txt b.txt c.txt</code>: um relatório para cada um (um laço em <code>argv</code>) e um total no fim, como o <code>wc</code> faz.</li>
+  <li><strong>Ordem alfabética de gente.</strong> Faça "lápis" vir antes de "lojinha" comparando as palavras sem acento (troque <code>á</code> por <code>a</code> só para comparar).</li>
+</ol>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>std::ifstream arq{nome};</code> + <code>if (!arq)</code>: um arquivo que não abriu não lança exceção, só fica em falha. Confira sempre; avise em <code>std::cerr</code> e saia com <code>return 1</code>.</li>
+  <li><code>while (std::getline(arq, linha))</code> lê linha por linha, sem o <code>\n</code>.</li>
+  <li>Em UTF-8, um caractere tem de 1 a 4 bytes. <code>size()</code> conta <strong>bytes</strong>; para contar caracteres, conte os bytes com <code>(c &amp; 0xC0) != 0x80</code>, usando <code>unsigned char</code>. Confira com <code>wc -c</code> e <code>wc -m</code>.</li>
+  <li><code>std::istringstream</code> + <code>&gt;&gt;</code> separa palavras por espaços, como o <code>wc -w</code>; a pontuação vem grudada.</li>
+  <li><code>&lt;cctype&gt;</code> (<code>isalnum</code>, <code>tolower</code>) só entende os caracteres do inglês: preserve os bytes ≥ 0x80.</li>
+  <li><code>++contagem[palavra]</code> num <code>std::map&lt;std::string, int&gt;</code> conta ocorrências; para ordenar por contagem, copie para um <code>vector</code> de <code>pair</code> e use <code>std::sort</code> com uma lambda que desempata.</li>
+  <li><code>int main(int argc, char* argv[])</code> recebe a linha de comando; <code>std::istream&amp;</code> deixa o mesmo código ler de arquivo ou do teclado.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
