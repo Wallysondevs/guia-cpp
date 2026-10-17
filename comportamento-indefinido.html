@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Comportamento Indefinido — o que é UB e como evitar | Guia C++</title>
+<meta name="description" content="Comportamento indefinido (UB) em C++ para quem nunca programou: o que é, por que o compilador pode fazer qualquer coisa, e cinco exemplos clássicos com saídas reais que mudam entre -O0 e -O2 (variável não inicializada, índice fora do array, overflow de inteiro com sinal, ponteiro nulo e referência para variável local), e como se proteger com -Wall -Wextra, sanitizers, at() e std::vector.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Comportamento Indefinido</span></h1>
+
+<p class="intro">Em quase toda linguagem, um erro de programação dá uma mensagem: "índice fora do limite", "variável sem valor". Em C++, alguns erros <strong>não dão mensagem nenhuma</strong>. O programa compila, roda e mostra um número qualquer. Ou funciona hoje e quebra amanhã. Ou funciona no seu computador e quebra no do colega. Isso tem um nome oficial: <strong>comportamento indefinido</strong> (em inglês, <em>undefined behavior</em>, ou só <strong>UB</strong>). Esta aula mostra o que é, os cinco casos que mais aparecem e, principalmente, como se proteger.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é comportamento indefinido e por que o compilador "pode fazer qualquer coisa".</li>
+  <li>Por que o mesmo programa dá resultados diferentes com <code>-O0</code> e com <code>-O2</code>.</li>
+  <li>Os cinco casos clássicos: variável não inicializada, índice fora do array, estouro de inteiro com sinal, ponteiro nulo e referência para variável local.</li>
+  <li>Como se proteger: avisos, sanitizers, <code>at()</code>, <code>std::vector</code> e bons hábitos.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, de dois jeitos: com o comando padrão do guia (<code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>) e com <code>-O2</code> no fim, que liga as <strong>otimizações</strong> (veja <a href="compilar.html">Compilar com g++</a>). Os resultados que você vai ver são os daquele dia, naquela máquina. Esse é justamente o ponto: com UB, outro dia ou outra máquina podem dar outra coisa. O editor do guia usa outro compilador (o Clang) e roda o programa de outro jeito, então lá os resultados podem ser diferentes.</p>
+
+<hr>
+
+<h2>A ideia: um contrato com o compilador</h2>
+<p>A linguagem C++ é definida por um documento, o <strong>padrão</strong> (veja <a href="versoes.html">Versões do C++</a>). Ele funciona como um contrato. Para cada coisa que você escreve, o padrão diz o que deve acontecer: <code>2 + 3</code> dá <code>5</code>; <code>v.at(10)</code> num vetor de 3 lança <code>std::out_of_range</code>.</p>
+
+<p>Mas para algumas situações, o padrão diz: "<strong>isto o programa não pode fazer</strong>; se fizer, não prometo nada". Ler uma variável que nunca recebeu valor, acessar a posição 10 de um array de 4, estourar um <code>int</code>. É como um contrato de aluguel que diz "é proibido fazer churrasco na varanda": o contrato não explica o que acontece se você fizer, porque partiu do princípio de que você não vai fazer.</p>
+
+<p>E o compilador leva o contrato ao pé da letra. Para gerar um programa mais rápido, ele <strong>supõe que o UB nunca acontece</strong>. Se acontece, as suposições dele viram mentiras, e o resultado pode ser qualquer coisa:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo de problema</th><th>Quando aparece</th><th>Exemplo</th></tr>
+<tr><td>Erro de compilação</td><td>Ao compilar, sempre</td><td>Faltou um <code>;</code></td></tr>
+<tr><td>Erro com aviso em tempo de execução</td><td>Ao rodar, sempre do mesmo jeito</td><td><code>v.at(10)</code> lança uma exceção (veja <a href="excecoes.html">Exceções</a>)</td></tr>
+<tr><td><strong>Comportamento indefinido</strong></td><td>Talvez nunca, talvez às vezes, talvez de jeitos diferentes</td><td><code>v[10]</code>: pode mostrar lixo, pode travar, pode "funcionar"</td></tr>
+</table>
+</div>
+
+<div class="warning">
+<strong>"Funcionou" não prova nada</strong>
+<p>Com UB, um programa que deu a resposta certa no seu teste <strong>não está certo</strong>: ele só teve sorte desta vez. Mudar a otimização, o compilador, a versão do compilador ou até uma linha sem relação pode mudar o resultado. Por isso o objetivo não é "entender o que o UB faz", e sim <strong>nunca escrever UB</strong>.</p>
+</div>
+
+<hr>
+
+<h2>1. Variável não inicializada</h2>
+<p>Uma variável local sem valor inicial não vale zero: vale o que estava naquele pedaço da memória (veja <a href="variaveis.html">Variáveis</a> e <a href="memoria.html">Como a Memória Funciona</a>). Ler esse valor é UB. Veja como o "lixo" pode ser bem concreto:</p>
+
+<pre class="file" data-file="naoinit2.cpp">#include &lt;iostream&gt;
+
+void sorteio() {
+    int numero_da_sorte = 777;
+    std::cout &lt;&lt; "Número da sorte: " &lt;&lt; numero_da_sorte &lt;&lt; '\n';
+}
+
+void placar() {
+    int pontos;
+    std::cout &lt;&lt; "Pontos: " &lt;&lt; pontos &lt;&lt; '\n';
+}
+
+int main() {
+    sorteio();
+    placar();
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra naoinit2.cpp -o naoinit2
+naoinit2.cpp: In function ‘void placar()’:
+naoinit2.cpp:10:32: warning: ‘pontos’ is used uninitialized [-Wuninitialized]
+   10 |     std::cout &lt;&lt; "Pontos: " &lt;&lt; pontos &lt;&lt; '\n';
+      |                                ^~~~~~
+naoinit2.cpp:9:9: note: ‘pontos’ was declared here
+    9 |     int pontos;
+      |         ^~~~~~
+$ ./naoinit2
+Número da sorte: 777
+Pontos: 777                « o "lixo" é o número que a função anterior deixou na memória
+$ g++ -std=c++23 -Wall -Wextra -O2 naoinit2.cpp -o naoinit2-O2
+«… o mesmo aviso …»
+$ ./naoinit2-O2
+Número da sorte: 777
+Pontos: 0                  « com -O2, outro valor</pre>
+
+<p>Sem otimização, as funções <code>sorteio</code> e <code>placar</code> usaram o mesmo pedaço da memória, um depois do outro, e <code>pontos</code> "herdou" o <code>777</code>. Com <code>-O2</code>, o compilador organizou a memória de outro jeito, e apareceu <code>0</code>. Nenhum dos dois está "certo": o programa está errado. Desta vez o g++ avisou (<em>‘pontos’ is used uninitialized</em> = "<code>pontos</code> é usada sem ter sido inicializada"), mas nem sempre ele consegue perceber: na aula de <a href="structs.html">Structs</a>, campos sem valor deram lixo sem aviso nenhum.</p>
+
+<p><strong>Como evitar:</strong> dê valor a toda variável ao criá-la: <code>int pontos = 0;</code>. E trate esse aviso como erro.</p>
+
+<div class="trycpp" data-goal="semaviso,out:Pontos: 50">
+<p class="try-task"><strong>Missão:</strong> este programa até mostra <code>Pontos: 50</code> por sorte, mas o compilador avisa que <code>pontos</code> é usada sem valor. Corrija a declaração para o aviso sumir e a saída continuar <code>Pontos: 50</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int pontos;
+    int bonus = 50;
+    pontos += bonus;
+    std::cout &lt;&lt; "Pontos: " &lt;&lt; pontos &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int pontos = 0;
+    int bonus = 50;
+    pontos += bonus;
+    std::cout &lt;&lt; "Pontos: " &lt;&lt; pontos &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Índice fora do array</h2>
+<p>O operador <code>[ ]</code> dos arrays e do <code>std::vector</code> <strong>não confere</strong> se a posição existe (veja <a href="arrays.html">Arrays</a>). Pedir uma posição que não existe é UB: o programa lê (ou pior, escreve) a memória que estiver logo depois. O erro clássico é o <code>&lt;=</code> no lugar do <code>&lt;</code>:</p>
+
+<pre class="file" data-file="fora.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int notas[4] = {7, 8, 9, 10};
+    int soma = 0;
+    for (int i = 0; i &lt;= 4; ++i) {
+        soma += notas[i];
+    }
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra fora.cpp -o fora
+$ ./fora
+Soma: 73762                « deveria ser 34
+$ g++ -std=c++23 -Wall -Wextra -O2 fora.cpp -o fora-O2
+fora.cpp: In function ‘int main()’:
+fora.cpp:7:24: warning: iteration 4 invokes undefined behavior [-Waggressive-loop-optimizations]
+    7 |         soma += notas[i];
+      |                 ~~~~~~~^
+fora.cpp:6:23: note: within this loop
+    6 |     for (int i = 0; i &lt;= 4; ++i) {
+      |                     ~~^~~~
+$ ./fora-O2
+Soma: 73762</pre>
+
+<p>As posições válidas são 0, 1, 2 e 3; o laço também leu <code>notas[4]</code>, que é a memória vizinha, e somou o que havia lá. Repare em duas coisas:</p>
+<ul>
+  <li>Sem <code>-O2</code>, o g++ <strong>não avisou nada</strong>. Com <code>-O2</code>, ele analisa o código mais a fundo e percebeu: <em>iteration 4 invokes undefined behavior</em> = "a volta 4 do laço provoca comportamento indefinido". Compilar de vez em quando com <code>-O2</code> revela avisos escondidos.</li>
+  <li>Ler fora do array mostrou lixo. <strong>Escrever</strong> fora do array é pior: estraga outras variáveis em silêncio, e é a origem de muitas falhas de segurança famosas.</li>
+</ul>
+
+<h3>A proteção: <code>at()</code>, ou nem usar índice</h3>
+<p>Com <code>std::vector</code> (ou <code>std::array</code>), o <code>at()</code> confere a posição e lança uma exceção em vez de ler lixo. O mesmo erro do <code>&lt;=</code>, agora com <code>at()</code>:</p>
+
+<pre class="file" data-file="seguro.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas = {7, 8, 9, 10};
+    int soma = 0;
+    for (std::size_t i = 0; i &lt;= notas.size(); ++i) {
+        soma += notas.at(i);
+    }
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra seguro.cpp -o seguro
+$ ./seguro
+terminate called after throwing an instance of 'std::out_of_range'
+  what():  vector::_M_range_check: __n (which is 4) &gt;= this-&gt;size() (which is 4)
+Abortado                   (imagem do núcleo gravada) ./seguro
+$ echo $?
+134</pre>
+
+<p>O programa ainda está errado, mas agora o erro <strong>aparece</strong>, com a explicação: "a posição pedida (4) é maior ou igual ao tamanho (4)". Melhor ainda é não precisar de índice: o <a href="for-range.html">for de intervalo</a> (<code>for (int n : notas)</code>) percorre exatamente os elementos que existem.</p>
+
+<hr>
+
+<h2>3. Estouro de inteiro com sinal</h2>
+<p>Um <code>int</code> vai até 2.147.483.647 (<code>INT_MAX</code>, veja <a href="inteiros.html">Inteiros</a>). Passar disso num tipo <strong>com sinal</strong> (<code>int</code>, <code>long</code>…) é UB. Na prática, o número costuma "dar a volta" e virar negativo, mas o compilador tem o direito de supor que isso nunca acontece, e ele usa esse direito:</p>
+
+<pre class="file" data-file="overflow.cpp">#include &lt;climits&gt;
+#include &lt;iostream&gt;
+
+bool cabe_mais_um(int x) {
+    int proximo = x + 1;
+    return proximo &gt; x;
+}
+
+int main() {
+    int x = INT_MAX;
+    std::cout &lt;&lt; "INT_MAX = " &lt;&lt; x &lt;&lt; '\n';
+    std::cout &lt;&lt; "INT_MAX + 1 = " &lt;&lt; x + 1 &lt;&lt; '\n';
+    std::cout &lt;&lt; "cabe mais um? " &lt;&lt; cabe_mais_um(x) &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra overflow.cpp -o overflow
+$ ./overflow
+INT_MAX = 2147483647
+INT_MAX + 1 = -2147483648      « deu a volta
+cabe mais um? 0                « coerente: -2147483648 não é maior que INT_MAX
+$ g++ -std=c++23 -Wall -Wextra -O2 overflow.cpp -o overflow-O2
+$ ./overflow-O2
+INT_MAX = 2147483647
+INT_MAX + 1 = -2147483648
+cabe mais um? 1                « com -O2, a resposta mudou!</pre>
+
+<p>Com <code>-O2</code>, o compilador raciocinou assim: "<code>x + 1 &gt; x</code> é sempre verdade, porque estouro não existe". E trocou a conta inteira por <code>true</code>. O mesmo programa, as mesmas entradas, duas respostas. E nenhum aviso.</p>
+
+<p>Pode ficar pior. Este laço dobra <code>i</code> até ele "estourar" e ficar negativo:</p>
+
+<pre class="file" data-file="overflow2.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int passos = 0;
+    for (int i = 1; i &gt; 0; i *= 2) {
+        ++passos;
+    }
+    std::cout &lt;&lt; "Passos: " &lt;&lt; passos &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra overflow2.cpp -o overflow2
+$ ./overflow2
+Passos: 31
+$ g++ -std=c++23 -Wall -Wextra -O2 overflow2.cpp -o overflow2-O2
+$ timeout 3 ./overflow2-O2
+$ echo $?
+124                            « o timeout teve de matar o programa: laço infinito</pre>
+
+<p>Sem otimização, depois de 31 dobras o <code>i</code> deu a volta, ficou negativo, e o laço parou. Com <code>-O2</code>, o compilador concluiu que "um número positivo dobrado continua positivo" (o que é verdade, se não houver estouro) e removeu o teste <code>i &gt; 0</code>: o laço virou infinito. O <code>timeout 3</code> (que mata o programa depois de 3 segundos e devolve o código 124) foi o que impediu a máquina de ficar presa.</p>
+
+<p><strong>Como evitar:</strong> escolha um tipo que caiba o resultado (<code>long long</code> vai até 9,2 × 10¹⁸) e confira antes de fazer contas perto do limite. Os tipos <strong>sem sinal</strong> (<code>unsigned</code>) não têm UB no estouro (eles dão a volta de um jeito definido), mas isso também costuma ser um erro.</p>
+
+<div class="trycpp" data-goal="out:Total: 3000000000">
+<p class="try-task"><strong>Missão:</strong> a lojinha da Ana vendeu R$ 1 bilhão em cada um de três meses (sonhar não custa). Rode e veja o total negativo: a soma estourou o <code>int</code>. Troque o tipo de <code>total</code> por um que caiba 3 bilhões, para a saída ser <code>Total: 3000000000</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int vendas[3] = {1000000000, 1000000000, 1000000000};
+    int total = 0;
+    for (int v : vendas) {
+        total += v;
+    }
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int vendas[3] = {1000000000, 1000000000, 1000000000};
+    long long total = 0;
+    for (int v : vendas) {
+        total += v;
+    }
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>4. Ponteiro nulo</h2>
+<p>Um ponteiro nulo (<code>nullptr</code>) não aponta para lugar nenhum (veja <a href="nullptr.html">nullptr</a>). Usar o que ele aponta, com <code>*p</code> ou <code>p-&gt;</code>, é UB. No Linux, quase sempre termina assim:</p>
+
+<pre class="file" data-file="nulo.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int* p = nullptr;
+    std::cout &lt;&lt; "Antes\n";
+    *p = 5;
+    std::cout &lt;&lt; "Depois: " &lt;&lt; *p &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra nulo.cpp -o nulo
+$ ./nulo
+Antes
+Falha de segmentação     (imagem do núcleo gravada) ./nulo
+$ echo $?
+139</pre>
+
+<p><strong>Falha de segmentação</strong> (<em>segmentation fault</em>, ou <em>segfault</em>, num sistema em inglês): o programa tentou mexer numa parte da memória que não é dele, e o sistema o matou com o sinal <code>SIGSEGV</code>. O código 139 é 128 + 11, o número desse sinal. Nenhuma mensagem diz <strong>onde</strong> foi; para descobrir, use o <a href="depuracao-gdb.html">GDB</a>, que mostra a linha exata.</p>
+
+<p>Aqui o crash é até uma sorte: o erro aparece na hora. Mas como é UB, nada garante nem isso. O compilador pode, por exemplo, apagar um <code>if (p == nullptr)</code> que vem <strong>depois</strong> de um <code>*p</code>, porque "se o programa chegou aqui depois de usar <code>*p</code>, <code>p</code> não é nulo".</p>
+
+<p><strong>Como evitar:</strong> confira antes de usar (<code>if (p != nullptr)</code>), prefira referências a ponteiros quando o valor sempre existe, e use <a href="smart-pointers.html">ponteiros inteligentes</a>.</p>
+
+<hr>
+
+<h2>5. Referência (ou ponteiro) para variável local</h2>
+<p>As variáveis locais de uma função deixam de existir quando ela termina (veja <a href="escopo.html">Escopo</a>). Devolver uma referência para uma delas é entregar o endereço de uma casa que acabou de ser demolida:</p>
+
+<pre class="file" data-file="reflocal2.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+const std::string&amp; saudacao(const std::string&amp; nome) {
+    std::string texto = "Olá, " + nome + "!";
+    return texto;
+}
+
+int main() {
+    const std::string&amp; s = saudacao("Ana");
+    std::cout &lt;&lt; s &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra reflocal2.cpp -o reflocal2
+reflocal2.cpp: In function ‘const std::string&amp; saudacao(const std::string&amp;)’:
+reflocal2.cpp:6:12: warning: reference to local variable ‘texto’ returned [-Wreturn-local-addr]
+    6 |     return texto;
+      |            ^~~~~
+reflocal2.cpp:5:17: note: declared here
+    5 |     std::string texto = "Olá, " + nome + "!";
+      |                 ^~~~~
+reflocal2.cpp: In function ‘int main()’:
+reflocal2.cpp:10:24: warning: possibly dangling reference to a temporary [-Wdangling-reference]
+   10 |     const std::string&amp; s = saudacao("Ana");
+      |                        ^
+reflocal2.cpp:10:37: note: ‘const std::string’ {aka ‘const std::__cxx11::basic_string&lt;char&gt;’} temporary created here
+   10 |     const std::string&amp; s = saudacao("Ana");
+      |                                     ^~~~~
+$ ./reflocal2
+Falha de segmentação     (imagem do núcleo gravada) ./reflocal2
+$ echo $?
+139</pre>
+
+<p>Dois avisos: <em>reference to local variable ‘texto’ returned</em> = "foi devolvida uma referência para a variável local <code>texto</code>", e <em>possibly dangling reference</em> = "possível referência pendurada", uma referência que aponta para algo que já não existe. O programa compilou, e quebrou ao usar a referência.</p>
+
+<p>Com <code>int&amp;</code> em vez de <code>std::string</code>, o C++23 já transforma isso em <strong>erro</strong>: <code>int&amp; maior(int a, int b) { int m = …; return m; }</code> dá <code>error: cannot bind non-const lvalue reference of type ‘int&amp;’ to an rvalue of type ‘int’</code>. Com <code>-std=c++17</code>, a mesma função compila só com o aviso <code>reference to local variable ‘m’ returned</code>, e o programa terminou em falha de segmentação. É mais um motivo para usar o padrão mais novo.</p>
+
+<p><strong>Como evitar:</strong> devolva <strong>por valor</strong> (<code>std::string saudacao(…)</code>). Devolver por valor é barato no C++ moderno (veja <a href="retorno.html">Retorno</a>). Só devolva referência para algo que continua existindo depois da função, como um elemento de um vetor recebido por referência.</p>
+
+<hr>
+
+<h2>Como se proteger</h2>
+<p>Você não precisa decorar a lista completa de UBs do padrão (são centenas). Precisa de hábitos que evitam os comuns e de ferramentas que acham o resto:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Proteção</th><th>O que pega</th><th>Onde aprender</th></tr>
+<tr><td>Compilar com <code>-Wall -Wextra</code> e <strong>ler todos os avisos</strong>. Compilar de vez em quando também com <code>-O2</code>.</td><td>Variável não inicializada, referência para local, alguns índices fora do array.</td><td><a href="avisos.html">Avisos</a></td></tr>
+<tr><td><code>-Werror</code>: transforma avisos em erros.</td><td>Impede que um aviso passe despercebido.</td><td><a href="avisos.html">Avisos</a></td></tr>
+<tr><td><strong>Sanitizers</strong>: <code>-fsanitize=address,undefined</code></td><td>Índice fora, ponteiro nulo, estouro de inteiro, uso de memória liberada, <strong>na hora</strong> em que acontecem, com a linha.</td><td><a href="sanitizers.html">Sanitizers</a></td></tr>
+<tr><td>Inicializar tudo: <code>int x = 0;</code>, <code>Aluno a{};</code></td><td>Variável não inicializada.</td><td><a href="variaveis.html">Variáveis</a></td></tr>
+<tr><td><code>std::vector</code>/<code>std::array</code> com <code>at()</code> ou <code>for (x : v)</code></td><td>Índice fora (vira exceção ou nem acontece).</td><td><a href="vector.html">std::vector</a></td></tr>
+<tr><td>Smart pointers, referências e checagem de <code>nullptr</code></td><td>Ponteiro nulo, memória já liberada.</td><td><a href="smart-pointers.html">Ponteiros Inteligentes</a></td></tr>
+<tr><td>Tipos com folga (<code>long long</code>) e conferência antes de contas no limite</td><td>Estouro de inteiro.</td><td><a href="inteiros.html">Inteiros</a></td></tr>
+<tr><td>Devolver por valor</td><td>Referência para variável local.</td><td><a href="retorno.html">Retorno</a></td></tr>
+</table>
+</div>
+
+<p>Os sanitizers merecem destaque: eles transformam o UB silencioso em uma mensagem clara, com o nome do arquivo e a linha. Use-os sempre durante o desenvolvimento.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>O resultado muda de uma execução para outra, ou com <code>-O2</code></strong>
+<p><strong>O que aconteceu:</strong> quase certamente UB: variável não inicializada, índice fora, estouro.</p>
+<p><strong>Como resolver:</strong> leia os avisos com <code>-Wall -Wextra</code> (e com <code>-O2</code>), depois rode com <code>-fsanitize=address,undefined</code> (veja <a href="sanitizers.html">Sanitizers</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>"Falha de segmentação (imagem do núcleo gravada)" e código 139</strong>
+<p><strong>O que aconteceu:</strong> o programa mexeu numa memória que não é dele: ponteiro nulo, referência para algo que já não existe, índice muito fora do array.</p>
+<p><strong>Como resolver:</strong> descubra a linha com o <a href="depuracao-gdb.html">GDB</a> (<code>backtrace</code>) ou com <code>-fsanitize=address</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Funciona no meu computador, mas não no do meu colega" (ou no editor do guia)</strong>
+<p><strong>O que aconteceu:</strong> o programa tem UB, e cada compilador, versão ou opção tira proveito dele de um jeito.</p>
+<p><strong>Como resolver:</strong> não procure "o compilador errado"; procure o UB no seu código, com as mesmas ferramentas.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>UB clássico</th><th>Exemplo</th><th>Sintoma comum</th><th>Correção</th></tr>
+<tr><td>Variável não inicializada</td><td><code>int x; cout &lt;&lt; x;</code></td><td>Valores estranhos, que mudam</td><td><code>int x = 0;</code></td></tr>
+<tr><td>Índice fora</td><td><code>v[4]</code> num array de 4</td><td>Lixo, outras variáveis estragadas</td><td><code>v.at(i)</code>, <code>for (x : v)</code>, <code>i &lt; tamanho</code></td></tr>
+<tr><td>Estouro com sinal</td><td><code>INT_MAX + 1</code></td><td>Negativos, laço infinito com <code>-O2</code></td><td><code>long long</code>, conferir antes</td></tr>
+<tr><td>Ponteiro nulo</td><td><code>int* p = nullptr; *p = 5;</code></td><td>Falha de segmentação (139)</td><td><code>if (p)</code>, referências, smart pointers</td></tr>
+<tr><td>Referência para local</td><td><code>return texto;</code> em função que devolve <code>const std::string&amp;</code></td><td>Lixo ou falha de segmentação</td><td>Devolver por valor</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Inicializar</h3>
+<p>Complete a declaração para que <code>total</code> comece com zero:</p>
+<div class="ex-code">int total <input data-answer="= 0;|=0;|{};|{0};|{ 0 };" aria-label="inicialização"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Acesso conferido</h3>
+<p>Complete para ler a posição <code>i</code> do vetor <code>v</code> de um jeito que lança exceção se ela não existir:</p>
+<div class="ex-code">int x = <input data-answer="v.at(i)" aria-label="acesso">;</div>
+</div>
+
+<div class="exercise">
+<h3>3. A condição certa</h3>
+<p>Complete a condição do laço que percorre um array de 4 elementos sem passar do fim:</p>
+<div class="ex-code">for (int i = 0; <input data-answer="i &lt; 4|i &lt;= 3" aria-label="condição">; ++i)</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Um programa com comportamento indefinido mostrou a resposta certa nos seus testes. O que isso quer dizer?</p>
+<label><input type="radio" name="q4"> Que o UB foi corrigido sozinho pelo compilador.</label>
+<label><input type="radio" name="q4"> Que o programa está certo.</label>
+<label><input type="radio" name="q4"> Nada: com outra otimização, compilador ou máquina, pode dar outra coisa.</label>
+<label><input type="radio" name="q4"> Que o UB só acontece no Windows.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Por que <code>x + 1 &gt; x</code> deu verdadeiro com <code>-O2</code>, mesmo com <code>x = INT_MAX</code>?</p>
+<label><input type="radio" name="q5"> Porque o <code>-O2</code> usa números maiores.</label>
+<label><input type="radio" name="q5"> Porque o compilador supõe que estouro de <code>int</code> nunca acontece e trocou a conta por <code>true</code>.</label>
+<label><input type="radio" name="q5"> Porque é um bug do g++.</label>
+<label><input type="radio" name="q5"> Porque <code>INT_MAX + 1</code> vale <code>INT_MAX</code>.</label>
+</div>
+
+<h3>Missão final: a soma das notas</h3>
+<div class="trycpp" data-goal="out:Soma: 34">
+<p class="try-task"><strong>Missão:</strong> o laço passa uma posição do fim do array e soma lixo. Corrija o programa para a saída ser <code>Soma: 34</code>. Você pode só trocar o <code>&lt;=</code>, mas tente a forma mais segura: um <code>std::vector</code> percorrido com <code>for (int n : notas)</code>, sem índice nenhum.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int notas[4] = {7, 8, 9, 10};
+    int soma = 0;
+    for (int i = 0; i &lt;= 4; ++i) {
+        soma += notas[i];
+    }
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas = {7, 8, 9, 10};
+    int soma = 0;
+    for (int n : notas) {
+        soma += n;
+    }
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>Comportamento indefinido (UB)</strong> é o que o padrão proíbe sem dizer o que acontece. O compilador supõe que ele nunca ocorre, e o resultado pode ser qualquer coisa.</li>
+  <li>UB pode "funcionar", mostrar lixo, travar ou mudar com <code>-O2</code>: o mesmo código deu <code>777</code> e <code>0</code>, <code>0</code> e <code>1</code>, 31 passos e laço infinito.</li>
+  <li>Os clássicos: variável não inicializada, índice fora do array, estouro de <code>int</code>, ponteiro nulo, referência para variável local.</li>
+  <li>Proteja-se: <code>-Wall -Wextra</code> (e às vezes <code>-O2</code>), sanitizers, inicializar tudo, <code>std::vector</code> com <code>at()</code> ou <code>for</code> de intervalo, smart pointers, devolver por valor.</li>
+  <li>"Funcionou no teste" não prova que está certo.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
