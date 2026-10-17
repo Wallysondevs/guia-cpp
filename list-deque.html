@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ list e deque — inserir no meio e nas duas pontas | Guia C++</title>
+<meta name="description" content="std::list e std::deque em C++ para quem nunca programou: inserir no meio de uma list, por que a list não tem [], o erro real do std::sort numa list, push_front no deque, a tabela de custo de cada operação, uma medição pequena e real com o vector, e quando usar cada um (quase sempre: vector primeiro).">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">list e deque</span></h1>
+
+<p class="intro">O <code>std::vector</code> é ótimo para pôr e tirar itens <strong>no fim</strong>. Mas e se você precisa pôr gente <strong>no começo</strong> da fila, ou no meio? Para isso a STL tem mais dois containers de sequência: a <code>std::list</code> (inserir e remover no meio sem empurrar ninguém) e o <code>std::deque</code> (crescer pelas duas pontas). Esta aula mostra como cada um funciona, o que eles <strong>não</strong> sabem fazer, quanto custa cada operação, e por que, mesmo assim, o conselho continua sendo: comece pelo <code>vector</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como a <code>std::list</code> guarda os itens (vagões engatados) e por que inserir no meio é barato.</li>
+  <li>Por que a <code>list</code> não tem <code>[]</code>, com o erro real, e como chegar no item número tal.</li>
+  <li>Por que <code>std::sort</code> não funciona numa <code>list</code> (o erro real) e o <code>.sort()</code> dela.</li>
+  <li>Como o <code>std::deque</code> cresce dos dois lados: <code>push_front</code>, <code>pop_front</code>, e <code>[]</code> que funciona.</li>
+  <li>Uma tabela de custo das operações em <code>vector</code>, <code>deque</code> e <code>list</code>, e uma medição pequena e real.</li>
+  <li>Quando usar cada um.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp/ld</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. É bom conhecer <a href="vector.html">std::vector</a> e <a href="iteradores.html">Iteradores</a>.</p>
+
+<hr>
+
+<h2>A ideia: a fileira de cadeiras, o trem e a fila de duas portas</h2>
+<ul>
+  <li>O <strong><code>vector</code></strong> é uma <strong>fileira de cadeiras parafusadas</strong> no chão. Achar a cadeira 7 é instantâneo (é só contar). Mas para pôr alguém na cadeira 1, todo mundo da cadeira 1 em diante tem que se levantar e andar uma cadeira para a direita.</li>
+  <li>A <strong><code>list</code></strong> é um <strong>trem</strong>: cada vagão sabe qual é o da frente e o de trás. Para pôr um vagão no meio, você desengata dois vagões e engata o novo entre eles. Ninguém mais se mexe. Mas para chegar no vagão 7, tem que andar do primeiro até ele, vagão por vagão.</li>
+  <li>O <strong><code>deque</code></strong> (lê-se "déc", de <em>double-ended queue</em>, "fila de duas pontas") é uma <strong>fila com duas portas</strong>: dá para entrar e sair pela frente e por trás, rápido. Por dentro, são vários blocos de cadeiras; dá para achar a cadeira 7 contando, quase tão rápido quanto no <code>vector</code>.</li>
+</ul>
+
+<hr>
+
+<h2>1. <code>std::list</code>: inserir no meio</h2>
+
+<pre class="file" data-file="fila-list.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;list&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::list&lt;std::string&gt; fila{"Ana", "Bruno", "Davi"};
+
+    fila.push_back("Eva");
+    fila.push_front("Zeca");
+
+    auto pos = std::find(fila.begin(), fila.end(), "Davi");
+    fila.insert(pos, "Carla");
+
+    fila.remove("Bruno");
+
+    for (const auto&amp; nome : fila) {
+        std::cout &lt;&lt; nome &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+    std::cout &lt;&lt; "Primeiro: " &lt;&lt; fila.front() &lt;&lt; ", último: " &lt;&lt; fila.back() &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;list&gt;</dt><dd>O cabeçalho da <code>std::list</code>.</dd>
+  <dt>push_back / push_front</dt><dd>Engata um vagão no fim / no começo. Na <code>list</code>, as duas são baratas.</dd>
+  <dt>std::find(…, "Davi")</dt><dd>Procura o Davi andando vagão por vagão e devolve um iterador para ele (aula <a href="iteradores.html">Iteradores</a>).</dd>
+  <dt>fila.insert(pos, "Carla")</dt><dd>Engata a Carla <strong>antes</strong> do vagão apontado por <code>pos</code>. Nenhum outro item se move.</dd>
+  <dt>fila.remove("Bruno")</dt><dd>Desengata <strong>todos</strong> os vagões com o valor <code>"Bruno"</code>. É um método só da <code>list</code>.</dd>
+  <dt>front() / back()</dt><dd>O primeiro e o último item.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/ld">$ g++ -std=c++23 -Wall -Wextra fila-list.cpp -o fila-list
+$ ./fila-list
+Zeca Ana Carla Davi Eva
+Primeiro: Zeca, último: Eva</pre>
+
+<p>Uma vantagem da <code>list</code> que o <code>vector</code> não tem: inserir ou apagar um item <strong>não invalida</strong> os iteradores dos outros itens. O <code>pos</code> que apontava o Davi continua apontando o Davi depois do <code>insert</code>, porque o Davi não saiu do lugar. Só o iterador do item apagado deixa de valer.</p>
+
+<div class="trycpp" data-goal="out:Ana Bruno Carla Davi,src:insert">
+<p class="try-task"><strong>Missão:</strong> a fila está <code>Ana Bruno Davi</code>. Use <code>std::find</code> e <code>insert</code> para pôr a <code>"Carla"</code> entre o Bruno e o Davi. A saída deve ser <code>Ana Bruno Carla Davi</code>.</p>
+<pre class="script">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;list&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::list&lt;std::string&gt; fila{"Ana", "Bruno", "Davi"};
+
+    // ponha a Carla antes do Davi aqui
+
+    for (const auto&amp; nome : fila) {
+        std::cout &lt;&lt; nome &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;list&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::list&lt;std::string&gt; fila{"Ana", "Bruno", "Davi"};
+
+    auto pos = std::find(fila.begin(), fila.end(), "Davi");
+    fila.insert(pos, "Carla");
+
+    for (const auto&amp; nome : fila) {
+        std::cout &lt;&lt; nome &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. A <code>list</code> não tem <code>[]</code></h2>
+<p>No <code>vector</code>, <code>notas[1]</code> pega o segundo item na hora. Na <code>list</code>, isso não existe:</p>
+
+<pre class="file" data-file="colchetes.cpp">#include &lt;iostream&gt;
+#include &lt;list&gt;
+
+int main() {
+    std::list&lt;int&gt; notas{7, 9, 4};
+    std::cout &lt;&lt; notas[1] &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/ld">$ g++ -std=c++23 -Wall -Wextra colchetes.cpp -o colchetes
+colchetes.cpp: In function ‘int main()’:
+colchetes.cpp:6:23: error: no match for ‘operator[]’ (operand types are ‘std::__cxx11::list&lt;int&gt;’ and ‘int’)
+    6 |     std::cout &lt;&lt; notas[1] &lt;&lt; '\n';
+      |                       ^</pre>
+
+<p>"Não há <code>operator[]</code> (o colchete) para uma <code>list&lt;int&gt;</code> e um <code>int</code>." No editor do guia, o Clang diz <code>type 'std::list&lt;int&gt;' does not provide a subscript operator</code> ("o tipo não oferece operador de índice"). Não é esquecimento: é de propósito. Chegar no vagão 1000 exige andar 1000 vagões, e os criadores da STL não quiseram esconder esse custo atrás de um <code>[]</code> que parece instantâneo.</p>
+
+<p>Se você precisa mesmo do item número tal, ande com o iterador, usando <code>std::next</code> (cabeçalho <code>&lt;iterator&gt;</code>), e deixe o custo à vista:</p>
+
+<pre class="file" data-file="posicao.cpp">#include &lt;iostream&gt;
+#include &lt;iterator&gt;
+#include &lt;list&gt;
+
+int main() {
+    std::list&lt;int&gt; notas{7, 9, 4, 10};
+    auto it = std::next(notas.begin(), 2);
+    std::cout &lt;&lt; *it &lt;&lt; '\n';
+
+    notas.sort();
+    for (int n : notas) {
+        std::cout &lt;&lt; n &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/ld">$ g++ -std=c++23 -Wall -Wextra posicao.cpp -o posicao
+$ ./posicao
+4                        « std::next andou 2 vagões a partir do primeiro
+4 7 9 10                 « notas.sort(): o método de ordenar da própria list</pre>
+
+<p>Se você usa <code>std::next</code> com números o tempo todo, é sinal de que escolheu o container errado: use um <code>vector</code>.</p>
+
+<hr>
+
+<h2>3. <code>std::sort</code> não serve para <code>list</code></h2>
+<p>Por que o exemplo acima usou <code>notas.sort()</code> e não <code>std::sort</code>, como na aula <a href="stl.html">O que é a STL</a>? Porque o <code>std::sort</code> precisa <strong>pular</strong> direto para o meio da faixa (ele faz contas como <code>fim - começo</code>), e os iteradores da <code>list</code> só sabem andar um passo de cada vez. Veja o que acontece:</p>
+
+<pre class="file" data-file="ordenar.cpp">#include &lt;algorithm&gt;
+#include &lt;list&gt;
+
+int main() {
+    std::list&lt;int&gt; notas{7, 3, 9};
+    std::sort(notas.begin(), notas.end());
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/ld">$ g++ -std=c++23 -Wall -Wextra ordenar.cpp -o ordenar
+In file included from /usr/include/c++/15/algorithm:63,
+                 from ordenar.cpp:1:
+/usr/include/c++/15/bits/stl_algo.h: In instantiation of ‘constexpr void std::__sort(_RandomAccessIterator, _RandomAccessIterator, _Compare) [with _RandomAccessIterator = _List_iterator&lt;int&gt;; _Compare = __gnu_cxx::__ops::_Iter_less_iter]’:
+/usr/include/c++/15/bits/stl_algo.h:4841:18:   required from ‘constexpr void std::sort(_RAIter, _RAIter) [with _RAIter = _List_iterator&lt;int&gt;]’
+ 4841 |       std::__sort(__first, __last, __gnu_cxx::__ops::__iter_less_iter());
+      |       ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ordenar.cpp:6:14:   required from here
+    6 |     std::sort(notas.begin(), notas.end());
+      |     ~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/c++/15/bits/stl_algo.h:1907:50: error: no match for ‘operator-’ (operand types are ‘std::_List_iterator&lt;int&gt;’ and ‘std::_List_iterator&lt;int&gt;’)
+ 1907 |                                 std::__lg(__last - __first) * 2,
+      |                                           ~~~~~~~^~~~~~~~~
+/usr/include/c++/15/bits/stl_algo.h:1907:50: note: there are 2 candidates
+In file included from /usr/include/c++/15/bits/stl_algobase.h:67,
+                 from /usr/include/c++/15/algorithm:62:
+/usr/include/c++/15/bits/stl_iterator.h:620:5: note: candidate 1: ‘template&lt;class _IteratorL, class _IteratorR&gt; constexpr decltype ((__y.base() - __x.base())) std::operator-(const reverse_iterator&lt;_IteratorL&gt;&amp;, const reverse_iterator&lt;_IteratorR&gt;&amp;)’
+  620 |     operator-(const reverse_iterator&lt;_IteratorL&gt;&amp; __x,
+      |     ^~~~~~~~
+/usr/include/c++/15/bits/stl_iterator.h:620:5: note: template argument deduction/substitution failed:
+/usr/include/c++/15/bits/stl_algo.h:1907:50: note:   ‘std::_List_iterator&lt;int&gt;’ is not derived from ‘const std::reverse_iterator&lt;_IteratorL&gt;’
+ 1907 |                                 std::__lg(__last - __first) * 2,
+      |                                           ~~~~~~~^~~~~~~~~
+/usr/include/c++/15/bits/stl_iterator.h:1785:5: note: candidate 2: ‘template&lt;class _IteratorL, class _IteratorR&gt; constexpr decltype ((__x.base() - __y.base())) std::operator-(const move_iterator&lt;_IteratorL&gt;&amp;, const move_iterator&lt;_IteratorR&gt;&amp;)’
+ 1785 |     operator-(const move_iterator&lt;_IteratorL&gt;&amp; __x,
+      |     ^~~~~~~~
+/usr/include/c++/15/bits/stl_iterator.h:1785:5: note: template argument deduction/substitution failed:
+/usr/include/c++/15/bits/stl_algo.h:1907:50: note:   ‘std::_List_iterator&lt;int&gt;’ is not derived from ‘const std::move_iterator&lt;_IteratorL&gt;’
+ 1907 |                                 std::__lg(__last - __first) * 2,
+      |                                           ~~~~~~~^~~~~~~~~</pre>
+
+<p>Vinte e nove linhas. Use a técnica da aula <a href="templates-funcao.html">Templates de Função</a>:</p>
+<ol class="passo">
+  <li><strong>A linha <code>required from here</code></strong>: <code>ordenar.cpp:6:14</code>, a chamada do <code>std::sort</code>. É ali que está o problema.</li>
+  <li><strong>O primeiro <code>error:</code></strong>: <code>no match for ‘operator-’ (operand types are ‘std::_List_iterator&lt;int&gt;’ and ‘std::_List_iterator&lt;int&gt;’)</code>. Tradução: "não sei fazer <code>-</code> entre dois iteradores de <code>list</code>". O <code>sort</code> tentou calcular <code>__last - __first</code> (quantos itens há entre o fim e o começo), e iterador de <code>list</code> não faz essa conta.</li>
+  <li><strong>O resto</strong> (<code>candidate 1</code>, <code>candidate 2</code>, <code>reverse_iterator</code>, <code>move_iterator</code>) são as outras funções <code>-</code> que o compilador tentou. Pode ignorar.</li>
+</ol>
+
+<p>O conserto: <code>notas.sort();</code>. A <code>list</code> tem o próprio <code>sort</code>, que reengata os vagões na ordem certa, sem pular. Ela também tem <code>reverse()</code>, <code>unique()</code> (tira repetidos vizinhos) e <code>remove(valor)</code>.</p>
+
+<hr>
+
+<h2>4. <code>std::deque</code>: a fila de duas pontas</h2>
+<p>A Ana atende numa lojinha. Clientes chegam no fim da fila, mas quem tem prioridade (idosos, gestantes) entra <strong>na frente</strong>. E o atendimento sempre tira da frente.</p>
+
+<pre class="file" data-file="deque.cpp">#include &lt;deque&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::deque&lt;std::string&gt; atendimento{"Bruno", "Carla"};
+
+    atendimento.push_back("Davi");
+    atendimento.push_front("Dona Lúcia");
+
+    std::cout &lt;&lt; "Primeira: " &lt;&lt; atendimento.front() &lt;&lt; '\n';
+    std::cout &lt;&lt; "Terceiro: " &lt;&lt; atendimento[2] &lt;&lt; '\n';
+
+    atendimento.pop_front();
+    atendimento.pop_back();
+
+    for (const auto&amp; nome : atendimento) {
+        std::cout &lt;&lt; nome &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;deque&gt;</dt><dd>O cabeçalho do <code>std::deque</code>.</dd>
+  <dt>push_back("Davi")</dt><dd>Entra no fim, como no <code>vector</code>.</dd>
+  <dt>push_front("Dona Lúcia")</dt><dd>Entra <strong>na frente</strong>, sem empurrar os outros. É a razão de existir do <code>deque</code>.</dd>
+  <dt>atendimento[2]</dt><dd>O <code>deque</code> <strong>tem</strong> <code>[]</code>: <code>{"Dona Lúcia", "Bruno", "Carla", "Davi"}</code>, posição 2 = Carla.</dd>
+  <dt>pop_front() / pop_back()</dt><dd>Tira o primeiro / o último. Repare que não devolvem nada: leia com <code>front()</code> antes, se precisar do valor.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/ld">$ g++ -std=c++23 -Wall -Wextra deque.cpp -o deque
+$ ./deque
+Primeira: Dona Lúcia
+Terceiro: Carla
+Bruno Carla</pre>
+
+<p>E o <code>vector</code>? Ele simplesmente não tem <code>push_front</code>:</p>
+
+<pre class="term" data-cwd="~/cpp/ld">$ g++ -std=c++23 -Wall -Wextra vector-frente.cpp -o vector-frente     « notas.push_front(5);
+vector-frente.cpp: In function ‘int main()’:
+vector-frente.cpp:5:11: error: ‘class std::vector&lt;int&gt;’ has no member named ‘push_front’
+    5 |     notas.push_front(5);
+      |           ^~~~~~~~~~</pre>
+
+<p>"A classe <code>std::vector&lt;int&gt;</code> não tem membro chamado <code>push_front</code>." De novo, de propósito: no <code>vector</code>, pôr na frente obriga a empurrar todos. Se você precisar mesmo, existe <code>notas.insert(notas.begin(), 5)</code>, que funciona, mas deixa o custo à vista. A próxima seção mede esse custo.</p>
+
+<div class="note">
+<strong><code>deque</code> × <code>queue</code></strong>
+<p>Se a sua fila só entra por trás e sai pela frente, existe uma "capa" mais simples sobre o <code>deque</code>: <code>std::queue</code>, que só deixa fazer isso (aula <a href="stack-queue.html">stack e queue</a>). Use o <code>deque</code> quando precisar das duas pontas ou do <code>[]</code>.</p>
+</div>
+
+<hr>
+
+<h2>5. Quanto custa cada operação</h2>
+<p>Programadores descrevem o custo de uma operação pelo que acontece quando o container fica <strong>grande</strong>. Os dois casos que importam aqui:</p>
+<ul>
+  <li><strong>Constante</strong>: leva sempre mais ou menos o mesmo tempo, com 10 itens ou com 1 milhão. Escreve-se <strong>O(1)</strong>.</li>
+  <li><strong>Linear</strong>: o tempo cresce junto com o número de itens; com o dobro de itens, o dobro do trabalho. Escreve-se <strong>O(n)</strong>.</li>
+</ul>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operação</th><th><code>vector</code></th><th><code>deque</code></th><th><code>list</code></th></tr>
+<tr><td>Pôr / tirar no <strong>fim</strong></td><td>constante</td><td>constante</td><td>constante</td></tr>
+<tr><td>Pôr / tirar no <strong>começo</strong></td><td><strong>linear</strong> (empurra todos)</td><td>constante</td><td>constante</td></tr>
+<tr><td>Pôr / tirar no <strong>meio</strong> (já tendo o iterador)</td><td>linear (empurra os seguintes)</td><td>linear</td><td><strong>constante</strong></td></tr>
+<tr><td>Achar o item número <code>i</code></td><td>constante (<code>v[i]</code>)</td><td>constante (<code>d[i]</code>)</td><td><strong>linear</strong> (anda vagão por vagão)</td></tr>
+<tr><td>Percorrer tudo</td><td>linear, e o mais rápido na prática</td><td>linear</td><td>linear, e o mais lento na prática</td></tr>
+<tr><td>Procurar um valor (<code>std::find</code>)</td><td>linear</td><td>linear</td><td>linear</td></tr>
+<tr><td>Memória extra por item</td><td>quase nenhuma</td><td>pouca</td><td>dois ponteiros por item (o vagão da frente e o de trás)</td></tr>
+</table>
+</div>
+
+<h3>Uma medição pequena</h3>
+<p>A Ana mediu duas situações com <code>std::chrono</code> (o relógio do C++, aula <a href="chrono.html">Tempo e Datas</a>). Primeiro, pôr 20 000 números <strong>no começo</strong> de cada container:</p>
+
+<pre class="file" data-file="frente.cpp">#include &lt;chrono&gt;
+#include &lt;deque&gt;
+#include &lt;iostream&gt;
+#include &lt;list&gt;
+#include &lt;vector&gt;
+
+int main() {
+    const int N = 20000;
+    using relogio = std::chrono::steady_clock;
+
+    auto t0 = relogio::now();
+    std::vector&lt;int&gt; v;
+    for (int i = 0; i &lt; N; ++i) {
+        v.insert(v.begin(), i);
+    }
+    auto t1 = relogio::now();
+
+    std::deque&lt;int&gt; d;
+    for (int i = 0; i &lt; N; ++i) {
+        d.push_front(i);
+    }
+    auto t2 = relogio::now();
+
+    std::list&lt;int&gt; l;
+    for (int i = 0; i &lt; N; ++i) {
+        l.push_front(i);
+    }
+    auto t3 = relogio::now();
+
+    using ms = std::chrono::duration&lt;double, std::milli&gt;;
+    std::cout &lt;&lt; "vector (insert no começo): " &lt;&lt; ms(t1 - t0).count() &lt;&lt; " ms\n";
+    std::cout &lt;&lt; "deque  (push_front):       " &lt;&lt; ms(t2 - t1).count() &lt;&lt; " ms\n";
+    std::cout &lt;&lt; "list   (push_front):       " &lt;&lt; ms(t3 - t2).count() &lt;&lt; " ms\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/ld">$ g++ -std=c++23 -Wall -Wextra frente.cpp -o frente
+$ ./frente
+vector (insert no começo): 36.2485 ms
+deque  (push_front):       0.283619 ms
+list   (push_front):       2.85643 ms</pre>
+
+<p>Pôr na frente: o <code>vector</code> perdeu feio (cada inserção empurra todos os anteriores). O <code>deque</code> ganhou até da <code>list</code>, porque a <code>list</code> pede memória nova para <strong>cada</strong> vagão. Agora a situação mais comum de todas: <strong>percorrer</strong> um milhão de itens, somando:</p>
+
+<pre class="term" data-cwd="~/cpp/ld">$ ./fim-ler              « 1 milhão de push_back em cada um, depois um for somando
+somar 1 milhão no vector: 3.03591 ms
+somar 1 milhão no deque:  12.182 ms
+somar 1 milhão na list:   18.2945 ms
+1499998500000</pre>
+
+<p>Para percorrer, o <code>vector</code> foi umas 6 vezes mais rápido que a <code>list</code>, embora a tabela diga "linear" para os três. É o efeito da memória colada: o processador lê blocos vizinhos de uma vez, e os vagões da <code>list</code> estão espalhados pela memória.</p>
+
+<div class="warning">
+<strong>Os números são da máquina da Ana</strong>
+<p>Os tempos mudam a cada execução e de computador para computador, e o comando padrão do guia compila <strong>sem otimização</strong> (com <code>-O2</code>, tudo fica bem mais rápido). O que vale é a <strong>proporção</strong>, não os milissegundos. A medição de desempenho de verdade (com <code>-O2</code>, várias repetições) é assunto para quando você tiver um programa real lento.</p>
+</div>
+
+<hr>
+
+<h2>6. Qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th></tr>
+<tr><td>Uma lista de coisas, sem nada especial</td><td><strong><code>std::vector</code></strong></td></tr>
+<tr><td>Itens entram e saem <strong>pelas duas pontas</strong> (fila com prioridade, histórico com limite)</td><td><code>std::deque</code></td></tr>
+<tr><td>Só entra por trás e sai pela frente</td><td><code>std::queue</code> (aula <a href="stack-queue.html">stack e queue</a>)</td></tr>
+<tr><td>Muitas inserções e remoções <strong>no meio</strong>, de containers grandes, e você guarda iteradores que não podem ser invalidados</td><td><code>std::list</code></td></tr>
+<tr><td>Precisa de <code>[]</code></td><td><code>vector</code> ou <code>deque</code> (nunca <code>list</code>)</td></tr>
+</table>
+</div>
+
+<p>Na prática, a <code>list</code> é rara: a maioria dos programas que "precisariam" dela fica mais rápida com um <code>vector</code>, mesmo empurrando itens. Use a <code>list</code> quando tiver medido e visto a diferença, ou quando a garantia de "iteradores não se invalidam" for essencial. Existe também a <code>std::forward_list</code> (cabeçalho <code>&lt;forward_list&gt;</code>), um trem que só anda para a frente e gasta menos memória; é ainda mais rara.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: no match for ‘operator[]’ (operand types are ‘std::__cxx11::list&lt;int&gt;’ and ‘int’)</code></strong>
+<p><strong>O que significa:</strong> você usou <code>[]</code> numa <code>list</code>.</p>
+<p><strong>Como consertar:</strong> percorra com <code>for</code> de intervalo ou iterador; para um item específico, <code>*std::next(lista.begin(), i)</code>. Se isso for frequente, troque para <code>vector</code> ou <code>deque</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: no match for ‘operator-’ (operand types are ‘std::_List_iterator&lt;int&gt;’ …)</code> vindo de <code>stl_algo.h</code></strong>
+<p><strong>O que significa:</strong> você chamou <code>std::sort</code> (ou outro algoritmo que precisa pular) numa <code>list</code>.</p>
+<p><strong>Como consertar:</strong> <code>lista.sort();</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: ‘class std::vector&lt;int&gt;’ has no member named ‘push_front’</code></strong>
+<p><strong>O que significa:</strong> o <code>vector</code> não tem <code>push_front</code> nem <code>pop_front</code>.</p>
+<p><strong>Como consertar:</strong> se pôr na frente é raro, <code>v.insert(v.begin(), x)</code>. Se é frequente, troque para <code>std::deque</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>pop_front()</code> numa fila vazia</strong>
+<p><strong>O que significa:</strong> <code>pop_front</code>, <code>pop_back</code>, <code>front</code> e <code>back</code> num <code>deque</code> ou numa <code>list</code> <strong>vazios</strong> são comportamento indefinido: o programa pode cair ou seguir com lixo, sem mensagem.</p>
+<p><strong>Como consertar:</strong> confira <code>if (!fila.empty())</code> antes.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operação</th><th><code>vector</code></th><th><code>deque</code></th><th><code>list</code></th></tr>
+<tr><td><code>push_back</code> / <code>pop_back</code></td><td>sim</td><td>sim</td><td>sim</td></tr>
+<tr><td><code>push_front</code> / <code>pop_front</code></td><td>não</td><td>sim</td><td>sim</td></tr>
+<tr><td><code>front()</code> / <code>back()</code></td><td>sim</td><td>sim</td><td>sim</td></tr>
+<tr><td><code>[i]</code> e <code>.at(i)</code></td><td>sim</td><td>sim</td><td>não</td></tr>
+<tr><td><code>insert(it, x)</code> / <code>erase(it)</code></td><td>sim</td><td>sim</td><td>sim (o mais barato)</td></tr>
+<tr><td><code>std::sort(begin, end)</code></td><td>sim</td><td>sim</td><td>não: use <code>.sort()</code></td></tr>
+<tr><td><code>.sort()</code>, <code>.remove(x)</code>, <code>.unique()</code>, <code>.reverse()</code></td><td>não</td><td>não</td><td>sim</td></tr>
+<tr><td>Cabeçalho</td><td><code>&lt;vector&gt;</code></td><td><code>&lt;deque&gt;</code></td><td><code>&lt;list&gt;</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Pela frente</h3>
+<p>Complete para pôr o <code>"Rui"</code> no começo do deque <code>fila</code>:</p>
+<div class="ex-code">fila.<input data-answer="push_front" aria-label="método">("Rui");</div>
+</div>
+
+<div class="exercise">
+<h3>2. Ordenar uma list</h3>
+<p>Complete para ordenar a <code>std::list</code> chamada <code>notas</code>:</p>
+<div class="ex-code">notas.<input data-answer="sort()" aria-label="método">;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Por que <code>minhaLista[3]</code> não compila?</p>
+<label><input type="radio" name="q3"> Porque a <code>list</code> começa no índice 1</label>
+<label><input type="radio" name="q3"> Porque chegar no item 3 exige andar item por item, e a <code>list</code> não esconde esse custo atrás de um <code>[]</code></label>
+<label><input type="radio" name="q3"> Porque faltou o <code>#include &lt;list&gt;</code></label>
+<label><input type="radio" name="q3"> Porque a <code>list</code> só guarda textos</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Qual container põe itens <strong>no começo</strong> e ainda permite <code>[i]</code>?</p>
+<label><input type="radio" name="q4"> <code>std::vector</code></label>
+<label><input type="radio" name="q4"> <code>std::list</code></label>
+<label><input type="radio" name="q4"> <code>std::deque</code></label>
+<label><input type="radio" name="q4"> <code>std::array</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Você vai guardar as notas da turma e percorrê-las várias vezes. Qual container escolher?</p>
+<label><input type="radio" name="q5"> <code>std::vector</code></label>
+<label><input type="radio" name="q5"> <code>std::list</code>, porque inserir no meio é barato</label>
+<label><input type="radio" name="q5"> <code>std::deque</code>, porque tem duas pontas</label>
+<label><input type="radio" name="q5"> Tanto faz, os três têm o mesmo desempenho</label>
+</div>
+
+<h3>Missão final: a fila da lojinha</h3>
+
+<div class="trycpp" data-goal="out:Atendendo: Dona Lúcia,out:Atendendo: Bruno,out:Resta: Carla,src:push_front,src:pop_front">
+<p class="try-task"><strong>Missão:</strong> a fila começa com <code>Bruno</code> e <code>Carla</code>. A <code>"Dona Lúcia"</code> tem prioridade: ponha-a <strong>na frente</strong> com <code>push_front</code>. Depois atenda <strong>duas</strong> pessoas: para cada uma, mostre <code>Atendendo: NOME</code> (com <code>front()</code>) e tire-a da fila com <code>pop_front()</code>. No fim, mostre <code>Resta: NOME</code>. Saída esperada:</p>
+<pre class="out">Atendendo: Dona Lúcia
+Atendendo: Bruno
+Resta: Carla</pre>
+<pre class="script">#include &lt;deque&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::deque&lt;std::string&gt; fila{"Bruno", "Carla"};
+
+    // ponha a Dona Lúcia na frente
+
+    // atenda duas pessoas
+
+    // mostre quem resta
+}
+</pre>
+<pre class="solucao">#include &lt;deque&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::deque&lt;std::string&gt; fila{"Bruno", "Carla"};
+
+    fila.push_front("Dona Lúcia");
+
+    for (int i = 0; i &lt; 2; ++i) {
+        std::cout &lt;&lt; "Atendendo: " &lt;&lt; fila.front() &lt;&lt; '\n';
+        fila.pop_front();
+    }
+
+    std::cout &lt;&lt; "Resta: " &lt;&lt; fila.front() &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>std::list</code> é um trem de vagões: inserir e apagar no meio é barato e não invalida os outros iteradores, mas não há <code>[]</code> e percorrer é lento. Tem <code>.sort()</code> próprio (o <code>std::sort</code> não aceita <code>list</code>).</li>
+  <li><code>std::deque</code> é uma fila de duas pontas: <code>push_front</code>/<code>pop_front</code> e <code>push_back</code>/<code>pop_back</code> baratos, e <code>[]</code> funciona.</li>
+  <li>O <code>vector</code> não tem <code>push_front</code>; <code>insert(begin(), x)</code> existe, mas empurra todos.</li>
+  <li>Constante = O(1), não depende do tamanho; linear = O(n), cresce com o tamanho. Na prática, a memória colada faz o <code>vector</code> ganhar ao percorrer.</li>
+  <li><strong>Comece pelo <code>vector</code></strong>. Troque por <code>deque</code> quando precisar da frente; por <code>list</code>, raramente, e depois de medir.</li>
+  <li>Próximo passo: guardar valores por nome, em <a href="map.html">std::map</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
