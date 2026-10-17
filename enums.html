@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Enums — enum class, switch e static_cast | Guia C++</title>
+<meta name="description" content="Enums em C++ para quem nunca programou: criar uma lista de opções com enum class, usar com switch (e o aviso -Wswitch quando falta um caso), converter para número com static_cast, o enum antigo e por que o enum class é melhor, e como mostrar o nome de uma opção, com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Enums (enum class)</span></h1>
+
+<p class="intro">Um semáforo só tem três cores. Um açaí só vem em três tamanhos. Um pedido está "recebido", "preparando", "saiu para entrega" ou "entregue", e nada além disso. Quando uma informação só pode ter <strong>alguns valores fixos</strong>, o C++ oferece um tipo feito sob medida: o <strong>enum</strong> (de <em>enumeration</em>, "enumeração", uma lista numerada). Nesta aula você vai criar enums com <code>enum class</code>, usá-los com <code>switch</code> e ver por que o compilador consegue avisar quando você esquece uma opção.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como criar uma lista de opções: <code>enum class Cor { Vermelho, Amarelo, Verde };</code>.</li>
+  <li>Como guardar e comparar opções: <code>Cor::Verde</code>.</li>
+  <li>Como usar um enum com <code>switch</code>, e o aviso <code>-Wswitch</code> quando falta um caso.</li>
+  <li>Que cada opção é um número por dentro, e como ver esse número com <code>static_cast&lt;int&gt;</code>.</li>
+  <li>O <code>enum</code> antigo, sem <code>class</code>, e os problemas que ele causa.</li>
+  <li>Como mostrar o nome de uma opção na tela (o C++ não faz isso sozinho).</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Você pode repetir cada um no editor do guia.</p>
+
+<hr>
+
+<h2>A ideia: um cardápio fechado</h2>
+<p>Imagine que a Ana guarda a cor do semáforo num <code>std::string</code>. Nada impede alguém de escrever <code>"verde"</code>, <code>"Verde"</code>, <code>"VERDE"</code> ou <code>"verdi"</code>. São quatro textos diferentes, e o programa só descobre o erro (se descobrir) quando roda. Com um <code>int</code> é pior: <code>0</code> é vermelho? E o <code>7</code>, o que é?</p>
+
+<p>Um enum é um <strong>cardápio fechado</strong>: você escreve a lista de opções uma vez, e a variável só aceita uma delas. Errou o nome? O <strong>compilador</strong> avisa, antes de o programa existir.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Guardar a cor como…</th><th>Exemplo</th><th>Problema</th></tr>
+<tr><td><code>std::string</code></td><td><code>"verde"</code></td><td>Aceita qualquer texto, inclusive erros de digitação.</td></tr>
+<tr><td><code>int</code></td><td><code>2</code></td><td>Ninguém sabe o que <code>2</code> quer dizer; aceita <code>-50</code>.</td></tr>
+<tr><td><code>enum class Cor</code></td><td><code>Cor::Verde</code></td><td>Nenhum: só aceita as opções da lista, e o nome diz o que é.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. Criar e usar um <code>enum class</code></h2>
+
+<pre class="file" data-file="cor.cpp">#include &lt;iostream&gt;
+
+enum class Cor { Vermelho, Amarelo, Verde };
+
+int main() {
+    Cor sinal = Cor::Vermelho;
+
+    if (sinal == Cor::Vermelho) {
+        std::cout &lt;&lt; "Pare!\n";
+    }
+
+    sinal = Cor::Verde;
+    if (sinal != Cor::Vermelho) {
+        std::cout &lt;&lt; "Pode seguir.\n";
+    }
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>enum class Cor</dt><dd>Cria um tipo novo chamado <code>Cor</code>. O <code>class</code> aqui não tem nada a ver com as classes do Nível 3: é só o jeito de dizer "enum moderno" (o C++11 reaproveitou a palavra).</dd>
+  <dt>{ Vermelho, Amarelo, Verde };</dt><dd>As opções, separadas por vírgula. Cada uma é chamada de <strong>enumerador</strong>. Como na <a href="structs.html">struct</a>, termina com <code>;</code> depois da chave.</dd>
+  <dt>Cor sinal = Cor::Vermelho;</dt><dd>Cria uma variável do tipo <code>Cor</code> com a opção <code>Vermelho</code>. O <code>Cor::</code> na frente é obrigatório: diz "o <code>Vermelho</code> que pertence a <code>Cor</code>". O <code>::</code> se lê "de dentro de".</dd>
+  <dt>sinal == Cor::Vermelho</dt><dd>Compara opções com <code>==</code> e <code>!=</code>, como números.</dd>
+  <dt>sinal = Cor::Verde;</dt><dd>Troca a opção guardada.</dd>
+</dl>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra cor.cpp -o cor
+$ ./cor
+Pare!
+Pode seguir.</pre>
+
+<p>Os nomes das opções seguem as mesmas regras dos <a href="identificadores.html">nomes de variáveis</a>. Neste guia, usamos a primeira letra maiúscula (<code>Vermelho</code>). E, como em todos os nomes do guia, sem acento: <code>Medio</code>, não <code>Médio</code>.</p>
+
+<h3>O compilador protege a lista</h3>
+<p>Esqueceu o <code>Cor::</code>? O g++ não acha o nome solto e até sugere o certo:</p>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra semprefixo.cpp -o semprefixo
+semprefixo.cpp: In function ‘int main()’:
+semprefixo.cpp:4:17: error: ‘Verde’ was not declared in this scope; did you mean ‘Cor::Verde’?
+    4 |     Cor sinal = Verde;
+      |                 ^~~~~
+      |                 Cor::Verde
+semprefixo.cpp:1:37: note: ‘Cor::Verde’ declared here
+    1 | enum class Cor { Vermelho, Amarelo, Verde };
+      |                                     ^~~~~
+semprefixo.cpp:4:9: warning: unused variable ‘sinal’ [-Wunused-variable]
+    4 |     Cor sinal = Verde;
+      |         ^~~~~</pre>
+<p><em>‘Verde’ was not declared in this scope; did you mean ‘Cor::Verde’?</em> = "<code>Verde</code> não foi declarado aqui; você quis dizer <code>Cor::Verde</code>?". O aviso do fim só diz que a variável <code>sinal</code> não foi usada no programa (ele é curtinho de propósito).</p>
+
+<p>E tentar guardar um texto numa <code>Cor</code> também não passa:</p>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra texto.cpp -o texto
+texto.cpp: In function ‘int main()’:
+texto.cpp:6:17: error: cannot convert ‘const char*’ to ‘Cor’ in initialization
+    6 |     Cor sinal = "Verde";
+      |                 ^~~~~~~
+      |                 |
+      |                 const char*
+texto.cpp:6:9: warning: unused variable ‘sinal’ [-Wunused-variable]
+    6 |     Cor sinal = "Verde";
+      |         ^~~~~</pre>
+<p><em>cannot convert ‘const char*’ to ‘Cor’</em> = "não dá para converter um texto em <code>Cor</code>". <code>const char*</code> é o tipo de um texto entre aspas (veja <a href="strings.html">Strings</a>). Uma <code>Cor</code> só aceita <code>Cor::Vermelho</code>, <code>Cor::Amarelo</code> ou <code>Cor::Verde</code>.</p>
+
+<hr>
+
+<h2>2. Enum e <code>switch</code>: a dupla perfeita</h2>
+<p>Para fazer uma coisa diferente para cada opção, o <a href="switch.html">switch</a> é o caminho natural: um <code>case</code> por opção.</p>
+
+<pre class="file" data-file="semaforo.cpp">#include &lt;iostream&gt;
+
+enum class Cor { Vermelho, Amarelo, Verde };
+
+void orientar(Cor sinal) {
+    switch (sinal) {
+        case Cor::Vermelho:
+            std::cout &lt;&lt; "Pare!\n";
+            break;
+        case Cor::Amarelo:
+            std::cout &lt;&lt; "Atenção, vai fechar.\n";
+            break;
+        case Cor::Verde:
+            std::cout &lt;&lt; "Pode seguir.\n";
+            break;
+    }
+}
+
+int main() {
+    orientar(Cor::Vermelho);
+    orientar(Cor::Amarelo);
+    orientar(Cor::Verde);
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra semaforo.cpp -o semaforo
+$ ./semaforo
+Pare!
+Atenção, vai fechar.
+Pode seguir.</pre>
+
+<h3>O aviso <code>-Wswitch</code>: faltou uma opção</h3>
+<p>Aqui está o grande presente dos enums. Como o compilador conhece a lista inteira, ele percebe quando um <code>switch</code> esquece uma opção. Veja o mesmo programa sem o caso <code>Amarelo</code>:</p>
+
+<pre class="file" data-file="faltacaso.cpp">#include &lt;iostream&gt;
+
+enum class Cor { Vermelho, Amarelo, Verde };
+
+void orientar(Cor sinal) {
+    switch (sinal) {
+        case Cor::Vermelho:
+            std::cout &lt;&lt; "Pare!\n";
+            break;
+        case Cor::Verde:
+            std::cout &lt;&lt; "Pode seguir.\n";
+            break;
+    }
+}
+
+int main() {
+    orientar(Cor::Amarelo);
+    std::cout &lt;&lt; "Fim.\n";
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra faltacaso.cpp -o faltacaso
+faltacaso.cpp: In function ‘void orientar(Cor)’:
+faltacaso.cpp:6:12: warning: enumeration value ‘Amarelo’ not handled in switch [-Wswitch]
+    6 |     switch (sinal) {
+      |            ^
+$ ./faltacaso
+Fim.                « o amarelo não mostrou nada</pre>
+
+<p><em>enumeration value ‘Amarelo’ not handled in switch</em> = "a opção <code>Amarelo</code> não é tratada no switch". É um aviso, não um erro: o programa compila e roda, mas o amarelo passa em silêncio. O <code>[-Wswitch]</code> é o nome do aviso, ligado pelo <code>-Wall</code> (veja <a href="avisos.html">Avisos</a>).</p>
+
+<p>Isso vale ouro quando o programa cresce. Se um dia a Ana acrescentar <code>Cor::Piscando</code> ao enum, o g++ aponta <strong>todos</strong> os <code>switch</code> do programa que ainda não sabem lidar com a opção nova.</p>
+
+<div class="warning">
+<strong>O <code>default</code> desliga esse aviso</strong>
+<p>Se o <code>switch</code> tiver um <code>default:</code>, o compilador considera que todas as opções estão tratadas e não avisa mais nada, nem quando você acrescentar uma opção nova ao enum. Num <code>switch</code> sobre enum, prefira escrever um <code>case</code> para cada opção e <strong>não</strong> usar <code>default</code>.</p>
+</div>
+
+<div class="trycpp" data-goal="semaviso,out:Açaí grande: R$ 18">
+<p class="try-task"><strong>Missão:</strong> rode o programa e leia o aviso: o açaí grande está saindo por R$ 0! Acrescente o <code>case</code> que falta, para o grande custar <code>18.0</code>. A missão só passa quando o aviso sumir.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+enum class Tamanho { Pequeno, Medio, Grande };
+
+double preco(Tamanho t) {
+    switch (t) {
+        case Tamanho::Pequeno:
+            return 10.0;
+        case Tamanho::Medio:
+            return 14.0;
+    }
+    return 0.0;
+}
+
+int main() {
+    std::cout &lt;&lt; "Açaí pequeno: R$ " &lt;&lt; preco(Tamanho::Pequeno) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Açaí grande: R$ " &lt;&lt; preco(Tamanho::Grande) &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+enum class Tamanho { Pequeno, Medio, Grande };
+
+double preco(Tamanho t) {
+    switch (t) {
+        case Tamanho::Pequeno:
+            return 10.0;
+        case Tamanho::Medio:
+            return 14.0;
+        case Tamanho::Grande:
+            return 18.0;
+    }
+    return 0.0;
+}
+
+int main() {
+    std::cout &lt;&lt; "Açaí pequeno: R$ " &lt;&lt; preco(Tamanho::Pequeno) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Açaí grande: R$ " &lt;&lt; preco(Tamanho::Grande) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<h3>Atalho: <code>using enum</code> <span class="versao">C++20</span></h3>
+<p>Repetir <code>Cor::</code> em todo <code>case</code> cansa. Desde o C++20, <code>using enum Cor;</code> deixa os nomes das opções disponíveis sem o prefixo, só dentro do bloco onde ele aparece:</p>
+
+<pre class="file" data-file="usingenum.cpp">#include &lt;iostream&gt;
+
+enum class Cor { Vermelho, Amarelo, Verde };
+
+void orientar(Cor sinal) {
+    switch (sinal) {
+        using enum Cor;
+        case Vermelho: std::cout &lt;&lt; "Pare!\n"; break;
+        case Amarelo:  std::cout &lt;&lt; "Atenção, vai fechar.\n"; break;
+        case Verde:    std::cout &lt;&lt; "Pode seguir.\n"; break;
+    }
+}
+
+int main() {
+    orientar(Cor::Amarelo);
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra usingenum.cpp -o usingenum
+$ ./usingenum
+Atenção, vai fechar.</pre>
+<p>Fora do <code>switch</code>, o prefixo continua obrigatório (por isso <code>orientar(Cor::Amarelo)</code> no <code>main</code>). Antes do C++20, escreva sempre <code>Cor::Vermelho</code>.</p>
+
+<hr>
+
+<h2>3. Por dentro, cada opção é um número</h2>
+<p>O computador não guarda a palavra "Verde": guarda um número inteiro. A primeira opção vale <code>0</code>, a segunda <code>1</code>, e assim por diante. O <code>enum class</code> esconde isso de propósito, mas você pode pedir o número com <code>static_cast&lt;int&gt;</code> (veja <a href="conversao-tipos.html">Conversão de Tipos</a>). Também dá para escolher os números:</p>
+
+<pre class="file" data-file="numero.cpp">#include &lt;iostream&gt;
+
+enum class Cor { Vermelho, Amarelo, Verde };
+enum class Nivel { Baixo = 1, Medio = 5, Alto = 10 };
+
+int main() {
+    std::cout &lt;&lt; static_cast&lt;int&gt;(Cor::Vermelho) &lt;&lt; ' '
+              &lt;&lt; static_cast&lt;int&gt;(Cor::Amarelo) &lt;&lt; ' '
+              &lt;&lt; static_cast&lt;int&gt;(Cor::Verde) &lt;&lt; '\n';
+
+    std::cout &lt;&lt; static_cast&lt;int&gt;(Nivel::Medio) &lt;&lt; '\n';
+
+    int lido = 10;
+    Nivel n = static_cast&lt;Nivel&gt;(lido);
+    if (n == Nivel::Alto) {
+        std::cout &lt;&lt; "Nível alto!\n";
+    }
+}
+</pre>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra numero.cpp -o numero
+$ ./numero
+0 1 2
+5
+Nível alto!</pre>
+
+<dl class="anatomy">
+  <dt>static_cast&lt;int&gt;(Cor::Verde)</dt><dd>"Converta para <code>int</code>": dá o número da opção, <code>2</code>.</dd>
+  <dt>enum class Nivel { Baixo = 1, Medio = 5, Alto = 10 };</dt><dd>Escolhe o número de cada opção. Útil quando o número tem significado fora do programa (um código de um arquivo, uma pontuação).</dd>
+  <dt>static_cast&lt;Nivel&gt;(lido)</dt><dd>O caminho inverso: de número para opção. Serve, por exemplo, para transformar um número lido do teclado numa opção.</dd>
+</dl>
+
+<p>Sem o <code>static_cast</code>, o <code>enum class</code> não vira número sozinho:</p>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra semcast.cpp -o semcast
+semcast.cpp: In function ‘int main()’:
+semcast.cpp:6:18: error: cannot convert ‘Cor’ to ‘int’ in initialization
+    6 |     int x = Cor::Verde;
+      |             ~~~~~^~~~~
+      |                  |
+      |                  Cor</pre>
+<p>Isso é proposital: uma cor não é um número, e o compilador não deixa você misturar os dois sem querer. Quando você precisa do número, o <code>static_cast</code> deixa claro que foi de propósito.</p>
+
+<div class="warning">
+<strong>O <code>static_cast</code> de número para enum não confere nada</strong>
+<p><code>static_cast&lt;Nivel&gt;(7)</code> compila sem aviso, mas <code>7</code> não é nenhuma opção da lista: a variável fica com um valor que nenhum <code>case</code> trata. Se o número vem de fora (teclado, arquivo), confira antes se ele é válido (veja <a href="validar-entrada.html">Validar a Entrada</a>).</p>
+</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> troque os números do <code>Nivel</code> (por exemplo, <code>Medio = 50</code>) e veja o que muda na saída. Depois mude <code>lido</code> para <code>7</code> e repare que "Nível alto!" some, sem nenhum erro.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+enum class Cor { Vermelho, Amarelo, Verde };
+enum class Nivel { Baixo = 1, Medio = 5, Alto = 10 };
+
+int main() {
+    std::cout &lt;&lt; static_cast&lt;int&gt;(Cor::Vermelho) &lt;&lt; ' '
+              &lt;&lt; static_cast&lt;int&gt;(Cor::Amarelo) &lt;&lt; ' '
+              &lt;&lt; static_cast&lt;int&gt;(Cor::Verde) &lt;&lt; '\n';
+
+    std::cout &lt;&lt; static_cast&lt;int&gt;(Nivel::Medio) &lt;&lt; '\n';
+
+    int lido = 10;
+    Nivel n = static_cast&lt;Nivel&gt;(lido);
+    if (n == Nivel::Alto) {
+        std::cout &lt;&lt; "Nível alto!\n";
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>4. O <code>enum</code> antigo (sem <code>class</code>)</h2>
+<p>Antes do C++11, só existia o enum "simples", herdado da linguagem C. Você vai encontrá-lo em muito código e em bibliotecas antigas:</p>
+
+<pre class="file" data-file="antigo.cpp">#include &lt;iostream&gt;
+
+enum Cor { Vermelho, Amarelo, Verde };
+
+int main() {
+    Cor sinal = Verde;
+    int x = sinal;
+    std::cout &lt;&lt; x &lt;&lt; '\n';
+    std::cout &lt;&lt; sinal + 10 &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra antigo.cpp -o antigo
+$ ./antigo
+2
+12</pre>
+
+<p>Parece mais prático: não precisa do <code>Cor::</code>, e vira número sozinho. Esses são justamente os dois problemas.</p>
+
+<h3>Problema 1: os nomes "vazam"</h3>
+<p>No enum antigo, <code>Vermelho</code>, <code>Amarelo</code> e <code>Verde</code> ficam soltos no programa, como se fossem variáveis comuns. Se outro enum também tiver um <code>Verde</code> (a fruta verde, por exemplo), os nomes batem:</p>
+
+<pre class="file" data-file="vazamento.cpp">enum Cor { Vermelho, Amarelo, Verde };
+enum Fruta { Laranja, Limao, Verde };
+
+int main() {
+    Cor c = Verde;
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra vazamento.cpp -o vazamento
+vazamento.cpp:2:30: error: ‘Verde’ conflicts with a previous declaration
+    2 | enum Fruta { Laranja, Limao, Verde };
+      |                              ^~~~~
+vazamento.cpp:1:31: note: previous declaration ‘Cor Verde’
+    1 | enum Cor { Vermelho, Amarelo, Verde };
+      |                               ^~~~~
+vazamento.cpp: In function ‘int main()’:
+vazamento.cpp:5:9: warning: unused variable ‘c’ [-Wunused-variable]
+    5 |     Cor c = Verde;
+      |         ^</pre>
+<p><em>‘Verde’ conflicts with a previous declaration</em> = "<code>Verde</code> entra em conflito com uma declaração anterior": o nome já existia, vindo do enum <code>Cor</code>. No editor do guia, o Clang diz <code>redefinition of enumerator 'Verde'</code> ("redefinição do enumerador"). Com <code>enum class</code>, cada lista tem os seus próprios nomes, e <code>Cor::Verde</code> e <code>Fruta::Verde</code> convivem em paz: o mesmo programa com <code>enum class</code> compila (só com o aviso de variáveis não usadas).</p>
+
+<h3>Problema 2: vira número sem você pedir</h3>
+<p>O enum antigo se converte em <code>int</code> sozinho. Por isso <code>sinal + 10</code> deu <code>12</code> lá em cima, o que não faz sentido para uma cor. E dá para comparar coisas que não têm nada a ver:</p>
+
+<pre class="file" data-file="mistura.cpp">#include &lt;iostream&gt;
+
+enum Cor { Vermelho, Amarelo, Verde };
+enum Tamanho { Pequeno, Medio, Grande };
+
+int main() {
+    Cor c = Vermelho;
+    Tamanho t = Pequeno;
+    if (c == t) {
+        std::cout &lt;&lt; "Vermelho é igual a Pequeno?!\n";
+    }
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra mistura.cpp -o mistura
+mistura.cpp: In function ‘int main()’:
+mistura.cpp:9:11: warning: comparison between ‘enum Cor’ and ‘enum Tamanho’ [-Wenum-compare]
+    9 |     if (c == t) {
+      |         ~~^~~~
+$ ./mistura
+Vermelho é igual a Pequeno?!</pre>
+<p>Os dois valem <code>0</code> por dentro, então a comparação deu verdadeira. O g++ avisa (<em>comparison between ‘enum Cor’ and ‘enum Tamanho’</em>), mas compila. Com <code>enum class</code>, essa comparação é <strong>erro</strong>:</p>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra mistura2.cpp -o mistura2
+mistura2.cpp: In function ‘int main()’:
+mistura2.cpp:7:14: error: no match for ‘operator==’ (operand types are ‘Cor’ and ‘Tamanho’)
+    7 |     return c == t;
+      |            ~ ^~ ~
+      |            |    |
+      |            Cor  Tamanho
+«… seguido de notas que explicam as duas comparações que existem: Cor com Cor e Tamanho com Tamanho …»</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>enum class Cor</code> (moderno)</th><th><code>enum Cor</code> (antigo)</th></tr>
+<tr><td>Como escrever a opção</td><td><code>Cor::Verde</code></td><td><code>Verde</code></td></tr>
+<tr><td>Dois enums com o mesmo nome de opção</td><td>Pode</td><td>Erro: os nomes batem</td></tr>
+<tr><td>Vira <code>int</code> sozinho</td><td>Não; use <code>static_cast&lt;int&gt;</code></td><td>Sim, sem avisar</td></tr>
+<tr><td>Comparar com outro enum</td><td>Erro</td><td>Só um aviso</td></tr>
+<tr><td>Desde</td><td>C++11</td><td>C (sempre existiu)</td></tr>
+</table>
+</div>
+
+<p><strong>Qual usar:</strong> sempre <code>enum class</code> no código novo. Conheça o antigo para ler código dos outros.</p>
+
+<hr>
+
+<h2>5. Mostrar o nome de uma opção</h2>
+<p>Uma surpresa para quem vem de outras linguagens: o C++ <strong>não sabe</strong> transformar <code>Cor::Verde</code> no texto <code>"Verde"</code>. O nome existe só no código-fonte; o programa pronto guarda o número. E o <code>cout</code> nem aceita um <code>enum class</code>:</p>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra imprimir.cpp -o imprimir
+imprimir.cpp: In function ‘int main()’:
+imprimir.cpp:7:15: error: no match for ‘operator&lt;&lt;’ (operand types are ‘std::ostream’ {aka ‘std::basic_ostream&lt;char&gt;’} and ‘Cor’)
+    7 |     std::cout &lt;&lt; sinal &lt;&lt; '\n';
+      |     ~~~~~~~~~ ^~ ~~~~~
+      |          |       |
+      |          |       Cor
+      |          std::ostream {aka std::basic_ostream&lt;char&gt;}
+imprimir.cpp:7:15: note: there are 52 candidates
+«… mais de 360 linhas com os candidatos que não serviram …»</pre>
+
+<p>A solução clássica é escrever uma função com <code>switch</code> que devolve o texto de cada opção:</p>
+
+<pre class="file" data-file="nome.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+enum class Cor { Vermelho, Amarelo, Verde };
+
+std::string nome(Cor c) {
+    switch (c) {
+        case Cor::Vermelho: return "vermelho";
+        case Cor::Amarelo:  return "amarelo";
+        case Cor::Verde:    return "verde";
+    }
+    return "desconhecida";
+}
+
+int main() {
+    Cor sinal = Cor::Amarelo;
+    std::cout &lt;&lt; "O sinal está " &lt;&lt; nome(sinal) &lt;&lt; ".\n";
+
+    for (Cor c : {Cor::Vermelho, Cor::Amarelo, Cor::Verde}) {
+        std::cout &lt;&lt; static_cast&lt;int&gt;(c) &lt;&lt; " = " &lt;&lt; nome(c) &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra nome.cpp -o nome
+$ ./nome
+O sinal está amarelo.
+0 = vermelho
+1 = amarelo
+2 = verde</pre>
+
+<dl class="anatomy">
+  <dt>case Cor::Vermelho: return "vermelho";</dt><dd>Cada <code>case</code> devolve o texto direto, então não precisa de <code>break</code>: o <code>return</code> já sai da função.</dd>
+  <dt>return "desconhecida";</dt><dd>Depois do <code>switch</code>. Parece inútil (todas as opções têm <code>case</code>), mas uma <code>Cor</code> criada com <code>static_cast</code> de um número estranho não cai em nenhum. Sem essa linha, o g++ avisa, como você vai ver abaixo.</dd>
+  <dt>for (Cor c : {Cor::Vermelho, …})</dt><dd>Percorre uma lista escrita ali mesmo, entre chaves. O C++ não tem um jeito pronto de percorrer todas as opções de um enum.</dd>
+</dl>
+
+<p>Sem o <code>return</code> do fim, o g++ reclama:</p>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra nome2.cpp -o nome2
+nome2.cpp: In function ‘std::string nome(Cor)’:
+nome2.cpp:12:1: warning: control reaches end of non-void function [-Wreturn-type]
+   12 | }
+      | ^</pre>
+<p><em>control reaches end of non-void function</em> = "a execução pode chegar ao fim de uma função que deveria devolver um valor" sem devolver nada (veja <a href="retorno.html">Retorno</a>).</p>
+
+<div class="note">
+<strong>E no futuro?</strong>
+<p>O C++26 traz a <strong>reflexão</strong>, um recurso que permite ao programa consultar os nomes do próprio código, inclusive os das opções de um enum. Ainda não está disponível no g++ 15. Até lá, a função com <code>switch</code> é o jeito padrão, e o <code>-Wswitch</code> avisa se você esquecer uma opção nela.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"‘Verde’ was not declared in this scope; did you mean ‘Cor::Verde’?"</strong>
+<p><strong>O que aconteceu:</strong> faltou o prefixo <code>Cor::</code>. No <code>enum class</code>, ele é obrigatório.</p>
+<p><strong>Como resolver:</strong> escreva <code>Cor::Verde</code>, ou use <code>using enum Cor;</code> (C++20) dentro do bloco.</p>
+</div>
+
+<div class="cenario">
+<strong>"enumeration value ‘…’ not handled in switch"</strong>
+<p><strong>O que aconteceu:</strong> o <code>switch</code> não tem <code>case</code> para uma das opções. Quando a variável tiver esse valor, nenhum código roda.</p>
+<p><strong>Como resolver:</strong> acrescente o <code>case</code> que falta. Não "resolva" com <code>default:</code>: o aviso some, mas você perde a proteção para opções futuras.</p>
+</div>
+
+<div class="cenario">
+<strong>"cannot convert ‘Cor’ to ‘int’"</strong>
+<p><strong>O que aconteceu:</strong> você usou uma opção de <code>enum class</code> onde se espera um número (numa conta, num <code>int</code>, num índice de vetor).</p>
+<p><strong>Como resolver:</strong> se o número é mesmo o que você quer, <code>static_cast&lt;int&gt;(Cor::Verde)</code>. Se não, guarde numa variável do tipo <code>Cor</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"‘Verde’ conflicts with a previous declaration"</strong>
+<p><strong>O que aconteceu:</strong> dois enums antigos (sem <code>class</code>) usam o mesmo nome de opção, ou uma opção tem o nome de uma variável ou função.</p>
+<p><strong>Como resolver:</strong> troque <code>enum</code> por <code>enum class</code> e escreva as opções com o prefixo.</p>
+</div>
+
+<div class="cenario">
+<strong>"no match for ‘operator&lt;&lt;’ … and ‘Cor’"</strong>
+<p><strong>O que aconteceu:</strong> o <code>cout</code> não sabe mostrar um <code>enum class</code>.</p>
+<p><strong>Como resolver:</strong> mostre o texto com uma função <code>nome(Cor)</code> (seção 5) ou o número com <code>static_cast&lt;int&gt;</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Significado</th></tr>
+<tr><td><code>enum class Cor { Vermelho, Verde };</code></td><td>Cria o tipo <code>Cor</code> com duas opções (valem 0 e 1).</td></tr>
+<tr><td><code>enum class Nivel { Baixo = 1, Alto = 10 };</code></td><td>Escolhe o número de cada opção.</td></tr>
+<tr><td><code>Cor c = Cor::Verde;</code></td><td>Variável com uma opção.</td></tr>
+<tr><td><code>c == Cor::Verde</code></td><td>Compara opções.</td></tr>
+<tr><td><code>switch (c) { case Cor::Verde: … }</code></td><td>Um caminho por opção; <code>-Wswitch</code> avisa se faltar alguma.</td></tr>
+<tr><td><code>using enum Cor;</code></td><td>Usa as opções sem o prefixo, dentro do bloco <span class="versao">C++20</span>.</td></tr>
+<tr><td><code>static_cast&lt;int&gt;(c)</code></td><td>O número da opção.</td></tr>
+<tr><td><code>static_cast&lt;Cor&gt;(1)</code></td><td>A opção de número 1 (sem conferir se existe).</td></tr>
+<tr><td><code>enum Cor { Vermelho, Verde };</code></td><td>O enum antigo: nomes soltos, vira número sozinho. Evite.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Declarar um enum</h3>
+<p>Complete para criar o tipo <code>Tamanho</code> moderno, com as opções <code>Pequeno</code>, <code>Medio</code> e <code>Grande</code>:</p>
+<div class="ex-code"><input data-answer="enum class" aria-label="palavras-chave"> Tamanho { Pequeno, Medio, Grande };</div>
+</div>
+
+<div class="exercise">
+<h3>2. Escolher uma opção</h3>
+<p>Complete para a variável <code>t</code> guardar o tamanho grande:</p>
+<div class="ex-code">Tamanho t = <input data-answer="Tamanho::Grande" aria-label="opção">;</div>
+</div>
+
+<div class="exercise">
+<h3>3. O número da opção</h3>
+<p>Complete para mostrar o número da opção guardada em <code>t</code>:</p>
+<div class="ex-code">std::cout &lt;&lt; <input data-answer="static_cast&lt;int&gt;(t)" aria-label="conversão"> &lt;&lt; '\n';</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Em <code>enum class Dia { Seg, Ter, Qua };</code>, quanto vale <code>static_cast&lt;int&gt;(Dia::Qua)</code>?</p>
+<label><input type="radio" name="q4"> 3</label>
+<label><input type="radio" name="q4"> 1</label>
+<label><input type="radio" name="q4"> 2</label>
+<label><input type="radio" name="q4"> Dá erro: enum class não vira número</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Por que é melhor <strong>não</strong> pôr <code>default:</code> num <code>switch</code> sobre um enum?</p>
+<label><input type="radio" name="q5"> Porque <code>default</code> não funciona com enums.</label>
+<label><input type="radio" name="q5"> Porque ele desliga o aviso <code>-Wswitch</code>, e você não fica sabendo quando esquecer uma opção.</label>
+<label><input type="radio" name="q5"> Porque deixa o programa mais lento.</label>
+<label><input type="radio" name="q5"> Porque o g++ dá erro.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Qual destas é uma vantagem do <code>enum class</code> sobre o <code>enum</code> antigo?</p>
+<label><input type="radio" name="q6"> Dois enums diferentes podem ter uma opção com o mesmo nome.</label>
+<label><input type="radio" name="q6"> Ele mostra o nome da opção no <code>cout</code> sozinho.</label>
+<label><input type="radio" name="q6"> Ele vira <code>int</code> sozinho nas contas.</label>
+<label><input type="radio" name="q6"> Não precisa de <code>;</code> depois da chave.</label>
+</div>
+
+<h3>Missão final: o status do pedido</h3>
+<div class="trycpp" data-goal="out:0 = recebido,out:2 = saiu para entrega,out:3 = entregue,semaviso">
+<p class="try-task"><strong>Missão:</strong> a lanchonete da Ana acompanha cada pedido com o enum <code>Status</code>. Escreva a função <code>std::string nome(Status s)</code>, com um <code>switch</code>, que devolve <code>"recebido"</code>, <code>"preparando"</code>, <code>"saiu para entrega"</code> e <code>"entregue"</code>. No laço do <code>main</code>, mostre cada opção como <code>0 = recebido</code>, <code>1 = preparando</code> e assim por diante, sem nenhum aviso.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+enum class Status { Recebido, Preparando, Saiu, Entregue };
+
+// escreva aqui a função nome(Status)
+
+int main() {
+    for (Status s : {Status::Recebido, Status::Preparando, Status::Saiu, Status::Entregue}) {
+        // mostre o número e o nome, como em: 0 = recebido
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+enum class Status { Recebido, Preparando, Saiu, Entregue };
+
+std::string nome(Status s) {
+    switch (s) {
+        case Status::Recebido:   return "recebido";
+        case Status::Preparando: return "preparando";
+        case Status::Saiu:       return "saiu para entrega";
+        case Status::Entregue:   return "entregue";
+    }
+    return "desconhecido";
+}
+
+int main() {
+    for (Status s : {Status::Recebido, Status::Preparando, Status::Saiu, Status::Entregue}) {
+        std::cout &lt;&lt; static_cast&lt;int&gt;(s) &lt;&lt; " = " &lt;&lt; nome(s) &lt;&lt; '\n';
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um <strong>enum</strong> é um tipo com uma lista fechada de opções: <code>enum class Cor { Vermelho, Amarelo, Verde };</code>.</li>
+  <li>Escreva as opções com o prefixo: <code>Cor::Verde</code>. Compare com <code>==</code> e <code>!=</code>.</li>
+  <li>Com <code>switch</code>, escreva um <code>case</code> por opção e evite <code>default</code>: o <code>-Wswitch</code> avisa quando faltar alguma.</li>
+  <li>Por dentro, cada opção é um número (0, 1, 2…). <code>static_cast&lt;int&gt;</code> mostra o número; <code>static_cast&lt;Cor&gt;</code> faz o caminho inverso, sem conferir.</li>
+  <li>O <code>enum</code> antigo (sem <code>class</code>) espalha os nomes pelo programa e vira número sozinho. Use sempre <code>enum class</code>.</li>
+  <li>O C++ não mostra o nome de uma opção: escreva uma função <code>nome()</code> com <code>switch</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
