@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Polimorfismo — virtual, override, destrutor virtual e vector de unique_ptr | Guia C++</title>
+<meta name="description" content="Polimorfismo em C++ para quem está começando: o que acontece sem virtual (roda o método da base), virtual e override, chamar pela referência ou ponteiro da base, o erro real de override, destrutor virtual e o aviso -Wdelete-non-virtual-dtor, fatiamento e um vector de std::unique_ptr com animais diferentes.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Polimorfismo (virtual)</span></h1>
+
+<p class="intro">No fim da aula de <a href="heranca.html">Herança</a>, uma coisa estranha aconteceu: o <code>Livro</code> tinha o seu próprio <code>mostrar()</code>, mas, passado para uma função que recebia <code>const Produto&amp;</code>, rodou o <code>mostrar()</code> do <code>Produto</code>. Nesta aula você vai entender por quê e consertar com uma palavra: <code>virtual</code>. É ela que permite guardar cachorros, gatos e peixes na mesma lista e mandar "todo mundo falar", cada um do seu jeito. Esse "cada um do seu jeito" se chama <strong>polimorfismo</strong>, do grego "muitas formas".</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O problema: sem <code>virtual</code>, uma referência da base chama o método da base.</li>
+  <li><code>virtual</code> na base e <code>override</code> na filha, e o que cada um faz.</li>
+  <li>Como chamar pela referência (<code>Animal&amp;</code>) ou pelo ponteiro (<code>Animal*</code>) da base.</li>
+  <li>Como o <code>override</code> transforma um engano silencioso num erro de compilação.</li>
+  <li>Por que a classe base precisa de destrutor <code>virtual</code>, e o aviso que o g++ dá.</li>
+  <li>Como guardar objetos diferentes num <code>std::vector&lt;std::unique_ptr&lt;Animal&gt;&gt;</code>.</li>
+  <li>A armadilha do <strong>fatiamento</strong> e o <code>final</code> num método.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados com o <strong>g++ 15</strong> na máquina da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: "todo mundo, falem!"</h2>
+<p>A Ana abriu um pet shop. De manhã, ela passa pelas gaiolas e diz "bom dia!". Ela não precisa saber, gaiola por gaiola, que tipo de bicho está ali: o cachorro late, o gato mia, o peixe fica quieto. A <strong>mesma ordem</strong> produz <strong>respostas diferentes</strong>, conforme quem recebe.</p>
+
+<p>Em código: a Ana quer uma lista de <code>Animal</code> e um laço que chama <code>falar()</code> em cada um. Quem decide <strong>qual</strong> <code>falar()</code> roda deve ser o bicho de verdade, não o tipo da lista. Vamos ver que isso não acontece sozinho.</p>
+
+<hr>
+
+<h2>1. O problema: sem <code>virtual</code></h2>
+
+<pre class="file" data-file="semvirtual.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Animal {
+public:
+    Animal(std::string nome) : nome_{nome} {}
+    std::string nome() const { return nome_; }
+    void falar() const { std::cout &lt;&lt; nome_ &lt;&lt; ": ...\n"; }
+private:
+    std::string nome_;
+};
+
+class Cachorro : public Animal {
+public:
+    Cachorro(std::string nome) : Animal{nome} {}
+    void falar() const { std::cout &lt;&lt; nome() &lt;&lt; ": Au au!\n"; }
+};
+
+class Gato : public Animal {
+public:
+    Gato(std::string nome) : Animal{nome} {}
+    void falar() const { std::cout &lt;&lt; nome() &lt;&lt; ": Miau!\n"; }
+};
+
+void apresentar(const Animal&amp; a) {
+    a.falar();
+}
+
+int main() {
+    Cachorro rex{"Rex"};
+    Gato mimi{"Mimi"};
+
+    rex.falar();
+    mimi.falar();
+
+    std::cout &lt;&lt; "-- pela função apresentar --\n";
+    apresentar(rex);
+    apresentar(mimi);
+
+    std::cout &lt;&lt; "-- por um ponteiro de Animal --\n";
+    Animal* p = &amp;rex;
+    p-&gt;falar();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semvirtual.cpp -o semvirtual
+$ ./semvirtual
+Rex: Au au!
+Mimi: Miau!
+-- pela função apresentar --
+Rex: ...                 « o Rex é um Cachorro, mas rodou o falar() do Animal
+Mimi: ...
+-- por um ponteiro de Animal --
+Rex: ...</pre>
+
+<p>Chamando direto no objeto (<code>rex.falar()</code>), tudo certo. Mas, pela referência <code>const Animal&amp;</code> ou pelo ponteiro <code>Animal*</code>, rodou o <code>falar()</code> do <code>Animal</code>. O motivo: sem <code>virtual</code>, o compilador escolhe o método <strong>na hora de compilar</strong>, olhando só o tipo escrito no código. Dentro de <code>apresentar</code>, está escrito <code>Animal</code>; o compilador não sabe (e não pergunta) se, na hora de rodar, vai chegar um cachorro ou um gato.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Nome</th><th>O que é</th><th>Em <code>apresentar(rex)</code></th></tr>
+<tr><td><strong>Tipo estático</strong></td><td>O tipo escrito no código</td><td><code>Animal</code> (o parâmetro é <code>const Animal&amp;</code>)</td></tr>
+<tr><td><strong>Tipo dinâmico</strong></td><td>O tipo do objeto de verdade, na hora de rodar</td><td><code>Cachorro</code></td></tr>
+</table>
+</div>
+
+<p>Sem <code>virtual</code>, manda o tipo estático. Com <code>virtual</code>, manda o tipo dinâmico.</p>
+
+<hr>
+
+<h2>2. A solução: <code>virtual</code> e <code>override</code></h2>
+<p>Duas palavras, em três linhas:</p>
+
+<pre class="file" data-file="comvirtual.cpp">class Animal {
+public:
+    Animal(std::string nome) : nome_{nome} {}
+    std::string nome() const { return nome_; }
+    virtual void falar() const { std::cout &lt;&lt; nome_ &lt;&lt; ": ...\n"; }
+private:
+    std::string nome_;
+};
+
+class Cachorro : public Animal {
+public:
+    Cachorro(std::string nome) : Animal{nome} {}
+    void falar() const override { std::cout &lt;&lt; nome() &lt;&lt; ": Au au!\n"; }
+};
+
+class Gato : public Animal {
+public:
+    Gato(std::string nome) : Animal{nome} {}
+    void falar() const override { std::cout &lt;&lt; nome() &lt;&lt; ": Miau!\n"; }
+};
+// apresentar e main iguais ao programa anterior
+</pre>
+
+<dl class="anatomy">
+  <dt>virtual</dt><dd>Na <strong>base</strong>, antes do tipo de retorno. Diz: "as classes filhas podem trocar este método, e quem chamar por uma referência ou ponteiro de <code>Animal</code> deve receber a versão do objeto de verdade". Um método assim se chama <strong>função virtual</strong>.</dd>
+  <dt>void falar() const</dt><dd>Na filha, a assinatura precisa ser <strong>idêntica</strong> à da base: mesmo nome, mesmos parâmetros, mesmo <code>const</code>.</dd>
+  <dt>override</dt><dd>Na <strong>filha</strong>, depois dos parênteses (e do <code>const</code>). Quer dizer "sobrescreve": "este método substitui um <code>virtual</code> da base". É opcional, mas, como você vai ver na seção 3, deveria ser obrigatório na sua cabeça. <span class="versao">C++11</span></dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra comvirtual.cpp -o comvirtual
+$ ./comvirtual
+Rex: Au au!
+Mimi: Miau!
+-- pela função apresentar --
+Rex: Au au!              « agora quem decide é o objeto de verdade
+Mimi: Miau!
+-- por um ponteiro de Animal --
+Rex: Au au!</pre>
+
+<p>A função <code>apresentar</code> não mudou nada e continua sem saber que cachorros e gatos existem. Mesmo assim, cada animal falou do seu jeito. Isso é o polimorfismo: <strong>um código escrito para a base funciona com todas as filhas</strong>, inclusive as que forem criadas no ano que vem.</p>
+
+<div class="note">
+<strong>Como o C++ faz isso por dentro</strong>
+<p>Toda classe com função virtual ganha uma tabela escondida, a <strong>vtable</strong> (tabela virtual), com o endereço da versão certa de cada método virtual. Cada objeto carrega um ponteiro escondido para a tabela da sua classe. Na chamada <code>a.falar()</code>, o programa olha a tabela do objeto e pula para o endereço que está lá. O custo é pequeno: um ponteiro a mais por objeto e uma consulta por chamada.</p>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Jeito de chamar</th><th>Sem <code>virtual</code></th><th>Com <code>virtual</code></th></tr>
+<tr><td><code>rex.falar()</code> (o próprio objeto)</td><td>Cachorro</td><td>Cachorro</td></tr>
+<tr><td><code>Animal&amp; r = rex; r.falar()</code></td><td>Animal</td><td><strong>Cachorro</strong></td></tr>
+<tr><td><code>Animal* p = &amp;rex; p-&gt;falar()</code></td><td>Animal</td><td><strong>Cachorro</strong></td></tr>
+<tr><td><code>Animal copia = rex; copia.falar()</code></td><td>Animal</td><td>Animal (veja <a href="#fatiamento">fatiamento</a>)</td></tr>
+</table>
+</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode e confira que cada animal fala do seu jeito. Depois apague a palavra <code>virtual</code> do <code>Animal</code> (o compilador vai reclamar dos <code>override</code>: apague-os também) e rode de novo. Por fim, crie uma classe <code>Vaca</code> que diz <code>Muuu!</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Animal {
+public:
+    Animal(std::string nome) : nome_{nome} {}
+    std::string nome() const { return nome_; }
+    virtual void falar() const { std::cout &lt;&lt; nome_ &lt;&lt; ": ...\n"; }
+private:
+    std::string nome_;
+};
+
+class Cachorro : public Animal {
+public:
+    Cachorro(std::string nome) : Animal{nome} {}
+    void falar() const override { std::cout &lt;&lt; nome() &lt;&lt; ": Au au!\n"; }
+};
+
+class Gato : public Animal {
+public:
+    Gato(std::string nome) : Animal{nome} {}
+    void falar() const override { std::cout &lt;&lt; nome() &lt;&lt; ": Miau!\n"; }
+};
+
+void apresentar(const Animal&amp; a) {
+    a.falar();
+}
+
+int main() {
+    Cachorro rex{"Rex"};
+    Gato mimi{"Mimi"};
+    apresentar(rex);
+    apresentar(mimi);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. <code>override</code>: o compilador conferindo por você</h2>
+<p>Para substituir um método virtual, a assinatura da filha tem que ser <strong>exatamente</strong> igual à da base. Um detalhe diferente (um <code>const</code> esquecido, um <code>int</code> no lugar de <code>double</code>) e o método da filha vira um método <strong>novo</strong>, que não substitui nada. Veja o <code>Gato</code> sem o <code>const</code>, e sem <code>override</code>:</p>
+
+<pre class="file" data-file="semoverride.cpp">class Animal {
+public:
+    Animal(std::string nome) : nome_{nome} {}
+    virtual ~Animal() = default;
+    std::string nome() const { return nome_; }
+    virtual void falar() const { std::cout &lt;&lt; nome_ &lt;&lt; ": ...\n"; }
+private:
+    std::string nome_;
+};
+
+class Gato : public Animal {
+public:
+    Gato(std::string nome) : Animal{nome} {}
+    void falar() { std::cout &lt;&lt; nome() &lt;&lt; ": Miau!\n"; }    // faltou o const
+};
+
+int main() {
+    Gato mimi{"Mimi"};
+    const Animal&amp; a = mimi;
+    a.falar();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semoverride.cpp -o semoverride
+semoverride.cpp:9:18: warning: ‘virtual void Animal::falar() const’ was hidden [-Woverloaded-virtual=]
+    9 |     virtual void falar() const { std::cout &lt;&lt; nome_ &lt;&lt; ": ...\n"; }
+      |                  ^~~~~
+semoverride.cpp:17:10: note:   by ‘void Gato::falar()’
+   17 |     void falar() { std::cout &lt;&lt; nome() &lt;&lt; ": Miau!\n"; }
+      |          ^~~~~
+$ ./semoverride
+Mimi: ...                « a gata ficou muda</pre>
+
+<p>Compilou, rodou, e a resposta está errada. O g++ 15, com <code>-Wall</code>, até deu um aviso ("o virtual <code>Animal::falar() const</code> foi escondido por <code>Gato::falar()</code>"), mas aviso é fácil de ignorar no meio de outros. Agora, a mesma coisa <strong>com</strong> <code>override</code>:</p>
+
+<pre class="file" data-file="override.cpp">    void falar() override { std::cout &lt;&lt; nome() &lt;&lt; ": Miau!\n"; }    // faltou o const
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra override.cpp -o override
+override.cpp:17:10: error: ‘void Gato::falar()’ marked ‘override’, but does not override
+   17 |     void falar() override { std::cout &lt;&lt; nome() &lt;&lt; ": Miau!\n"; }
+      |          ^~~~~
+override.cpp:9:18: warning: ‘virtual void Animal::falar() const’ was hidden [-Woverloaded-virtual=]
+    9 |     virtual void falar() const { std::cout &lt;&lt; nome_ &lt;&lt; ": ...\n"; }
+      |                  ^~~~~
+override.cpp:17:10: note:   by ‘void Gato::falar()’
+   17 |     void falar() override { std::cout &lt;&lt; nome() &lt;&lt; ": Miau!\n"; }
+      |          ^~~~~</pre>
+
+<dl class="anatomy">
+  <dt>error:</dt><dd>Agora é <strong>erro</strong>: o programa nem é gerado.</dd>
+  <dt>‘void Gato::falar()’ marked ‘override’, but does not override</dt><dd>"<code>Gato::falar()</code> está marcado como <code>override</code>, mas não sobrescreve nada". Você prometeu substituir um método da base, e não existe nenhum método virtual da base com essa assinatura.</dd>
+  <dt>warning: … was hidden / note: by …</dt><dd>A pista: compare as duas linhas. A da base tem <code>const</code>; a do <code>Gato</code>, não.</dd>
+</dl>
+
+<p>O Clang do editor diz <code>non-virtual member function marked 'override' hides virtual member function</code>. Conserto: <code>void falar() const override</code>. Moral: <strong>escreva <code>override</code> em todo método que substitui um virtual</strong>. Custa uma palavra e transforma um defeito silencioso em erro com número de linha.</p>
+
+<hr>
+
+<h2>4. Destrutor <code>virtual</code></h2>
+<p>O destrutor também é um método, e a mesma regra vale para ele. Se você destrói um <code>Cachorro</code> por um ponteiro de <code>Animal</code>, e o destrutor do <code>Animal</code> não é virtual, só a parte <code>Animal</code> é destruída:</p>
+
+<pre class="file" data-file="destrutor.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Animal {
+public:
+    virtual void falar() const { std::cout &lt;&lt; "...\n"; }
+    ~Animal() { std::cout &lt;&lt; "~Animal\n"; }
+};
+
+class Cachorro : public Animal {
+public:
+    Cachorro() : brinquedos_{new std::string[3]} {}
+    void falar() const override { std::cout &lt;&lt; "Au au!\n"; }
+    ~Cachorro() {
+        delete[] brinquedos_;
+        std::cout &lt;&lt; "~Cachorro (devolvi os brinquedos)\n";
+    }
+private:
+    std::string* brinquedos_;
+};
+
+int main() {
+    Animal* p = new Cachorro;
+    p-&gt;falar();
+    delete p;
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra destrutor.cpp -o destrutor
+destrutor.cpp: In function ‘int main()’:
+destrutor.cpp:25:5: warning: deleting object of polymorphic class type ‘Animal’ which has non-virtual destructor might cause undefined behavior [-Wdelete-non-virtual-dtor]
+   25 |     delete p;
+      |     ^~~~~~~~
+$ ./destrutor
+Au au!
+~Animal                  « o ~Cachorro nunca rodou: os brinquedos vazaram</pre>
+
+<p>O aviso diz: "apagar um objeto de classe polimórfica <code>Animal</code>, que tem destrutor não virtual, pode causar <a href="comportamento-indefinido.html">comportamento indefinido</a>". E a saída confirma: o <code>~Cachorro</code> não rodou, e o array de brinquedos nunca foi devolvido. (O Clang avisa com <code>delete called on non-final 'Animal' that has virtual functions but non-virtual destructor</code>.)</p>
+
+<p>O conserto é uma palavra: <code>virtual ~Animal() { … }</code>.</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra destrutor2.cpp -o destrutor2
+$ ./destrutor2
+Au au!
+~Cachorro (devolvi os brinquedos)     « primeiro a filha...
+~Animal                               « ...depois a base, como na aula de Herança</pre>
+
+<div class="note">
+<strong>A regra</strong>
+<p>Se uma classe tem <strong>qualquer</strong> método <code>virtual</code>, dê a ela um destrutor <code>virtual</code>. Se ela não precisa fazer nada no destrutor, escreva <code>virtual ~Animal() = default;</code>: "a versão padrão, só que virtual". Isso vale também para <code>std::unique_ptr&lt;Animal&gt;</code>, que faz o mesmo <code>delete</code> por um ponteiro de <code>Animal</code>.</p>
+</div>
+
+<hr>
+
+<h2>5. Uma lista de animais diferentes: <code>vector&lt;unique_ptr&lt;Animal&gt;&gt;</code></h2>
+<p>Agora o objetivo da Ana: todos os bichos numa lista só. Um <code>std::vector&lt;Animal&gt;</code> não serve (veja o <a href="#fatiamento">fatiamento</a>); a lista precisa guardar <strong>ponteiros</strong> para os animais. E, para ninguém precisar de <code>delete</code>, ponteiros inteligentes (<a href="smart-pointers.html">Ponteiros Inteligentes</a>):</p>
+
+<pre class="file" data-file="petshop.cpp">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class Animal {
+public:
+    Animal(std::string nome) : nome_{nome} {}
+    virtual ~Animal() = default;
+    std::string nome() const { return nome_; }
+    virtual void falar() const { std::cout &lt;&lt; nome_ &lt;&lt; ": ...\n"; }
+private:
+    std::string nome_;
+};
+
+class Cachorro : public Animal {
+public:
+    Cachorro(std::string nome) : Animal{nome} {}
+    void falar() const override { std::cout &lt;&lt; nome() &lt;&lt; ": Au au!\n"; }
+};
+
+class Gato : public Animal {
+public:
+    Gato(std::string nome) : Animal{nome} {}
+    void falar() const override { std::cout &lt;&lt; nome() &lt;&lt; ": Miau!\n"; }
+};
+
+class Peixe : public Animal {
+public:
+    Peixe(std::string nome) : Animal{nome} {}
+};
+
+int main() {
+    std::vector&lt;std::unique_ptr&lt;Animal&gt;&gt; petshop;
+    petshop.push_back(std::make_unique&lt;Cachorro&gt;("Rex"));
+    petshop.push_back(std::make_unique&lt;Gato&gt;("Mimi"));
+    petshop.push_back(std::make_unique&lt;Peixe&gt;("Nemo"));
+    petshop.push_back(std::make_unique&lt;Cachorro&gt;("Thor"));
+
+    for (const auto&amp; animal : petshop) {
+        animal-&gt;falar();
+    }
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>std::vector&lt;std::unique_ptr&lt;Animal&gt;&gt;</code></td><td>Uma lista de "donos" de animais. Cada item aponta para um objeto que pode ser de qualquer classe filha.</td></tr>
+<tr><td><code>std::make_unique&lt;Cachorro&gt;("Rex")</code></td><td>Cria um <code>Cachorro</code> e devolve um <code>unique_ptr&lt;Cachorro&gt;</code>, que se converte sozinho em <code>unique_ptr&lt;Animal&gt;</code>.</td></tr>
+<tr><td><code>class Peixe</code> sem <code>falar()</code></td><td>Não é obrigatório substituir: o peixe usa a versão do <code>Animal</code>.</td></tr>
+<tr><td><code>const auto&amp; animal</code></td><td>Percorre a lista sem copiar (um <code>unique_ptr</code> nem pode ser copiado).</td></tr>
+<tr><td><code>animal-&gt;falar()</code></td><td>A chamada virtual: a seta, porque <code>animal</code> é (um ponteiro inteligente para) um ponteiro.</td></tr>
+<tr><td><code>virtual ~Animal() = default;</code></td><td>Quando o vetor morrer, cada <code>unique_ptr</code> apaga o seu bicho pelo destrutor certo.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra petshop.cpp -o petshop
+$ ./petshop
+Rex: Au au!
+Mimi: Miau!
+Nemo: ...                « o Peixe não substituiu: usou o do Animal
+Thor: Au au!</pre>
+
+<p>Repare que o laço do <code>main</code> não tem nenhum <code>if</code> perguntando "é cachorro? é gato?". Para acrescentar um papagaio, basta criar a classe e colocar um no vetor: o laço não muda. Esse é o ganho real do polimorfismo.</p>
+
+<hr>
+
+<h2 id="fatiamento">6. A armadilha do fatiamento</h2>
+<p>O polimorfismo só funciona por <strong>referência</strong> ou <strong>ponteiro</strong>. Se você copia um <code>Cachorro</code> para uma variável do tipo <code>Animal</code> (por valor), só a parte <code>Animal</code> é copiada; o resto é "fatiado" fora, e o que sobra é um <code>Animal</code> de verdade:</p>
+
+<pre class="file" data-file="fatia.cpp">void apresentar(Animal a) {      // por valor!
+    a.falar();
+}
+
+int main() {
+    Cachorro rex{"Rex"};
+    apresentar(rex);
+
+    std::vector&lt;Animal&gt; lista;
+    lista.push_back(rex);
+    lista[0].falar();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra fatia.cpp -o fatia
+$ ./fatia
+Rex: ...                 « o parâmetro a é um Animal, cópia da parte Animal do Rex
+Rex: ...                 « o vector&lt;Animal&gt; guarda Animals, não Cachorros</pre>
+
+<p>Nenhum aviso: o C++ deixa copiar um filho para a base, porque às vezes é isso mesmo que você quer. O <code>falar()</code> é virtual, mas não ajudou: o objeto <strong>é</strong> um <code>Animal</code>. Conserto: <code>const Animal&amp;</code> no parâmetro e <code>std::vector&lt;std::unique_ptr&lt;Animal&gt;&gt;</code> na lista.</p>
+
+<hr>
+
+<h2>7. <code>final</code> num método</h2>
+<p>Na aula de <a href="heranca.html">Herança</a>, <code>final</code> proibiu herdar de uma classe. Num método virtual, ele proíbe que as classes de baixo o substituam de novo:</p>
+
+<pre class="file" data-file="metfinal.cpp">class Cachorro : public Animal {
+public:
+    void falar() const final { std::cout &lt;&lt; "Au au!\n"; }
+};
+
+class Filhote : public Cachorro {
+public:
+    void falar() const override { std::cout &lt;&lt; "Au!\n"; }
+};
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra metfinal.cpp -o metfinal
+metfinal.cpp:16:10: error: virtual function ‘virtual void Filhote::falar() const’ overriding final function
+   16 |     void falar() const override { std::cout &lt;&lt; "Au!\n"; }
+      |          ^~~~~
+metfinal.cpp:11:10: note: overridden function is ‘virtual void Cachorro::falar() const’
+   11 |     void falar() const final { std::cout &lt;&lt; "Au au!\n"; }
+      |          ^~~~~</pre>
+
+<p>"Função virtual <code>Filhote::falar()</code> sobrescrevendo uma função <code>final</code>". (Clang: <code>declaration of 'falar' overrides a 'final' function</code>.) Use <code>final</code> quando a versão de uma classe precisa ser a última palavra, por exemplo por segurança.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Todos os objetos fazem a mesma coisa (a da base)</strong>
+<p><strong>O que aconteceu:</strong> uma de três causas: (1) faltou <code>virtual</code> no método da base; (2) a assinatura da filha é diferente da da base (um <code>const</code>, um tipo de parâmetro), então ela não substitui nada; (3) o objeto foi copiado por valor para uma variável da base (fatiamento).</p>
+<p><strong>Como consertar:</strong> (1) <code>virtual</code> na base; (2) <code>override</code> na filha, para o compilador apontar a diferença; (3) use referência, ponteiro ou <code>unique_ptr</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"marked ‘override’, but does not override"</strong>
+<p><strong>O que significa:</strong> o método da filha não corresponde a nenhum <code>virtual</code> da base. Compare letra por letra: nome, tipos dos parâmetros, <code>const</code> no fim. Também acontece se você esqueceu o <code>virtual</code> na base. O Clang diz <code>only virtual member functions can be marked 'override'</code> nesse último caso, e <code>non-virtual member function marked 'override' hides virtual member function</code> quando a assinatura difere.</p>
+<p><strong>Como consertar:</strong> iguale a assinatura à da base, ou acrescente <code>virtual</code> na base.</p>
+</div>
+
+<div class="cenario">
+<strong>"deleting object of polymorphic class type … which has non-virtual destructor"</strong>
+<p><strong>O que significa:</strong> você deu <code>delete</code> (ou um <code>unique_ptr</code> deu) por um ponteiro da base, e o destrutor da base não é virtual. Só o destrutor da base roda; o da filha é pulado.</p>
+<p><strong>Como consertar:</strong> <code>virtual ~Base() = default;</code> na classe base.</p>
+</div>
+
+<div class="cenario">
+<strong>"‘const class Animal’ has no member named ‘latir’"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra latir.cpp -o latir
+latir.cpp: In function ‘void passear(const Animal&amp;)’:
+latir.cpp:12:7: error: ‘const class Animal’ has no member named ‘latir’
+   12 |     a.latir();
+      |       ^~~~~</pre>
+<p><strong>O que significa:</strong> a função <code>passear(const Animal&amp; a)</code> chamou <code>a.latir()</code>, um método que só o <code>Cachorro</code> tem. (Clang: <code>no member named 'latir' in 'Animal'</code>.) Por uma referência ou ponteiro de <code>Animal</code>, você só pode chamar o que o <code>Animal</code> declara. Mesmo que o objeto seja um <code>Cachorro</code>, o compilador só conhece o tipo estático.</p>
+<p><strong>Como consertar:</strong> se todo animal deve saber fazer aquilo, declare o método (virtual) no <code>Animal</code>. Se só cachorros sabem, trate o cachorro como <code>Cachorro</code> nesse trecho do código.</p>
+</div>
+
+<hr>
+
+<h2>Missão</h2>
+
+<div class="trycpp" data-goal="out:Rex: Au au!,out:Mimi: Miau!,out:Piu: Piu piu!,src:override">
+<p class="try-task"><strong>Missão:</strong> o pet shop está mudo: todos dizem <code>...</code>. (1) Faça o <code>falar()</code> do <code>Animal</code> ser virtual e marque os da filha com <code>override</code>. (2) Crie a classe <code>Passaro</code>, que diz <code>Piu piu!</code>, e acrescente um pássaro chamado <code>Piu</code> ao vetor.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class Animal {
+public:
+    Animal(std::string nome) : nome_{nome} {}
+    virtual ~Animal() = default;
+    std::string nome() const { return nome_; }
+    void falar() const { std::cout &lt;&lt; nome_ &lt;&lt; ": ...\n"; }
+private:
+    std::string nome_;
+};
+
+class Cachorro : public Animal {
+public:
+    Cachorro(std::string nome) : Animal{nome} {}
+    void falar() const { std::cout &lt;&lt; nome() &lt;&lt; ": Au au!\n"; }
+};
+
+class Gato : public Animal {
+public:
+    Gato(std::string nome) : Animal{nome} {}
+    void falar() const { std::cout &lt;&lt; nome() &lt;&lt; ": Miau!\n"; }
+};
+
+int main() {
+    std::vector&lt;std::unique_ptr&lt;Animal&gt;&gt; petshop;
+    petshop.push_back(std::make_unique&lt;Cachorro&gt;("Rex"));
+    petshop.push_back(std::make_unique&lt;Gato&gt;("Mimi"));
+
+    for (const auto&amp; animal : petshop) {
+        animal-&gt;falar();
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class Animal {
+public:
+    Animal(std::string nome) : nome_{nome} {}
+    virtual ~Animal() = default;
+    std::string nome() const { return nome_; }
+    virtual void falar() const { std::cout &lt;&lt; nome_ &lt;&lt; ": ...\n"; }
+private:
+    std::string nome_;
+};
+
+class Cachorro : public Animal {
+public:
+    Cachorro(std::string nome) : Animal{nome} {}
+    void falar() const override { std::cout &lt;&lt; nome() &lt;&lt; ": Au au!\n"; }
+};
+
+class Gato : public Animal {
+public:
+    Gato(std::string nome) : Animal{nome} {}
+    void falar() const override { std::cout &lt;&lt; nome() &lt;&lt; ": Miau!\n"; }
+};
+
+class Passaro : public Animal {
+public:
+    Passaro(std::string nome) : Animal{nome} {}
+    void falar() const override { std::cout &lt;&lt; nome() &lt;&lt; ": Piu piu!\n"; }
+};
+
+int main() {
+    std::vector&lt;std::unique_ptr&lt;Animal&gt;&gt; petshop;
+    petshop.push_back(std::make_unique&lt;Cachorro&gt;("Rex"));
+    petshop.push_back(std::make_unique&lt;Gato&gt;("Mimi"));
+    petshop.push_back(std::make_unique&lt;Passaro&gt;("Piu"));
+
+    for (const auto&amp; animal : petshop) {
+        animal-&gt;falar();
+    }
+}
+</pre>
+</div>
+
+<p>A saída da solução no laboratório:</p>
+<pre class="term" data-cwd="~/cpp">$ ./petshop2
+Rex: Au au!
+Mimi: Miau!
+Piu: Piu piu!</pre>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>Onde</th><th>O que faz</th></tr>
+<tr><td><code>virtual void f() const;</code></td><td>Base</td><td>Permite que as filhas substituam <code>f</code>; a chamada por referência/ponteiro usa o objeto de verdade</td></tr>
+<tr><td><code>void f() const override;</code></td><td>Filha</td><td>Substitui o <code>f</code> da base; erro de compilação se não houver o que substituir</td></tr>
+<tr><td><code>void f() const final;</code></td><td>Filha</td><td>Substitui e proíbe as classes de baixo de substituírem de novo</td></tr>
+<tr><td><code>virtual ~Base() = default;</code></td><td>Base</td><td>Destrutor virtual: <code>delete</code> pela base destrói o objeto inteiro</td></tr>
+<tr><td><code>void g(const Base&amp; b)</code></td><td>Funções</td><td>Recebe qualquer filha sem copiar; chamadas virtuais funcionam</td></tr>
+<tr><td><code>std::vector&lt;std::unique_ptr&lt;Base&gt;&gt;</code></td><td>Listas</td><td>Guarda objetos de classes filhas diferentes</td></tr>
+<tr><td><code>void g(Base b)</code> / <code>std::vector&lt;Base&gt;</code></td><td>Evite</td><td>Fatiamento: sobra só a parte da base</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A palavra na base</h3>
+<p>Complete para o método <code>area()</code> poder ser substituído pelas filhas:</p>
+<div class="ex-code"><input data-answer="virtual" aria-label="palavra"> double area() const { return 0; }</div>
+</div>
+
+<div class="exercise">
+<h3>2. A palavra na filha</h3>
+<p>Complete a declaração na filha, para o compilador conferir que ela substitui o método da base:</p>
+<div class="ex-code">double area() const <input data-answer="override" aria-label="palavra"> { return lado_ * lado_; }</div>
+</div>
+
+<div class="exercise">
+<h3>3. O destrutor da base</h3>
+<p>Escreva o destrutor virtual padrão da classe <code>Forma</code> (sem corpo, com <code>= default</code>):</p>
+<div class="ex-code"><input data-answer="virtual ~Forma() = default;|virtual ~Forma() = default|virtual ~Forma()=default;" aria-label="destrutor"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. <code>Animal</code> tem <code>void falar() const</code> <strong>sem</strong> <code>virtual</code>; <code>Gato</code> tem o seu. O que <code>Animal&amp; a = mimi; a.falar();</code> executa?</p>
+<label><input type="radio" name="q4"> O <code>falar()</code> do <code>Gato</code>.</label>
+<label><input type="radio" name="q4"> O <code>falar()</code> do <code>Animal</code>.</label>
+<label><input type="radio" name="q4"> Os dois, um depois do outro.</label>
+<label><input type="radio" name="q4"> Dá erro de compilação.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Por que escrever <code>override</code>, se o programa funciona sem ele?</p>
+<label><input type="radio" name="q5"> Deixa o programa mais rápido.</label>
+<label><input type="radio" name="q5"> Torna o método virtual na base.</label>
+<label><input type="radio" name="q5"> Impede que alguém herde da classe.</label>
+<label><input type="radio" name="q5"> Se a assinatura não bater com a da base, vira erro de compilação, em vez de um defeito silencioso.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">6. Qual lista consegue guardar cachorros e gatos e fazer cada um falar do seu jeito?</p>
+<label><input type="radio" name="q6"> <code>std::vector&lt;Animal&gt;</code></label>
+<label><input type="radio" name="q6"> <code>std::vector&lt;Cachorro&gt;</code></label>
+<label><input type="radio" name="q6"> <code>std::vector&lt;std::unique_ptr&lt;Animal&gt;&gt;</code></label>
+<label><input type="radio" name="q6"> <code>std::vector&lt;std::string&gt;</code></label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>Polimorfismo</strong>: o mesmo código (escrito para a base) faz coisas diferentes conforme o objeto de verdade.</li>
+  <li>Sem <code>virtual</code>, uma referência ou ponteiro da base chama o método da base (tipo estático).</li>
+  <li><code>virtual</code> na base faz a chamada seguir o objeto de verdade (tipo dinâmico); <code>override</code> na filha pede ao compilador para conferir a assinatura.</li>
+  <li>Assinatura diferente sem <code>override</code> = método novo, defeito silencioso. Com <code>override</code> = <code>marked ‘override’, but does not override</code>.</li>
+  <li>Classe com método virtual precisa de <code>virtual ~Base() = default;</code>; sem isso, o <code>delete</code> pela base pula o destrutor da filha.</li>
+  <li>Para listas de objetos diferentes: <code>std::vector&lt;std::unique_ptr&lt;Base&gt;&gt;</code>. Copiar para a base por valor fatia o objeto.</li>
+  <li>Próximo passo: e se o <code>Animal</code> não devesse ter um <code>falar()</code> "padrão"? Veja <a href="classes-abstratas.html">Classes Abstratas</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
