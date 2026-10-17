@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ this — o ponteiro para o próprio objeto | Guia C++</title>
+<meta name="description" content="O ponteiro this em C++ para iniciantes: como o método sabe qual objeto o chamou, this->nome para desambiguar parâmetro e atributo, o bug do preco = preco, retornar *this para encadear chamadas e comparar this com outro objeto, com saídas reais do g++ 15 e do Clang 21.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">this</span></h1>
+
+<p class="intro">Desde a aula <a href="metodos.html">Métodos</a>, você escreve <code>nome</code> dentro de um método e o C++ sabe que é o nome <em>da caneta</em> quando a caneta chamou, e o nome <em>do caderno</em> quando o caderno chamou. Como ele sabe? Por um parâmetro escondido, que todo método recebe sem você ver: o ponteiro <strong><code>this</code></strong> ("este"). Nesta aula você vai conhecê-lo e usá-lo em duas situações do dia a dia: quando um parâmetro tem o mesmo nome de um atributo e quando você quer encadear chamadas, como <code>caneta.repor(10).vender(3)</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é <code>this</code> e como ver que ele aponta para o objeto que chamou o método.</li>
+  <li>Por que <code>preco = preco;</code> não faz nada, e como <code>this-&gt;preco = preco;</code> resolve.</li>
+  <li>As alternativas a <code>this-&gt;</code>: nomes diferentes e o sublinhado (<code>preco_</code>).</li>
+  <li>Como retornar <code>*this</code> para encadear chamadas, e por que o retorno precisa ser uma referência (<code>Produto&amp;</code>).</li>
+  <li>Como usar <code>this</code> para saber se dois objetos são o mesmo.</li>
+</ul>
+</div>
+
+<p>Para esta aula, ajuda lembrar de <a href="ponteiros.html">Ponteiros</a> (o <code>&amp;</code> que pega o endereço, o <code>*</code> que segue o ponteiro e a seta <code>-&gt;</code>) e de <a href="referencias.html">Referências</a>. Os programas foram compilados e executados na máquina fictícia da Ana, na pasta <code>~/cpp/this</code>, com o <strong>g++ 15.2</strong> e o comando padrão <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: "esta ficha aqui"</h2>
+<p>Quando a Ana segue a instrução "repor: some a quantidade ao estoque", ela está com <strong>uma</strong> ficha nas mãos. "O estoque" quer dizer "o estoque <em>desta ficha aqui</em>". Se ela precisasse apontar com o dedo, apontaria para a ficha que está segurando.</p>
+<p><code>this</code> é esse dedo: dentro de um método, ele <strong>aponta para o objeto que chamou o método</strong>. Em <code>caneta.repor(10)</code>, <code>this</code> aponta para a caneta; em <code>caderno.repor(10)</code>, para o caderno.</p>
+
+<hr>
+
+<h2>1. Ver o <code>this</code></h2>
+<p>Um ponteiro guarda um endereço de memória. Vamos mostrar o endereço de cada objeto (com <code>&amp;</code>) e, dentro do método, o valor de <code>this</code>:</p>
+
+<pre class="file" data-file="endereco.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+
+    void quemSouEu() {
+        std::cout &lt;&lt; "Sou " &lt;&lt; nome &lt;&lt; " e moro em " &lt;&lt; this &lt;&lt; "\n";
+    }
+};
+
+int main() {
+    Produto caneta{"caneta"};
+    Produto caderno{"caderno"};
+
+    std::cout &lt;&lt; "&amp;caneta  = " &lt;&lt; &amp;caneta &lt;&lt; "\n";
+    std::cout &lt;&lt; "&amp;caderno = " &lt;&lt; &amp;caderno &lt;&lt; "\n";
+
+    caneta.quemSouEu();
+    caderno.quemSouEu();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/this">$ g++ -std=c++23 -Wall -Wextra endereco.cpp -o endereco
+$ ./endereco
+&amp;caneta  = 0x7ffd3f599000
+&amp;caderno = 0x7ffd3f599020
+Sou caneta e moro em 0x7ffd3f599000
+Sou caderno e moro em 0x7ffd3f599020</pre>
+
+<p>Os endereços batem: quando a caneta chamou <code>quemSouEu()</code>, <code>this</code> valia o endereço da caneta; quando o caderno chamou, o do caderno. (Os números em si mudam a cada execução e de máquina para máquina; o que importa é que são iguais dois a dois.)</p>
+
+<p>Por baixo dos panos, o C++ transforma <code>caneta.quemSouEu()</code> em algo parecido com <code>quemSouEu(&amp;caneta)</code>: passa o endereço do objeto como um parâmetro invisível, chamado <code>this</code>. E, toda vez que você escreve só <code>nome</code> num método, o compilador entende <code>this-&gt;nome</code>: "o <code>nome</code> do objeto para onde <code>this</code> aponta".</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Dentro de um método de <code>Produto</code></th><th>Quer dizer</th></tr>
+<tr><td><code>this</code></td><td>Ponteiro (<code>Produto*</code>) para o objeto que chamou o método.</td></tr>
+<tr><td><code>this-&gt;nome</code></td><td>O atributo <code>nome</code> desse objeto. É o que <code>nome</code> sozinho já quer dizer.</td></tr>
+<tr><td><code>*this</code></td><td>O próprio objeto (seguindo o ponteiro com <code>*</code>).</td></tr>
+<tr><td><code>(*this).nome</code></td><td>Igual a <code>this-&gt;nome</code>, escrito do jeito longo. A seta existe justamente para evitar esses parênteses.</td></tr>
+</table>
+</div>
+
+<p>Na maior parte do tempo você não escreve <code>this</code>: o compilador o coloca sozinho. Ele aparece quando você precisa dele <strong>explicitamente</strong>, nas próximas seções.</p>
+
+<hr>
+
+<h2>2. Parâmetro com o mesmo nome do atributo</h2>
+<p>É natural querer chamar o parâmetro de <code>mudarPreco</code> de <code>preco</code>. Veja o que acontece:</p>
+
+<pre class="file" data-file="sombra.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco = 0;
+
+    void mudarPreco(int preco) {
+        preco = preco;
+    }
+};
+
+int main() {
+    Produto caneta{"caneta", 3};
+    caneta.mudarPreco(5);
+    std::cout &lt;&lt; caneta.nome &lt;&lt; ": R$ " &lt;&lt; caneta.preco &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/this">$ g++ -std=c++23 -Wall -Wextra sombra.cpp -o sombra
+$ ./sombra
+caneta: R$ 3          « deveria ser 5!</pre>
+
+<p>O preço não mudou, e o g++ não avisou nada. Por quê? Dentro de <code>mudarPreco</code>, existem dois <code>preco</code>: o atributo do objeto e o parâmetro. A regra de <a href="escopo.html">escopo</a> diz que o nome <strong>mais próximo</strong> ganha, e o mais próximo é o parâmetro. Ele <strong>esconde</strong> o atributo (diz-se que o parâmetro faz <em>sombra</em>, <em>shadows</em>, sobre o atributo). Então <code>preco = preco;</code> quer dizer "parâmetro recebe parâmetro": copia o 5 em cima dele mesmo, e o atributo fica intocado.</p>
+
+<p>O Clang, compilador do editor do guia, percebe e avisa:</p>
+
+<pre class="term" data-cwd="~/cpp/this">$ clang++ -std=c++23 -Wall -Wextra sombra.cpp -o sombra
+sombra.cpp:10:15: warning: explicitly assigning value of variable of type 'int' to itself; did you mean to assign to member 'preco'? [-Wself-assign]
+   10 |         preco = preco;
+      |         ~~~~~ ^ ~~~~~
+      |         this-&gt;
+1 warning generated.</pre>
+
+<p>"Atribuindo explicitamente um valor de uma variável <code>int</code> a ela mesma; você quis atribuir ao membro <code>preco</code>?" E ele ainda desenha a correção: <code>this-&gt;</code> na frente do primeiro <code>preco</code>.</p>
+
+<h3>A solução com <code>this-&gt;</code></h3>
+<p>O parâmetro esconde o atributo, mas <code>this-&gt;preco</code> não deixa dúvida: é o <code>preco</code> <strong>do objeto</strong>.</p>
+
+<pre class="file" data-file="desambiguar.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(std::string nome, int preco) : nome(nome), preco(preco) {
+    }
+
+    void mudarPreco(int preco) {
+        if (preco &gt;= 0) {
+            this-&gt;preco = preco;
+        }
+    }
+
+    void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; ": R$ " &lt;&lt; preco &lt;&lt; "\n";
+    }
+
+private:
+    std::string nome;
+    int preco;
+};
+
+int main() {
+    Produto caneta{"caneta", 3};
+    caneta.mudarPreco(5);
+    caneta.mostrar();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/this">$ g++ -std=c++23 -Wall -Wextra desambiguar.cpp -o desambiguar
+$ ./desambiguar
+caneta: R$ 5</pre>
+
+<dl class="anatomy">
+  <dt>this-&gt;preco = preco;</dt><dd>À esquerda, o atributo do objeto; à direita, o parâmetro (o nome mais próximo). Agora o 5 vai para o lugar certo.</dd>
+  <dt>if (preco &gt;= 0)</dt><dd>Sem <code>this-&gt;</code>, <code>preco</code> é o parâmetro: estamos conferindo o valor <strong>novo</strong>, como queríamos.</dd>
+  <dt>: nome(nome), preco(preco)</dt><dd>Na <a href="construtores.html">lista de inicialização</a>, não precisa de <code>this</code>: o nome <strong>de fora</strong> dos parênteses só pode ser um atributo, e o de <strong>dentro</strong> segue a regra normal (o parâmetro). Por isso <code>nome(nome)</code> funciona e é muito comum.</dd>
+</dl>
+
+<h3>Três costumes: qual usar</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Costume</th><th>Exemplo</th><th>Prós e contras</th></tr>
+<tr><td>Mesmo nome + <code>this-&gt;</code></td><td><code>void mudarPreco(int preco) { this-&gt;preco = preco; }</code></td><td>Nomes limpos. Mas basta esquecer o <code>this-&gt;</code> uma vez para criar o bug acima, e o g++ não avisa.</td></tr>
+<tr><td>Parâmetro com outro nome</td><td><code>void mudarPreco(int novo) { preco = novo; }</code></td><td>Sem ambiguidade, sem <code>this</code>. Às vezes é difícil achar um bom nome alternativo.</td></tr>
+<tr><td>Atributo com marca</td><td><code>int preco_;</code> … <code>preco_ = preco;</code></td><td>Usado na aula <a href="encapsulamento.html">public e private</a>. Nunca há conflito, e o getter pode se chamar <code>preco()</code>. É o mais seguro.</td></tr>
+</table>
+</div>
+
+<div class="tip"><strong>Peça ajuda ao g++:</strong> a opção <code>-Wshadow</code> (fora do <code>-Wall</code> e do <code>-Wextra</code>) avisa sempre que um nome esconde outro. Com ela, o g++ diz no <code>sombra.cpp</code>: <code>warning: declaration of ‘preco’ shadows a member of ‘Produto’ [-Wshadow]</code>. O porém: ela avisa também no código <em>correto</em> com <code>this-&gt;</code> e no <code>nome(nome)</code> da lista de inicialização. Por isso, quem liga <code>-Wshadow</code> costuma adotar o costume do sublinhado.</div>
+
+<div class="trycpp" data-goal="out:caneta: R$ 5,src:this\s*-&gt;\s*preco\s*=">
+<p class="try-task"><strong>Missão:</strong> o preço da caneta não está mudando. Rode e repare no aviso do Clang. Depois conserte o <code>mudarPreco</code> usando <code>this-&gt;</code>, sem trocar o nome do parâmetro, para a saída ser <code>caneta: R$ 5</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco = 0;
+
+    void mudarPreco(int preco) {
+        preco = preco;
+    }
+};
+
+int main() {
+    Produto caneta{"caneta", 3};
+    caneta.mudarPreco(5);
+    std::cout &lt;&lt; caneta.nome &lt;&lt; ": R$ " &lt;&lt; caneta.preco &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+    int preco = 0;
+
+    void mudarPreco(int preco) {
+        this-&gt;preco = preco;
+    }
+};
+
+int main() {
+    Produto caneta{"caneta", 3};
+    caneta.mudarPreco(5);
+    std::cout &lt;&lt; caneta.nome &lt;&lt; ": R$ " &lt;&lt; caneta.preco &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Retornar <code>*this</code> para encadear chamadas</h2>
+<p>Às vezes você quer fazer várias coisas seguidas com o mesmo objeto. Em vez de</p>
+<pre class="file" data-file="trecho.cpp">caneta.repor(10);
+caneta.vender(3);
+caneta.vender(2);
+caneta.mostrar();
+</pre>
+<p>dá para escrever tudo numa linha, uma chamada "pendurada" na outra: <code>caneta.repor(10).vender(3).vender(2).mostrar();</code>. Para isso funcionar, cada método precisa <strong>devolver o próprio objeto</strong>, para que o próximo <code>.</code> tenha onde se apoiar. O próprio objeto é <code>*this</code>:</p>
+
+<pre class="file" data-file="encadear.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(std::string nome, int estoque) : nome(nome), estoque(estoque) {
+    }
+
+    Produto&amp; repor(int quantidade) {
+        estoque += quantidade;
+        return *this;
+    }
+
+    Produto&amp; vender(int quantidade) {
+        if (quantidade &lt;= estoque) {
+            estoque -= quantidade;
+        }
+        return *this;
+    }
+
+    void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; ": " &lt;&lt; estoque &lt;&lt; " no estoque\n";
+    }
+
+private:
+    std::string nome;
+    int estoque;
+};
+
+int main() {
+    Produto caneta{"caneta", 50};
+
+    caneta.repor(10).vender(3).vender(2).mostrar();
+
+    caneta.vender(5)
+          .repor(20)
+          .mostrar();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/this">$ g++ -std=c++23 -Wall -Wextra encadear.cpp -o encadear
+$ ./encadear
+caneta: 55 no estoque
+caneta: 70 no estoque</pre>
+
+<dl class="anatomy">
+  <dt>Produto&amp; repor(int quantidade)</dt><dd>O tipo de retorno é <code>Produto&amp;</code>: uma <a href="referencias.html">referência</a> a um produto, isto é, "outro nome para um produto que já existe", sem cópia.</dd>
+  <dt>return *this;</dt><dd><code>this</code> é o ponteiro; <code>*this</code> é o objeto apontado. O método devolve uma referência ao próprio objeto que o chamou.</dd>
+  <dt>caneta.repor(10).vender(3)</dt><dd>Lido da esquerda para a direita: <code>caneta.repor(10)</code> roda e devolve a própria caneta; nela, roda <code>.vender(3)</code>, que devolve de novo a caneta; e assim por diante. 50 + 10 − 3 − 2 = 55.</dd>
+  <dt>caneta.vender(5)<br>.repor(20)<br>.mostrar();</dt><dd>A mesma corrente, quebrada em linhas para ficar legível. O <code>;</code> só vem no fim. 55 − 5 + 20 = 70.</dd>
+</dl>
+
+<p>Você já usa isso há tempos sem saber: <code>std::cout &lt;&lt; "a" &lt;&lt; "b"</code> funciona porque cada <code>&lt;&lt;</code> devolve uma referência ao próprio <code>std::cout</code>, e o próximo <code>&lt;&lt;</code> se apoia nele. Esse estilo de classe que se encadeia tem até nome: <em>interface fluente</em>.</p>
+
+<h3>Por que o <code>&amp;</code> no retorno é essencial</h3>
+<p>Sem o <code>&amp;</code>, o método devolveria uma <strong>cópia</strong> do objeto, e o resto da corrente trabalharia na cópia:</p>
+
+<pre class="file" data-file="copia.cpp">    Produto repor(int quantidade) {          // sem o &amp;
+        estoque += quantidade;
+        return *this;
+    }
+
+    Produto vender(int quantidade) {         // sem o &amp;
+        if (quantidade &lt;= estoque) {
+            estoque -= quantidade;
+        }
+        return *this;
+    }
+…
+int main() {
+    Produto caneta{"caneta", 50};
+    caneta.repor(10).vender(3).vender(2);
+    caneta.mostrar();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/this">$ g++ -std=c++23 -Wall -Wextra copia.cpp -o copia
+$ ./copia
+caneta: 60 no estoque          « as duas vendas sumiram</pre>
+
+<p>Compilou sem aviso, e o resultado está errado. O <code>repor(10)</code> mexeu na caneta de verdade (60), mas devolveu uma <strong>cópia</strong>. As duas vendas aconteceram nessa cópia (e na cópia da cópia), que desapareceram no fim da linha. A caneta original ficou com 60. Lembre: em C++, copiar um objeto cria outro objeto independente (aula <a href="poo.html">O que é POO</a>).</p>
+
+<div class="warning"><strong>Regra:</strong> para encadear, o retorno é <code>Classe&amp;</code> e o <code>return</code> é <code>*this</code>. As duas coisas juntas. Sem o <code>&amp;</code>, compila e dá resultado errado em silêncio.</div>
+
+<hr>
+
+<h2>4. <code>this</code> para comparar objetos</h2>
+<p>Como <code>this</code> é um endereço, dá para comparar com o endereço de outro objeto e descobrir se os dois são <strong>o mesmo</strong> objeto (não só parecidos: o mesmo, no mesmo lugar da memória). A Ana tem duas lojas e transfere canetas de uma para a outra; transferir de uma loja para ela mesma é engano:</p>
+
+<pre class="file" data-file="transferir.cpp">class Produto {
+public:
+    Produto(std::string nome, int estoque) : nome(nome), estoque(estoque) {
+    }
+
+    bool transferirPara(Produto&amp; outro, int quantidade) {
+        if (this == &amp;outro) {
+            std::cout &lt;&lt; "Transferir para si mesmo não faz sentido.\n";
+            return false;
+        }
+        if (quantidade &gt; estoque) {
+            return false;
+        }
+        estoque -= quantidade;
+        outro.estoque += quantidade;
+        return true;
+    }
+
+    void mostrar() {
+        std::cout &lt;&lt; nome &lt;&lt; ": " &lt;&lt; estoque &lt;&lt; "\n";
+    }
+
+private:
+    std::string nome;
+    int estoque;
+};
+
+int main() {
+    Produto lojaCentro{"caneta (centro)", 50};
+    Produto lojaBairro{"caneta (bairro)", 5};
+
+    lojaCentro.transferirPara(lojaBairro, 20);
+    lojaCentro.transferirPara(lojaCentro, 1);
+
+    lojaCentro.mostrar();
+    lojaBairro.mostrar();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/this">$ g++ -std=c++23 -Wall -Wextra transferir.cpp -o transferir
+$ ./transferir
+Transferir para si mesmo não faz sentido.
+caneta (centro): 30
+caneta (bairro): 25</pre>
+
+<p><code>this == &amp;outro</code> compara dois endereços: "o objeto que está executando é o mesmo que veio no parâmetro?". Na segunda chamada, <code>outro</code> é a própria <code>lojaCentro</code>, e o método recusa. Essa checagem ("auto-atribuição") é clássica e você vai reencontrá-la em <a href="copia-movimento.html">Cópia e Movimento</a>.</p>
+
+<hr>
+
+<h2 id="errado">Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>this.nome</code> com ponto, como em Java</strong>
+<pre class="file" data-file="ponto.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+
+    void mostrar() {
+        std::cout &lt;&lt; this.nome &lt;&lt; "\n";
+    }
+};
+
+int main() {
+    Produto caneta{"caneta"};
+    caneta.mostrar();
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/this">$ g++ -std=c++23 -Wall -Wextra ponto.cpp -o ponto
+ponto.cpp: In member function ‘void Produto::mostrar()’:
+ponto.cpp:9:27: error: request for member ‘nome’ in ‘(Produto*)this’, which is of pointer type ‘Produto*’ (maybe you meant to use ‘-&gt;’ ?)
+    9 |         std::cout &lt;&lt; this.nome &lt;&lt; "\n";
+      |                           ^~~~</pre>
+<p><strong>O que aconteceu:</strong> em Java e C#, <code>this</code> é usado com ponto. Em C++, <code>this</code> é um <strong>ponteiro</strong>, e com ponteiros se usa a seta. A mensagem diz: "pedido do membro <code>nome</code> em <code>this</code>, que é do tipo ponteiro <code>Produto*</code> (talvez você quisesse usar <code>-&gt;</code>?)". No Clang: <code>member reference type 'Produto *' is a pointer; did you mean to use '-&gt;'?</code></p>
+<p><strong>Como resolver:</strong> <code>this-&gt;nome</code> (ou <code>(*this).nome</code>, ou simplesmente <code>nome</code>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>this</code> fora de um método</strong>
+<pre class="file" data-file="solto.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    std::string nome;
+};
+
+void mostrar() {
+    std::cout &lt;&lt; this-&gt;nome &lt;&lt; "\n";
+}
+
+int main() {
+    mostrar();
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/this">$ g++ -std=c++23 -Wall -Wextra solto.cpp -o solto
+solto.cpp: In function ‘void mostrar()’:
+solto.cpp:10:18: error: invalid use of ‘this’ in non-member function
+   10 |     std::cout &lt;&lt; this-&gt;nome &lt;&lt; "\n";
+      |                  ^~~~</pre>
+<p><strong>O que aconteceu:</strong> "uso inválido de <code>this</code> em função que não é membro". <code>mostrar</code> é uma função solta: ninguém a chamou "sobre" um objeto, então não existe "este objeto". O mesmo vale para métodos <code>static</code> (aula <a href="membros-static.html">Membros static</a>), que também não têm <code>this</code>. No Clang: <code>invalid use of 'this' outside of a non-static member function</code>.</p>
+<p><strong>Como resolver:</strong> transforme a função em método da classe (<code>void Produto::mostrar()</code>, aula <a href="metodos.html">Métodos</a>) ou receba o objeto por parâmetro (<code>void mostrar(const Produto&amp; p)</code> e use <code>p.nome</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>O atributo que não muda (<code>preco = preco</code>) e a corrente que se perde (retorno sem <code>&amp;</code>)</strong>
+<p>Os dois piores erros desta aula <strong>não dão erro</strong>: compilam e dão resultado errado. Reveja as seções 2 e 3. Sintomas: um setter que "não funciona" (desconfie de parâmetro com o nome do atributo) e uma corrente de chamadas em que só a primeira tem efeito (desconfie do retorno sem <code>&amp;</code>). Compilar também com o Clang, ou com <code>-Wshadow</code>, pega o primeiro.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>this</code></td><td>Ponteiro para o objeto que chamou o método. Só existe dentro de métodos (não <code>static</code>).</td></tr>
+<tr><td><code>this-&gt;preco</code></td><td>O atributo <code>preco</code> do objeto, mesmo que um parâmetro tenha o mesmo nome.</td></tr>
+<tr><td><code>*this</code></td><td>O próprio objeto.</td></tr>
+<tr><td><code>Produto&amp; f() { …; return *this; }</code></td><td>Devolve o próprio objeto por referência, para encadear: <code>obj.f().g()</code>.</td></tr>
+<tr><td><code>if (this == &amp;outro)</code></td><td>Confere se <code>outro</code> é o mesmo objeto que está executando.</td></tr>
+<tr><td><code>: preco(preco)</code></td><td>Na lista de inicialização, o mesmo nome funciona sem <code>this</code>.</td></tr>
+<tr><td><code>-Wshadow</code></td><td>Opção do g++ que avisa quando um nome esconde outro.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Desambiguar</h3>
+<p>Complete para que o atributo <code>estoque</code> receba o parâmetro <code>estoque</code>:</p>
+<div class="ex-code">void mudarEstoque(int estoque) { <input data-answer="this-&gt;estoque|(*this).estoque" aria-label="atributo"> = estoque; }</div>
+</div>
+
+<div class="exercise">
+<h3>2. Devolver o próprio objeto</h3>
+<p>Complete o fim do método, para permitir encadear chamadas:</p>
+<div class="ex-code">Produto&amp; repor(int q) { estoque += q; return <input data-answer="*this;|*this" aria-label="retorno"> }</div>
+</div>
+
+<div class="exercise">
+<h3>3. O tipo de retorno</h3>
+<p>Complete o tipo de retorno para que <code>caneta.vender(1).vender(2)</code> venda as duas vezes <strong>na caneta original</strong>:</p>
+<div class="ex-code"><input data-answer="Produto&amp;|Produto &amp;" aria-label="tipo"> vender(int q) { estoque -= q; return *this; }</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Em <code>caderno.mostrar()</code>, para onde aponta <code>this</code> dentro de <code>mostrar</code>?</p>
+<label><input type="radio" name="q4"> Para a classe <code>Produto</code></label>
+<label><input type="radio" name="q4"> Para o primeiro objeto criado no programa</label>
+<label><input type="radio" name="q4"> Para o objeto <code>caderno</code></label>
+<label><input type="radio" name="q4"> Para o método <code>mostrar</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. No método <code>void mudarPreco(int preco) { preco = preco; }</code>, o que acontece com o atributo <code>preco</code>?</p>
+<label><input type="radio" name="q5"> Recebe o valor novo</label>
+<label><input type="radio" name="q5"> Nada: a linha copia o parâmetro nele mesmo</label>
+<label><input type="radio" name="q5"> Erro de compilação no g++</label>
+<label><input type="radio" name="q5"> Fica zerado</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Por que <code>this.nome</code> dá erro em C++?</p>
+<label><input type="radio" name="q6"> Porque <code>this</code> é um ponteiro, e ponteiros usam <code>-&gt;</code></label>
+<label><input type="radio" name="q6"> Porque <code>nome</code> é privado</label>
+<label><input type="radio" name="q6"> Porque <code>this</code> só existe em Java</label>
+<label><input type="radio" name="q6"> Porque falta o <code>*</code> antes de <code>nome</code></label>
+</div>
+
+<h3>Missão final: o pedido encadeado</h3>
+
+<div class="trycpp" data-goal="out:Pedido da Bia: R$ 10,src:Pedido\s*&amp;\s*adicionar,src:Pedido\s*&amp;\s*desconto,src:return\s*\*\s*this">
+<p class="try-task"><strong>Missão:</strong> complete a classe <code>Pedido</code> com dois métodos <strong>encadeáveis</strong>: <code>adicionar(int valor)</code>, que soma <code>valor</code> ao total, e <code>desconto(int reais)</code>, que subtrai <code>reais</code> do total. Os dois devem devolver <code>Pedido&amp;</code> com <code>return *this;</code>. Com o <code>main</code> pronto, a saída deve ser <code>Pedido da Bia: R$ 10</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Pedido {
+public:
+    Pedido(std::string cliente) : cliente(cliente) {
+    }
+
+    // escreva adicionar e desconto aqui
+
+    void mostrar() {
+        std::cout &lt;&lt; "Pedido da " &lt;&lt; cliente &lt;&lt; ": R$ " &lt;&lt; total &lt;&lt; "\n";
+    }
+
+private:
+    std::string cliente;
+    int total = 0;
+};
+
+int main() {
+    Pedido pedido{"Bia"};
+    pedido.adicionar(12).adicionar(3).desconto(5).mostrar();
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Pedido {
+public:
+    Pedido(std::string cliente) : cliente(cliente) {
+    }
+
+    Pedido&amp; adicionar(int valor) {
+        total += valor;
+        return *this;
+    }
+
+    Pedido&amp; desconto(int reais) {
+        total -= reais;
+        return *this;
+    }
+
+    void mostrar() {
+        std::cout &lt;&lt; "Pedido da " &lt;&lt; cliente &lt;&lt; ": R$ " &lt;&lt; total &lt;&lt; "\n";
+    }
+
+private:
+    std::string cliente;
+    int total = 0;
+};
+
+int main() {
+    Pedido pedido{"Bia"};
+    pedido.adicionar(12).adicionar(3).desconto(5).mostrar();
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>this</code> é um ponteiro, passado escondido a todo método, que aponta para o objeto que chamou o método. <code>nome</code> sozinho, num método, quer dizer <code>this-&gt;nome</code>.</li>
+  <li>Quando um parâmetro tem o nome de um atributo, ele esconde o atributo: <code>preco = preco;</code> não faz nada (o Clang avisa; o g++ só com <code>-Wshadow</code>). Use <code>this-&gt;preco = preco;</code>, outro nome no parâmetro ou o sublinhado no atributo.</li>
+  <li>Na lista de inicialização, <code>preco(preco)</code> funciona sem <code>this</code>.</li>
+  <li>Para encadear chamadas, devolva <code>Classe&amp;</code> e <code>return *this;</code>. Sem o <code>&amp;</code>, a corrente trabalha em cópias e as mudanças se perdem.</li>
+  <li><code>this == &amp;outro</code> diz se dois nomes são o mesmo objeto.</li>
+  <li>Em C++, <code>this-&gt;</code>, nunca <code>this.</code>; e não existe <code>this</code> fora de métodos.</li>
+  <li>Próxima aula: marcar quais métodos só leem o objeto, em <a href="metodos-const.html">Métodos const</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

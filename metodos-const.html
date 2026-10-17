@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Métodos const — const-correctness e o erro discards qualifiers | Guia C++</title>
+<meta name="description" content="Métodos const em C++ para iniciantes: int preco() const, o que o const promete, objetos const só chamam métodos const, o erro real passing ‘const Produto’ as ‘this’ argument discards qualifiers, const&amp; em parâmetros de objetos, mutable e const-correctness, com saídas do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Métodos const</span></h1>
+
+<p class="intro">Desde a aula <a href="metodos.html">Métodos</a>, você viu que há dois tipos de método: os que só <strong>olham</strong> o objeto (<code>preco()</code>, <code>mostrar()</code>) e os que <strong>mudam</strong> o objeto (<code>vender()</code>, <code>mudarPreco()</code>). Até agora, essa diferença só existia na sua cabeça. Nesta aula você vai escrevê-la no código, com a palavra <code>const</code> depois dos parênteses, e ver por que isso não é enfeite: sem ela, o seu código simplesmente não compila em situações muito comuns.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que significa <code>int preco() const</code> e o que o compilador passa a conferir.</li>
+  <li>Por que um objeto <code>const</code> (ou uma referência <code>const&amp;</code>) só pode chamar métodos <code>const</code>.</li>
+  <li>A ler o erro <code>passing ‘const Produto’ as ‘this’ argument discards qualifiers</code>.</li>
+  <li>Por que objetos vão para funções como <code>const Produto&amp;</code>.</li>
+  <li>O que é <em>const-correctness</em> e como aplicá-la a uma classe inteira.</li>
+  <li>Os detalhes: <code>const</code> fora da classe, getters que devolvem <code>const std::string&amp;</code> e <code>mutable</code>.</li>
+</ul>
+</div>
+
+<p>Esta aula usa o que você viu em <a href="constantes.html">Constantes</a>, <a href="const-ponteiros.html">const com Ponteiros e Referências</a>, <a href="encapsulamento.html">public e private</a> e <a href="this.html">this</a>. Os programas foram compilados e executados na máquina fictícia da Ana, na pasta <code>~/cpp/const</code>, com o <strong>g++ 15.2</strong> e o comando padrão <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: "só para consulta"</h2>
+<p>A Ana deixa no balcão uma pasta com as fichas dos produtos, com uma etiqueta: <strong>"só para consulta"</strong>. O cliente pode folhear, ler preços, conferir o estoque. Não pode riscar nem apagar nada. Agora imagine as instruções do verso das fichas: "ler o preço" pode ser feito numa ficha "só para consulta"; "vender: tire do estoque" não pode.</p>
+<p>Em C++, a pasta "só para consulta" é um objeto <code>const</code> (ou uma referência <code>const&amp;</code>). A marca nas instruções é o <code>const</code> depois dos parênteses do método: "este método pode ser usado em fichas só para consulta, porque ele não risca nada". O compilador confere as duas pontas: o método marcado não pode mudar o objeto, e o objeto "só para consulta" só aceita métodos marcados.</p>
+
+<hr>
+
+<h2>1. O problema: a função que só queria ler</h2>
+<p>Esta é a classe <code>Produto</code> da aula <a href="encapsulamento.html">public e private</a>, com getters sem <code>const</code>, e uma função que mostra um produto. A função recebe o produto como <code>const Produto&amp;</code>, como você aprendeu: por referência, para não copiar, e <code>const</code>, porque só vai ler.</p>
+
+<pre class="file" data-file="problema.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(std::string nome, int preco) : nome_(nome), preco_(preco) {
+    }
+
+    std::string nome() { return nome_; }
+    int preco() { return preco_; }
+
+private:
+    std::string nome_;
+    int preco_;
+};
+
+void mostrar(const Produto&amp; p) {
+    std::cout &lt;&lt; p.nome() &lt;&lt; ": R$ " &lt;&lt; p.preco() &lt;&lt; "\n";
+}
+
+int main() {
+    Produto caneta{"caneta", 3};
+    mostrar(caneta);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/const">$ g++ -std=c++23 -Wall -Wextra problema.cpp -o problema
+problema.cpp: In function ‘void mostrar(const Produto&amp;)’:
+problema.cpp:18:24: error: passing ‘const Produto’ as ‘this’ argument discards qualifiers [-fpermissive]
+   18 |     std::cout &lt;&lt; p.nome() &lt;&lt; ": R$ " &lt;&lt; p.preco() &lt;&lt; "\n";
+      |                  ~~~~~~^~
+problema.cpp:9:17: note:   in call to ‘std::string Produto::nome()’
+    9 |     std::string nome() { return nome_; }
+      |                 ^~~~
+problema.cpp:18:48: error: passing ‘const Produto’ as ‘this’ argument discards qualifiers [-fpermissive]
+   18 |     std::cout &lt;&lt; p.nome() &lt;&lt; ": R$ " &lt;&lt; p.preco() &lt;&lt; "\n";
+      |                                         ~~~~~~~^~
+problema.cpp:10:9: note:   in call to ‘int Produto::preco()’
+   10 |     int preco() { return preco_; }
+      |         ^~~~~</pre>
+
+<p>A função só lê, os getters só leem, e mesmo assim não compila. Esta é a mensagem mais famosa desta aula; leia por partes:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>Significado</th></tr>
+<tr><td><code>passing ‘const Produto’</code></td><td>"Passando um <code>const Produto</code>…": o <code>p</code> é uma referência <code>const</code>, um produto "só para consulta".</td></tr>
+<tr><td><code>as ‘this’ argument</code></td><td>"…como o argumento <code>this</code>…": lembre da aula <a href="this.html">this</a>. Chamar <code>p.nome()</code> passa o endereço de <code>p</code> para o parâmetro escondido <code>this</code> do método.</td></tr>
+<tr><td><code>discards qualifiers</code></td><td>"…descarta qualificadores": o <code>this</code> de <code>nome()</code> é um <code>Produto*</code> comum, que permite mudar o objeto. Para passar o produto "só para consulta" ali, o compilador teria de <strong>jogar fora</strong> o <code>const</code> (o "qualificador"). Ele se recusa.</td></tr>
+<tr><td><code>[-fpermissive]</code></td><td>A opção que faria o g++ aceitar mesmo assim. <strong>Nunca use</strong>: ela desliga a proteção em vez de consertar o código.</td></tr>
+<tr><td><code>note: in call to ‘std::string Produto::nome()’</code></td><td>Aponta o método culpado: repare que a assinatura dele não tem <code>const</code> no fim.</td></tr>
+</table>
+</div>
+
+<p>Em resumo: o compilador não lê o corpo de <code>nome()</code> para ver se ele muda algo. Ele só confia no que está <strong>declarado</strong>. Sem <code>const</code> na declaração, para ele, <code>nome()</code> <em>pode</em> mudar o produto, e um produto "só para consulta" não pode correr esse risco.</p>
+
+<p>No editor do guia, o Clang explica com outras palavras, até mais diretas: <code>'this' argument to member function 'nome' has type 'const Produto', but function is not marked const</code> ("o argumento <code>this</code> do método <code>nome</code> é <code>const Produto</code>, mas o método não está marcado como <code>const</code>").</p>
+
+<hr>
+
+<h2>2. A solução: <code>const</code> depois dos parênteses</h2>
+
+<pre class="file" data-file="certo.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(std::string nome, int preco) : nome_(nome), preco_(preco) {
+    }
+
+    std::string nome() const { return nome_; }
+    int preco() const { return preco_; }
+
+    void mudarPreco(int novo) {
+        if (novo &gt;= 0) {
+            preco_ = novo;
+        }
+    }
+
+private:
+    std::string nome_;
+    int preco_;
+};
+
+void mostrar(const Produto&amp; p) {
+    std::cout &lt;&lt; p.nome() &lt;&lt; ": R$ " &lt;&lt; p.preco() &lt;&lt; "\n";
+}
+
+int main() {
+    Produto caneta{"caneta", 3};
+    mostrar(caneta);
+    caneta.mudarPreco(4);
+    mostrar(caneta);
+
+    const Produto brinde{"chaveiro", 0};
+    std::cout &lt;&lt; "Brinde: " &lt;&lt; brinde.nome() &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/const">$ g++ -std=c++23 -Wall -Wextra certo.cpp -o certo
+$ ./certo
+caneta: R$ 3
+caneta: R$ 4
+Brinde: chaveiro</pre>
+
+<dl class="anatomy">
+  <dt>int preco() const</dt><dd>O <code>const</code> fica <strong>depois</strong> dos parênteses (e antes das chaves). Ele promete: "este método não muda o objeto". Lê-se "<code>preco</code> é um método const".</dd>
+  <dt>{ return preco_; }</dt><dd>O corpo é o mesmo de antes. O que mudou é que agora o compilador <strong>confere</strong> a promessa: se o corpo tentar mudar um atributo, dá erro (seção 3).</dd>
+  <dt>void mudarPreco(int novo)</dt><dd><strong>Sem</strong> <code>const</code>: este método muda o objeto, e está certo não marcá-lo.</dd>
+  <dt>void mostrar(const Produto&amp; p)</dt><dd>Agora a função compila: <code>p.nome()</code> e <code>p.preco()</code> são métodos <code>const</code>, permitidos em produtos "só para consulta".</dd>
+  <dt>const Produto brinde{"chaveiro", 0};</dt><dd>Um objeto <code>const</code>: nasce e nunca mais muda. Pode chamar <code>nome()</code> e <code>preco()</code>; não pode chamar <code>mudarPreco()</code>.</dd>
+</dl>
+
+<p>Por dentro, o <code>const</code> muda o tipo do <code>this</code>: num método comum, <code>this</code> é <code>Produto*</code>; num método <code>const</code>, é <code>const Produto*</code> ("ponteiro para produto que não pode ser mudado"). É por isso que a mensagem fala do argumento <code>this</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Método <code>const</code> (<code>preco()</code>)</th><th>Método comum (<code>mudarPreco()</code>)</th></tr>
+<tr><td>Objeto comum (<code>caneta</code>)</td><td>pode</td><td>pode</td></tr>
+<tr><td>Objeto <code>const</code> (<code>brinde</code>)</td><td>pode</td><td><strong>erro</strong></td></tr>
+<tr><td>Referência <code>const Produto&amp;</code></td><td>pode</td><td><strong>erro</strong></td></tr>
+<tr><td>Ponteiro <code>const Produto*</code></td><td>pode</td><td><strong>erro</strong></td></tr>
+</table>
+</div>
+
+<div class="trycpp" data-goal="out:caneta: R$ 3,src:nome\(\)\s*const,src:preco\(\)\s*const">
+<p class="try-task"><strong>Missão:</strong> rode e veja o erro do Clang. Depois conserte <strong>só a classe</strong>, acrescentando <code>const</code> aos dois getters, sem mexer na função <code>mostrar</code>. A saída deve ser <code>caneta: R$ 3</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(std::string nome, int preco) : nome_(nome), preco_(preco) {
+    }
+
+    std::string nome() { return nome_; }
+    int preco() { return preco_; }
+
+private:
+    std::string nome_;
+    int preco_;
+};
+
+void mostrar(const Produto&amp; p) {
+    std::cout &lt;&lt; p.nome() &lt;&lt; ": R$ " &lt;&lt; p.preco() &lt;&lt; "\n";
+}
+
+int main() {
+    Produto caneta{"caneta", 3};
+    mostrar(caneta);
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(std::string nome, int preco) : nome_(nome), preco_(preco) {
+    }
+
+    std::string nome() const { return nome_; }
+    int preco() const { return preco_; }
+
+private:
+    std::string nome_;
+    int preco_;
+};
+
+void mostrar(const Produto&amp; p) {
+    std::cout &lt;&lt; p.nome() &lt;&lt; ": R$ " &lt;&lt; p.preco() &lt;&lt; "\n";
+}
+
+int main() {
+    Produto caneta{"caneta", 3};
+    mostrar(caneta);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. O compilador confere a promessa</h2>
+<p>Marcar um método como <code>const</code> não é só uma etiqueta. Se o corpo tentar mudar um atributo, o compilador recusa:</p>
+
+<pre class="file" data-file="mexer.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(std::string nome, int estoque) : nome_(nome), estoque_(estoque) {
+    }
+
+    int estoque() const {
+        estoque_ = estoque_ - 1;
+        return estoque_;
+    }
+
+private:
+    std::string nome_;
+    int estoque_;
+};
+
+int main() {
+    Produto caneta{"caneta", 50};
+    std::cout &lt;&lt; caneta.estoque() &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/const">$ g++ -std=c++23 -Wall -Wextra mexer.cpp -o mexer
+mexer.cpp: In member function ‘int Produto::estoque() const’:
+mexer.cpp:10:18: error: assignment of member ‘Produto::estoque_’ in read-only object
+   10 |         estoque_ = estoque_ - 1;
+      |         ~~~~~~~~~^~~~~~~~~~~~~~</pre>
+
+<p>"Atribuição ao membro <code>Produto::estoque_</code> num objeto só de leitura". Dentro de um método <code>const</code>, o objeto inteiro é tratado como só de leitura. Um getter que, por engano, mudasse o estoque seria pego aqui, na compilação, e não semanas depois por uma conta errada no caixa. No Clang: <code>cannot assign to non-static data member within const member function 'estoque'</code>.</p>
+
+<p>A regra vale também para chamar outros métodos: dentro de um método <code>const</code>, só se podem chamar outros métodos <code>const</code> do mesmo objeto. Veja em <a href="#errado">Quando dá errado</a>.</p>
+
+<hr>
+
+<h2>4. Objetos vão para funções como <code>const&amp;</code></h2>
+<p>A seção 1 mostrou que o problema aparece justamente quando você faz a coisa certa ao passar objetos para funções. Recordando as três formas (aula <a href="passagem-referencia.html">Por Valor × Por Referência</a>):</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parâmetro</th><th>Copia o objeto?</th><th>A função pode mudar o original?</th><th>Quando usar</th></tr>
+<tr><td><code>Produto p</code></td><td><strong>Sim</strong>: copia nome, preço, estoque…</td><td>Não (muda a cópia)</td><td>Quando a função precisa de uma cópia própria para mexer.</td></tr>
+<tr><td><code>Produto&amp; p</code></td><td>Não</td><td><strong>Sim</strong></td><td>Quando a função <strong>deve</strong> mudar o objeto (<code>void reajustar(Produto&amp; p)</code>).</td></tr>
+<tr><td><code>const Produto&amp; p</code></td><td>Não</td><td>Não</td><td><strong>O padrão</strong> para objetos que a função só lê.</td></tr>
+</table>
+</div>
+
+<p>Copiar um <code>int</code> é instantâneo, mas um objeto pode carregar textos longos, vetores com milhares de itens… Passar por <code>const&amp;</code> evita a cópia e ainda garante, a quem chama, que o objeto volta intacto. Por isso essa é a forma mais comum de receber objetos em C++, e por isso todo método que só lê precisa ser <code>const</code>: senão, ninguém consegue usá-lo pela <code>const&amp;</code>.</p>
+
+<p>Um exemplo maior, com uma vitrine inteira passada por <code>const&amp;</code> para duas funções:</p>
+
+<pre class="file" data-file="lista.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class Produto {
+public:
+    Produto(std::string nome, int preco, int estoque)
+        : nome_(nome), preco_(preco), estoque_(estoque) {
+    }
+
+    const std::string&amp; nome() const { return nome_; }
+    int preco() const { return preco_; }
+    int estoque() const { return estoque_; }
+    int valorEmEstoque() const { return preco_ * estoque_; }
+
+    void vender(int quantidade) {
+        if (quantidade &gt; 0 &amp;&amp; quantidade &lt;= estoque_) {
+            estoque_ -= quantidade;
+        }
+    }
+
+private:
+    std::string nome_;
+    int preco_;
+    int estoque_;
+};
+
+int valorTotal(const std::vector&lt;Produto&gt;&amp; vitrine) {
+    int total = 0;
+    for (const Produto&amp; p : vitrine) {
+        total += p.valorEmEstoque();
+    }
+    return total;
+}
+
+void relatorio(const std::vector&lt;Produto&gt;&amp; vitrine) {
+    for (const Produto&amp; p : vitrine) {
+        std::cout &lt;&lt; p.nome() &lt;&lt; ": " &lt;&lt; p.estoque() &lt;&lt; " un. x R$ " &lt;&lt; p.preco() &lt;&lt; "\n";
+    }
+    std::cout &lt;&lt; "Total: R$ " &lt;&lt; valorTotal(vitrine) &lt;&lt; "\n";
+}
+
+int main() {
+    std::vector&lt;Produto&gt; vitrine{{"caneta", 3, 50}, {"caderno", 12, 8}};
+    vitrine[0].vender(10);
+    relatorio(vitrine);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/const">$ g++ -std=c++23 -Wall -Wextra lista.cpp -o lista
+$ ./lista
+caneta: 40 un. x R$ 3
+caderno: 8 un. x R$ 12
+Total: R$ 216</pre>
+
+<dl class="anatomy">
+  <dt>const std::string&amp; nome() const</dt><dd>Dois <code>const</code> com papéis diferentes. O do fim: "o método não muda o objeto". O do começo: o método devolve uma <strong>referência só de leitura</strong> ao <code>nome_</code> interno, sem copiar o texto. Quem chama pode ler, não pode mudar.</dd>
+  <dt>int valorEmEstoque() const</dt><dd>Faz uma conta com os atributos, sem mudá-los: é <code>const</code>.</dd>
+  <dt>const std::vector&lt;Produto&gt;&amp; vitrine</dt><dd>O vetor inteiro chega "só para consulta". Cada elemento também fica só de leitura, por isso o <code>for</code> usa <code>const Produto&amp; p</code>.</dd>
+  <dt>valorTotal(vitrine)</dt><dd>Uma função <code>const&amp;</code> pode passar o objeto adiante para outra função <code>const&amp;</code>, sem cópia nenhuma.</dd>
+</dl>
+
+<hr>
+
+<h2>5. Const-correctness: marcar tudo direito</h2>
+<p><em>Const-correctness</em> ("correção de const") é o hábito de marcar <code>const</code> em tudo o que não muda: métodos que só leem, parâmetros que só são lidos, variáveis que não mudam depois de criadas. Os ganhos:</p>
+<ul>
+  <li><strong>O compilador pega erros</strong>: um getter que muda o objeto sem querer, uma função "de relatório" que vende um produto por engano.</li>
+  <li><strong>O código se explica</strong>: quem lê <code>int preco() const</code> sabe, sem abrir o corpo, que chamar <code>preco()</code> é seguro.</li>
+  <li><strong>A classe funciona em todo lugar</strong>: com objetos <code>const</code>, com <code>const&amp;</code>, dentro de containers passados por <code>const&amp;</code>.</li>
+</ul>
+
+<p>Para decidir, pergunte de cada método: <em>"depois de chamar este método, o objeto está igual?"</em></p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método do <code>Produto</code></th><th>O objeto fica igual?</th><th><code>const</code>?</th></tr>
+<tr><td><code>nome()</code>, <code>preco()</code>, <code>estoque()</code></td><td>Sim</td><td>Sim</td></tr>
+<tr><td><code>valorEmEstoque()</code>, <code>temEstoque(int)</code></td><td>Sim (só calcula)</td><td>Sim</td></tr>
+<tr><td><code>mostrar()</code></td><td>Sim (só escreve na tela)</td><td>Sim</td></tr>
+<tr><td><code>maisCaroQue(const Produto&amp;)</code></td><td>Sim (só compara)</td><td>Sim</td></tr>
+<tr><td><code>vender(int)</code>, <code>repor(int)</code>, <code>mudarPreco(int)</code></td><td>Não</td><td>Não</td></tr>
+<tr><td>Construtores</td><td>—</td><td>Nunca (construtor não leva <code>const</code>)</td></tr>
+</table>
+</div>
+
+<div class="tip"><strong>Comece pelo <code>const</code>.</strong> Ao escrever um método novo, coloque <code>const</code> de saída. Se o compilador reclamar que o método muda algo, aí você decide: ou o método realmente muda o objeto (tire o <code>const</code>), ou há um engano no corpo (conserte o corpo). Acrescentar <code>const</code> depois, numa classe grande, é bem mais trabalhoso, porque um método não-<code>const</code> "contamina" quem o chama.</div>
+
+<h3>A exceção controlada: <code>mutable</code></h3>
+<p>Às vezes um atributo é só um detalhe interno que não faz parte do "estado" que importa, como um contador de quantas vezes o preço foi consultado. A palavra <code>mutable</code> ("mutável") deixa esse atributo mudar até dentro de métodos <code>const</code>:</p>
+
+<pre class="file" data-file="mutable.cpp">class Produto {
+public:
+    Produto(std::string nome, int preco) : nome_(nome), preco_(preco) {
+    }
+
+    int preco() const {
+        ++consultas_;
+        return preco_;
+    }
+
+    int consultas() const { return consultas_; }
+
+private:
+    std::string nome_;
+    int preco_;
+    mutable int consultas_ = 0;
+};
+
+int main() {
+    const Produto caneta{"caneta", 3};
+    caneta.preco();
+    caneta.preco();
+    caneta.preco();
+    std::cout &lt;&lt; "Preço consultado " &lt;&lt; caneta.consultas() &lt;&lt; " vezes\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/const">$ g++ -std=c++23 -Wall -Wextra mutable.cpp -o mutable
+$ ./mutable
+Preço consultado 3 vezes</pre>
+
+<p>Mesmo com a caneta <code>const</code>, o contador subiu. Use <code>mutable</code> com muita parcimônia, só para detalhes que quem usa a classe não percebe (contadores, memória de cálculos já feitos). Se você está usando <code>mutable</code> para driblar o <code>const</code> num dado de verdade, o método não deveria ser <code>const</code>.</p>
+
+<hr>
+
+<h2 id="errado">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Chamar um método que muda o objeto num objeto <code>const</code></strong>
+<pre class="file" data-file="brinde.cpp">int main() {
+    const Produto brinde{"chaveiro", 0};
+    std::cout &lt;&lt; brinde.preco() &lt;&lt; "\n";
+    brinde.mudarPreco(5);
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/const">$ g++ -std=c++23 -Wall -Wextra brinde.cpp -o brinde
+brinde.cpp: In function ‘int main()’:
+brinde.cpp:26:22: error: passing ‘const Produto’ as ‘this’ argument discards qualifiers [-fpermissive]
+   26 |     brinde.mudarPreco(5);
+      |     ~~~~~~~~~~~~~~~~~^~~
+brinde.cpp:12:10: note:   in call to ‘void Produto::mudarPreco(int)’
+   12 |     void mudarPreco(int novo) {
+      |          ^~~~~~~~~~</pre>
+<p><strong>O que aconteceu:</strong> a classe é a de <code>certo.cpp</code>, já com os getters <code>const</code>. O <code>brinde.preco()</code> passou; o <code>mudarPreco</code> não, porque muda o objeto e o brinde é <code>const</code>. Aqui o erro está <strong>certo</strong>: o problema é a linha do <code>main</code>, não a classe.</p>
+<p><strong>Como resolver:</strong> descubra qual dos dois está errado. Se o brinde precisa mudar de preço, ele não deveria ser <code>const</code>. Se o método não muda nada de verdade, marque-o <code>const</code>. Nunca use <code>-fpermissive</code> nem <code>const_cast</code> para calar o erro.</p>
+</div>
+
+<div class="cenario">
+<strong>Método <code>const</code> chamando método não-<code>const</code></strong>
+<pre class="file" data-file="chamaoutro.cpp">class Produto {
+public:
+    Produto(std::string nome, int preco, int estoque)
+        : nome_(nome), preco_(preco), estoque_(estoque) {
+    }
+
+    int valorEmEstoque() {
+        return preco_ * estoque_;
+    }
+
+    void mostrar() const {
+        std::cout &lt;&lt; nome_ &lt;&lt; ": R$ " &lt;&lt; valorEmEstoque() &lt;&lt; " em estoque\n";
+    }
+
+private:
+    std::string nome_;
+    int preco_;
+    int estoque_;
+};
+</pre>
+<pre class="term" data-cwd="~/cpp/const">$ g++ -std=c++23 -Wall -Wextra chamaoutro.cpp -o chamaoutro
+chamaoutro.cpp: In member function ‘void Produto::mostrar() const’:
+chamaoutro.cpp:15:56: error: passing ‘const Produto’ as ‘this’ argument discards qualifiers [-fpermissive]
+   15 |         std::cout &lt;&lt; nome_ &lt;&lt; ": R$ " &lt;&lt; valorEmEstoque() &lt;&lt; " em estoque\n";
+      |                                          ~~~~~~~~~~~~~~^~
+chamaoutro.cpp:10:9: note:   in call to ‘int Produto::valorEmEstoque()’
+   10 |     int valorEmEstoque() {
+      |         ^~~~~~~~~~~~~~</pre>
+<p><strong>O que aconteceu:</strong> dentro de <code>mostrar() const</code>, o <code>this</code> é <code>const Produto*</code>. Chamar <code>valorEmEstoque()</code> passa esse <code>this</code> adiante, e <code>valorEmEstoque</code> não prometeu não mudar nada. É o mesmo erro, agora dentro da classe (repare em <code>In member function ‘void Produto::mostrar() const’</code>).</p>
+<p><strong>Como resolver:</strong> <code>valorEmEstoque</code> só calcula, então merece <code>const</code>: <code>int valorEmEstoque() const</code>. Esse "efeito cascata" é normal: marcar um método <code>const</code> costuma revelar outros que também deveriam ser.</p>
+</div>
+
+<div class="cenario">
+<strong>Esquecer o <code>const</code> na definição fora da classe</strong>
+<pre class="file" data-file="fora.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(int preco) : preco_(preco) {
+    }
+
+    int preco() const;
+
+private:
+    int preco_;
+};
+
+int Produto::preco() {
+    return preco_;
+}
+
+int main() {
+    Produto caneta{3};
+    std::cout &lt;&lt; caneta.preco() &lt;&lt; "\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp/const">$ g++ -std=c++23 -Wall -Wextra fora.cpp -o fora
+fora.cpp:15:5: error: no declaration matches ‘int Produto::preco()’
+   15 | int Produto::preco() {
+      |     ^~~~~~~
+fora.cpp:9:9: note: candidate is: ‘int Produto::preco() const’
+    9 |     int preco() const;
+      |         ^~~~~
+fora.cpp:4:7: note: ‘class Produto’ defined here
+    4 | class Produto {
+      |       ^~~~~~~</pre>
+<p><strong>O que aconteceu:</strong> o <code>const</code> faz parte da assinatura do método. <code>preco()</code> e <code>preco() const</code> são, para o compilador, métodos <strong>diferentes</strong> (dá até para ter os dois). A definição sem <code>const</code> não corresponde a nenhuma declaração, e o g++ mostra o candidato que quase serviu.</p>
+<p><strong>Como resolver:</strong> repita o <code>const</code> na definição: <code>int Produto::preco() const { … }</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Getter <code>const</code> devolvendo referência comum</strong>
+<pre class="file" data-file="referencia.cpp">class Produto {
+public:
+    Produto(std::string nome) : nome_(nome) {
+    }
+
+    std::string&amp; nome() const { return nome_; }
+
+private:
+    std::string nome_;
+};
+</pre>
+<pre class="term" data-cwd="~/cpp/const">$ g++ -std=c++23 -Wall -Wextra referencia.cpp -o referencia
+referencia.cpp: In member function ‘std::string&amp; Produto::nome() const’:
+referencia.cpp:9:40: error: binding reference of type ‘std::string&amp;’ {aka ‘std::__cxx11::basic_string&lt;char&gt;&amp;’} to ‘const std::string’ {aka ‘const std::__cxx11::basic_string&lt;char&gt;’} discards qualifiers
+    9 |     std::string&amp; nome() const { return nome_; }
+      |                                        ^~~~~</pre>
+<p><strong>O que aconteceu:</strong> dentro do método <code>const</code>, <code>nome_</code> é <code>const std::string</code>. Devolver um <code>std::string&amp;</code> comum daria a quem chama uma porta para mudar o nome por fora (<code>caneta.nome() = "x";</code>), furando a promessa. O compilador não deixa: "ligar uma referência <code>std::string&amp;</code> a um <code>const std::string</code> descarta qualificadores". (O <code>{aka …}</code> é o nome completo, "também conhecido como", do tipo <code>std::string</code> por dentro da biblioteca.)</p>
+<p><strong>Como resolver:</strong> devolva <code>const std::string&amp;</code> (sem cópia, só leitura) ou <code>std::string</code> (uma cópia).</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>int preco() const { … }</code></td><td>Método que promete não mudar o objeto; o compilador confere.</td></tr>
+<tr><td><code>int Produto::preco() const { … }</code></td><td>Definição fora da classe: o <code>const</code> se repete.</td></tr>
+<tr><td><code>const Produto brinde{…};</code></td><td>Objeto que nunca muda: só chama métodos <code>const</code>.</td></tr>
+<tr><td><code>void f(const Produto&amp; p)</code></td><td>Recebe sem copiar e sem poder mudar: só chama métodos <code>const</code>.</td></tr>
+<tr><td><code>const std::string&amp; nome() const</code></td><td>Getter que devolve o texto interno sem cópia, só para leitura.</td></tr>
+<tr><td><code>mutable int consultas_;</code></td><td>Atributo que pode mudar até em métodos <code>const</code> (use pouco).</td></tr>
+<tr><td><code>passing ‘const X’ as ‘this’ argument discards qualifiers</code></td><td>Erro: chamou um método não-<code>const</code> num objeto/referência <code>const</code>.</td></tr>
+<tr><td><code>assignment of member … in read-only object</code></td><td>Erro: um método <code>const</code> tentou mudar um atributo.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Onde vai o const</h3>
+<p>Complete o getter para que ele possa ser chamado num <code>const Produto&amp;</code>:</p>
+<div class="ex-code">int estoque() <input data-answer="const" aria-label="palavra"> { return estoque_; }</div>
+</div>
+
+<div class="exercise">
+<h3>2. O parâmetro</h3>
+<p>Complete o parâmetro da função que só lê um cliente, sem copiar e sem poder mudar:</p>
+<div class="ex-code">void imprimir(<input data-answer="const Cliente&amp;|const Cliente &amp;|Cliente const&amp;|Cliente const &amp;" aria-label="tipo"> c)</div>
+</div>
+
+<div class="exercise">
+<h3>3. Leve e só de leitura</h3>
+<p>Complete o tipo de retorno do getter do nome, sem cópia e sem deixar mudar:</p>
+<div class="ex-code"><input data-answer="const std::string&amp;|const std::string &amp;|std::string const&amp;" aria-label="tipo"> nome() const { return nome_; }</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Qual destes métodos <strong>não</strong> deve ser <code>const</code>?</p>
+<label><input type="radio" name="q4"> <code>int valorEmEstoque()</code></label>
+<label><input type="radio" name="q4"> <code>void repor(int quantidade)</code></label>
+<label><input type="radio" name="q4"> <code>void mostrar()</code></label>
+<label><input type="radio" name="q4"> <code>bool temEstoque(int quantidade)</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. O g++ diz <code>passing ‘const Produto’ as ‘this’ argument discards qualifiers</code> numa linha <code>p.mostrar();</code>, dentro de <code>void f(const Produto&amp; p)</code>. O que fazer, se <code>mostrar</code> só escreve na tela?</p>
+<label><input type="radio" name="q5"> Compilar com <code>-fpermissive</code></label>
+<label><input type="radio" name="q5"> Trocar o parâmetro para <code>Produto p</code></label>
+<label><input type="radio" name="q5"> Tirar o <code>const</code> do parâmetro</label>
+<label><input type="radio" name="q5"> Marcar <code>mostrar</code> como <code>const</code>: <code>void mostrar() const</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Dentro de um método <code>const</code> de <code>Produto</code>, qual é o tipo de <code>this</code>?</p>
+<label><input type="radio" name="q6"> <code>const Produto*</code></label>
+<label><input type="radio" name="q6"> <code>Produto*</code></label>
+<label><input type="radio" name="q6"> <code>Produto&amp;</code></label>
+<label><input type="radio" name="q6"> Não existe <code>this</code> em métodos <code>const</code></label>
+</div>
+
+<h3>Missão final: a ficha do cliente VIP</h3>
+
+<div class="trycpp" data-goal="out:Bia: 15 pontos,out:VIP Caio: 100 pontos,src:nome\(\)\s*const,src:pontos\(\)\s*const,src:void\s+ganhar\s*\(\s*int\s+\w+\s*\)\s*\{">
+<p class="try-task"><strong>Missão:</strong> o programa não compila. Acrescente <code>const</code> <strong>só nos métodos que não mudam o cliente</strong> (o <code>ganhar</code> muda, então fica sem). Não mexa no <code>main</code> nem em <code>mostrar</code>. A saída deve ser:</p>
+<pre class="out">Bia: 15 pontos
+VIP Caio: 100 pontos</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Cliente {
+public:
+    Cliente(std::string nome, int pontos) : nome_(nome), pontos_(pontos) {
+    }
+
+    const std::string&amp; nome() { return nome_; }
+    int pontos() { return pontos_; }
+
+    void ganhar(int quantidade) {
+        if (quantidade &gt; 0) {
+            pontos_ += quantidade;
+        }
+    }
+
+private:
+    std::string nome_;
+    int pontos_;
+};
+
+void mostrar(const Cliente&amp; c) {
+    std::cout &lt;&lt; c.nome() &lt;&lt; ": " &lt;&lt; c.pontos() &lt;&lt; " pontos\n";
+}
+
+int main() {
+    Cliente bia{"Bia", 10};
+    bia.ganhar(5);
+    mostrar(bia);
+
+    const Cliente vip{"Caio", 100};
+    std::cout &lt;&lt; "VIP ";
+    mostrar(vip);
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Cliente {
+public:
+    Cliente(std::string nome, int pontos) : nome_(nome), pontos_(pontos) {
+    }
+
+    const std::string&amp; nome() const { return nome_; }
+    int pontos() const { return pontos_; }
+
+    void ganhar(int quantidade) {
+        if (quantidade &gt; 0) {
+            pontos_ += quantidade;
+        }
+    }
+
+private:
+    std::string nome_;
+    int pontos_;
+};
+
+void mostrar(const Cliente&amp; c) {
+    std::cout &lt;&lt; c.nome() &lt;&lt; ": " &lt;&lt; c.pontos() &lt;&lt; " pontos\n";
+}
+
+int main() {
+    Cliente bia{"Bia", 10};
+    bia.ganhar(5);
+    mostrar(bia);
+
+    const Cliente vip{"Caio", 100};
+    std::cout &lt;&lt; "VIP ";
+    mostrar(vip);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>int preco() const</code>: o <code>const</code> depois dos parênteses promete que o método não muda o objeto, e o compilador confere (<code>assignment of member … in read-only object</code>).</li>
+  <li>Objetos <code>const</code>, referências <code>const&amp;</code> e ponteiros <code>const*</code> só chamam métodos <code>const</code>. Senão: <code>passing ‘const Produto’ as ‘this’ argument discards qualifiers</code>.</li>
+  <li>O compilador confia na declaração, não no corpo: um getter sem <code>const</code> é tratado como se mudasse o objeto.</li>
+  <li>Objetos vão para funções como <code>const Produto&amp;</code> quando só são lidos: sem cópia e sem risco. Por isso, todo método que só lê deve ser <code>const</code>.</li>
+  <li><em>Const-correctness</em>: marque <code>const</code> em tudo o que não muda. Comece pelo <code>const</code> e tire só se precisar.</li>
+  <li>O <code>const</code> se repete na definição fora da classe. Getters <code>const</code> devolvem cópia ou <code>const&amp;</code>. <code>mutable</code> é a exceção, para detalhes internos.</li>
+  <li>Próxima aula: dados e métodos que pertencem à classe, e não a cada objeto, em <a href="membros-static.html">Membros static</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
