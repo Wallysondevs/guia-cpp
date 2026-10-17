@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Módulos — export module, import e import std (C++20) | Guia C++</title>
+<meta name="description" content="Módulos do C++20 para quem está começando: o problema dos arquivos de cabeçalho, export module, import, a ordem de compilação com g++ 15 e -fmodules, import std do C++23, CMake com Ninja e o estado real do suporte nos compiladores em 2026, com tudo conferido no laboratório.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Módulos</span> <span class="versao">C++20</span></h1>
+
+<p class="intro">Desde os anos 1970, programas em C e C++ compartilham código com <code>#include</code>: o pré-processador <strong>copia e cola</strong> o texto de um arquivo dentro do outro. Funciona, mas é lento e cheio de armadilhas. O C++20 trouxe uma forma nova de organizar o código, os <strong>módulos</strong>: você diz o que um arquivo <code>export</code>a ("exporta", deixa ver) e os outros fazem <code>import</code> ("importam"). Esta aula mostra o problema que os módulos resolvem, como usá-los com o g++ 15 (só o que conferimos que funciona) e, com honestidade, em que pé está o suporte em 2026.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Os problemas do <code>#include</code>: texto copiado, cabeçalho incluído duas vezes, macros que vazam.</li>
+  <li>Escrever um módulo com <code>export module</code> e <code>export</code>.</li>
+  <li>Usá-lo com <code>import</code>, e o que fica escondido.</li>
+  <li>Compilar com o g++ 15: a opção <code>-fmodules</code> e a <strong>ordem</strong> de compilação.</li>
+  <li><code>import std;</code> <span class="versao">C++23</span>: a biblioteca padrão inteira numa linha.</li>
+  <li>Compilar módulos com CMake (e por que o Make não serve).</li>
+  <li>O estado do suporte nos compiladores e ferramentas em 2026.</li>
+</ul>
+</div>
+
+<p>Tudo foi conferido com o <strong>g++ 15.2</strong>, o <strong>clang++ 21.1</strong> e o <strong>CMake 4.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>. Esta aula pressupõe que você já viu <a href="headers.html">Arquivos .h e .cpp</a>, <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>, <a href="preprocessador.html">O Pré-processador</a> e <a href="cmake.html">CMake</a>.</p>
+
+<div class="warning">
+<strong>Módulos não rodam no editor do guia</strong>
+<p>Módulos exigem compilar os arquivos numa ordem certa, com opções especiais, e o editor "Experimente" compila tudo de uma vez. Por isso os exemplos com <code>import</code> aparecem só no terminal do laboratório. As caixas de "Experimente" desta aula mostram, com arquivos <code>.h</code>, os problemas que os módulos resolvem.</p>
+</div>
+
+<hr>
+
+<h2>A ideia: fotocópia × biblioteca com balcão</h2>
+<p>O <code>#include</code> é como <strong>fotocopiar o livro inteiro</strong> toda vez que você quer consultar uma receita: cada arquivo <code>.cpp</code> que diz <code>#include &lt;iostream&gt;</code> recebe uma cópia completa do texto, e o compilador relê tudo, de novo, em cada arquivo. E a cópia vem com tudo que estava no livro, inclusive anotações de rodapé (as macros) que se espalham pelo seu texto.</p>
+<p>Um módulo é como uma <strong>biblioteca com balcão</strong>: o livro é catalogado uma vez só (compilado), e quem pede recebe exatamente o que o catálogo oferece (o que foi exportado). O resto fica lá dentro.</p>
+
+<hr>
+
+<h2>1. O problema dos cabeçalhos</h2>
+
+<h3>O texto copiado é enorme</h3>
+<p>O comando <code>g++ -E</code> mostra o arquivo depois que o pré-processador fez as "colagens" (aula <a href="preprocessador.html">O Pré-processador</a>). Veja o tamanho do menor programa do guia:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat ola.cpp
+#include &lt;iostream&gt;
+int main() { std::cout &lt;&lt; "Olá, mundo!\n"; }
+$ g++ -std=c++23 -E ola.cpp | wc -l
+68843                                « linhas que o compilador realmente lê
+$ g++ -std=c++23 -E ola.cpp | wc -c
+1808549                              « cerca de 1,8 MB de texto, por causa de uma linha de #include</pre>
+
+<p>Duas linhas viraram quase 69 mil. E num projeto com 100 arquivos <code>.cpp</code> que incluem <code>&lt;iostream&gt;</code>, esse texto é lido e analisado 100 vezes. É por isso que projetos C++ grandes demoram tanto para compilar.</p>
+
+<h3>O mesmo cabeçalho incluído duas vezes</h3>
+<p>Como o <code>#include</code> só cola texto, se um arquivo chega por dois caminhos, a definição aparece duas vezes. O exemplo tem três arquivos (clique nas abas):</p>
+
+<div class="trycpp" data-goal="compila,out:Área: 12">
+<p class="try-task"><strong>Missão:</strong> o <code>main.cpp</code> inclui <code>ponto.h</code> e também <code>forma.h</code>, que inclui <code>ponto.h</code> de novo. Rode e veja o erro de redefinição. Depois conserte acrescentando <code>#pragma once</code> na primeira linha de <code>ponto.h</code>. A saída deve ser <code>Área: 12</code>.</p>
+<pre class="script" data-file="main.cpp">#include &lt;iostream&gt;
+#include "ponto.h"
+#include "forma.h"
+
+int main() {
+    Retangulo r{{0, 0}, 4, 3};
+    std::cout &lt;&lt; "Área: " &lt;&lt; r.largura * r.altura &lt;&lt; '\n';
+}
+</pre>
+<pre class="script" data-file="ponto.h">struct Ponto {
+    int x;
+    int y;
+};
+</pre>
+<pre class="script" data-file="forma.h">#include "ponto.h"
+
+struct Retangulo {
+    Ponto canto;
+    int largura;
+    int altura;
+};
+</pre>
+<pre class="solucao" data-file="ponto.h">#pragma once
+struct Ponto {
+    int x;
+    int y;
+};
+</pre>
+</div>
+
+<p>No laboratório, antes do conserto:</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra main.cpp -o main
+In file included from forma.h:1,
+                 from main.cpp:3:
+ponto.h:1:8: error: redefinition of ‘struct Ponto’
+    1 | struct Ponto {
+      |        ^~~~~
+In file included from main.cpp:2:
+ponto.h:1:8: note: previous definition of ‘struct Ponto’
+    1 | struct Ponto {
+      |        ^~~~~</pre>
+
+<p><em>Redefinition of ‘struct Ponto’</em> = "redefinição da struct <code>Ponto</code>": ela chegou uma vez por <code>main.cpp:2</code> e outra por <code>forma.h:1</code>. Todo cabeçalho precisa de <code>#pragma once</code> (ou das "guardas" <code>#ifndef</code>/<code>#define</code>/<code>#endif</code>, aula <a href="headers.html">Arquivos .h e .cpp</a>) para se defender disso. Com módulos, esse problema não existe: importar duas vezes é o mesmo que importar uma.</p>
+
+<h3>Macros vazam</h3>
+<p>Um <code>#define</code> dentro de um cabeçalho vale para todo arquivo que o inclui, inclusive para o seu código que não tem nada a ver com ele:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat config.h
+#pragma once
+#define LIMITE 10
+$ cat main.cpp
+#include &lt;iostream&gt;
+#include "config.h"
+
+int main() {
+    int LIMITE = 50;
+    std::cout &lt;&lt; "Limite da Ana: " &lt;&lt; LIMITE &lt;&lt; '\n';
+}
+$ g++ -std=c++23 -Wall -Wextra main.cpp -o main
+In file included from main.cpp:2:
+main.cpp: In function ‘int main()’:
+config.h:2:16: error: expected unqualified-id before numeric constant
+    2 | #define LIMITE 10
+      |                ^~
+main.cpp:5:9: note: in expansion of macro ‘LIMITE’
+    5 |     int LIMITE = 50;
+      |         ^~~~~~</pre>
+
+<p>O pré-processador trocou o seu <code>LIMITE</code> por <code>10</code>, e a linha virou <code>int 10 = 50;</code>. Por isso o g++ reclama de um "identificador" esperado antes de uma "constante numérica" e mostra a nota <em>in expansion of macro ‘LIMITE’</em> ("na expansão da macro"). Módulos <strong>não exportam macros</strong>: o que acontece dentro de um módulo fica lá.</p>
+
+<hr>
+
+<h2>2. Escrever um módulo: <code>export module</code></h2>
+<p>Um módulo é um arquivo de código que começa declarando seu nome e marca com <code>export</code> o que os outros podem usar:</p>
+
+<pre class="file" data-file="matematica.cpp">export module matematica;
+
+export int dobro(int x) {
+    return x * 2;
+}
+
+export double media(double a, double b) {
+    return (a + b) / 2;
+}
+
+int segredo() {
+    return 42;
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>export module matematica;</dt><dd>"Este arquivo é a interface do módulo chamado <code>matematica</code>." Precisa ser a primeira declaração do arquivo.</dd>
+  <dt>export int dobro(int x) { … }</dt><dd>Uma função <strong>exportada</strong>: quem importar o módulo pode usá-la.</dd>
+  <dt>int segredo() { … }</dt><dd>Sem <code>export</code>: só existe dentro do módulo. Ninguém de fora vê.</dd>
+</dl>
+
+<p>Repare que não há <code>.h</code> separado nem <code>#pragma once</code>: o próprio módulo diz o que é público. O nome do arquivo não precisa ser igual ao do módulo, mas é costume. Muitos projetos usam extensões especiais para módulos (<code>.cppm</code>, <code>.ixx</code>, <code>.mpp</code>); o g++ aceita o <code>.cpp</code> comum, e o Clang e o CMake preferem <code>.cppm</code>.</p>
+
+<h2>3. Usar: <code>import</code></h2>
+
+<pre class="file" data-file="main.cpp">#include &lt;iostream&gt;
+import matematica;
+
+int main() {
+    std::cout &lt;&lt; "Dobro de 21: " &lt;&lt; dobro(21) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Média de 7 e 10: " &lt;&lt; media(7, 10) &lt;&lt; '\n';
+}
+</pre>
+
+<p><code>import matematica;</code> (sem <code>#</code>, sem aspas, com ponto e vírgula) traz tudo o que o módulo exportou. Dá para misturar <code>#include</code> e <code>import</code> no mesmo arquivo, como aqui.</p>
+
+<h3>Compilar com o g++ 15: a opção <code>-fmodules</code></h3>
+<p>Com o comando padrão do guia, o g++ 15 ainda não entende <code>import</code>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra main.cpp -o programa
+main.cpp:2:1: error: ‘import’ does not name a type
+    2 | import matematica;
+      | ^~~~~~
+main.cpp:2:1: note: C++20 ‘import’ only available with ‘-fmodules’, which is not yet enabled with ‘-std=c++20’
+main.cpp: In function ‘int main()’:
+main.cpp:5:37: error: ‘dobro’ was not declared in this scope
+    5 |     std::cout &lt;&lt; "Dobro de 21: " &lt;&lt; dobro(21) &lt;&lt; '\n';
+      |                                     ^~~~~
+main.cpp:6:41: error: ‘media’ was not declared in this scope
+    6 |     std::cout &lt;&lt; "Média de 7 e 10: " &lt;&lt; media(7, 10) &lt;&lt; '\n';
+      |                                         ^~~~~</pre>
+
+<p>A nota é clara: <em>C++20 ‘import’ only available with ‘-fmodules’, which is not yet enabled with ‘-std=c++20’</em> ("o <code>import</code> só está disponível com <code>-fmodules</code>, que ainda não é ligado pelo <code>-std=c++20</code>"). Mesmo com <code>-std=c++23</code>, o g++ 15 exige que você ligue os módulos à mão. (Em versões anteriores do g++, a opção se chamava <code>-fmodules-ts</code>; o g++ 15 ainda aceita esse nome antigo.)</p>
+
+<h3>A ordem importa</h3>
+<p>Ligando <code>-fmodules</code>, mas compilando o <code>main.cpp</code> primeiro:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -fmodules main.cpp -o programa
+In module imported at main.cpp:2:1:
+matematica: error: failed to read compiled module: Arquivo ou diretório inexistente
+matematica: note: compiled module file is ‘gcm.cache/matematica.gcm’
+matematica: note: imports must be built before being imported
+matematica: fatal error: returning to the gate for a mechanical issue
+compilation terminated.</pre>
+
+<dl class="anatomy">
+  <dt>failed to read compiled module</dt><dd>"Falhou ao ler o módulo compilado." O <code>Arquivo ou diretório inexistente</code> vem do sistema, em português.</dd>
+  <dt>compiled module file is ‘gcm.cache/matematica.gcm’</dt><dd>O g++ procurou o módulo já compilado neste arquivo, e ele não existe.</dd>
+  <dt>imports must be built before being imported</dt><dd>A regra de ouro: "o que é importado precisa ser compilado <strong>antes</strong>".</dd>
+  <dt>returning to the gate for a mechanical issue</dt><dd>"Voltando ao portão por um problema mecânico": uma piada dos autores do g++ (como um avião que volta ao portão). Só quer dizer que a compilação parou.</dd>
+</dl>
+
+<p>Então, primeiro o módulo, depois quem o usa:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -fmodules -c matematica.cpp     « 1. o módulo
+$ ls
+gcm.cache
+main.cpp
+matematica.cpp
+matematica.o
+segredo.cpp
+$ ls gcm.cache
+matematica.gcm                       « a "ficha do catálogo" do módulo
+$ g++ -std=c++23 -Wall -Wextra -fmodules main.cpp matematica.o -o programa     « 2. o main, ligado ao módulo
+$ ./programa
+Dobro de 21: 42
+Média de 7 e 10: 8.5</pre>
+
+<ol class="passo">
+  <li><code>-c matematica.cpp</code> compila o módulo sem montar o programa (aula <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>). Saem <strong>dois</strong> arquivos: <code>matematica.o</code> (o código de máquina das funções) e <code>gcm.cache/matematica.gcm</code> (a descrição do que o módulo exporta, que o <code>import</code> lê).</li>
+  <li>Depois, o <code>main.cpp</code> é compilado: o <code>import</code> encontra o <code>.gcm</code>, e o <code>matematica.o</code> entra na montagem do programa.</li>
+</ol>
+
+<h3>O que não foi exportado fica escondido</h3>
+
+<pre class="term" data-cwd="~/cpp">$ cat segredo.cpp
+import matematica;
+
+int main() {
+    return segredo();
+}
+$ g++ -std=c++23 -Wall -Wextra -fmodules segredo.cpp matematica.o -o segredo
+segredo.cpp: In function ‘int main()’:
+segredo.cpp:4:12: error: ‘segredo’ was not declared in this scope
+    4 |     return segredo();
+      |            ^~~~~~~</pre>
+
+<p>A função existe no módulo, mas como não tem <code>export</code>, para quem importa é como se não existisse. Com cabeçalhos, esconder uma função exigia truques (<code>static</code>, namespaces anônimos); com módulos, é o comportamento normal.</p>
+
+<hr>
+
+<h2>4. <code>import std;</code>: a biblioteca padrão inteira <span class="versao">C++23</span></h2>
+<p>O C++23 transformou a biblioteca padrão inteira num módulo chamado <code>std</code>. Uma linha substitui todos os <code>#include</code> da biblioteca:</p>
+
+<pre class="file" data-file="ola_std.cpp">import std;
+
+int main() {
+    std::vector&lt;int&gt; notas = {7, 10, 4};
+    std::ranges::sort(notas);
+    std::println("Notas: {}", notas);
+}
+</pre>
+
+<p>No g++ 15, o módulo <code>std</code> não vem pronto: na primeira vez, você precisa compilá-lo. Sem isso, o erro é o mesmo de antes (<code>std: error: failed to read compiled module</code>, <code>compiled module file is ‘gcm.cache/std.gcm’</code>). O código-fonte do módulo vem com o g++, no arquivo <code>bits/std.cc</code>, e a opção <code>-fsearch-include-path</code> manda o g++ procurá-lo nas pastas da biblioteca:</p>
+
+<pre class="term" data-cwd="~/cpp">$ time g++ -std=c++23 -fmodules -fsearch-include-path -c bits/std.cc     « uma vez só
+
+real	0m12,437s                       « a biblioteca inteira, em alguns segundos
+user	0m7,054s
+sys	0m0,522s
+$ ls gcm.cache
+matematica.gcm
+std.gcm
+$ g++ -std=c++23 -Wall -Wextra -fmodules ola_std.cpp -o ola_std
+$ ./ola_std
+Notas: [4, 7, 10]</pre>
+
+<p>E ficou mais rápido? Comparamos com o mesmo programa escrito com <code>#include &lt;algorithm&gt;</code>, <code>&lt;print&gt;</code> e <code>&lt;vector&gt;</code>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ time g++ -std=c++23 -Wall -Wextra ola_include.cpp -o ola_include
+
+real	0m2,298s
+user	0m2,127s
+sys	0m0,171s
+$ time g++ -std=c++23 -Wall -Wextra -fmodules ola_std.cpp -o ola_std
+
+real	0m1,729s
+user	0m1,553s
+sys	0m0,176s</pre>
+
+<p>Num programa de um arquivo, cerca de meio segundo a menos, e com a biblioteca <strong>inteira</strong> disponível, contra só três cabeçalhos. O ganho aparece de verdade em projetos com centenas de arquivos, em que o <code>std.gcm</code> é aproveitado por todos. Os tempos variam de máquina para máquina.</p>
+
+<div class="note">
+<strong><code>import std;</code> não traz as macros</strong>
+<p>Como módulos não exportam macros, coisas como <code>assert</code> (de <code>&lt;cassert&gt;</code>) e <code>INT_MAX</code> (de <code>&lt;climits&gt;</code>) não vêm com o <code>import std;</code>. Para elas, continue usando o <code>#include</code> correspondente, ou as alternativas sem macro (<code>std::numeric_limits&lt;int&gt;::max()</code>).</p>
+</div>
+
+<hr>
+
+<h2>5. Módulos com CMake (e por que o Make não serve)</h2>
+<p>Em projetos reais, ninguém digita a ordem de compilação à mão. O problema é que, para saber a ordem, a ferramenta precisa <strong>ler</strong> os arquivos e descobrir quem importa quem. O <a href="make.html">Make</a> não faz isso sozinho. O CMake 4.2 faz, desde que o gerador seja o <strong>Ninja</strong>:</p>
+
+<pre class="file" data-file="CMakeLists.txt">cmake_minimum_required(VERSION 3.28)
+project(contas CXX)
+
+set(CMAKE_CXX_STANDARD 23)
+
+add_executable(contas main.cpp)
+target_sources(contas
+    PUBLIC FILE_SET CXX_MODULES FILES matematica.cppm)
+</pre>
+
+<p>A novidade em relação à aula <a href="cmake.html">CMake</a> é o <code>target_sources(… FILE_SET CXX_MODULES FILES …)</code>: ele avisa que <code>matematica.cppm</code> é um módulo. O <code>main.cpp</code> é o mesmo de antes.</p>
+
+<pre class="term" data-cwd="~/cpp/contas">$ cmake -S . -B build -G Ninja
+-- The CXX compiler identification is GNU 15.2.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done (0.3s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/ana/cpp/contas/build
+$ cmake --build build
+[1/6] Scanning /home/ana/cpp/contas/matematica.cppm for CXX dependencies
+[2/6] Scanning /home/ana/cpp/contas/main.cpp for CXX dependencies
+[3/6] Generating CXX dyndep file CMakeFiles/contas.dir/CXX.dd
+[4/6] Building CXX object CMakeFiles/contas.dir/matematica.cppm.o
+[5/6] Building CXX object CMakeFiles/contas.dir/main.cpp.o
+[6/6] Linking CXX executable contas
+$ ./build/contas
+Dobro de 21: 42
+Média de 7 e 10: 8.5</pre>
+
+<p>Os passos 1 a 3 são a "leitura" (<em>scanning</em>): o CMake descobre que <code>main.cpp</code> importa <code>matematica</code> e, por isso, no passo 4 compila o módulo antes do <code>main.cpp</code> (passo 5). O CMake liga o <code>-fmodules</code> sozinho. Com o gerador padrão do Linux, que produz um <code>Makefile</code>, não funciona:</p>
+
+<pre class="term" data-cwd="~/cpp/contas">$ cmake -S . -B build-make
+-- The CXX compiler identification is GNU 15.2.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done (0.3s)
+CMake Error in CMakeLists.txt:
+  The target named "contas" has C++ sources that may use modules, but modules
+  are not supported by this generator:
+
+    Unix Makefiles
+
+  Modules are supported only by Ninja, Ninja Multi-Config, and Visual Studio
+  generators for VS 17.4 and newer.  See the cmake-cxxmodules(7) manual for
+  details.  Use the CMAKE_CXX_SCAN_FOR_MODULES variable to enable or disable
+  scanning.
+
+
+-- Generating done (0.0s)
+CMake Generate step failed.  Build files cannot be regenerated correctly.</pre>
+
+<p>A mensagem diz tudo: "o alvo <code>contas</code> tem fontes C++ que podem usar módulos, mas módulos não são suportados por este gerador: Unix Makefiles. Módulos só são suportados pelo Ninja, Ninja Multi-Config e Visual Studio 17.4 ou mais novo". Solução: <code>-G Ninja</code> (o pacote <code>ninja-build</code> no Ubuntu).</p>
+
+<hr>
+
+<h2>6. O estado do suporte em 2026, com honestidade</h2>
+<p>Módulos entraram no padrão em 2020, mas são uma mudança enorme para compiladores e ferramentas, e o suporte chegou devagar. A tabela separa o que <strong>conferimos</strong> no laboratório do que só conhecemos pela documentação:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ferramenta</th><th>Módulos próprios (<code>export module</code>)</th><th><code>import std;</code></th><th>Como conferimos</th></tr>
+<tr><td>g++ 15.2</td><td>Funciona, com <code>-fmodules</code> e ordem manual</td><td>Funciona, depois de compilar <code>bits/std.cc</code> uma vez</td><td>Testado no laboratório (seções 3 e 4)</td></tr>
+<tr><td>clang++ 21.1</td><td>Funciona, com outra receita: <code>--precompile</code> gera um <code>.pcm</code> e <code>-fmodule-file=</code> o usa</td><td>Não conferido no laboratório. Segundo a documentação do CMake 4.2, funciona a partir do Clang 18.1.2, com a biblioteca libc++ ou com a do g++</td><td>Testado só o módulo próprio</td></tr>
+<tr><td>Visual Studio (MSVC)</td><td>Foi o primeiro a suportar, desde o Visual Studio 2019</td><td>Suportado desde o Visual Studio 2022 versão 17.5, segundo a Microsoft</td><td>Não testado (o laboratório é Linux)</td></tr>
+<tr><td>CMake 4.2</td><td>Funciona com Ninja (e Visual Studio); não com Makefiles</td><td>Ainda experimental: a documentação do CMake 4.2 exige ligar uma opção "de teste" (<code>CMAKE_EXPERIMENTAL_CXX_IMPORT_STD</code>)</td><td>Testado o módulo próprio com Ninja e o erro com Makefiles</td></tr>
+<tr><td>Make puro</td><td>Só escrevendo a ordem à mão</td><td>Idem</td><td>Não há suporte automático</td></tr>
+<tr><td>Editor do guia</td><td colspan="2">Não usado nesta aula: o editor compila tudo de uma vez</td><td>—</td></tr>
+</table>
+</div>
+
+<p>No clang++ 21, o mesmo módulo e o mesmo <code>main.cpp</code> (com o módulo salvo como <code>matematica.cppm</code>):</p>
+<pre class="term" data-cwd="~/cpp">$ clang++ -std=c++23 --precompile matematica.cppm -o matematica.pcm
+$ clang++ -std=c++23 -Wall -Wextra -fmodule-file=matematica=matematica.pcm main.cpp matematica.pcm -o programa_clang
+$ ./programa_clang
+Dobro de 21: 42
+Média de 7 e 10: 8.5</pre>
+
+<p>Repare que cada compilador tem sua receita, e os arquivos intermediários (<code>.gcm</code> no g++, <code>.pcm</code> no Clang) não servem para o outro. É justamente por isso que, em projetos de verdade, quem cuida dos módulos é o CMake.</p>
+
+<h3>Então, devo usar módulos?</h3>
+<ul>
+  <li><strong>Para aprender e para projetos pessoais novos:</strong> vale experimentar, principalmente com CMake + Ninja.</li>
+  <li><strong>Para projetos que precisam compilar em vários sistemas e compiladores:</strong> em 2026, a maioria dos projetos ainda usa <code>#include</code>. Editores, ferramentas de análise e bibliotecas externas ainda estão se adaptando.</li>
+  <li><strong>Neste guia:</strong> todas as outras aulas usam <code>#include</code>, que é o que você vai encontrar em quase todo código C++ hoje. Os módulos são o futuro; os cabeçalhos ainda são o presente.</li>
+</ul>
+
+<p>O padrão ainda tem outras peças que não vimos: dividir um módulo em vários arquivos (<em>partitions</em>, "partições", com <code>export module matematica:geometria;</code>) e importar cabeçalhos antigos como se fossem módulos (<em>header units</em>, <code>import &lt;iostream&gt;;</code>), cujo suporte é ainda menor.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: ‘import’ does not name a type</code> / <code>note: C++20 ‘import’ only available with ‘-fmodules’</code></strong>
+<p><strong>O que significa:</strong> o g++ 15 não liga módulos sozinho, nem com <code>-std=c++23</code>.</p>
+<p><strong>Como consertar:</strong> acrescente <code>-fmodules</code> ao comando.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: failed to read compiled module</code> / <code>imports must be built before being imported</code></strong>
+<p><strong>O que significa:</strong> o arquivo que importa foi compilado antes do módulo, ou o <code>gcm.cache</code> está em outra pasta (ele fica na pasta em que você rodou o g++). Para <code>import std;</code>, falta compilar <code>bits/std.cc</code>.</p>
+<p><strong>Como consertar:</strong> compile primeiro os módulos (<code>g++ -std=c++23 -fmodules -c modulo.cpp</code>), depois o resto, sempre da mesma pasta. Para <code>std</code>: <code>g++ -std=c++23 -fmodules -fsearch-include-path -c bits/std.cc</code>. Ou deixe o CMake + Ninja cuidar da ordem.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: ‘x’ was not declared in this scope</code> com o <code>import</code> funcionando</strong>
+<p><strong>O que significa:</strong> a função ou classe existe no módulo, mas não foi exportada.</p>
+<p><strong>Como consertar:</strong> acrescente <code>export</code> na frente da declaração, dentro do módulo.</p>
+</div>
+
+<div class="cenario">
+<strong><code>CMake Error … modules are not supported by this generator: Unix Makefiles</code></strong>
+<p><strong>O que significa:</strong> o CMake só sabe ordenar módulos com Ninja ou Visual Studio.</p>
+<p><strong>Como consertar:</strong> apague a pasta de build e configure com <code>cmake -S . -B build -G Ninja</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>export module nome;</code></td><td>Primeira linha da interface de um módulo</td></tr>
+<tr><td><code>export int f();</code></td><td>Deixa <code>f</code> visível para quem importa</td></tr>
+<tr><td><code>export { … }</code></td><td>Exporta tudo dentro das chaves</td></tr>
+<tr><td><code>import nome;</code></td><td>Usa o módulo</td></tr>
+<tr><td><code>import std;</code></td><td>A biblioteca padrão inteira (C++23), sem macros</td></tr>
+<tr><td><code>g++ -std=c++23 -fmodules -c modulo.cpp</code></td><td>Compila o módulo (gera <code>.o</code> e <code>gcm.cache/nome.gcm</code>)</td></tr>
+<tr><td><code>g++ -std=c++23 -fmodules main.cpp modulo.o -o prog</code></td><td>Compila quem importa e monta o programa</td></tr>
+<tr><td><code>g++ -std=c++23 -fmodules -fsearch-include-path -c bits/std.cc</code></td><td>Prepara o <code>import std;</code> no g++ 15</td></tr>
+<tr><td><code>target_sources(alvo PUBLIC FILE_SET CXX_MODULES FILES m.cppm)</code></td><td>Declara um módulo no CMake</td></tr>
+<tr><td><code>cmake -S . -B build -G Ninja</code></td><td>Configura com o gerador que entende módulos</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A primeira linha</h3>
+<p>Complete a primeira linha do módulo <code>loja</code>:</p>
+<div class="ex-code"><input data-answer="export module" aria-label="palavras"> loja;</div>
+</div>
+
+<div class="exercise">
+<h3>2. A opção do g++</h3>
+<p>Complete o comando para o g++ 15 aceitar <code>import</code>:</p>
+<div class="ex-code">g++ -std=c++23 <input data-answer="-fmodules|-fmodules-ts" aria-label="opção"> -c loja.cpp</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Um módulo tem <code>export int a();</code> e <code>int b();</code>. Quem faz <code>import</code> pode chamar…</p>
+<label><input type="radio" name="q3"> <code>a</code> e <code>b</code></label>
+<label><input type="radio" name="q3"> Só <code>a</code></label>
+<label><input type="radio" name="q3"> Só <code>b</code></label>
+<label><input type="radio" name="q3"> Nenhuma das duas</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Você compilou <code>main.cpp</code> (que importa <code>loja</code>) antes de <code>loja.cpp</code>. O que acontece?</p>
+<label><input type="radio" name="q4"> Funciona igual</label>
+<label><input type="radio" name="q4"> O g++ compila o módulo sozinho</label>
+<label><input type="radio" name="q4"> Erro: <code>failed to read compiled module</code></label>
+<label><input type="radio" name="q4"> Erro no <code>./main</code>, ao rodar</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Qual destes problemas do <code>#include</code> os módulos <strong>não</strong> resolvem sozinhos?</p>
+<label><input type="radio" name="q5"> Macros vazando para o seu código</label>
+<label><input type="radio" name="q5"> O mesmo cabeçalho chegando duas vezes</label>
+<label><input type="radio" name="q5"> O mesmo texto sendo relido em cada arquivo</label>
+<label><input type="radio" name="q5"> A necessidade de compilar as coisas numa certa ordem</label>
+</div>
+
+<h3>Missão final: a macro que vaza</h3>
+
+<div class="trycpp" data-goal="compila,out:Limite da Ana: 50">
+<p class="try-task"><strong>Missão:</strong> o <code>config.h</code> define a macro <code>LIMITE</code>, que "invade" o <code>main.cpp</code> e estraga a variável da Ana. Rode e veja o erro. Depois conserte o <strong><code>config.h</code></strong>: troque a macro por uma constante de verdade com outro nome, <code>constexpr int limite_padrao = 10;</code> (aula <a href="constexpr.html">constexpr</a>). Uma constante respeita escopo e não troca texto às escondidas; e num módulo, nem macros nem nomes não exportados escapariam.</p>
+<pre class="script" data-file="main.cpp">#include &lt;iostream&gt;
+#include "config.h"
+
+int main() {
+    int LIMITE = 50;
+    std::cout &lt;&lt; "Limite da Ana: " &lt;&lt; LIMITE &lt;&lt; '\n';
+}
+</pre>
+<pre class="script" data-file="config.h">#pragma once
+#define LIMITE 10
+</pre>
+<pre class="solucao" data-file="config.h">#pragma once
+constexpr int limite_padrao = 10;
+</pre>
+</div>
+
+<p>A solução, no laboratório:</p>
+<pre class="term" data-cwd="~/cpp">$ cat config.h
+#pragma once
+constexpr int limite_padrao = 10;
+$ g++ -std=c++23 -Wall -Wextra main.cpp -o main
+$ ./main
+Limite da Ana: 50</pre>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>#include</code> cola texto: dezenas de milhares de linhas relidas em cada arquivo, cabeçalhos duplicados e macros que vazam.</li>
+  <li>Um módulo começa com <code>export module nome;</code> e marca com <code>export</code> o que é público. Quem usa escreve <code>import nome;</code>.</li>
+  <li>No g++ 15: <code>-fmodules</code>, e o módulo é compilado <strong>antes</strong> de quem o importa (gera <code>gcm.cache/nome.gcm</code>).</li>
+  <li><code>import std;</code> (C++23) funciona no g++ 15 depois de compilar <code>bits/std.cc</code> uma vez; não traz macros.</li>
+  <li>Em projetos, use CMake 4.2 com <code>FILE_SET CXX_MODULES</code> e o gerador Ninja; com Makefiles, não funciona.</li>
+  <li>Em 2026, g++, Clang e MSVC compilam módulos, cada um com sua receita; a maior parte do código C++ ainda usa <code>#include</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
