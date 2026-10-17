@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Arrays — vários valores numa variável só | Guia C++</title>
+<meta name="description" content="Arrays (vetores estilo C) em C++ para quem nunca programou: int notas[5] = {…}, índices a partir de 0, tamanho fixo, std::size (C++17), percorrer com for, acesso fora do intervalo (comportamento indefinido, com o relatório real do -fsanitize=address), o array que esquece o tamanho numa função e por que preferir std::array e std::vector.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Arrays</span></h1>
+
+<p class="intro">A Ana tem 5 alunos. Para guardar as notas, ela poderia criar <code>nota1</code>, <code>nota2</code>, <code>nota3</code>, <code>nota4</code>, <code>nota5</code>… e se a turma tiver 40 alunos? E como fazer um laço passar por variáveis com nomes diferentes? A solução é um <strong>array</strong> (em português, "arranjo" ou "vetor"): <strong>uma</strong> variável que guarda <strong>vários valores do mesmo tipo</strong>, lado a lado, cada um numa posição numerada.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como criar um array: <code>int notas[5] = {7, 9, 6, 8, 10};</code>.</li>
+  <li>Por que as posições (os <strong>índices</strong>) começam do <strong>0</strong>.</li>
+  <li>Como ler, trocar e percorrer os valores com <code>for</code>.</li>
+  <li>Como perguntar o tamanho com <code>std::size</code> <span class="versao">C++17</span>.</li>
+  <li>O que acontece quando você acessa uma posição que não existe, e como o <code>-fsanitize=address</code> pega isso.</li>
+  <li>Os limites do array "cru": tamanho fixo e esquecimento do tamanho nas funções. E por que o C++ moderno prefere <code>std::array</code> e <code>std::vector</code>.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<div class="warning">
+<strong>Por que aprender arrays "estilo C"?</strong>
+<p>No C++ moderno, para listas você vai usar quase sempre <a href="std-array.html">std::array</a> (tamanho fixo) ou <a href="vector.html">std::vector</a> (tamanho que cresce). Mas o array estilo C, herdado da linguagem C, aparece em muito código existente, em exemplos da internet e por baixo dos próprios <code>std::array</code> e <code>std::vector</code>. Entender como ele funciona, e onde ele é perigoso, explica <strong>por que</strong> as alternativas existem.</p>
+</div>
+
+<hr>
+
+<h2>A ideia: uma fileira de armários numerados</h2>
+<p>Pense numa fileira de armários de escola, todos iguais, colados uns nos outros. A fileira inteira tem um nome ("armários do 3º ano"), e cada armário tem um <strong>número</strong> na porta. Para pegar algo, você diz o nome da fileira e o número do armário.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na escola</th><th>No array</th><th>Exemplo</th></tr>
+<tr><td>O nome da fileira</td><td>O nome do array</td><td><code>notas</code></td></tr>
+<tr><td>Quantos armários a fileira tem</td><td>O <strong>tamanho</strong> (fixo!)</td><td><code>5</code></td></tr>
+<tr><td>O número na porta</td><td>O <strong>índice</strong></td><td><code>0</code>, <code>1</code>, <code>2</code>, <code>3</code>, <code>4</code></td></tr>
+<tr><td>O que está dentro</td><td>O <strong>elemento</strong> (o valor)</td><td><code>7</code>, <code>9</code>, <code>6</code>…</td></tr>
+<tr><td>"Todos os armários são do mesmo modelo"</td><td>Todos os elementos têm o mesmo tipo</td><td><code>int</code></td></tr>
+</table>
+</div>
+<p>Uma diferença importante: os armários do C++ começam do número <strong>0</strong>, não do 1.</p>
+
+<hr>
+
+<h2>1. Criar um array e usar os elementos</h2>
+
+<pre class="file" data-file="notas.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int notas[5] = {7, 9, 6, 8, 10};
+    std::cout &lt;&lt; "Primeira nota: " &lt;&lt; notas[0] &lt;&lt; '\n';
+    std::cout &lt;&lt; "Terceira nota: " &lt;&lt; notas[2] &lt;&lt; '\n';
+    std::cout &lt;&lt; "Última nota: " &lt;&lt; notas[4] &lt;&lt; '\n';
+
+    notas[2] = 7;
+    std::cout &lt;&lt; "Terceira nota corrigida: " &lt;&lt; notas[2] &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>int</dt><dd>O tipo de <strong>cada</strong> elemento. Todos os 5 são <code>int</code>.</dd>
+  <dt>notas</dt><dd>O nome do array inteiro.</dd>
+  <dt>[5]</dt><dd>O <strong>tamanho</strong>: quantos elementos cabem. Fica fixo para sempre: um array de 5 nunca vira de 6.</dd>
+  <dt>= {7, 9, 6, 8, 10};</dt><dd>Os valores iniciais, na ordem das posições: o 7 vai para a posição 0, o 9 para a 1…</dd>
+  <dt>notas[2]</dt><dd>Usar <strong>um</strong> elemento: o nome, e entre colchetes o <strong>índice</strong>. <code>notas[2]</code> é o terceiro (posições 0, 1, <strong>2</strong>). Funciona como uma variável comum: dá para mostrar, usar em contas e atribuir (<code>notas[2] = 7;</code>).</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra notas.cpp -o notas
+$ ./notas
+Primeira nota: 7
+Terceira nota: 6
+Última nota: 10
+Terceira nota corrigida: 7</pre>
+
+<h3>Por que o índice começa do 0?</h3>
+<p>O índice não é "o número do aluno", e sim a <strong>distância desde o começo</strong> do array. O primeiro elemento está a 0 passos do começo; o segundo, a 1 passo; o último de um array de 5, a 4 passos. Por isso:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Índice</th><td><strong>0</strong></td><td><strong>1</strong></td><td><strong>2</strong></td><td><strong>3</strong></td><td><strong>4</strong></td></tr>
+<tr><th>Valor</th><td>7</td><td>9</td><td>6</td><td>8</td><td>10</td></tr>
+<tr><th>Em português</th><td>1º</td><td>2º</td><td>3º</td><td>4º</td><td>5º (último)</td></tr>
+</table>
+</div>
+
+<p>Num array de tamanho <code>N</code>, os índices válidos vão de <code>0</code> a <code>N − 1</code>. O índice <code>N</code> <strong>não existe</strong>. Grave isso: é a fonte do erro mais perigoso desta aula.</p>
+
+<hr>
+
+<h2>2. Formas de criar</h2>
+
+<pre class="file" data-file="iniciar.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int a[5] = {1, 2};
+    int b[5] = {};
+    int c[] = {4, 5, 6};
+
+    for (int x : a) std::cout &lt;&lt; x &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+    for (int x : b) std::cout &lt;&lt; x &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+    for (int x : c) std::cout &lt;&lt; x &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra iniciar.cpp -o iniciar
+$ ./iniciar
+1 2 0 0 0
+0 0 0 0 0
+4 5 6 </pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Resultado</th></tr>
+<tr><td><code>int a[5] = {1, 2};</code></td><td>Os que faltam viram <strong>0</strong>: <code>1 2 0 0 0</code>.</td></tr>
+<tr><td><code>int b[5] = {};</code></td><td>Todos <strong>0</strong>. A forma certa de criar um array "zerado".</td></tr>
+<tr><td><code>int c[] = {4, 5, 6};</code></td><td>Sem o tamanho: o compilador <strong>conta</strong> os valores (aqui, 3).</td></tr>
+<tr><td><code>int d[5];</code></td><td>Sem valores: os elementos ficam com <strong>lixo</strong>. Evite!</td></tr>
+</table>
+</div>
+
+<p>(Os laços acima são o <a href="for-range.html">for de intervalo</a>, que funciona com arrays também. Escrevemos cada um em uma linha, sem chaves, só para o exemplo caber; no seu código, use chaves.)</p>
+
+<p>O que é "lixo"? Um array sem valores iniciais fica com o que estava na memória antes, restos de outros programas ou de outras partes deste. Veja uma execução real:</p>
+
+<pre class="file" data-file="lixo.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int d[5];
+    for (int x : d) std::cout &lt;&lt; x &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra lixo.cpp -o lixo
+$ ./lixo
+1 0 1075516120 32765 73728 </pre>
+
+<p>Esses números não significam nada e podem mudar a cada execução ou em outro computador. Nem o <code>-Wall -Wextra</code> avisou. Por isso a regra do guia: <strong>sempre inicialize</strong>, nem que seja com <code>{}</code>.</p>
+
+<h3>Arrays de outros tipos</h3>
+<p>Qualquer tipo serve: <code>double precos[3] = {12.5, 8.0, 27.0};</code>, <code>char vogais[5] = {'a', 'e', 'i', 'o', 'u'};</code> ou a lista de compras da Ana em <code>std::string</code>:</p>
+<pre class="file" data-file="nomes.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string lista[4] = {"arroz", "feijão", "café", "leite"};
+    for (const auto&amp; item : lista) {
+        std::cout &lt;&lt; "- " &lt;&lt; item &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra nomes.cpp -o nomes
+$ ./nomes
+- arroz
+- feijão
+- café
+- leite</pre>
+
+<hr>
+
+<h2>3. Percorrer com <code>for</code></h2>
+<p>A grande vantagem do array é poder usar um <strong>laço</strong> para passar por todos os elementos. O índice vira a variável do <a href="for.html">for</a>: do 0 até o tamanho, com <code>&lt;</code> (o "jeito do C++" daquela aula):</p>
+
+<pre class="file" data-file="percorrer.cpp">#include &lt;iostream&gt;
+
+int main() {
+    constexpr int TOTAL = 5;
+    int notas[TOTAL] = {7, 9, 6, 8, 10};
+
+    for (int i = 0; i &lt; TOTAL; i++) {
+        std::cout &lt;&lt; "Aluno " &lt;&lt; i + 1 &lt;&lt; ": " &lt;&lt; notas[i] &lt;&lt; '\n';
+    }
+
+    double soma = 0.0;
+    for (int nota : notas) {
+        soma += nota;
+    }
+    std::cout &lt;&lt; "Média: " &lt;&lt; soma / TOTAL &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>constexpr int TOTAL = 5;</dt><dd>O tamanho guardado numa constante (veja <a href="constantes.html">Constantes</a>). Se a turma mudar para 6 alunos, você troca um número só. O tamanho de um array precisa ser conhecido <strong>na hora de compilar</strong>, e é isso que o <code>constexpr</code> garante.</dd>
+  <dt>i &lt; TOTAL</dt><dd>De 0 a 4. Com <code>&lt;=</code>, o laço tentaria ler <code>notas[5]</code>, que não existe.</dd>
+  <dt>notas[i]</dt><dd>O elemento da posição <code>i</code>. Em cada volta, <code>i</code> muda, e o mesmo código lê um elemento diferente.</dd>
+  <dt>i + 1</dt><dd>Para a tela, a numeração "de gente" (Aluno 1, não Aluno 0).</dd>
+  <dt>for (int nota : notas)</dt><dd>Quando você não precisa do índice, o for de intervalo é mais simples e não tem como errar o tamanho.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra percorrer.cpp -o percorrer
+$ ./percorrer
+Aluno 1: 7
+Aluno 2: 9
+Aluno 3: 6
+Aluno 4: 8
+Aluno 5: 10
+Média: 8</pre>
+
+<div class="trycpp" data-goal="out:Média: 8.5,src:for\s*\(">
+<p class="try-task"><strong>Missão:</strong> a turma da tarde tem 4 alunos. Some as notas com um laço e mostre <code>Média: 8.5</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    constexpr int TOTAL = 4;
+    int notas[TOTAL] = {8, 9, 7, 10};
+    double soma = 0.0;
+    // some as notas aqui
+
+    std::cout &lt;&lt; "Média: " &lt;&lt; soma / TOTAL &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    constexpr int TOTAL = 4;
+    int notas[TOTAL] = {8, 9, 7, 10};
+    double soma = 0.0;
+    for (int i = 0; i &lt; TOTAL; i++) {
+        soma += notas[i];
+    }
+    std::cout &lt;&lt; "Média: " &lt;&lt; soma / TOTAL &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>4. Perguntar o tamanho: <code>std::size</code> <span class="versao">C++17</span></h2>
+<p>Em vez de guardar o tamanho numa constante, você pode <strong>perguntar</strong> ao array com <code>std::size</code>, que vem do cabeçalho <code>&lt;iterator&gt;</code>:</p>
+
+<pre class="file" data-file="tamanho.cpp">#include &lt;iostream&gt;
+#include &lt;iterator&gt;
+
+int main() {
+    int notas[] = {7, 9, 6, 8, 10};
+    std::cout &lt;&lt; "A turma tem " &lt;&lt; std::size(notas) &lt;&lt; " notas\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tamanho.cpp -o tamanho
+$ ./tamanho
+A turma tem 5 notas</pre>
+
+<p>Agora, acrescentar um valor nas chaves já atualiza o tamanho. Antes do C++17, a forma tradicional era <code>sizeof(notas) / sizeof(notas[0])</code> (o tamanho em bytes do array inteiro dividido pelo de um elemento), que você ainda vai encontrar em código antigo.</p>
+
+<p>Um detalhe: <code>std::size</code> devolve um número <strong>sem sinal</strong> (<code>std::size_t</code>, que nunca é negativo). Compará-lo com um <code>int</code> num <code>for</code> gera um aviso:</p>
+
+<pre class="file" data-file="sinal.cpp">#include &lt;iostream&gt;
+#include &lt;iterator&gt;
+
+int main() {
+    int notas[] = {7, 9, 6, 8, 10};
+    for (int i = 0; i &lt; std::size(notas); i++) {
+        std::cout &lt;&lt; notas[i] &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sinal.cpp -o sinal
+sinal.cpp: In function ‘int main()’:
+sinal.cpp:6:23: warning: comparison of integer expressions of different signedness: ‘int’ and ‘std::size_t’ {aka ‘long unsigned int’} [-Wsign-compare]
+    6 |     for (int i = 0; i &lt; std::size(notas); i++) {
+      |                     ~~^~~~~~~~~~~~~~~~~~</pre>
+
+<p>"Comparação de inteiros com sinais diferentes: <code>int</code> e <code>std::size_t</code>". Aqui o programa funciona, mas comparar números com e sem sinal pode dar resultados absurdos com valores negativos (veja <a href="inteiros.html">Inteiros</a>). Três saídas: use o for de intervalo (sem índice, sem problema), declare o índice como <code>std::size_t i</code>, ou guarde o tamanho numa constante <code>int</code>, como na seção 3. O mesmo aviso aparece com o <code>.size()</code> do <a href="vector.html">std::vector</a>.</p>
+
+<hr>
+
+<h2 id="fora">5. Fora do intervalo: o erro mais perigoso</h2>
+<p>O que acontece se você pedir <code>notas[5]</code> num array de 5 elementos? Em muitas linguagens, o programa para com uma mensagem clara. Em C++, com arrays crus, <strong>ninguém confere</strong>. O programa simplesmente lê (ou escreve!) a memória que estiver logo depois do array, seja ela o que for. Este laço tem o erro do "um a mais" (<code>&lt;=</code> no lugar de <code>&lt;</code>, veja <a href="for.html#um-a-mais">for</a>):</p>
+
+<pre class="file" data-file="fora.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int notas[5] = {7, 9, 6, 8, 10};
+    for (int i = 0; i &lt;= 5; i++) {
+        std::cout &lt;&lt; notas[i] &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra fora.cpp -o fora
+$ ./fora
+7 9 6 8 10 0 </pre>
+
+<p>Nenhum erro, nenhum aviso, e um <code>0</code> que <strong>não é nota de ninguém</strong> apareceu no fim. Esse 0 é o que estava na memória logo depois do array, nesta execução, neste computador. Isso se chama <strong>comportamento indefinido</strong> (em inglês, <em>undefined behavior</em>): a linguagem não define o que acontece. Pode aparecer um número qualquer, o programa pode travar, ou pode "funcionar" hoje e falhar amanhã. Escrever fora do array é ainda pior: estraga outras variáveis e é a origem de muitas falhas de segurança famosas. O assunto tem aula própria: <a href="comportamento-indefinido.html">Comportamento Indefinido</a>.</p>
+
+<h3>Pegando o erro com <code>-fsanitize=address</code></h3>
+<p>Como o erro é silencioso, existem ferramentas que vigiam a memória enquanto o programa roda. A mais usada é o <strong>AddressSanitizer</strong> ("higienizador de endereços"), ligado com a opção <code>-fsanitize=address</code> do g++. O <code>-g</code> acrescenta as informações que permitem ao relatório citar o arquivo e a linha:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -g -fsanitize=address fora.cpp -o fora
+$ ./fora
+=================================================================
+==8==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x74898bdf0034 at pc 0x64f3413be447 bp 0x7ffdd98b4da0 sp 0x7ffdd98b4d90
+READ of size 4 at 0x74898bdf0034 thread T0
+    #0 0x64f3413be446 in main /home/ana/cpp/fora.cpp:6
+    #1 0x78898de2a600 in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+    #2 0x78898de2a717 in __libc_start_main_impl ../csu/libc-start.c:360
+    #3 0x64f3413be164 in _start (/home/ana/cpp/fora+0x1164) (BuildId: edb3d6275155e381074227e67ed3cca84cbb56a0)
+
+Address 0x74898bdf0034 is located in stack of thread T0 at offset 52 in frame
+    #0 0x64f3413be238 in main /home/ana/cpp/fora.cpp:3
+
+  This frame has 1 object(s):
+    [32, 52) 'notas' (line 4) &lt;== Memory access at offset 52 overflows this variable
+HINT: this may be a false positive if your program uses some custom stack unwind mechanism, swapcontext or vfork
+      (longjmp and C++ exceptions *are* supported)
+SUMMARY: AddressSanitizer: stack-buffer-overflow /home/ana/cpp/fora.cpp:6 in main
+Shadow bytes around the buggy address:     « daqui em diante, um mapa da memória (cortado)
+==8==ABORTING
+$ echo $?
+1</pre>
+
+<p>Assusta, mas só quatro linhas importam:</p>
+<dl class="anatomy">
+  <dt>stack-buffer-overflow</dt><dd>"Estouro de um bloco de memória na pilha": acesso além do fim de um array local.</dd>
+  <dt>READ of size 4</dt><dd>Foi uma <strong>leitura</strong> de 4 bytes (o tamanho de um <code>int</code>).</dd>
+  <dt>#0 … in main /home/ana/cpp/fora.cpp:6</dt><dd>Onde: na função <code>main</code>, <strong>linha 6</strong> do <code>fora.cpp</code>, o <code>std::cout &lt;&lt; notas[i]</code>.</dd>
+  <dt>[32, 52) 'notas' (line 4) &lt;== … overflows this variable</dt><dd>Qual variável: o array <code>notas</code>, criado na linha 4, ocupa os bytes 32 a 51; o acesso foi no byte 52, logo depois do fim.</dd>
+</dl>
+
+<p>O programa foi interrompido no momento do erro (<code>ABORTING</code>, código de saída 1). Nem as notas válidas apareceram: elas estavam esperando para ir para a tela quando o programa foi abortado. Use <code>-fsanitize=address</code> sempre que estiver testando programas com arrays; a aula <a href="sanitizers.html">Sanitizers</a> mostra todos os detalhes.</p>
+
+<div class="note">
+<strong>No editor do guia</strong>
+<p>O relatório acima vem do g++ no terminal. O editor do guia roda o programa de outro jeito (em WebAssembly, veja <a href="simulador.html">O Editor do Guia</a>), então o mesmo <code>fora.cpp</code> pode mostrar outro número no lugar do <code>0</code>. Isso é exatamente o que "comportamento indefinido" quer dizer: não há resultado certo. Para ver o relatório do AddressSanitizer, compile no seu computador como acima.</p>
+</div>
+
+<hr>
+
+<h2>6. Os limites do array estilo C</h2>
+
+<h3>Tamanho fixo</h3>
+<p>O tamanho é decidido quando você escreve o programa e não muda nunca. Não dá para "acrescentar o sexto aluno" num array de 5. Se a quantidade só é conhecida durante a execução (quantos produtos o usuário vai digitar?), o array estilo C não serve. Isso é trabalho para o <a href="vector.html">std::vector</a>.</p>
+
+<p>Você pode encontrar na internet código como <code>int n; std::cin &gt;&gt; n; int notas[n];</code>. Isso <strong>não é C++ padrão</strong> (chama-se VLA, <em>variable length array</em>, um recurso da linguagem C). O g++ aceita em silêncio, como extensão; o Clang do editor avisa: <code>warning: variable length arrays in C++ are a Clang extension [-Wvla-cxx-extension]</code>. Não use: com um <code>n</code> grande, o programa quebra sem aviso.</p>
+
+<h3>Mostrar o array inteiro não funciona</h3>
+<pre class="file" data-file="cout.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int notas[5] = {7, 9, 6, 8, 10};
+    std::cout &lt;&lt; notas &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra cout.cpp -o cout
+$ ./cout
+0x7ffcf485b480</pre>
+<p>Em vez das notas, apareceu um número em hexadecimal: o <strong>endereço</strong> do array na memória (muda a cada execução). Na maioria das situações, o nome de um array "vira" o endereço do primeiro elemento. Essa conversão tem nome, <em>decaimento</em> (<em>decay</em>), e é explicada em <a href="ponteiros-arrays.html">Ponteiros e Arrays</a>. Para mostrar os valores, use um laço.</p>
+
+<h3>O array esquece o tamanho quando vai para uma função</h3>
+<p>Esta é a ideia mais importante da seção, mesmo que você ainda não tenha estudado <a href="funcoes.html">funções</a>. Quando um array é entregue a uma função, por causa do decaimento, a função recebe <strong>só o endereço do começo</strong>. O tamanho fica para trás. Por isso, este código nem compila:</p>
+
+<pre class="file" data-file="funcao.cpp">#include &lt;iostream&gt;
+#include &lt;iterator&gt;
+
+void mostrar(int notas[]) {
+    for (std::size_t i = 0; i &lt; std::size(notas); i++) {
+        std::cout &lt;&lt; notas[i] &lt;&lt; ' ';
+    }
+}
+
+int main() {
+    int notas[5] = {7, 9, 6, 8, 10};
+    mostrar(notas);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra funcao.cpp -o funcao
+funcao.cpp: In function ‘void mostrar(int*)’:
+funcao.cpp:5:42: error: no matching function for call to ‘size(int*&amp;)’
+    5 |     for (std::size_t i = 0; i &lt; std::size(notas); i++) {
+      |                                 ~~~~~~~~~^~~~~~~
+funcao.cpp:5:42: note: there are 2 candidates     « e mais umas 20 linhas de notas</pre>
+
+<p>Repare na primeira linha: <code>In function ‘void mostrar(int*)’</code>. Você escreveu <code>int notas[]</code>, mas o compilador entende <code>int*</code> (um <a href="ponteiros.html">ponteiro</a> para <code>int</code>), e um ponteiro não tem tamanho. O jeito "estilo C" é passar o tamanho junto, num segundo parâmetro, e torcer para ninguém passar o número errado:</p>
+
+<pre class="file" data-file="funcao2.cpp">#include &lt;iostream&gt;
+#include &lt;iterator&gt;
+
+void mostrar(int notas[], int tamanho) {
+    for (int i = 0; i &lt; tamanho; i++) {
+        std::cout &lt;&lt; notas[i] &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+
+int main() {
+    int notas[5] = {7, 9, 6, 8, 10};
+    mostrar(notas, 5);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra funcao2.cpp -o funcao2
+$ ./funcao2
+7 9 6 8 10 </pre>
+
+<p>Se alguém chamar <code>mostrar(notas, 6)</code>, volta o problema da seção 5.</p>
+
+<hr>
+
+<h2>Por que preferir <code>std::array</code> e <code>std::vector</code></h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Array estilo C<br><code>int a[5]</code></th><th><a href="std-array.html">std::array</a><br><code>std::array&lt;int, 5&gt;</code></th><th><a href="vector.html">std::vector</a><br><code>std::vector&lt;int&gt;</code></th></tr>
+<tr><td>Tamanho</td><td>Fixo</td><td>Fixo</td><td><strong>Cresce e diminui</strong></td></tr>
+<tr><td>Sabe o próprio tamanho</td><td>Só onde foi criado</td><td>Sempre (<code>.size()</code>)</td><td>Sempre (<code>.size()</code>)</td></tr>
+<tr><td>Acesso conferido</td><td>Nunca</td><td>Com <code>.at(i)</code></td><td>Com <code>.at(i)</code></td></tr>
+<tr><td>Copiar com <code>=</code>, comparar com <code>==</code></td><td>Não</td><td>Sim</td><td>Sim</td></tr>
+<tr><td>Vai para funções inteiro</td><td>Não (vira ponteiro)</td><td>Sim</td><td>Sim</td></tr>
+<tr><td>Quando usar</td><td>Código antigo, casos especiais</td><td>Quantidade fixa e conhecida</td><td><strong>O padrão</strong> para listas</td></tr>
+</table>
+</div>
+
+<p>Tudo o que você aprendeu aqui (índices do 0, <code>[i]</code>, laços, o perigo do "fora do intervalo") vale igualzinho para os dois. Eles só acrescentam segurança e comodidade. Próximos passos: <a href="arrays-multidimensionais.html">Arrays Multidimensionais</a> (tabelas), <a href="std-array.html">std::array</a> e <a href="vector.html">std::vector</a>.</p>
+
+<hr>
+
+<h2 id="erros">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Um número estranho no fim (ou no meio) da lista</strong>
+<pre class="term" data-cwd="~/cpp">$ ./fora
+7 9 6 8 10 0 </pre>
+<p><strong>O que aconteceu:</strong> o laço leu uma posição que não existe (<a href="#fora">seção 5</a>). Quase sempre é <code>&lt;=</code> no lugar de <code>&lt;</code>, ou um laço que começa do 1 em vez do 0.</p>
+<p><strong>Como confirmar:</strong> compile com <code>-g -fsanitize=address</code>; o relatório aponta a linha.</p>
+<p><strong>Como consertar:</strong> índices de <code>0</code> a <code>tamanho − 1</code>: <code>for (int i = 0; i &lt; TOTAL; i++)</code>. Melhor ainda: for de intervalo.</p>
+</div>
+
+<div class="cenario">
+<strong>"too many initializers for ‘int [3]’"</strong>
+<pre class="file" data-file="demais.cpp">int main() {
+    int notas[3] = {7, 9, 6, 8};
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra demais.cpp -o demais
+demais.cpp: In function ‘int main()’:
+demais.cpp:2:31: error: too many initializers for ‘int [3]’
+    2 |     int notas[3] = {7, 9, 6, 8};
+      |                               ^
+demais.cpp:2:9: warning: unused variable ‘notas’ [-Wunused-variable]
+    2 |     int notas[3] = {7, 9, 6, 8};
+      |         ^~~~~</pre>
+<p><strong>O que significa:</strong> "valores iniciais demais para <code>int [3]</code>" (um array de 3 <code>int</code>). Você declarou 3 posições e passou 4 valores. O aviso de "variável não usada" é só porque o exemplo não usa o array. O Clang do editor diz <code>error: excess elements in array initializer</code>.</p>
+<p><strong>Como consertar:</strong> aumente o tamanho, tire o valor sobrando ou omita o tamanho (<code>int notas[] = {…}</code>) e deixe o compilador contar.</p>
+</div>
+
+<div class="cenario">
+<strong>Apareceu um número como <code>0x7ffc…</code></strong>
+<p><strong>O que aconteceu:</strong> <code>std::cout &lt;&lt; notas</code> mostra o endereço do array, não os valores.</p>
+<p><strong>Como consertar:</strong> mostre com um laço, elemento por elemento.</p>
+</div>
+
+<div class="cenario">
+<strong>Valores sem sentido logo na primeira leitura</strong>
+<p><strong>O que aconteceu:</strong> o array foi criado sem valores iniciais (<code>int d[5];</code>) e guarda lixo.</p>
+<p><strong>Como consertar:</strong> <code>int d[5] = {};</code> zera tudo.</p>
+</div>
+
+<div class="cenario">
+<strong>"no matching function for call to ‘size(int*&amp;)’"</strong>
+<p><strong>O que aconteceu:</strong> você usou <code>std::size</code> num array que foi passado para uma função, onde ele já virou um ponteiro e perdeu o tamanho.</p>
+<p><strong>Como consertar:</strong> passe o tamanho como parâmetro ou, melhor, use <a href="std-array.html">std::array</a> ou <a href="vector.html">std::vector</a>, que levam o tamanho com eles.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que faz</th></tr>
+<tr><td><code>int a[5] = {1, 2, 3, 4, 5};</code></td><td>Cria um array de 5 <code>int</code> com valores.</td></tr>
+<tr><td><code>int a[5] = {};</code></td><td>Cria com todos os elementos valendo 0.</td></tr>
+<tr><td><code>int a[] = {1, 2, 3};</code></td><td>O tamanho (3) é contado pelo compilador.</td></tr>
+<tr><td><code>a[i]</code></td><td>O elemento da posição <code>i</code> (de <code>0</code> a <code>tamanho − 1</code>). Sem conferência!</td></tr>
+<tr><td><code>a[i] = valor;</code></td><td>Troca o elemento da posição <code>i</code>.</td></tr>
+<tr><td><code>std::size(a)</code></td><td><span class="versao">C++17</span> O tamanho (<code>&lt;iterator&gt;</code>). Só onde o array foi criado.</td></tr>
+<tr><td><code>for (int i = 0; i &lt; N; i++)</code></td><td>Percorre com índice.</td></tr>
+<tr><td><code>for (int x : a)</code></td><td>Percorre sem índice.</td></tr>
+<tr><td><code>g++ … -g -fsanitize=address</code></td><td>Detecta acesso fora do intervalo ao rodar.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O último elemento</h3>
+<p>Num array <code>int v[8]</code>, qual é o índice do <strong>último</strong> elemento?</p>
+<div class="ex-code">v[<input data-answer="7" aria-label="índice" size="3">]</div>
+</div>
+
+<div class="exercise">
+<h3>2. Criar zerado</h3>
+<p>Complete para criar um array de 10 <code>int</code>, todos valendo 0:</p>
+<div class="ex-code">int contagem[10] = <input data-answer="{}|{0}|{ }" aria-label="inicialização" size="6">;</div>
+</div>
+
+<div class="exercise">
+<h3>3. A condição certa</h3>
+<p>Complete o laço que percorre <code>int precos[6]</code> sem sair do intervalo:</p>
+<div class="ex-code">for (int i = 0; <input data-answer="i &lt; 6|i&lt;6|i &lt;= 5|i&lt;=5" aria-label="condição">; i++)</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Depois de <code>int a[4] = {5, 6};</code>, quanto vale <code>a[3]</code>?</p>
+<label><input type="radio" name="q4"> 6</label>
+<label><input type="radio" name="q4"> Lixo (um valor qualquer)</label>
+<label><input type="radio" name="q4"> 0</label>
+<label><input type="radio" name="q4"> Não compila</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. O que o C++ faz quando você lê <code>notas[5]</code> num array de 5 elementos?</p>
+<label><input type="radio" name="q5"> Para o programa com uma mensagem de erro.</label>
+<label><input type="radio" name="q5"> Nada confere: é comportamento indefinido, pode aparecer qualquer coisa.</label>
+<label><input type="radio" name="q5"> Devolve sempre 0.</label>
+<label><input type="radio" name="q5"> O compilador sempre recusa.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Por que, no C++ moderno, se prefere <code>std::vector</code> ao array estilo C para uma lista de produtos digitados pelo usuário?</p>
+<label><input type="radio" name="q6"> Porque o array estilo C não aceita <code>double</code>.</label>
+<label><input type="radio" name="q6"> Porque o <code>std::vector</code> começa do índice 1.</label>
+<label><input type="radio" name="q6"> Porque arrays estilo C não podem ser percorridos com <code>for</code>.</label>
+<label><input type="radio" name="q6"> Porque o array tem tamanho fixo e não sabe o próprio tamanho fora de onde foi criado.</label>
+</div>
+
+<h3>Missão final: a maior nota</h3>
+<div class="trycpp" data-goal="out:Maior nota: 10 (aluno 4),src:for\s*\(">
+<p class="try-task"><strong>Missão:</strong> percorra o array com um <code>for</code> com índice e descubra a maior nota <strong>e em que posição</strong> ela está. Mostre <code>Maior nota: 10 (aluno 4)</code>; lembre-se de que o aluno 4 está no índice 3. Dica: comece com <code>maior = notas[0]</code> e <code>posicao = 0</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    constexpr int TOTAL = 5;
+    int notas[TOTAL] = {7, 9, 6, 10, 8};
+    int maior = notas[0];
+    int posicao = 0;
+    // procure a maior nota aqui
+
+    std::cout &lt;&lt; "Maior nota: " &lt;&lt; maior &lt;&lt; " (aluno " &lt;&lt; posicao + 1 &lt;&lt; ")\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    constexpr int TOTAL = 5;
+    int notas[TOTAL] = {7, 9, 6, 10, 8};
+    int maior = notas[0];
+    int posicao = 0;
+    for (int i = 1; i &lt; TOTAL; i++) {
+        if (notas[i] &gt; maior) {
+            maior = notas[i];
+            posicao = i;
+        }
+    }
+    std::cout &lt;&lt; "Maior nota: " &lt;&lt; maior &lt;&lt; " (aluno " &lt;&lt; posicao + 1 &lt;&lt; ")\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um array guarda vários valores do mesmo tipo: <code>int notas[5] = {7, 9, 6, 8, 10};</code>.</li>
+  <li>Os índices vão de <code>0</code> a <code>tamanho − 1</code>; <code>notas[0]</code> é o primeiro.</li>
+  <li>Sempre inicialize: <code>{}</code> zera tudo; sem valores, sobra lixo.</li>
+  <li>Percorra com <code>for (int i = 0; i &lt; N; i++)</code> ou, sem índice, com <code>for (int x : notas)</code>. <code>std::size(notas)</code> dá o tamanho <span class="versao">C++17</span>.</li>
+  <li>Acesso fora do intervalo não é conferido: é <strong>comportamento indefinido</strong>. Teste com <code>-g -fsanitize=address</code>.</li>
+  <li>O tamanho é fixo, <code>std::cout &lt;&lt; notas</code> mostra um endereço, e numa função o array vira ponteiro e esquece o tamanho.</li>
+  <li>Por isso, prefira <a href="std-array.html">std::array</a> (tamanho fixo) e <a href="vector.html">std::vector</a> (o padrão para listas).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
