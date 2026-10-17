@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Versões — do C++98 ao C++26 | Guia C++</title>
+<meta name="description" content="As versões do C++ (C++98, 03, 11, 14, 17, 20, 23 e 26) e o que cada uma trouxe, o padrão ISO e o comitê, a diferença entre padrão e compilador, como ver a versão com g++ --version e __cplusplus, o padrão que o g++ 15 usa sem -std (C++17) e por que o guia compila com -std=c++23.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Versões</span></h1>
+
+<p class="intro">O C++ de hoje não é o mesmo de 1998. A linguagem ganha uma versão nova a cada três anos, com recursos que deixam o código mais curto, mais seguro e mais fácil de ler. Ao mesmo tempo, o seu compilador precisa saber <strong>qual</strong> versão você quer usar, e nem sempre ele escolhe a mais nova sozinho. Nesta aula você vai conhecer as versões, do C++98 ao C++26, entender quem decide o que entra na linguagem e aprender a conferir (e escolher) a versão com que o seu programa é compilado.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é o <strong>padrão ISO</strong> do C++ e quem decide o que entra nele.</li>
+  <li>As versões C++98, 03, 11, 14, 17, 20, 23 e 26, e duas ou três novidades de cada uma.</li>
+  <li>A diferença entre o <strong>padrão</strong> (as regras) e o <strong>compilador</strong> (o programa que segue as regras).</li>
+  <li>Como ver a versão do compilador (<code>g++ --version</code>) e a versão do C++ em uso (<code>__cplusplus</code>).</li>
+  <li>Por que o g++ 15 usa o C++17 quando você não pede nada, e por que o guia sempre compila com <code>-std=c++23</code>.</li>
+  <li>O que quer dizer o selo <span class="versao">C++20</span> nas aulas.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: as regras do futebol</h2>
+<p>As regras do futebol não pertencem a nenhum time. Elas são escritas por uma entidade internacional, mudam de tempos em tempos (o impedimento já mudou várias vezes, o VAR entrou em 2018) e cada campeonato <strong>adota</strong> as regras novas no seu ritmo. Um campeonato de bairro pode ainda jogar sem VAR, e ninguém diz que aquilo "não é futebol".</p>
+
+<p>Com o C++ é igual:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No futebol</th><th>No C++</th></tr>
+<tr><td>O livro de regras</td><td>O <strong>padrão</strong> (<em>standard</em>): um documento que diz o que é C++ válido e o que cada coisa faz.</td></tr>
+<tr><td>A entidade que escreve as regras</td><td>O <strong>comitê do C++</strong>, dentro da ISO.</td></tr>
+<tr><td>Uma edição das regras</td><td>Uma <strong>versão</strong>: C++11, C++17, C++23…</td></tr>
+<tr><td>Os campeonatos que aplicam as regras</td><td>Os <strong>compiladores</strong>: g++, Clang, o compilador da Microsoft (MSVC).</td></tr>
+<tr><td>Escolher com que regras jogar</td><td>A opção <code>-std=</code> do compilador: <code>-std=c++23</code>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>O padrão ISO</h2>
+<p>A <strong>ISO</strong> (<em>International Organization for Standardization</em>, "Organização Internacional de Normalização") é a entidade que publica normas técnicas no mundo inteiro: tamanhos de parafusos, formatos de data, e também linguagens de programação. O C++ é a norma <strong>ISO/IEC 14882</strong>. Quem escreve essa norma é um grupo de trabalho chamado <strong>WG21</strong>, o "comitê do C++": centenas de voluntários de empresas (Google, Microsoft, Apple, Intel, Nvidia, bancos, fabricantes de jogos), universidades e pessoas independentes, que se reúnem algumas vezes por ano para discutir e votar propostas.</p>
+
+<p>Isso quer dizer que <strong>nenhuma empresa é dona do C++</strong>. Qualquer pessoa pode escrever uma proposta. Se o comitê aprovar, ela entra na próxima versão, e os compiladores passam a implementá-la. Desde 2011, o comitê funciona como um trem com horário fixo: <strong>a cada três anos</strong> sai uma versão, com o que estiver pronto. O que não ficou pronto pega o próximo trem.</p>
+
+<p>O nome de cada versão é o ano em que ela ficou pronta: <strong>C++98</strong> é de 1998, <strong>C++23</strong> é de 2023. Enquanto uma versão está sendo preparada, os compiladores usam um apelido com letra: o C++23 foi chamado de <code>c++2b</code>, e o C++26 de <code>c++2c</code>. Você ainda vai encontrar esses apelidos em tutoriais e opções de compilador.</p>
+
+<hr>
+
+<h2>O que cada versão trouxe</h2>
+<p>A tabela mostra as novidades mais marcantes de cada versão. Não se preocupe com os nomes agora: cada um tem a sua aula, e o link leva até ela. Todos os exemplos das aulas foram conferidos com o g++ 15.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Versão</th><th>Apelido</th><th>Principais novidades</th></tr>
+<tr><td><strong>C++98</strong></td><td>o primeiro padrão</td><td>A biblioteca padrão com a <strong>STL</strong>: <code>std::vector</code>, <code>std::string</code>, <code>std::map</code> e os algoritmos (<code>std::sort</code>). <a href="templates-funcao.html">Templates</a>, <a href="excecoes.html">exceções</a> e <a href="namespaces.html">namespaces</a> padronizados.</td></tr>
+<tr><td><strong>C++03</strong></td><td>a revisão</td><td>Só correções do texto do C++98, sem recursos novos para quem programa. Para os compiladores, C++98 e C++03 são praticamente a mesma coisa.</td></tr>
+<tr><td><strong>C++11</strong></td><td>a grande virada</td><td><a href="auto.html"><code>auto</code></a>, <a href="lambdas.html">lambdas</a>, o <a href="for-range.html">for de intervalo</a>, <a href="nullptr.html"><code>nullptr</code></a>, <a href="smart-pointers.html">ponteiros inteligentes</a> (<code>std::unique_ptr</code>), <a href="move.html">semântica de movimento</a>, <a href="threads.html">threads</a>, <a href="enums.html"><code>enum class</code></a>. É o começo do "C++ moderno".</td></tr>
+<tr><td><strong>C++14</strong></td><td>o acabamento</td><td><code>std::make_unique</code>, lambdas genéricas (<code>[](auto x)</code>), separador de dígitos (<code>1'000'000</code>) e números binários (<code>0b1010</code>).</td></tr>
+<tr><td><strong>C++17</strong></td><td>a caixa de ferramentas</td><td><a href="optional-variant.html"><code>std::optional</code> e <code>std::variant</code></a>, <a href="string-view.html"><code>std::string_view</code></a>, <a href="pair-tuple.html">desestruturação</a> (<code>auto [a, b] = …</code>), <code>std::filesystem</code> para pastas e arquivos, <code>if constexpr</code>.</td></tr>
+<tr><td><strong>C++20</strong></td><td>a segunda grande virada</td><td><a href="concepts.html">Concepts</a>, <a href="ranges.html">ranges</a>, <a href="format-print.html"><code>std::format</code></a>, <a href="modulos.html">módulos</a>, o operador "nave espacial" <code>&lt;=&gt;</code>, <code>std::span</code>, corrotinas.</td></tr>
+<tr><td><strong>C++23</strong></td><td>a versão do guia</td><td><a href="format-print.html"><code>std::print</code> e <code>std::println</code></a>, <code>std::expected</code> (um resultado <strong>ou</strong> um erro), <code>import std;</code> (a biblioteca padrão inteira como módulo), <code>std::ranges::to</code>, <code>std::flat_map</code>.</td></tr>
+<tr><td><strong>C++26</strong></td><td>a próxima</td><td><strong>Reflexão</strong> (o programa "olhar para si mesmo" durante a compilação), <strong>contratos</strong> (pré-condições conferidas pelo compilador), <code>std::execution</code> (tarefas paralelas). Aprovado tecnicamente pelo comitê em março de 2026; os compiladores ainda estão implementando.</td></tr>
+</table>
+</div>
+
+<p>A Ana escreveu um programinha de teste para cada versão, usando as novidades da tabela, e compilou cada um com o <code>-std=</code> da versão. Todos compilaram e rodaram no g++ 15, inclusive alguns recursos pequenos do C++26 (como a variável "descartável" <code>_</code> e o <code>= delete("motivo")</code>). A reflexão e os contratos do C++26, não: o g++ 15 ainda não os tem. A aula <a href="novidades.html">Novidades do C++11 ao C++26</a> mostra cada recurso com exemplos.</p>
+
+<div class="tip">
+<strong>Código antigo continua valendo</strong>
+<p>O comitê tem muito cuidado para não "quebrar" programas que já existem: quase todo código C++98 compila sem mudanças com <code>-std=c++23</code>. Mas o contrário não vale: um programa que usa <code>std::println</code> (C++23) não compila com <code>-std=c++17</code>. Por isso o guia marca os recursos novos com um selo e mostra a alternativa antiga.</p>
+</div>
+
+<hr>
+
+<h2>Padrão × compilador</h2>
+<p>O padrão é só um documento, com mais de duas mil páginas. Quem transforma o seu código em programa é o <strong>compilador</strong>, e cada compilador é um projeto separado, com a sua própria numeração de versão:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Compilador</th><th>Comando</th><th>De quem</th><th>Versão no guia</th></tr>
+<tr><td><strong>GCC</strong> (<em>GNU Compiler Collection</em>)</td><td><code>g++</code></td><td>Projeto GNU, software livre</td><td>15.2 (a do Ubuntu 26.04)</td></tr>
+<tr><td><strong>Clang</strong> (projeto LLVM)</td><td><code>clang++</code></td><td>Comunidade LLVM (Apple, Google e outros), software livre</td><td>21.1 (no terminal e no editor do guia)</td></tr>
+<tr><td><strong>MSVC</strong> (<em>Microsoft Visual C++</em>)</td><td><code>cl</code></td><td>Microsoft, vem com o Visual Studio</td><td>(não usado no guia)</td></tr>
+</table>
+</div>
+
+<p>Não confunda os números: <strong>g++ 15</strong> é a versão do <strong>programa</strong> GCC; <strong>C++23</strong> é a versão da <strong>linguagem</strong>. O g++ 15 entende várias versões da linguagem, do C++98 ao C++26 (este último em parte). Os compiladores implementam as novidades aos poucos, às vezes antes de a versão ficar pronta, às vezes anos depois. O site <a href="https://en.cppreference.com/w/cpp/compiler_support">cppreference</a> tem uma tabela de qual recurso funciona em qual compilador.</p>
+
+<h3>Ver a versão do compilador</h3>
+<p>A opção <code>--version</code> mostra a versão do programa:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ --version
+g++ (Ubuntu 15.2.0-16ubuntu1) 15.2.0              « g++ versão 15.2.0, empacotado pelo Ubuntu
+Copyright (C) 2025 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+$ clang++ --version
+Ubuntu clang version 21.1.8 (6ubuntu1)            « clang versão 21.1.8
+Target: x86_64-pc-linux-gnu                       « gera programas para PC (x86-64) com Linux
+Thread model: posix
+InstalledDir: /usr/lib/llvm-21/bin</pre>
+
+<p>O texto em inglês do g++ diz que ele é software livre, sem garantia. O <code>15.2.0</code> se lê assim: <strong>15</strong> é a versão principal (uma por ano, com recursos novos), <strong>2</strong> é a revisão (correções), e o último número quase sempre é <code>0</code>. Repare que o comando <code>g++ --version</code> <strong>não</strong> diz qual versão do C++ ele usa. Para isso, há outro jeito.</p>
+
+<h3>Ver a versão do C++: <code>__cplusplus</code></h3>
+<p>Todo compilador define uma "constante" chamada <code>__cplusplus</code> (com dois sublinhados no começo), cujo valor é o ano e o mês da versão do C++ em uso. Um programa pode mostrá-la:</p>
+
+<pre class="file" data-file="versao.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "__cplusplus = " &lt;&lt; __cplusplus &lt;&lt; "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>__cplusplus</dt><dd>Um nome que o próprio compilador cria (uma <strong>macro</strong> do pré-processador, aula <a href="preprocessador.html">O Pré-processador</a>). Você não declara nada: ele já existe em todo programa C++.</dd>
+  <dt>201703</dt><dd>O valor: <code>2017</code> é o ano e <code>03</code> o mês da versão. Não é uma data exata de lançamento, é um número combinado no padrão.</dd>
+</dl>
+
+<p>A Ana compila sem pedir versão nenhuma, e depois com cada <code>-std=</code>. O <code>for</code> do terminal repete o mesmo comando para cada valor da lista (você não precisa entendê-lo agora):</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ versao.cpp -o versao &amp;&amp; ./versao
+__cplusplus = 201703                               « sem -std: o g++ 15 usa o C++17!
+$ for v in c++98 c++03 c++11 c++14 c++17 c++20 c++23 c++26; do g++ -std=$v versao.cpp -o versao &amp;&amp; echo -n "$v: " &amp;&amp; ./versao; done
+c++98: __cplusplus = 199711
+c++03: __cplusplus = 199711                        « C++03 tem o mesmo número do C++98
+c++11: __cplusplus = 201103
+c++14: __cplusplus = 201402
+c++17: __cplusplus = 201703
+c++20: __cplusplus = 202002
+c++23: __cplusplus = 202302                        « a versão do guia
+c++26: __cplusplus = 202400                        « ainda não terminado no g++ 15: número provisório
+$ clang++ versao.cpp -o versao &amp;&amp; ./versao
+__cplusplus = 201703                               « o Clang 21 também usa C++17 por padrão
+$ clang++ -std=c++23 versao.cpp -o versao &amp;&amp; ./versao
+__cplusplus = 202302</pre>
+
+<p>Este é o ponto mais importante da aula: <strong>sem <code>-std</code>, o g++ 15 compila como C++17</strong>, uma versão de 2017. Não é o mais novo que ele sabe, é o que os desenvolvedores do GCC consideraram mais seguro como padrão. Na verdade, sem <code>-std</code> ele usa o <code>gnu++17</code>: o C++17 com algumas extensões próprias do GCC (o valor de <code>__cplusplus</code> é o mesmo). Dá para ver o valor sem escrever programa nenhum, pedindo ao pré-processador a lista das macros que ele define:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -dM -E -x c++ /dev/null | grep __cplusplus
+#define __cplusplus 201703L                        « o L no fim quer dizer "número long"</pre>
+
+<p>(O <code>-dM -E</code> lista as macros, o <code>-x c++</code> diz "trate como C++" e o <code>/dev/null</code> é um arquivo vazio.) O padrão muda com o tempo: o <strong>GCC 16</strong>, lançado em abril de 2026, passou a usar o C++20 quando você não pede nada. O Ubuntu 26.04 da Ana ainda traz o g++ 15. Por causa dessas diferenças, o guia nunca depende do padrão do compilador.</p>
+
+<h3>Por que o guia usa <code>-std=c++23</code></h3>
+<p>Muitos recursos que o guia ensina desde o Nível 1 são do C++20 ou do C++23, como o <code>std::println</code>. Sem pedir, eles não funcionam no g++ 15:</p>
+
+<pre class="file" data-file="print.cpp">#include &lt;print&gt;
+
+int main() {
+    std::println("Olá, {}!", "Ana");
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ print.cpp -o print
+print.cpp: In function ‘int main()’:
+print.cpp:4:10: error: ‘println’ is not a member of ‘std’
+    4 |     std::println("Olá, {}!", "Ana");
+      |          ^~~~~~~
+print.cpp:4:10: note: ‘std::println’ is only available from C++23 onwards
+$ g++ -std=c++23 -Wall -Wextra print.cpp -o print &amp;&amp; ./print
+Olá, Ana!</pre>
+
+<p>A primeira tentativa falhou com <code>‘println’ is not a member of ‘std’</code> ("<code>println</code> não é membro de <code>std</code>"), e o g++ ainda deixou uma dica (<code>note</code>): "<code>std::println</code> só está disponível a partir do C++23". Com <code>-std=c++23</code>, funcionou. Por isso o comando padrão das aulas é:</p>
+
+<pre class="file" data-file="comando padrão do guia">g++ -std=c++23 -Wall -Wextra programa.cpp -o programa</pre>
+
+<p>O <code>-std=c++23</code> escolhe a versão; o <code>-Wall -Wextra</code> liga os avisos (aula <a href="avisos.html">Avisos</a>). A aula <a href="compilar.html">Compilar com g++</a> explica cada pedaço. As caixas Experimente já compilam com <code>-std=c++23 -Wall -Wextra</code> sozinhas.</p>
+
+<p>Confira no editor do guia. Esta caixa mostra o <code>__cplusplus</code> do compilador do navegador:</p>
+
+<div class="trycpp" data-goal="out:202302">
+<p class="try-task"><strong>Missão:</strong> rode e confira que o número é <code>202302</code>, o do C++23. Depois acrescente uma linha que mostre o ano sozinho: <code>std::cout &lt;&lt; __cplusplus / 100 &lt;&lt; "\n";</code> (dividir por 100 "corta" os dois últimos dígitos, o mês). Deve aparecer <code>2023</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "__cplusplus = " &lt;&lt; __cplusplus &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "__cplusplus = " &lt;&lt; __cplusplus &lt;&lt; "\n";
+    std::cout &lt;&lt; __cplusplus / 100 &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Escolher a versão: as opções <code>-std=</code></h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Opção</th><th>Versão</th><th>Também aceita</th><th><code>__cplusplus</code> (g++ 15)</th></tr>
+<tr><td><code>-std=c++98</code></td><td>C++98</td><td></td><td>199711</td></tr>
+<tr><td><code>-std=c++03</code></td><td>C++03</td><td></td><td>199711</td></tr>
+<tr><td><code>-std=c++11</code></td><td>C++11</td><td><code>c++0x</code> (apelido antigo)</td><td>201103</td></tr>
+<tr><td><code>-std=c++14</code></td><td>C++14</td><td><code>c++1y</code></td><td>201402</td></tr>
+<tr><td><code>-std=c++17</code></td><td>C++17</td><td><code>c++1z</code></td><td>201703</td></tr>
+<tr><td><code>-std=c++20</code></td><td>C++20</td><td><code>c++2a</code></td><td>202002</td></tr>
+<tr><td><code>-std=c++23</code></td><td>C++23 (a do guia)</td><td><code>c++2b</code></td><td>202302</td></tr>
+<tr><td><code>-std=c++26</code></td><td>C++26 (parcial no g++ 15)</td><td><code>c++2c</code></td><td>202400</td></tr>
+<tr><td><code>-std=gnu++23</code> etc.</td><td>A mesma versão, com extensões do GCC</td><td></td><td>igual à versão</td></tr>
+<tr><td>(nada)</td><td><code>gnu++17</code> no g++ 15 e no Clang 21; <code>gnu++20</code> no GCC 16</td><td></td><td>201703 no g++ 15</td></tr>
+</table>
+</div>
+
+<p>No compilador da Microsoft, a opção tem outra forma: <code>/std:c++20</code> ou <code>/std:c++latest</code> (a mais nova que ele conhece); sem nada, o MSVC usa o C++14. A aula <a href="instalar-windows-mac.html">Instalar no Windows e macOS</a> mostra onde ela fica no Visual Studio.</p>
+
+<hr>
+
+<h2>O selo de versão do guia</h2>
+<p>Quando uma aula usa um recurso de uma versão recente, ele aparece com um selo, assim: <code>std::println</code> <span class="versao">C++23</span>. O selo quer dizer: "isto só funciona com <code>-std=c++23</code> ou mais novo". Junto com o selo, a aula mostra a <strong>alternativa antiga</strong>, para quando você estiver num projeto que usa uma versão mais velha (é muito comum: empresas trocam de versão devagar, e há projetos presos no C++17 ou até no C++11).</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Recurso</th><th>Selo</th><th>Alternativa antiga</th></tr>
+<tr><td><code>std::println("Olá, {}!", nome);</code></td><td><span class="versao">C++23</span></td><td><code>std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "!\n";</code></td></tr>
+<tr><td><code>std::format("{} anos", idade)</code></td><td><span class="versao">C++20</span></td><td><code>std::to_string(idade) + " anos"</code></td></tr>
+<tr><td><code>auto [nome, idade] = pessoa;</code></td><td><span class="versao">C++17</span></td><td><code>pessoa.first</code> e <code>pessoa.second</code></td></tr>
+<tr><td><code>auto total = 0;</code></td><td><span class="versao">C++11</span></td><td><code>int total = 0;</code></td></tr>
+</table>
+</div>
+
+<p>Recursos do C++11 e do C++14 aparecem sem selo na maior parte do guia: eles são tão antigos e tão usados que qualquer compilador atual os aceita, mesmo sem <code>-std</code>.</p>
+
+<p>Veja na prática. A caixa abaixo foi configurada para compilar como <strong>C++20</strong> (como se fosse um projeto de empresa ainda nessa versão), e o código usa <code>std::println</code>, que é do C++23:</p>
+
+<div class="trycpp" data-flags="-std=c++20 -Wall -Wextra" data-goal="out:Olá\, Ana! Você tem 29 anos.,src:std::format,compila">
+<p class="try-task"><strong>Missão:</strong> rode e veja o erro: neste projeto não existe <code>std::println</code>. Reescreva o programa com a alternativa do C++20: troque o <code>#include &lt;print&gt;</code> por <code>#include &lt;format&gt;</code> e <code>#include &lt;iostream&gt;</code>, e mostre o texto com <code>std::cout &lt;&lt; std::format("Olá, {}! Você tem {} anos.\n", nome, idade);</code>.</p>
+<pre class="script">#include &lt;print&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana";
+    int idade = 29;
+    std::println("Olá, {}! Você tem {} anos.", nome, idade);
+}
+</pre>
+<pre class="solucao">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana";
+    int idade = 29;
+    std::cout &lt;&lt; std::format("Olá, {}! Você tem {} anos.\n", nome, idade);
+}
+</pre>
+</div>
+
+<p>O <code>{}</code> dentro do texto é um "buraco" que o <code>std::format</code> preenche com os valores seguintes, na ordem. A aula <a href="format-print.html">std::format e std::print</a> conta tudo.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: ‘println’ is not a member of ‘std’</code> (ou outro recurso novo "não existe")</strong>
+<p>Você viu esse erro acima. <strong>O que significa:</strong> o recurso existe, mas não na versão do C++ que o compilador está usando. Quase sempre é um <code>-std</code> esquecido: sem ele, o g++ 15 usa o C++17. Leia a linha <code>note:</code> logo abaixo do erro: o g++ costuma dizer a partir de qual versão o recurso existe (<code>only available from C++23 onwards</code>).</p>
+<p><strong>Como consertar:</strong> compile com <code>-std=c++23</code>. Se você não pode mudar a versão (um projeto antigo), use a alternativa antiga.</p>
+</div>
+
+<div class="cenario">
+<strong>Código moderno num modo antigo: <code>does not name a type</code></strong>
+<pre class="file" data-file="auto98.cpp">#include &lt;iostream&gt;
+
+int main() {
+    auto idade = 29;
+    std::cout &lt;&lt; idade &lt;&lt; "\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++98 auto98.cpp -o auto98
+auto98.cpp: In function ‘int main()’:
+auto98.cpp:4:10: error: ‘idade’ does not name a type
+    4 |     auto idade = 29;
+      |          ^~~~~
+auto98.cpp:5:18: error: ‘idade’ was not declared in this scope
+    5 |     std::cout &lt;&lt; idade &lt;&lt; "\n";
+      |                  ^~~~~
+$ g++ -std=c++11 auto98.cpp -o auto98 &amp;&amp; ./auto98
+29</pre>
+<p><strong>O que significa:</strong> no C++98, o <code>auto</code> tinha outro significado (antigo e inútil), e o compilador não entendeu a linha: "<code>idade</code> não é nome de um tipo". O segundo erro é consequência do primeiro: como a variável não foi criada, na linha 5 "<code>idade</code> não foi declarada neste escopo". Repare que <strong>nenhuma</strong> das mensagens diz "use C++11": às vezes o compilador não sabe que você quis um recurso novo.</p>
+<p><strong>Como consertar:</strong> se um código que funciona em todo lugar dá erros estranhos no seu computador, confira o <code>-std</code>. Com <code>-std=c++11</code> (ou mais novo), o mesmo arquivo compila e mostra <code>29</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>unrecognized command-line option ‘-std=c++99’</code></strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++99 versao.cpp -o versao
+g++: error: unrecognized command-line option ‘-std=c++99’; did you mean ‘-std=c++98’?</pre>
+<p><strong>O que significa:</strong> "opção de linha de comando não reconhecida; você quis dizer <code>-std=c++98</code>?". Não existe C++99 (existe o <strong>C99</strong>, uma versão da linguagem C). O mesmo erro aparece se você pedir uma versão que o seu compilador é velho demais para conhecer, por exemplo <code>-std=c++23</code> num g++ 10.</p>
+<p><strong>Como consertar:</strong> use um dos nomes da tabela. Se o seu compilador não conhece <code>-std=c++23</code>, atualize-o (aulas <a href="instalar-linux.html">Instalar no Linux</a> e <a href="instalar-windows-mac.html">Instalar no Windows e macOS</a>) ou tente o apelido <code>-std=c++2b</code>: algumas versões mais antigas conheciam o C++23 só por esse nome, antes de ele ficar pronto.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Versão</th><th>Ano</th><th><code>__cplusplus</code></th><th>Em uma frase</th></tr>
+<tr><td>C++98</td><td>1998</td><td>199711</td><td>O primeiro padrão, com a STL</td></tr>
+<tr><td>C++03</td><td>2003</td><td>199711</td><td>Correções</td></tr>
+<tr><td>C++11</td><td>2011</td><td>201103</td><td>O C++ moderno: <code>auto</code>, lambdas, smart pointers, move</td></tr>
+<tr><td>C++14</td><td>2014</td><td>201402</td><td>Acabamento do C++11</td></tr>
+<tr><td>C++17</td><td>2017</td><td>201703</td><td><code>optional</code>, <code>string_view</code>, desestruturação; padrão do g++ 15</td></tr>
+<tr><td>C++20</td><td>2020</td><td>202002</td><td>Concepts, ranges, <code>format</code>, módulos; padrão do GCC 16</td></tr>
+<tr><td>C++23</td><td>2023</td><td>202302</td><td><code>print</code>, <code>expected</code>, <code>import std</code>; a versão do guia</td></tr>
+<tr><td>C++26</td><td>2026</td><td>(provisório)</td><td>Reflexão, contratos, <code>std::execution</code></td></tr>
+</table>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Para saber…</th><th>Use</th></tr>
+<tr><td>a versão do compilador</td><td><code>g++ --version</code>, <code>clang++ --version</code></td></tr>
+<tr><td>a versão do C++ dentro do programa</td><td><code>std::cout &lt;&lt; __cplusplus;</code></td></tr>
+<tr><td>a versão do C++ que o g++ usa sem <code>-std</code></td><td><code>g++ -dM -E -x c++ /dev/null | grep __cplusplus</code></td></tr>
+<tr><td>escolher a versão</td><td><code>g++ -std=c++23 …</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">1. Quem decide o que entra numa nova versão do C++?</p>
+<label><input type="radio" name="q1"> A Microsoft, dona do C++.</label>
+<label><input type="radio" name="q1"> O comitê internacional da ISO (WG21), por votação.</label>
+<label><input type="radio" name="q1"> O Bjarne Stroustrup, sozinho.</label>
+<label><input type="radio" name="q1"> Cada compilador inventa as suas regras.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">2. Você compila com o g++ 15 sem nenhum <code>-std</code>. Qual versão do C++ está em uso?</p>
+<label><input type="radio" name="q2"> C++23, a mais nova.</label>
+<label><input type="radio" name="q2"> C++98, a primeira.</label>
+<label><input type="radio" name="q2"> C++17 (na verdade, <code>gnu++17</code>).</label>
+<label><input type="radio" name="q2"> C++15, igual à versão do g++.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">3. Qual versão é chamada de "a grande virada", o começo do C++ moderno, com <code>auto</code>, lambdas e ponteiros inteligentes?</p>
+<label><input type="radio" name="q3"> C++98</label>
+<label><input type="radio" name="q3"> C++03</label>
+<label><input type="radio" name="q3"> C++17</label>
+<label><input type="radio" name="q3"> C++11</label>
+</div>
+
+<div class="exercise">
+<h3>4. O comando da versão</h3>
+<p>Complete o comando que mostra a versão do compilador g++:</p>
+<div class="ex-code">g++ <input data-answer="--version" aria-label="opção" size="10"></div>
+</div>
+
+<div class="exercise">
+<h3>5. Escolher o C++23</h3>
+<p>Complete a opção que manda o g++ compilar como C++23:</p>
+<div class="ex-code">g++ <input data-answer="-std=c++23|-std=c++2b" aria-label="opção" size="12"> -Wall -Wextra ola.cpp -o ola</div>
+</div>
+
+<div class="exercise">
+<h3>6. Ler o <code>__cplusplus</code></h3>
+<p>Um programa mostrou <code>__cplusplus = 202002</code>. Com qual versão do C++ ele foi compilado? (responda no formato C++XX)</p>
+<div class="ex-code">Versão: <input data-answer="C++20|c++20" aria-label="versão" size="8"></div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>O C++ é uma norma ISO (14882), escrita pelo comitê WG21; ninguém é dono. Sai uma versão a cada três anos.</li>
+  <li>Versões: <strong>C++98</strong> (STL), <strong>03</strong> (correções), <strong>11</strong> (a grande virada), <strong>14</strong>, <strong>17</strong> (<code>optional</code>, <code>string_view</code>), <strong>20</strong> (concepts, ranges, <code>format</code>), <strong>23</strong> (<code>print</code>, <code>expected</code>; a do guia) e <strong>26</strong> (reflexão, contratos).</li>
+  <li><strong>Padrão</strong> = as regras; <strong>compilador</strong> = o programa (g++ 15, Clang 21, MSVC). g++ 15 ≠ C++15.</li>
+  <li><code>g++ --version</code> mostra a versão do compilador; <code>__cplusplus</code> mostra a versão do C++ em uso.</li>
+  <li>Sem <code>-std</code>, o g++ 15 usa C++17 (<code>201703</code>). Por isso o guia sempre compila com <code>g++ -std=c++23 -Wall -Wextra</code>.</li>
+  <li>O selo <span class="versao">C++20</span> marca recursos novos; a aula mostra a alternativa antiga.</li>
+  <li>Próximo passo: ter um compilador no seu computador, em <a href="instalar-linux.html">Instalar no Linux</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
