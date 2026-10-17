@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Entrada com cin — ler números e palavras do teclado | Guia C++</title>
+<meta name="description" content="std::cin para quem nunca programou: ler um número, vários valores, uma palavra, o que acontece com espaços, com letras num int e com vírgula no preço, e como usar a entrada no editor do guia, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Entrada com cin</span></h1>
+
+<p class="intro">Até agora, todos os seus programas mostravam sempre a mesma coisa: os valores estavam escritos no próprio código. Um programa de verdade <strong>conversa</strong> com quem usa: pergunta a idade, o nome, o preço de um produto, e responde de acordo. Em C++, o jeito mais simples de ler o que a pessoa digita é o <code>std::cin</code>. Nesta aula você vai ler números, palavras e vários valores de uma vez, e vai ver o que acontece quando a pessoa digita algo inesperado.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como ler um valor do teclado com <code>std::cin &gt;&gt; variavel;</code>.</li>
+  <li>Como o <code>cin</code> usa o <strong>tipo</strong> da variável para decidir o que ler.</li>
+  <li>Como ler vários valores numa linha só: <code>std::cin &gt;&gt; a &gt;&gt; b;</code>.</li>
+  <li>Por que o <code>cin</code> lê só a primeira palavra de "Ana Maria".</li>
+  <li>O que acontece quando a pessoa digita uma letra onde se espera um número (e por que a vírgula no preço dá errado).</li>
+  <li>Como testar programas que leem do teclado, no terminal e no editor do guia.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: a esteira do caixa do mercado</h2>
+<p>Pense na esteira do caixa do supermercado. O cliente vai colocando as compras na esteira, separadas por aquelas <strong>barrinhas divisórias</strong>. A operadora do caixa pega <strong>um produto de cada vez</strong>, do começo da esteira, e não se importa com quantas divisórias existem entre um produto e outro.</p>
+<p>O <code>cin</code> funciona assim:</p>
+<ul>
+  <li>Tudo o que você digita vai para uma <strong>esteira de caracteres</strong> (os programadores chamam de <em>buffer</em>, "área de espera"). Nada chega ao programa antes de você apertar <kbd>Enter</kbd>.</li>
+  <li>Os <strong>espaços</strong> e os <kbd>Enter</kbd> são as barrinhas divisórias.</li>
+  <li>Cada <code>&gt;&gt;</code> pega <strong>um</strong> pedaço do começo da esteira e o guarda numa variável. O que sobrou continua na esteira, esperando o próximo <code>&gt;&gt;</code>.</li>
+</ul>
+<p>O nome <code>cin</code> vem de <em>character input</em>, "entrada de caracteres", e é o irmão do <code>cout</code> (<em>character output</em>, veja <a href="saida-cout.html">Saída com cout</a>). Os dois moram na biblioteca <code>&lt;iostream&gt;</code>.</p>
+
+<hr>
+
+<h2>1. Ler um número</h2>
+
+<pre class="file" data-file="idade.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 0;
+    std::cout &lt;&lt; "Quantos anos você tem? ";
+    std::cin &gt;&gt; idade;
+    std::cout &lt;&lt; "Daqui a 10 anos você terá " &lt;&lt; idade + 10 &lt;&lt; " anos.\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>int idade = 0;</dt><dd>Cria a variável que vai <strong>receber</strong> o que for digitado. Começar com 0 é uma boa prática: a variável nunca fica com lixo (veja <a href="variaveis.html">Variáveis</a>).</dd>
+  <dt>std::cout &lt;&lt; "Quantos anos você tem? ";</dt><dd>A <strong>pergunta</strong>. Sem ela, o programa ficaria parado esperando, e a pessoa não saberia o que digitar. Repare que não há <code>\n</code>: assim o cursor fica na mesma linha, logo depois da pergunta.</dd>
+  <dt>std::cin</dt><dd>A entrada padrão: normalmente, o teclado.</dd>
+  <dt>&gt;&gt;</dt><dd>O operador de <strong>extração</strong> ("tirar de dentro"). Pense numa seta mostrando para onde o valor vai: do <code>cin</code> <strong>para</strong> a variável. No <code>cout</code> a seta é ao contrário, <code>&lt;&lt;</code>, porque o valor vai da variável para a tela.</dd>
+  <dt>idade</dt><dd>Onde guardar o valor. O programa <strong>para nesta linha</strong> e espera a pessoa digitar e apertar <kbd>Enter</kbd>.</dd>
+</dl>
+
+<p>Rodando no terminal, a Ana digita <code>29</code> e aperta <kbd>Enter</kbd>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra idade.cpp -o idade
+$ ./idade
+Quantos anos você tem? 29          « o 29 foi digitado pela Ana, seguido de Enter
+Daqui a 10 anos você terá 39 anos.</pre>
+
+<p>O <code>29</code> aparece na tela porque o <strong>terminal</strong> mostra o que você digita (isso se chama <em>eco</em>). O <code>Enter</code> que a Ana apertou também é eco: é por isso que a resposta começa na linha de baixo, mesmo sem <code>\n</code> antes dela.</p>
+
+<h3>Testar sem digitar: o <code>printf</code> com <code>|</code></h3>
+<p>Digitar a mesma coisa toda vez que você testa cansa. No terminal, dá para "digitar" pelo programa com o comando <code>printf</code> e uma barra vertical <code>|</code> (o <em>pipe</em>, "cano"), que liga a saída de um comando à entrada do outro:</p>
+
+<pre class="term" data-cwd="~/cpp">$ printf '29\n' | ./idade
+Quantos anos você tem? Daqui a 10 anos você terá 39 anos.</pre>
+
+<dl class="anatomy">
+  <dt>printf '29\n'</dt><dd>Escreve <code>29</code> seguido de uma quebra de linha (o <code>\n</code> faz o papel do <kbd>Enter</kbd>).</dd>
+  <dt>|</dt><dd>Em vez de ir para a tela, esse texto vai para a <strong>entrada</strong> do <code>./idade</code>: o <code>cin</code> o lê como se fosse digitado.</dd>
+</dl>
+
+<p>A resposta ficou grudada na pergunta porque, desta vez, ninguém digitou: não houve eco do <code>29</code> nem do <kbd>Enter</kbd>. O programa é o mesmo; só a tela fica diferente. O Guia Bash tem uma aula inteira sobre o <code>|</code>; aqui basta saber que ele economiza digitação. Vamos usar as duas formas nesta aula.</p>
+
+<hr>
+
+<h2>2. O tipo da variável decide o que é lido</h2>
+<p>O <code>&gt;&gt;</code> olha o tipo da variável que vai receber o valor e lê do jeito certo para aquele tipo:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo da variável</th><th>O que o <code>&gt;&gt;</code> pega da esteira</th><th>Digitado → guardado</th></tr>
+<tr><td><code>int</code></td><td>Sinal (opcional) e algarismos. Para no primeiro caractere que não é algarismo.</td><td><code>29</code> → <code>29</code></td></tr>
+<tr><td><code>double</code></td><td>Algarismos, com <strong>ponto</strong> decimal.</td><td><code>12.50</code> → <code>12.5</code></td></tr>
+<tr><td><code>char</code></td><td><strong>Um</strong> caractere (que não seja espaço).</td><td><code>sim</code> → <code>'s'</code></td></tr>
+<tr><td><code>std::string</code></td><td>Uma <strong>palavra</strong>: tudo até o próximo espaço ou Enter.</td><td><code>Ana Maria</code> → <code>"Ana"</code></td></tr>
+</table>
+</div>
+
+<p>Um <code>double</code>, para calcular um desconto:</p>
+
+<pre class="file" data-file="preco.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double preco = 0;
+    std::cout &lt;&lt; "Preço: ";
+    std::cin &gt;&gt; preco;
+    std::cout &lt;&lt; "Com 10% de desconto: " &lt;&lt; preco * 0.9 &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra preco.cpp -o preco
+$ printf '12.50\n' | ./preco
+Preço: Com 10% de desconto: 11.25</pre>
+
+<p>E um <code>char</code>, para uma resposta de uma letra. Repare que a Ana digitou a palavra inteira <code>sim</code>, mas o <code>char</code> só guarda <strong>um</strong> caractere:</p>
+
+<pre class="file" data-file="letra.cpp">#include &lt;iostream&gt;
+
+int main() {
+    char resposta = '?';
+    std::cout &lt;&lt; "Continuar (s/n)? ";
+    std::cin &gt;&gt; resposta;
+    std::cout &lt;&lt; "Você respondeu: " &lt;&lt; resposta &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra letra.cpp -o letra
+$ ./letra
+Continuar (s/n)? sim
+Você respondeu: s          « só o 's'; o "im" ficou na esteira e foi descartado no fim do programa</pre>
+
+<hr>
+
+<h2>3. Ler vários valores</h2>
+<p>Você pode encadear vários <code>&gt;&gt;</code> no mesmo <code>cin</code>, do mesmo jeito que encadeia vários <code>&lt;&lt;</code> no <code>cout</code>. Eles são lidos da esquerda para a direita:</p>
+
+<pre class="file" data-file="soma.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int a = 0;
+    int b = 0;
+    std::cout &lt;&lt; "Digite dois números: ";
+    std::cin &gt;&gt; a &gt;&gt; b;
+    std::cout &lt;&lt; a &lt;&lt; " + " &lt;&lt; b &lt;&lt; " = " &lt;&lt; a + b &lt;&lt; '\n';
+}
+</pre>
+
+<p><code>std::cin &gt;&gt; a &gt;&gt; b;</code> é o mesmo que <code>std::cin &gt;&gt; a;</code> seguido de <code>std::cin &gt;&gt; b;</code>. E, como espaços e Enter são todos "divisórias", a pessoa pode digitar os números na mesma linha ou em linhas separadas:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra soma.cpp -o soma
+$ ./soma
+Digite dois números: 3          « a Ana digitou 3 e Enter: o cin leu o 3 e continua esperando o b
+4
+3 + 4 = 7
+$ ./soma
+Digite dois números: 10 20 30   « três números para duas variáveis
+10 + 20 = 30                    « o 30 sobrou na esteira e ninguém leu</pre>
+
+<p>Os valores podem ter <strong>tipos diferentes</strong>. Cada <code>&gt;&gt;</code> lê do jeito do tipo da sua variável:</p>
+
+<pre class="file" data-file="cadastro.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string produto;
+    int quantidade = 0;
+    double preco = 0;
+    std::cout &lt;&lt; "Produto, quantidade e preço: ";
+    std::cin &gt;&gt; produto &gt;&gt; quantidade &gt;&gt; preco;
+    std::cout &lt;&lt; quantidade &lt;&lt; "x " &lt;&lt; produto &lt;&lt; " = R$ " &lt;&lt; quantidade * preco &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra cadastro.cpp -o cadastro
+$ ./cadastro
+Produto, quantidade e preço: café 2 18.90
+2x café = R$ 37.8</pre>
+
+<p>O <code>#include &lt;string&gt;</code> traz o <code>std::string</code>, o tipo para textos (aula <a href="strings.html">Strings</a>). O resultado <code>37.8</code> aparece sem o zero final porque o <code>cout</code> esconde zeros que não mudam o valor; para mostrar <code>37.80</code>, veja <a href="iomanip.html">Formatar com iomanip</a>.</p>
+
+<div class="trycpp" data-stdin="8 6">
+<p class="try-task"><strong>Experimente:</strong> esta caixa já vem com a entrada <code>8 6</code>, como se alguém tivesse digitado (é o mesmo papel do <code>printf '8 6\n' |</code> no terminal). Rode, depois acrescente a subtração e a multiplicação na saída.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int a = 0;
+    int b = 0;
+    std::cin &gt;&gt; a &gt;&gt; b;
+    std::cout &lt;&lt; "Soma: " &lt;&lt; a + b &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>4. Ler texto: o <code>cin</code> para no espaço</h2>
+<p>Com um <code>std::string</code>, o <code>&gt;&gt;</code> lê uma <strong>palavra</strong>. Para o <code>cin</code>, "palavra" é tudo até o primeiro espaço, tab ou Enter. Isso surpreende quem tenta ler um nome completo:</p>
+
+<pre class="file" data-file="nome.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome;
+    std::cout &lt;&lt; "Seu nome: ";
+    std::cin &gt;&gt; nome;
+    std::cout &lt;&lt; "Olá, " &lt;&lt; nome &lt;&lt; "!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra nome.cpp -o nome
+$ ./nome
+Seu nome: Ana Maria
+Olá, Ana!                        « cadê a Maria?
+$ printf 'Ana Maria\n' | ./nome
+Seu nome: Olá, Ana!</pre>
+
+<p>A "Maria" não sumiu: ela ficou <strong>na esteira</strong>, esperando outro <code>&gt;&gt;</code>. Como este programa não lê mais nada, ela foi descartada quando o programa terminou. Para ver a Maria, leia duas vezes:</p>
+
+<pre class="file" data-file="nome2.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome;
+    std::string sobrenome;
+    std::cin &gt;&gt; nome;
+    std::cin &gt;&gt; sobrenome;
+    std::cout &lt;&lt; "[" &lt;&lt; nome &lt;&lt; "] [" &lt;&lt; sobrenome &lt;&lt; "]\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra nome2.cpp -o nome2
+$ printf 'Ana Maria\n' | ./nome2
+[Ana] [Maria]                     « o segundo &gt;&gt; pegou o que sobrou na esteira
+$ printf '   Ana\n\n\n   Maria  \n' | ./nome2
+[Ana] [Maria]                     « espaços e linhas vazias no caminho são pulados</pre>
+
+<p>Os colchetes mostram exatamente onde cada texto começa e termina: o <code>&gt;&gt;</code> <strong>pula</strong> os espaços e os Enter antes da palavra, e <strong>não guarda</strong> o espaço depois dela. Isso também vale para números: <code>"   29"</code> é lido como 29.</p>
+
+<p>Esse "pular" tem um efeito curioso no terminal: se a pessoa só apertar <kbd>Enter</kbd>, o programa <strong>continua esperando</strong>, porque ainda não chegou nenhuma palavra:</p>
+
+<pre class="term" data-cwd="~/cpp">$ ./nome
+Seu nome:                « a Ana apertou Enter
+                         « e Enter de novo: o cin continua esperando uma palavra
+Ana
+Olá, Ana!</pre>
+
+<div class="tip">
+<strong>E se eu quiser a linha inteira?</strong>
+<p>Para ler "Ana Maria" (ou "pão de queijo") inteiro numa variável, existe o <code>std::getline</code>, que lê até o <kbd>Enter</kbd>, com espaços e tudo. Ele tem aula própria: <a href="getline.html">Ler uma Linha (getline)</a>. O <code>&gt;&gt;</code> é o certo para números e palavras soltas.</p>
+</div>
+
+<hr>
+
+<h2>5. Quando a pessoa digita outra coisa</h2>
+<p>O <code>cin</code> confia que a pessoa vai digitar o que foi pedido. Quando ela não digita, o resultado pode ser estranho, e <strong>nenhuma mensagem de erro aparece</strong>. Conhecer esses casos evita muita confusão.</p>
+
+<h3>Uma letra onde se espera um número</h3>
+<p>O mesmo <code>idade.cpp</code> do começo. Desta vez, a Ana digita <code>abc</code>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ ./idade
+Quantos anos você tem? abc
+Daqui a 10 anos você terá 10 anos.     « a idade virou 0!
+$ echo $?
+0                                       « e o programa terminou como se tudo estivesse bem</pre>
+
+<p>O que aconteceu, passo a passo:</p>
+<ol class="passo">
+  <li>O <code>&gt;&gt;</code> foi ler um <code>int</code> e encontrou a letra <code>a</code>, que não pode começar um número.</li>
+  <li>A leitura <strong>falhou</strong>. Quando isso acontece, o C++ (desde o C++11) coloca <strong>0</strong> na variável.</li>
+  <li>O <code>abc</code> <strong>continua na esteira</strong>: o <code>&gt;&gt;</code> não tira o que não conseguiu ler.</li>
+  <li>O <code>cin</code> entra em <strong>estado de falha</strong>: a partir daí, <strong>todas as próximas leituras são ignoradas</strong>, até alguém "consertar" o <code>cin</code>.</li>
+  <li>O programa continua normalmente e calcula 0 + 10.</li>
+</ol>
+
+<p>O passo 4 é o mais perigoso. Veja um programa que lê dois números:</p>
+
+<pre class="file" data-file="falha.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int idade = -1;
+    int ano = -1;
+    std::cout &lt;&lt; "Idade e ano de nascimento: ";
+    std::cin &gt;&gt; idade &gt;&gt; ano;
+    std::cout &lt;&lt; "idade = " &lt;&lt; idade &lt;&lt; ", ano = " &lt;&lt; ano &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra falha.cpp -o falha
+$ ./falha
+Idade e ano de nascimento: 29 2000
+idade = 29, ano = 2000
+$ ./falha
+Idade e ano de nascimento: abc 2000
+idade = 0, ano = -1               « a idade virou 0; o ano nem foi lido</pre>
+
+<p>As variáveis começaram com −1 justamente para mostrar o que mudou. A <code>idade</code> virou 0 (falhou). O <code>ano</code> continuou −1: depois da falha, o <code>cin</code> nem tentou ler o <code>2000</code>, mesmo ele estando ali na esteira.</p>
+
+<h3>Um número "com sobra"</h3>
+<p>Se o começo do que foi digitado é um número válido, o <code>&gt;&gt;</code> lê <strong>até onde der</strong> e deixa o resto na esteira:</p>
+
+<pre class="term" data-cwd="~/cpp">$ ./idade
+Quantos anos você tem? 12abc
+Daqui a 10 anos você terá 22 anos.   « leu o 12 e parou no 'a'
+$ ./idade
+Quantos anos você tem? 3.7
+Daqui a 10 anos você terá 13 anos.   « int não tem ponto: leu o 3 e parou no '.'</pre>
+
+<h3>A vírgula no preço</h3>
+<p>No Brasil escrevemos <code>12,50</code>. O <code>cin</code> espera o formato americano, com <strong>ponto</strong>: <code>12.50</code>. A vírgula não é um erro para ele, é só "o fim do número":</p>
+
+<pre class="term" data-cwd="~/cpp">$ ./preco
+Preço: 12,50
+Com 10% de desconto: 10.8          « leu só o 12 (10% de desconto de 12 = 10.8)</pre>
+
+<p>Esse engano é traiçoeiro porque o resultado <strong>parece</strong> certo. Em programas para outras pessoas, diga na pergunta que é para usar ponto (<code>"Preço (use ponto, ex.: 12.50): "</code>), ou leia como texto e troque a vírgula (assunto de <a href="string-numero.html">Texto ↔ Número</a>).</p>
+
+<div class="warning">
+<strong>Por enquanto, confie na entrada; depois, valide</strong>
+<p>Nesta aula, os programas supõem que a pessoa digita o que foi pedido. Programas de verdade precisam <strong>conferir</strong> se a leitura deu certo e pedir de novo quando não deu. Isso exige <code>if</code> e laços de repetição, e tem uma aula própria: <a href="validar-entrada.html">Validar a Entrada</a>.</p>
+</div>
+
+<hr>
+
+<h2>6. <code>cin</code> no editor do guia</h2>
+<p>As caixas "Experimente" rodam o programa no seu navegador. Quando o programa usa <code>std::cin</code>, a entrada pode chegar de duas formas:</p>
+<ul>
+  <li><strong>Entrada preparada:</strong> a caixa já vem com o texto que o programa vai ler, como na caixa da seção 3. É o mesmo que <code>printf '…' | ./programa</code> no terminal: o que foi "digitado" <strong>não aparece</strong> na saída, então a resposta pode ficar grudada na pergunta. Isso é normal.</li>
+  <li><strong>Você digita:</strong> sem entrada preparada, o programa pode pedir e você digita no terminal da caixa, como no terminal de verdade.</li>
+</ul>
+<p>A aula <a href="simulador.html">O Editor do Guia</a> mostra os detalhes de como o editor lida com a entrada.</p>
+
+<div class="trycpp" data-stdin="Ana Maria 29">
+<p class="try-task"><strong>Experimente:</strong> a entrada preparada é <code>Ana Maria 29</code>. Rode e veja o que vai para cada variável: a idade sai <code>0</code>. Por quê? (Dica: qual palavra o segundo <code>&gt;&gt;</code> encontrou na esteira?) Depois troque <code>std::cin &gt;&gt; nome &gt;&gt; idade;</code> por <code>std::cin &gt;&gt; nome &gt;&gt; sobrenome &gt;&gt; idade;</code>, crie a variável <code>sobrenome</code> e mostre-a também.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome;
+    int idade = -1;
+    std::cin &gt;&gt; nome &gt;&gt; idade;
+    std::cout &lt;&lt; "nome = [" &lt;&lt; nome &lt;&lt; "]\n";
+    std::cout &lt;&lt; "idade = " &lt;&lt; idade &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Formas diferentes: qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você quer ler…</th><th>Use</th><th>Observação</th></tr>
+<tr><td>Um número inteiro</td><td><code>int n = 0; std::cin &gt;&gt; n;</code></td><td>Letra no lugar do número: <code>n</code> vira 0 e o <code>cin</code> falha.</td></tr>
+<tr><td>Um número com casas decimais</td><td><code>double x = 0; std::cin &gt;&gt; x;</code></td><td>Com ponto: <code>12.50</code>. A vírgula encerra o número.</td></tr>
+<tr><td>Uma letra (s/n)</td><td><code>char c = '?'; std::cin &gt;&gt; c;</code></td><td>Pega um caractere; o resto fica na esteira.</td></tr>
+<tr><td>Uma palavra</td><td><code>std::string p; std::cin &gt;&gt; p;</code></td><td>Para no espaço.</td></tr>
+<tr><td>Vários valores</td><td><code>std::cin &gt;&gt; a &gt;&gt; b &gt;&gt; c;</code></td><td>Separados por espaço ou Enter.</td></tr>
+<tr><td>Uma frase inteira</td><td><code>std::getline(std::cin, frase);</code></td><td>Aula <a href="getline.html">getline</a>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: no match for ‘operator&lt;&lt;’</code> (operand types are ‘std::istream’ … and ‘int’)</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra seta.cpp -o seta
+seta.cpp: In function ‘int main()’:
+seta.cpp:5:14: error: no match for ‘operator&lt;&lt;’ (operand types are ‘std::istream’ {aka ‘std::basic_istream&lt;char&gt;’} and ‘int’)
+    5 |     std::cin &lt;&lt; idade;
+      |     ~~~~~~~~ ^~ ~~~~~
+      |          |      |
+      |          |      int
+      |          std::istream {aka std::basic_istream&lt;char&gt;}
+seta.cpp:5:14: note: there are 30 candidates          « seguem mais 234 linhas de "candidatos"</pre>
+<p><strong>O que aconteceu:</strong> a seta está virada. <code>std::cin &lt;&lt; idade</code> tenta "mandar a idade para o teclado", o que não existe. O g++ explica: "não há <code>&lt;&lt;</code> entre um <code>std::istream</code> (o tipo do <code>cin</code>; <em>input stream</em>, fluxo de entrada) e um <code>int</code>". Depois ele lista dezenas de "candidatos" (outras versões de <code>&lt;&lt;</code> que também não servem); pode ignorar, a primeira linha de <code>error</code> já diz tudo.</p>
+<p><strong>Como resolver:</strong> <code>std::cin &gt;&gt; idade;</code>. Para lembrar: as setas apontam para onde o valor vai. Do <code>cin</code> para a variável: <code>&gt;&gt;</code>. Da variável para o <code>cout</code>: <code>&lt;&lt;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A resposta usa 0, mas a pessoa digitou outra coisa</strong>
+<pre class="term" data-cwd="~/cpp">$ ./idade
+Quantos anos você tem? abc
+Daqui a 10 anos você terá 10 anos.</pre>
+<p><strong>O que aconteceu:</strong> a leitura do <code>int</code> falhou. A variável virou 0 e o <code>cin</code> passou a ignorar as próximas leituras. Nada avisa: o código de saída continua 0.</p>
+<p><strong>Como resolver:</strong> por enquanto, diga claramente na pergunta o que digitar. Na aula <a href="validar-entrada.html">Validar a Entrada</a> você vai aprender a detectar a falha e pedir de novo.</p>
+</div>
+
+<div class="cenario">
+<strong>"pão de queijo" deu quantidade 0</strong>
+<pre class="term" data-cwd="~/cpp">$ printf 'pão de queijo 3 2.50\n' | ./cadastro
+Produto, quantidade e preço: 0x pão = R$ 0</pre>
+<p><strong>O que aconteceu:</strong> o <code>&gt;&gt;</code> do <code>produto</code> leu só <code>pão</code>. O próximo <code>&gt;&gt;</code> tentou ler a <code>quantidade</code> e encontrou <code>de</code>: falhou, virou 0, e o <code>preco</code> nem foi lido (continuou com o 0 inicial).</p>
+<p><strong>Como resolver:</strong> para nomes com espaço, leia a linha inteira com <a href="getline.html">getline</a>, ou peça o nome numa pergunta separada.</p>
+</div>
+
+<div class="cenario">
+<strong>O programa "travou" e não mostra nada</strong>
+<p><strong>O que aconteceu:</strong> provavelmente ele está parado num <code>std::cin &gt;&gt;</code>, esperando você digitar, e você esqueceu de mostrar uma pergunta antes. Ou você apertou só <kbd>Enter</kbd>, e o <code>&gt;&gt;</code> continua esperando um valor de verdade.</p>
+<p><strong>Como resolver:</strong> digite o valor e aperte <kbd>Enter</kbd>. Para desistir, aperte <kbd>Ctrl</kbd>+<kbd>C</kbd>. No código, coloque sempre um <code>std::cout</code> com a pergunta antes de cada leitura.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>O que faz</th></tr>
+<tr><td><code>#include &lt;iostream&gt;</code></td><td>Traz <code>std::cin</code> e <code>std::cout</code>.</td></tr>
+<tr><td><code>std::cin &gt;&gt; x;</code></td><td>Lê um valor do tipo de <code>x</code> e guarda em <code>x</code>. Pula espaços e Enter antes do valor.</td></tr>
+<tr><td><code>std::cin &gt;&gt; a &gt;&gt; b;</code></td><td>Lê <code>a</code>, depois <code>b</code>.</td></tr>
+<tr><td>Leitura que falha</td><td>Número vira 0; o que não foi lido fica na esteira; as próximas leituras são ignoradas.</td></tr>
+<tr><td>Valores a mais</td><td>Ficam na esteira para o próximo <code>&gt;&gt;</code> (ou são descartados no fim do programa).</td></tr>
+<tr><td><code>printf '29\n' | ./prog</code></td><td>No terminal, "digita" <code>29</code> e Enter para o programa.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A seta certa</h3>
+<p>Complete para ler um valor do teclado e guardar na variável <code>nota</code>:</p>
+<div class="ex-code">std::cin <input data-answer="&gt;&gt;" aria-label="operador"> nota;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Dois de uma vez</h3>
+<p>Complete para ler a <code>largura</code> e depois a <code>altura</code> num comando só:</p>
+<div class="ex-code">std::cin &gt;&gt; largura <input data-answer="&gt;&gt; altura;|&gt;&gt; altura|&gt;&gt;altura;|&gt;&gt;altura" aria-label="resto do comando"></div>
+</div>
+
+<div class="exercise">
+<h3>3. Qual biblioteca?</h3>
+<p>Complete o <code>#include</code> necessário para usar <code>std::cin</code>:</p>
+<div class="ex-code">#include &lt;<input data-answer="iostream" aria-label="biblioteca">&gt;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. A variável é <code>std::string cidade;</code>. A pessoa digita <code>Belo Horizonte</code>. O que fica em <code>cidade</code> depois de <code>std::cin &gt;&gt; cidade;</code>?</p>
+<label><input type="radio" name="q4"> <code>Belo Horizonte</code></label>
+<label><input type="radio" name="q4"> <code>Belo</code></label>
+<label><input type="radio" name="q4"> <code>Horizonte</code></label>
+<label><input type="radio" name="q4"> Nada: dá erro por causa do espaço</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. <code>int x = 5;</code> e a pessoa digita <code>dez</code> para <code>std::cin &gt;&gt; x;</code>. Quanto vale <code>x</code>?</p>
+<label><input type="radio" name="q5"> <code>10</code></label>
+<label><input type="radio" name="q5"> <code>5</code>, porque a leitura falhou e nada mudou</label>
+<label><input type="radio" name="q5"> <code>0</code></label>
+<label><input type="radio" name="q5"> O programa para com uma mensagem de erro</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. <code>double preco = 0;</code> e a pessoa digita <code>7,90</code>. Quanto vale <code>preco</code>?</p>
+<label><input type="radio" name="q6"> <code>7.9</code></label>
+<label><input type="radio" name="q6"> <code>790</code></label>
+<label><input type="radio" name="q6"> <code>0</code></label>
+<label><input type="radio" name="q6"> <code>7</code></label>
+</div>
+
+<h3>Missão final: a calculadora de área</h3>
+
+<div class="trycpp" data-stdin="4.5 3" data-goal="out:Área: 13.5 m²,src:std::cin\s*&gt;&gt;">
+<p class="try-task"><strong>Missão:</strong> a entrada preparada traz a largura e o comprimento de um quarto, em metros: <code>4.5 3</code>. Leia os dois valores com <code>std::cin</code> (em variáveis <code>double</code>) e mostre a área, que é largura × comprimento:</p>
+<pre class="out">Área: 13.5 m²</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    double largura = 0;
+    double comprimento = 0;
+    // leia os dois valores aqui
+
+    // mostre a área aqui
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    double largura = 0;
+    double comprimento = 0;
+    std::cin &gt;&gt; largura &gt;&gt; comprimento;
+    std::cout &lt;&lt; "Área: " &lt;&lt; largura * comprimento &lt;&lt; " m²\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>std::cin &gt;&gt; variavel;</code> espera a pessoa digitar e apertar <kbd>Enter</kbd>, e guarda o valor na variável. A seta aponta para onde o valor vai.</li>
+  <li>Sempre mostre uma pergunta com <code>std::cout</code> antes de ler.</li>
+  <li>O tipo da variável decide o que é lido: <code>int</code> lê algarismos, <code>double</code> lê número com <strong>ponto</strong>, <code>char</code> lê um caractere, <code>std::string</code> lê uma palavra.</li>
+  <li>Espaços e Enter separam os valores: <code>std::cin &gt;&gt; a &gt;&gt; b;</code> aceita <code>3 4</code> ou <code>3</code> Enter <code>4</code>. O que sobra fica na esteira para a próxima leitura.</li>
+  <li>Para texto, o <code>&gt;&gt;</code> para no espaço: "Ana Maria" vira "Ana". Para a linha inteira, use <a href="getline.html">getline</a>.</li>
+  <li>Letra num <code>int</code>: a variável vira 0, o <code>cin</code> falha em silêncio e ignora as próximas leituras. Vírgula num <code>double</code>: só a parte antes da vírgula é lida. Validar fica para <a href="validar-entrada.html">Validar a Entrada</a>.</li>
+  <li>No terminal, <code>printf '…\n' | ./programa</code> "digita" por você. No editor do guia, a entrada preparada faz o mesmo papel.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
