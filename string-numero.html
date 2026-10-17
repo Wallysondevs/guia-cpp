@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Texto ↔ Número — stoi, stod, to_string e from_chars | Guia C++</title>
+<meta name="description" content="Converter texto em número e número em texto em C++ para quem nunca programou: std::stoi, std::stod e std::stol, os erros std::invalid_argument e std::out_of_range, std::to_string, std::from_chars sem exceções, a ideia do std::stringstream e por que stod(&quot;3,14&quot;) dá 3, com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Texto ↔ Número</span></h1>
+
+<p class="intro">Para o computador, o texto <code>"42"</code> e o número <code>42</code> são coisas completamente diferentes. O texto é um colar de dois caracteres, <code>'4'</code> e <code>'2'</code>; o número é um valor com o qual dá para fazer contas. Toda vez que um número chega como texto (digitado com <code>getline</code>, lido de um arquivo, recortado com <code>substr</code>) você precisa <strong>convertê-lo</strong> antes de somar. E o caminho contrário também aparece: pôr um número dentro de uma mensagem. Esta aula ensina as duas direções e o que fazer quando o texto não é um número.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Converter texto em número com <code>std::stoi</code>, <code>std::stol</code> e <code>std::stod</code>.</li>
+  <li>O que acontece com <code>"42abc"</code>, <code>"3.99"</code> e espaços, e as mensagens <code>std::invalid_argument: stoi</code> e <code>std::out_of_range: stoi</code>.</li>
+  <li>Por que <code>std::stod("3,14")</code> dá <strong>3</strong>, e como lidar com a vírgula brasileira.</li>
+  <li>Converter número em texto com <code>std::to_string</code> (e quando preferir <code>std::format</code>).</li>
+  <li>Converter sem exceções com <code>std::from_chars</code> <span class="versao">C++17</span>.</li>
+  <li>A ideia do <code>std::stringstream</code>.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com o comando padrão <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: o desenho do número e o número</h2>
+<p>Pense numa etiqueta de preço escrita à mão, "42". Ela é um <strong>desenho</strong>: dois rabiscos. Você não soma etiquetas; você lê o desenho, entende "quarenta e dois" e faz a conta de cabeça. Converter texto em número é ensinar o programa a "ler a etiqueta". O caminho inverso, número em texto, é "escrever a etiqueta".</p>
+
+<p>Veja a diferença na prática: com texto, <code>+</code> <strong>junta</strong>; com número, <code>+</code> <strong>soma</strong>.</p>
+
+<pre class="file" data-file="stoi.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string texto = "42";
+    int numero = std::stoi(texto);
+    std::cout &lt;&lt; numero + 8 &lt;&lt; '\n';
+    std::cout &lt;&lt; texto + "8" &lt;&lt; '\n';
+
+    double preco = std::stod("19.90");
+    std::cout &lt;&lt; preco * 2 &lt;&lt; '\n';
+
+    long populacao = std::stol("3000000000");
+    std::cout &lt;&lt; populacao &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra stoi.cpp -o stoi
+$ ./stoi
+50                 « número: 42 + 8
+428                « texto: "42" junto com "8"
+39.8
+3000000000</pre>
+
+<hr>
+
+<h2>1. Texto → número: <code>stoi</code>, <code>stol</code>, <code>stod</code></h2>
+<p>Os nomes parecem enigmas, mas seguem um padrão: <code>sto</code> = "<em>string to</em>" ("de string para"), e a última letra é o tipo de destino.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Lê-se</th><th>Devolve</th><th>Exemplo</th></tr>
+<tr><td><code>std::stoi(s)</code></td><td><em>string to int</em></td><td><code>int</code> (até uns 2 bilhões)</td><td><code>std::stoi("42")</code> → 42</td></tr>
+<tr><td><code>std::stol(s)</code></td><td><em>string to long</em></td><td><code>long</code></td><td><code>std::stol("3000000000")</code></td></tr>
+<tr><td><code>std::stoll(s)</code></td><td><em>string to long long</em></td><td><code>long long</code></td><td>Números enormes</td></tr>
+<tr><td><code>std::stod(s)</code></td><td><em>string to double</em></td><td><code>double</code> (com casas decimais)</td><td><code>std::stod("19.90")</code> → 19.9</td></tr>
+<tr><td><code>std::stof(s)</code></td><td><em>string to float</em></td><td><code>float</code></td><td>Raramente usado</td></tr>
+</table>
+</div>
+
+<dl class="anatomy">
+  <dt>int numero = std::stoi(texto);</dt><dd>Lê o texto <code>"42"</code> e devolve o número 42, que é guardado num <code>int</code>. O <code>texto</code> continua igual.</dd>
+  <dt>std::stod("19.90")</dt><dd>Para números com casas decimais: devolve um <code>double</code> (veja <a href="ponto-flutuante.html">float e double</a>). O separador decimal é o <strong>ponto</strong>. Ao mostrar, o <code>std::cout</code> tira o zero do fim: <code>39.8</code>.</dd>
+  <dt>std::stol("3000000000")</dt><dd>Três bilhões não cabem num <code>int</code>; num <code>long</code>, sim (na máquina da Ana, até uns 9 quintilhões; veja <a href="inteiros.html">Inteiros</a>).</dd>
+</dl>
+
+<h3>O que o <code>stoi</code> aceita</h3>
+<p>O <code>stoi</code> é mais tolerante do que parece. Ele pula espaços do começo, lê os dígitos que conseguir e <strong>para no primeiro caractere que não é dígito</strong>, sem reclamar:</p>
+
+<pre class="file" data-file="stoi2.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::cout &lt;&lt; std::stoi("  42") &lt;&lt; '\n';
+    std::cout &lt;&lt; std::stoi("42abc") &lt;&lt; '\n';
+    std::cout &lt;&lt; std::stoi("-7") &lt;&lt; '\n';
+    std::cout &lt;&lt; std::stoi("3.99") &lt;&lt; '\n';
+    std::cout &lt;&lt; std::stoi("+15") &lt;&lt; '\n';
+    std::size_t usados = 0;
+    int n = std::stoi("42abc", &amp;usados);
+    std::cout &lt;&lt; n &lt;&lt; " usou " &lt;&lt; usados &lt;&lt; " caracteres\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra stoi2.cpp -o stoi2
+$ ./stoi2
+42                 « os espaços do começo foram pulados
+42                 « parou no "a", sem erro!
+-7
+3                  « parou no ponto: não arredonda, corta
+15
+42 usou 2 caracteres</pre>
+
+<dl class="anatomy">
+  <dt>std::stoi("42abc")</dt><dd>Devolve 42 e ignora o resto. Isso é perigoso: se a pessoa digitou <code>42abc</code> por engano, o programa segue como se estivesse tudo certo.</dd>
+  <dt>std::stoi("3.99")</dt><dd>Para no ponto e devolve 3. Para ler o número com casas, use <code>std::stod</code>.</dd>
+  <dt>std::stoi("42abc", &amp;usados)</dt><dd>Um segundo argumento opcional: o <code>stoi</code> escreve em <code>usados</code> quantos caracteres conseguiu ler (o <code>&amp;</code> entrega o "endereço" da variável para a função escrever nela; veja <a href="ponteiros.html">Ponteiros</a>). Se <code>usados</code> for menor que o tamanho do texto, sobrou lixo: dá para recusar a entrada com <code>if (usados != texto.size())</code>.</dd>
+</dl>
+
+<div class="trycpp" data-goal="out:15 + 27 = 42,src:sto(i|l|ll)\s*\(">
+<p class="try-task"><strong>Missão:</strong> os dois números chegaram como texto, e o programa mostra <code>1527</code> em vez da soma. Converta os dois com <code>std::stoi</code> para mostrar <code>15 + 27 = 42</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string a = "15";
+    std::string b = "27";
+    std::cout &lt;&lt; a &lt;&lt; " + " &lt;&lt; b &lt;&lt; " = " &lt;&lt; a + b &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string a = "15";
+    std::string b = "27";
+    int soma = std::stoi(a) + std::stoi(b);
+    std::cout &lt;&lt; a &lt;&lt; " + " &lt;&lt; b &lt;&lt; " = " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Quando o texto não é um número</h2>
+<p>Se o texto não começa com um número, o <code>stoi</code> não tem o que devolver. Ele então <strong>lança uma exceção</strong>, o "alarme" que você viu com o <code>.at()</code> em <a href="acessar-caracteres.html">Acessar Caracteres</a>:</p>
+
+<pre class="file" data-file="invalido.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string idade = "trinta";
+    std::cout &lt;&lt; "convertendo...\n";
+    int n = std::stoi(idade);
+    std::cout &lt;&lt; n &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra invalido.cpp -o invalido
+$ ./invalido
+convertendo...
+terminate called after throwing an instance of 'std::invalid_argument'
+  what():  stoi
+Abortado                   (imagem do núcleo gravada) ./invalido</pre>
+
+<dl class="anatomy">
+  <dt>std::invalid_argument</dt><dd>"Argumento inválido": o texto entregue não começa com um número. Acontece com <code>"trinta"</code>, <code>"abc"</code>, <code>"R$ 10"</code> e com a string <strong>vazia</strong> <code>""</code> (por exemplo, quando a pessoa só apertou <kbd>Enter</kbd>).</dd>
+  <dt>what():  stoi</dt><dd>A explicação é só o nome da função que reclamou. Não diz qual texto era: se o programa tem vários <code>stoi</code>, você vai ter de descobrir qual foi.</dd>
+  <dt>Abortado</dt><dd>Como ninguém tratou o alarme, o programa foi encerrado. O <code>std::cout &lt;&lt; n</code> nunca rodou.</dd>
+</dl>
+
+<p>E se o texto é um número, mas grande demais para o tipo?</p>
+
+<pre class="file" data-file="grande.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string cpf = "12345678901";
+    std::cout &lt;&lt; "convertendo...\n";
+    int n = std::stoi(cpf);
+    std::cout &lt;&lt; n &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra grande.cpp -o grande
+$ ./grande
+convertendo...
+terminate called after throwing an instance of 'std::out_of_range'
+  what():  stoi
+Abortado                   (imagem do núcleo gravada) ./grande</pre>
+
+<p><code>std::out_of_range</code>, "fora do intervalo": 12 bilhões não cabem num <code>int</code>. Com <code>std::stoll</code>, caberia. Mas repare no exemplo: um CPF <strong>não é um número</strong> de verdade. Você nunca vai somar dois CPFs, e um CPF começando com zero perderia o zero. Códigos, telefones, CEPs e CPFs devem ficar em <code>std::string</code>.</p>
+
+<h3>Tratar o erro em vez de morrer</h3>
+<p>Com <code>try</code> ("tente") e <code>catch</code> ("pegue"), o programa captura o alarme e decide o que fazer. A aula <a href="excecoes.html">Exceções</a> explica tudo; aqui está só o formato, para você reconhecer:</p>
+
+<pre class="file" data-file="trycatch.cpp">#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string entrada = "trinta";
+    try {
+        int idade = std::stoi(entrada);
+        std::cout &lt;&lt; "Idade: " &lt;&lt; idade &lt;&lt; '\n';
+    } catch (const std::invalid_argument&amp;) {
+        std::cout &lt;&lt; "\"" &lt;&lt; entrada &lt;&lt; "\" não é um número\n";
+    } catch (const std::out_of_range&amp;) {
+        std::cout &lt;&lt; "número grande demais\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra trycatch.cpp -o trycatch
+$ ./trycatch
+"trinta" não é um número</pre>
+
+<p>Se você prefere não lidar com exceções, a seção 5 mostra o <code>std::from_chars</code>, que avisa o erro por um valor de retorno.</p>
+
+<hr>
+
+<h2>3. A vírgula brasileira: <code>stod("3,14")</code> dá 3</h2>
+<p>No Brasil escrevemos <code>3,14</code>. O C++ espera <code>3.14</code>. Veja o que acontece quando alguém digita do jeito brasileiro:</p>
+
+<pre class="file" data-file="decimal.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    double a = std::stod("3.14");
+    double b = std::stod("3,14");
+    std::cout &lt;&lt; a &lt;&lt; '\n';
+    std::cout &lt;&lt; b &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra decimal.cpp -o decimal
+$ ./decimal
+3.14
+3                  « sem erro, sem aviso: as casas decimais sumiram</pre>
+
+<p>É a mesma regra do <code>"42abc"</code>: o <code>stod</code> lê <code>3</code>, encontra a vírgula, que para ele não faz parte de um número, e para ali. Não há exceção. Numa lojinha, um produto de R$ 12,50 passaria a custar R$ 12,00, em silêncio.</p>
+
+<p>A solução mais simples é <strong>trocar a vírgula por ponto</strong> antes de converter, com o <code>find</code> da aula <a href="funcoes-string.html">Funções de String</a>:</p>
+
+<pre class="file" data-file="trocavirgula.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string digitado = "3,14";
+    std::size_t pos = digitado.find(',');
+    if (pos != std::string::npos) {
+        digitado[pos] = '.';
+    }
+    double valor = std::stod(digitado);
+    std::cout &lt;&lt; valor * 2 &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra trocavirgula.cpp -o trocavirgula
+$ ./trocavirgula
+6.28</pre>
+
+<div class="note">
+<strong>Curiosidade: o "locale" muda o separador</strong>
+<p>O <code>stod</code> segue o <strong>locale</strong> do programa, a configuração de idioma e país. Todo programa C++ começa no locale "C", que usa ponto, mesmo num Linux em português. Se o programa pedir o locale do sistema, com <code>std::setlocale(LC_ALL, "")</code> (de <code>&lt;clocale&gt;</code>), na máquina da Ana (<code>pt_BR.UTF-8</code>) a regra se inverte:</p>
+<pre class="term" data-cwd="~/cpp">$ cat locale.cpp
+#include &lt;clocale&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::setlocale(LC_ALL, "");
+    std::cout &lt;&lt; std::stod("3,14") &lt;&lt; '\n';
+    std::cout &lt;&lt; std::stod("3.14") &lt;&lt; '\n';
+}
+$ g++ -std=c++23 -Wall -Wextra locale.cpp -o locale
+$ ./locale
+3.14
+3</pre>
+<p>O mesmo programa dá resultados diferentes conforme o computador em que roda. Por isso a recomendação é: não dependa do locale; troque a vírgula você mesmo, ou use <code>std::from_chars</code> (seção 5), que sempre usa ponto.</p>
+</div>
+
+<hr>
+
+<h2>4. Número → texto: <code>std::to_string</code></h2>
+<p>O caminho de volta. Você já usou <code>std::to_string</code> em <a href="concatenacao.html">Juntar Strings</a>, para pôr um número dentro de uma mensagem:</p>
+
+<pre class="file" data-file="tostring2.cpp">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string a = std::to_string(42);
+    std::string b = std::to_string(-7);
+    std::string c = std::to_string(3.14);
+    std::string d = std::to_string(1.0 / 3);
+    std::cout &lt;&lt; a &lt;&lt; " | " &lt;&lt; b &lt;&lt; " | " &lt;&lt; c &lt;&lt; " | " &lt;&lt; d &lt;&lt; '\n';
+    std::cout &lt;&lt; a.size() &lt;&lt; '\n';
+    std::string e = std::format("{:.2f}", 3.14159);
+    std::cout &lt;&lt; e &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tostring2.cpp -o tostring2
+$ ./tostring2
+42 | -7 | 3.140000 | 0.333333
+2                  « "42" é um texto de 2 caracteres
+3.14</pre>
+
+<dl class="anatomy">
+  <dt>std::to_string(42)</dt><dd>Devolve o <code>std::string</code> <code>"42"</code>. Agora ele tem <code>.size()</code>, pode ser juntado com <code>+</code>, recortado com <code>substr</code>…</dd>
+  <dt>std::to_string(3.14)</dt><dd>Com <code>double</code>, sempre 6 casas decimais: <code>3.140000</code>. Não dá para escolher.</dd>
+  <dt>std::format("{:.2f}", 3.14159)</dt><dd>Quando você quer controlar as casas, o <code>std::format</code> <span class="versao">C++20</span> resolve: <code>{:.2f}</code> = "número com 2 casas". Detalhes em <a href="format-print.html">std::format e std::print</a>.</dd>
+</dl>
+
+<hr>
+
+<h2>5. Sem exceções: <code>std::from_chars</code> <span class="versao">C++17</span></h2>
+<p><code>std::from_chars</code> ("a partir de caracteres", do cabeçalho <code>&lt;charconv&gt;</code>) é a conversão "profissional": a mais rápida, sempre com ponto (ignora o locale), e que <strong>não lança exceções</strong>. Em vez de abortar, ela devolve um resultado com um código de erro, que você confere com <code>if</code>. A escrita é mais comprida:</p>
+
+<pre class="file" data-file="fromchars.cpp">#include &lt;charconv&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string texto = "2026";
+    int ano = 0;
+    auto resultado = std::from_chars(texto.data(), texto.data() + texto.size(), ano);
+    if (resultado.ec == std::errc()) {
+        std::cout &lt;&lt; "ano: " &lt;&lt; ano &lt;&lt; '\n';
+    }
+
+    std::string ruim = "abc";
+    int x = 0;
+    auto r2 = std::from_chars(ruim.data(), ruim.data() + ruim.size(), x);
+    if (r2.ec == std::errc::invalid_argument) {
+        std::cout &lt;&lt; "\"" &lt;&lt; ruim &lt;&lt; "\" não é número\n";
+    }
+
+    std::string enorme = "99999999999";
+    auto r3 = std::from_chars(enorme.data(), enorme.data() + enorme.size(), x);
+    if (r3.ec == std::errc::result_out_of_range) {
+        std::cout &lt;&lt; "grande demais para int\n";
+    }
+
+    std::string meio = "42abc";
+    auto r4 = std::from_chars(meio.data(), meio.data() + meio.size(), x);
+    std::cout &lt;&lt; x &lt;&lt; ", sobrou: " &lt;&lt; r4.ptr &lt;&lt; '\n';
+
+    double d = 0;
+    std::string preco = "19.90";
+    std::from_chars(preco.data(), preco.data() + preco.size(), d);
+    std::cout &lt;&lt; d &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra fromchars.cpp -o fromchars
+$ ./fromchars
+ano: 2026
+"abc" não é número
+grande demais para int
+42, sobrou: abc
+19.9</pre>
+
+<dl class="anatomy">
+  <dt>texto.data(), texto.data() + texto.size()</dt><dd>O <code>from_chars</code> não recebe o <code>std::string</code>, recebe <strong>onde o texto começa</strong> e <strong>onde termina</strong> na memória. <code>.data()</code> dá o endereço do primeiro caractere; somando o tamanho, o endereço logo depois do último. Copie a receita.</dd>
+  <dt>ano</dt><dd>A variável onde o número é escrito. O tipo dela decide o tipo da conversão (<code>int</code>, <code>long</code>, <code>double</code>…). Se der erro, ela não é mexida.</dd>
+  <dt>auto resultado = …</dt><dd>O <code>from_chars</code> devolve dois dados juntos; o <code>auto</code> deixa o compilador descobrir o tipo (veja <a href="auto.html">auto</a>).</dd>
+  <dt>resultado.ec</dt><dd>O código de erro (<em>error code</em>). <code>std::errc()</code> = "nenhum erro"; <code>std::errc::invalid_argument</code> = não é número; <code>std::errc::result_out_of_range</code> = não cabe no tipo.</dd>
+  <dt>r4.ptr</dt><dd>Onde a leitura parou. Em <code>"42abc"</code>, aponta para o <code>abc</code> que sobrou: assim você descobre que havia lixo depois do número.</dd>
+</dl>
+
+<p>Diferente do <code>stoi</code>, o <code>from_chars</code> <strong>não</strong> pula espaços do começo e não aceita o sinal <code>+</code>: o texto tem de começar direto no número. Para quem começa, o <code>stoi</code>/<code>stod</code> com <code>try</code>/<code>catch</code> é mais fácil de ler. O <code>from_chars</code> brilha quando há muitos números para converter (um arquivo grande) ou num programa que não usa exceções.</p>
+
+<hr>
+
+<h2>6. A ideia do <code>std::stringstream</code></h2>
+<p>Há uma terceira forma, mais antiga, que você vai encontrar muito em código e em respostas na internet: os <strong>string streams</strong> (cabeçalho <code>&lt;sstream&gt;</code>). A ideia é usar o <code>&gt;&gt;</code> e o <code>&lt;&lt;</code> que você já conhece, só que lendo de uma string e escrevendo numa string, em vez do teclado e da tela:</p>
+
+<pre class="file" data-file="sstream.cpp">#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::istringstream entrada("10 20 30");
+    int a = 0, b = 0, c = 0;
+    entrada &gt;&gt; a &gt;&gt; b &gt;&gt; c;
+    std::cout &lt;&lt; a + b + c &lt;&lt; '\n';
+
+    std::ostringstream saida;
+    saida &lt;&lt; "Total: " &lt;&lt; a + b + c &lt;&lt; " itens";
+    std::string texto = saida.str();
+    std::cout &lt;&lt; texto &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sstream.cpp -o sstream
+$ ./sstream
+60
+Total: 60 itens</pre>
+
+<dl class="anatomy">
+  <dt>std::istringstream entrada("10 20 30");</dt><dd>Uma "entrada de mentira" (<code>i</code> = <em>input</em>) cujo conteúdo é o texto. Funciona como o <code>std::cin</code>.</dd>
+  <dt>entrada &gt;&gt; a &gt;&gt; b &gt;&gt; c;</dt><dd>Lê três números separados por espaço, exatamente como leria do teclado (aula <a href="entrada-cin.html">Entrada com cin</a>).</dd>
+  <dt>std::ostringstream saida;</dt><dd>Uma "tela de mentira" (<code>o</code> = <em>output</em>): o que você manda com <code>&lt;&lt;</code> vai sendo guardado.</dd>
+  <dt>saida.str()</dt><dd>Devolve tudo o que foi escrito, como <code>std::string</code>.</dd>
+</dl>
+
+<p>É útil para separar uma linha em vários valores (você já viu isso com <code>getline</code> e vírgulas, em <a href="getline.html">Ler uma Linha</a>). Para converter <strong>um</strong> número, prefira <code>stoi</code>/<code>stod</code>; para montar textos, <code>std::format</code>.</p>
+
+<div class="tip">
+<strong>Um dígito só: <code>c - '0'</code></strong>
+<p>Para converter <strong>um único caractere</strong> de dígito (<code>'7'</code>) no número (7), não precisa de função: <code>int n = c - '0';</code>. Funciona porque os dígitos <code>'0'</code> a <code>'9'</code> estão em sequência na tabela de caracteres (<code>'0'</code> é 48, <code>'5'</code> é 53; 53 − 48 = 5). Veja <a href="char.html">Caracteres</a>.</p>
+</div>
+
+<h3>Qual usar?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th></tr>
+<tr><td>Texto → número, no dia a dia</td><td><code>std::stoi</code> / <code>std::stod</code> (com <code>try</code>/<code>catch</code> se o texto vem do usuário)</td></tr>
+<tr><td>Texto → número, sem exceções ou com muitos números</td><td><code>std::from_chars</code> <span class="versao">C++17</span></td></tr>
+<tr><td>Vários números numa linha</td><td><code>std::istringstream</code> com <code>&gt;&gt;</code></td></tr>
+<tr><td>Número → texto, simples</td><td><code>std::to_string</code></td></tr>
+<tr><td>Número → texto, controlando casas e formato</td><td><code>std::format</code> <span class="versao">C++20</span></td></tr>
+<tr><td>Número brasileiro (<code>3,14</code>)</td><td>Troque a vírgula por ponto antes de converter</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>terminate called after throwing an instance of 'std::invalid_argument'</code> / <code>what():  stoi</code></strong>
+<p><strong>O que significa:</strong> o texto entregue ao <code>stoi</code> (ou <code>stod</code>, <code>stol</code>: o <code>what()</code> diz qual) não começa com um número. Causas comuns: a string está vazia (o <code>getline</code> leu uma linha vazia, veja <a href="getline.html">o bug do getline</a>), tem letras, ou tem <code>R$</code> na frente.</p>
+<p><strong>Como consertar:</strong> confira o texto antes (mostre-o entre colchetes: <code>std::cout &lt;&lt; "[" &lt;&lt; s &lt;&lt; "]"</code>), limpe o que não é número e trate a exceção com <code>try</code>/<code>catch</code>, ou use <code>std::from_chars</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>terminate called after throwing an instance of 'std::out_of_range'</code> / <code>what():  stoi</code></strong>
+<p><strong>O que significa:</strong> o texto é um número, mas não cabe no tipo (<code>int</code> vai até 2147483647).</p>
+<p><strong>Como consertar:</strong> use <code>std::stoll</code> (<code>long long</code>). Se é um código (CPF, telefone, CEP), não converta: guarde como <code>std::string</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O preço perdeu os centavos (<code>12,50</code> virou <code>12</code>)</strong>
+<p><strong>O que significa:</strong> <code>std::stod</code> parou na vírgula. Não há erro nem aviso.</p>
+<p><strong>Como consertar:</strong> troque <code>','</code> por <code>'.'</code> antes de converter (seção 3).</p>
+</div>
+
+<div class="cenario">
+<strong>O <code>stoi</code> aceitou <code>"42abc"</code> ou <code>"3.99"</code> sem reclamar</strong>
+<p><strong>O que significa:</strong> o <code>stoi</code> lê o que pode e ignora o resto.</p>
+<p><strong>Como consertar:</strong> use o segundo argumento (<code>std::stoi(s, &amp;usados)</code>) e recuse se <code>usados != s.size()</code>; ou confira o <code>ptr</code> do <code>from_chars</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th><th>Exemplo → resultado</th></tr>
+<tr><td><code>std::stoi(s)</code></td><td>Texto → <code>int</code></td><td><code>std::stoi("42")</code> → 42</td></tr>
+<tr><td><code>std::stol(s)</code> / <code>std::stoll(s)</code></td><td>Texto → <code>long</code> / <code>long long</code></td><td><code>std::stoll("3000000000")</code></td></tr>
+<tr><td><code>std::stod(s)</code></td><td>Texto → <code>double</code> (com ponto)</td><td><code>std::stod("19.90")</code> → 19.9</td></tr>
+<tr><td><code>std::stoi(s, &amp;usados)</code></td><td>Também diz quantos caracteres leu</td><td><code>"42abc"</code> → 42, <code>usados</code> = 2</td></tr>
+<tr><td><code>std::invalid_argument</code></td><td>Exceção: não é número</td><td><code>std::stoi("abc")</code>, <code>std::stoi("")</code></td></tr>
+<tr><td><code>std::out_of_range</code></td><td>Exceção: não cabe no tipo</td><td><code>std::stoi("12345678901")</code></td></tr>
+<tr><td><code>std::to_string(n)</code></td><td>Número → texto</td><td><code>std::to_string(3.14)</code> → <code>"3.140000"</code></td></tr>
+<tr><td><code>std::format("{:.2f}", x)</code></td><td>Número → texto formatado <span class="versao">C++20</span></td><td><code>"3.14"</code></td></tr>
+<tr><td><code>std::from_chars(ini, fim, var)</code></td><td>Texto → número, sem exceções (<code>&lt;charconv&gt;</code>) <span class="versao">C++17</span></td><td>Confira <code>.ec == std::errc()</code></td></tr>
+<tr><td><code>std::istringstream</code> / <code>std::ostringstream</code></td><td>Ler de / escrever em uma string com <code>&gt;&gt;</code> / <code>&lt;&lt;</code> (<code>&lt;sstream&gt;</code>)</td><td><code>saida.str()</code></td></tr>
+<tr><td><code>c - '0'</code></td><td>Um caractere de dígito → número</td><td><code>'7' - '0'</code> → 7</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Para inteiro</h3>
+<p>Complete para converter o texto <code>s</code> em <code>int</code>:</p>
+<div class="ex-code">int n = std::<input data-answer="stoi" aria-label="função">(s);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Para decimal</h3>
+<p>Complete para converter <code>"19.90"</code> num <code>double</code>:</p>
+<div class="ex-code">double preco = std::<input data-answer="stod" aria-label="função">("19.90");</div>
+</div>
+
+<div class="exercise">
+<h3>3. De volta para texto</h3>
+<p>Complete para transformar o número <code>idade</code> em texto:</p>
+<div class="ex-code">std::string t = std::<input data-answer="to_string" aria-label="função">(idade);</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Quanto vale <code>std::stod("2,75")</code>, num programa que não mexe no locale?</p>
+<label><input type="radio" name="q4"> 2.75</label>
+<label><input type="radio" name="q4"> 2</label>
+<label><input type="radio" name="q4"> 275</label>
+<label><input type="radio" name="q4"> Lança <code>std::invalid_argument</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. O que acontece com <code>std::stoi("")</code> (string vazia)?</p>
+<label><input type="radio" name="q5"> Devolve 0</label>
+<label><input type="radio" name="q5"> Devolve -1</label>
+<label><input type="radio" name="q5"> Erro de compilação</label>
+<label><input type="radio" name="q5"> Lança <code>std::invalid_argument</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Qual o resultado de <code>std::to_string(2.5)</code>?</p>
+<label><input type="radio" name="q6"> <code>"2.500000"</code></label>
+<label><input type="radio" name="q6"> <code>"2.5"</code></label>
+<label><input type="radio" name="q6"> <code>"2,5"</code></label>
+<label><input type="radio" name="q6"> <code>"3"</code></label>
+</div>
+
+<h3>Missão final: o caixa da lojinha</h3>
+
+<div class="trycpp" data-stdin="3&#10;12,50&#10;" data-goal="outre:Total: 37\.5,src:sto(i|l|ll)\s*\(,src:stod\s*\(">
+<p class="try-task"><strong>Missão:</strong> o caixa lê a quantidade e o preço como texto (com <code>getline</code>). O preço vem do jeito brasileiro, <code>12,50</code>. Converta a quantidade com <code>std::stoi</code>, troque a vírgula do preço por ponto, converta com <code>std::stod</code> e mostre o total. Com a entrada <code>3</code> e <code>12,50</code>, a saída deve ser <code>Total: 37.50</code> (ou <code>Total: 37.5</code>).</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string qtd_texto, preco_texto;
+    std::getline(std::cin, qtd_texto);
+    std::getline(std::cin, preco_texto);
+    // converta, troque a vírgula e calcule o total
+
+}
+</pre>
+<pre class="solucao">#include &lt;format&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string qtd_texto, preco_texto;
+    std::getline(std::cin, qtd_texto);
+    std::getline(std::cin, preco_texto);
+    int quantidade = std::stoi(qtd_texto);
+    std::size_t virgula = preco_texto.find(',');
+    if (virgula != std::string::npos) {
+        preco_texto[virgula] = '.';
+    }
+    double preco = std::stod(preco_texto);
+    std::cout &lt;&lt; std::format("Total: {:.2f}", quantidade * preco) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>O texto <code>"42"</code> não é o número 42: com texto, <code>+</code> junta; com número, soma.</li>
+  <li>Texto → número: <code>std::stoi</code> (<code>int</code>), <code>std::stol</code>/<code>std::stoll</code>, <code>std::stod</code> (<code>double</code>). Eles pulam espaços do começo e param no primeiro caractere que não é número, sem reclamar.</li>
+  <li>Texto que não começa com número (ou vazio) → <code>std::invalid_argument</code>; número que não cabe → <code>std::out_of_range</code>. Sem <code>try</code>/<code>catch</code>, o programa aborta com <code>what():  stoi</code>.</li>
+  <li><code>std::stod("3,14")</code> dá 3: troque a vírgula por ponto antes. O locale pode inverter a regra; não dependa dele.</li>
+  <li>Número → texto: <code>std::to_string</code> (doubles com 6 casas) ou <code>std::format</code>.</li>
+  <li><code>std::from_chars</code> <span class="versao">C++17</span> converte sem exceções, conferindo <code>.ec</code>. <code>std::stringstream</code> lê e escreve em strings com <code>&gt;&gt;</code> e <code>&lt;&lt;</code>.</li>
+  <li>CPF, CEP e telefone são texto, não números.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
