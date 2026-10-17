@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Operadores Aritméticos — + - * / % e divisão por zero | Guia C++</title>
+<meta name="description" content="Operadores aritméticos em C++ para quem nunca programou: soma, subtração, multiplicação, divisão inteira e real, resto (%) com negativos, divisão por zero (o crash SIGFPE com código 136 e o inf do double) e a ordem das contas, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Operadores Aritméticos</span></h1>
+
+<p class="intro">Computador vem de "computar", calcular. Fazer contas é o trabalho mais básico de qualquer programa: somar o carrinho de compras, dividir a conta do restaurante, converter minutos em horas. Os símbolos que fazem essas contas se chamam <strong>operadores aritméticos</strong>. Quatro deles você já conhece da escola; o quinto, o <code>%</code>, é novidade e muito útil. Nesta aula você vai usar todos, ver as duas divisões do C++ e descobrir o que acontece quando alguém divide por zero.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Os cinco operadores: <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code> e <code>%</code>.</li>
+  <li>A diferença entre divisão <strong>inteira</strong> (<code>7 / 2</code> = 3) e <strong>real</strong> (<code>7 / 2.0</code> = 3.5).</li>
+  <li>O resto da divisão (<code>%</code>) e para que ele serve: par ou ímpar, horas e minutos, reais e centavos.</li>
+  <li>O que <code>%</code> faz com números negativos.</li>
+  <li>O que acontece ao dividir por zero: o programa <strong>quebra</strong> com inteiros e dá <code>inf</code> com <code>double</code>.</li>
+  <li>A ordem em que as contas são feitas, e por que o <code>^</code> não é potência.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: a calculadora com uma tecla a mais</h2>
+<p>Os operadores do C++ são as teclas de uma calculadora, com duas diferenças:</p>
+<ul>
+  <li>A <strong>multiplicação</strong> é o asterisco <code>*</code> (o teclado não tem ×), e a <strong>divisão</strong> é a barra <code>/</code> (o teclado não tem ÷).</li>
+  <li>Existe uma tecla a mais, o <code>%</code>, que dá o <strong>resto</strong> de uma divisão. É o "sobrou" da continha armada que você fazia na escola: 17 balas para 5 crianças dá 3 para cada e <strong>sobram 2</strong>.</li>
+</ul>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operador</th><th>Nome</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>+</code></td><td>Soma (adição)</td><td><code>17 + 5</code></td><td><code>22</code></td></tr>
+<tr><td><code>-</code></td><td>Subtração</td><td><code>17 - 5</code></td><td><code>12</code></td></tr>
+<tr><td><code>*</code></td><td>Multiplicação</td><td><code>17 * 5</code></td><td><code>85</code></td></tr>
+<tr><td><code>/</code></td><td>Divisão</td><td><code>17 / 5</code></td><td><code>3</code> (com inteiros!)</td></tr>
+<tr><td><code>%</code></td><td>Resto da divisão (módulo)</td><td><code>17 % 5</code></td><td><code>2</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. Os cinco operadores</h2>
+
+<pre class="file" data-file="contas.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int a = 17;
+    int b = 5;
+    std::cout &lt;&lt; a + b &lt;&lt; '\n';
+    std::cout &lt;&lt; a - b &lt;&lt; '\n';
+    std::cout &lt;&lt; a * b &lt;&lt; '\n';
+    std::cout &lt;&lt; a / b &lt;&lt; '\n';
+    std::cout &lt;&lt; a % b &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra contas.cpp -o contas
+$ ./contas
+22
+12
+85
+3        « 17 / 5: cabem 3 inteiros (3 × 5 = 15)
+2        « 17 % 5: sobram 2 (17 - 15)</pre>
+
+<dl class="anatomy">
+  <dt>a + b</dt><dd>Uma <strong>expressão</strong>: valores ligados por um operador. O C++ calcula a expressão e o resultado é usado no lugar dela (aqui, mostrado pelo <code>cout</code>).</dd>
+  <dt>a e b</dt><dd>Os <strong>operandos</strong>: os valores em que o operador trabalha. Podem ser variáveis, números escritos direto (<code>17 + 5</code>) ou outras expressões (<code>a * 2 + 1</code>).</dd>
+  <dt>os espaços</dt><dd>São opcionais: <code>a+b</code> funciona igual. Com espaços fica mais fácil de ler, e é o estilo deste guia.</dd>
+</dl>
+
+<p>Uma expressão não muda as variáveis: depois de <code>a + b</code>, o <code>a</code> continua 17. Para guardar um resultado, use uma variável: <code>int total = a + b;</code>. Para mudar a própria variável (<code>a = a + b</code>, ou o atalho <code>a += b</code>), veja <a href="operadores-atribuicao.html">Operadores de Atribuição</a>.</p>
+
+<h3>O menos sozinho: trocar o sinal</h3>
+<p>O <code>-</code> também funciona com um operando só, na frente de um valor: ele troca o sinal. O nome técnico é <strong>operador unário</strong> ("de um operando"; os outros são <strong>binários</strong>, de dois):</p>
+
+<pre class="file" data-file="sinais.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int saldo = 50;
+    int divida = -saldo;
+    std::cout &lt;&lt; divida &lt;&lt; '\n';
+    std::cout &lt;&lt; -divida &lt;&lt; '\n';
+    std::cout &lt;&lt; 10 - -3 &lt;&lt; '\n';
+    double metade = 1 / 2;
+    std::cout &lt;&lt; metade &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sinais.cpp -o sinais
+$ ./sinais
+-50
+50       « menos com menos dá mais
+13       « 10 - (-3)
+0        « a última linha é a próxima seção!</pre>
+
+<hr>
+
+<h2>2. A divisão: inteira ou real</h2>
+<p>O <code>/</code> do C++ faz <strong>duas</strong> divisões diferentes, dependendo do tipo dos números:</p>
+<ul>
+  <li><code>int / int</code> → <strong>divisão inteira</strong>. O resultado é um <code>int</code>, e a parte fracionária é <strong>jogada fora</strong> (não é arredondada). <code>17 / 5</code> = 3, <code>1 / 2</code> = 0, <code>7 / 2</code> = 3.</li>
+  <li>Se um dos lados é <code>double</code> → <strong>divisão real</strong>. <code>7 / 2.0</code> = 3.5, <code>1.0 / 2</code> = 0.5.</li>
+</ul>
+<p>É por isso que <code>double metade = 1 / 2;</code> deu 0: a conta <code>1 / 2</code> foi feita entre inteiros (resultado 0) e <strong>só depois</strong> o 0 foi guardado no <code>double</code>. A variável ser <code>double</code> não muda a conta. Esse assunto, com o <code>static_cast&lt;double&gt;</code> para resolver, é explicado em detalhe na aula <a href="conversao-tipos.html">Conversão de Tipos</a>.</p>
+
+<p>Com números negativos, a divisão inteira corta <strong>em direção ao zero</strong>: <code>-7 / 2</code> é −3,5, que vira <strong>−3</strong> (e não −4).</p>
+
+<p>A divisão inteira não é um defeito: muitas vezes é exatamente o que você quer. Quantas caixas de 6 ovos dá para encher com 20 ovos? <code>20 / 6</code> = 3. Ninguém quer "3,33 caixas".</p>
+
+<hr>
+
+<h2>3. O resto: <code>%</code></h2>
+<p>O <code>%</code> (lê-se "módulo" ou "resto") dá o que <strong>sobra</strong> de uma divisão inteira. Ele e o <code>/</code> trabalham juntos: o <code>/</code> diz quantas vezes cabe, o <code>%</code> diz quanto sobrou.</p>
+
+<p>O uso mais comum é <strong>quebrar uma quantidade em unidades</strong>. 135 minutos são quantas horas e quantos minutos? E 1234 centavos são quantos reais?</p>
+
+<pre class="file" data-file="tempo.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int minutos = 135;
+    int horas = minutos / 60;
+    int resto = minutos % 60;
+    std::cout &lt;&lt; minutos &lt;&lt; " minutos = " &lt;&lt; horas &lt;&lt; "h" &lt;&lt; resto &lt;&lt; "min\n";
+
+    int centavos = 1234;
+    std::cout &lt;&lt; "R$ " &lt;&lt; centavos / 100 &lt;&lt; "," &lt;&lt; centavos % 100 &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tempo.cpp -o tempo
+$ ./tempo
+135 minutos = 2h15min
+R$ 12,34</pre>
+
+<ol class="passo">
+  <li><code>135 / 60</code> = 2: cabem 2 horas inteiras (120 minutos).</li>
+  <li><code>135 % 60</code> = 15: sobram 15 minutos (135 − 120).</li>
+  <li><code>1234 / 100</code> = 12 reais; <code>1234 % 100</code> = 34 centavos.</li>
+</ol>
+
+<p>(Com 1205 centavos, este programa mostraria <code>R$ 12,5</code>, porque o 5 não ganha um zero na frente. Para formatar com dois dígitos, veja <a href="iomanip.html">Formatar com iomanip</a>.)</p>
+
+<h3>Par ou ímpar</h3>
+<p>Outro uso clássico: um número é <strong>par</strong> se o resto da divisão por 2 é zero. <code>8 % 2</code> = 0 (par), <code>7 % 2</code> = 1 (ímpar). Da mesma forma, <code>n % 10</code> dá o último algarismo de <code>n</code>, e <code>n % 3 == 0</code> diz se <code>n</code> é múltiplo de 3.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> troque os <code>200</code> ovos por outros números e veja quantas caixas de 12 ficam cheias e quantos ovos sobram. Depois troque o tamanho da caixa para 6.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int ovos = 200;
+    int por_caixa = 12;
+    std::cout &lt;&lt; "Caixas cheias: " &lt;&lt; ovos / por_caixa &lt;&lt; '\n';
+    std::cout &lt;&lt; "Ovos soltos: " &lt;&lt; ovos % por_caixa &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<h3><code>%</code> com números negativos</h3>
+<p>Aqui o C++ pode surpreender quem vem da matemática. A regra é: o resultado do <code>%</code> tem o <strong>mesmo sinal do número da esquerda</strong> (o que está sendo dividido). Isso acontece porque a divisão inteira corta em direção ao zero, e o resto é o que "falta" para voltar ao número original.</p>
+
+<pre class="file" data-file="resto.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; 7 % 3 &lt;&lt; '\n';
+    std::cout &lt;&lt; -7 % 3 &lt;&lt; '\n';
+    std::cout &lt;&lt; 7 % -3 &lt;&lt; '\n';
+    std::cout &lt;&lt; -7 % -3 &lt;&lt; '\n';
+    std::cout &lt;&lt; -7 / 2 &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra resto.cpp -o resto
+$ ./resto
+1        « 7 = 3 × 2 + 1
+-1       « -7 = 3 × (-2) + (-1): o sinal vem do -7
+1        « 7 = (-3) × (-2) + 1: o sinal vem do 7
+-1
+-3       « -3,5 cortado em direção ao zero</pre>
+
+<p>Na prática, isso morde no teste de ímpar. Muita gente escreve "ímpar é quando <code>n % 2 == 1</code>". Para negativos, não funciona:</p>
+
+<pre class="file" data-file="impar.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; 3 % 2 &lt;&lt; '\n';
+    std::cout &lt;&lt; -3 % 2 &lt;&lt; '\n';
+    std::cout &lt;&lt; (-3 % 2 == 1) &lt;&lt; '\n';
+    std::cout &lt;&lt; (-3 % 2 != 0) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra impar.cpp -o impar
+$ ./impar
+1
+-1       « o resto de -3 por 2 é -1, não 1
+0        « "-3 é ímpar?" pelo teste == 1: falso (errado!)
+1        « "-3 é ímpar?" pelo teste != 0: verdadeiro (certo)</pre>
+
+<p>O <code>1</code> e o <code>0</code> são o jeito de o <code>cout</code> mostrar verdadeiro e falso (veja <a href="bool.html">Booleanos</a> e <a href="operadores-comparacao.html">Operadores de Comparação</a>). A lição: para saber se é ímpar, teste <code>n % 2 != 0</code>, que funciona para positivos e negativos.</p>
+
+<h3><code>%</code> só funciona com inteiros</h3>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra restod.cpp -o restod
+restod.cpp: In function ‘int main()’:
+restod.cpp:5:20: error: invalid operands of types ‘double’ and ‘int’ to binary ‘operator%’
+    5 |     std::cout &lt;&lt; x % 2 &lt;&lt; '\n';
+      |                  ~ ^ ~
+      |                  |   |
+      |                  |   int
+      |                  double</pre>
+
+<p>"Operandos inválidos dos tipos double e int para o <code>operator%</code> binário": a variável <code>x</code> era <code>double</code> (7.5). Para o resto de números com vírgula existe a função <code>std::fmod</code>, de <code>&lt;cmath&gt;</code>: <code>std::fmod(7.5, 2)</code> dá <code>1.5</code> (veja <a href="matematica.html">Matemática (cmath)</a>).</p>
+
+<hr>
+
+<h2>4. Dividir por zero</h2>
+<p>Na matemática, dividir por zero "não existe". No C++, o que acontece depende do tipo.</p>
+
+<h3>Com inteiros: o programa quebra</h3>
+
+<pre class="file" data-file="zero.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int pizzas = 8;
+    int pessoas = 0;
+    std::cout &lt;&lt; "Dividindo...\n";
+    std::cout &lt;&lt; pizzas / pessoas &lt;&lt; '\n';
+    std::cout &lt;&lt; "Fim\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra zero.cpp -o zero
+$ ./zero
+Dividindo...
+Exceção de ponto flutuante (imagem do núcleo gravada) ./zero
+$ echo $?
+136</pre>
+
+<p>O g++ compilou sem aviso (ele não sabe, ao compilar, que <code>pessoas</code> vai valer 0). Ao rodar, o programa <strong>morreu</strong> na linha da divisão: o <code>Fim</code> nunca apareceu. Vamos entender cada pedaço:</p>
+
+<dl class="anatomy">
+  <dt>Exceção de ponto flutuante</dt><dd>A mensagem é do <strong>Bash</strong>, não do seu programa: ele avisa que o programa foi morto pelo sinal <strong>SIGFPE</strong> (<em>floating-point exception</em>). O nome é histórico e engana: a conta era com inteiros, e mesmo assim o sinal se chama "ponto flutuante". Num sistema em inglês, a mensagem é <code>Floating point exception (core dumped)</code>.</dd>
+  <dt>(imagem do núcleo gravada)</dt><dd>Em inglês, <em>core dumped</em>: o sistema pode ter salvo uma "fotografia" da memória do programa para investigar depois (veja <a href="depuracao-gdb.html">Depurar com o GDB</a>).</dd>
+  <dt>136</dt><dd>O código de saída. Quando um programa é morto por um sinal, o Bash informa <strong>128 + número do sinal</strong>. O SIGFPE é o sinal 8: 128 + 8 = 136. O comando <code>kill -l 136</code> traduz: <code>FPE</code>.</dd>
+</dl>
+
+<p>Se o zero estiver escrito direto na conta, o g++ percebe e avisa, mas compila mesmo assim:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra zero2.cpp -o zero2
+zero2.cpp: In function ‘int main()’:
+zero2.cpp:4:20: warning: division by zero [-Wdiv-by-zero]
+    4 |     std::cout &lt;&lt; 8 / 0 &lt;&lt; '\n';
+      |                  ~~^~~
+$ ./zero2
+Exceção de ponto flutuante (imagem do núcleo gravada) ./zero2
+$ echo $?
+136</pre>
+
+<p>Dividir um inteiro por zero é <strong>comportamento indefinido</strong>: a regra do C++ não diz o que acontece, e quebrar com SIGFPE é só o que acontece no Linux com processador Intel/AMD. Também vale para <code>%</code>: <code>8 % 0</code> quebra igual. No editor do guia, que roda o programa em WebAssembly, a mensagem é outra, mas o programa também para. A aula <a href="comportamento-indefinido.html">Comportamento Indefinido</a> explica por que isso é tão perigoso.</p>
+
+<div class="warning">
+<strong>A regra de ouro</strong>
+<p>Antes de dividir por um valor que veio de fora (do teclado, de um arquivo, de uma conta), confira se ele é zero. Você vai aprender a fazer essa conferência com <code>if</code> em <a href="if-else.html">if e else</a>, e um truque com <code>&amp;&amp;</code> em <a href="operadores-logicos.html">Operadores Lógicos</a>.</p>
+</div>
+
+<h3>Com <code>double</code>: infinito</h3>
+<p>Os números de ponto flutuante seguem uma norma internacional (IEEE 754) que tem valores especiais para isso. O programa não quebra:</p>
+
+<pre class="file" data-file="zerod.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double pizzas = 8;
+    double pessoas = 0;
+    std::cout &lt;&lt; pizzas / pessoas &lt;&lt; '\n';
+    std::cout &lt;&lt; -pizzas / pessoas &lt;&lt; '\n';
+    std::cout &lt;&lt; pessoas / pessoas &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra zerod.cpp -o zerod
+$ ./zerod
+inf      « infinito positivo
+-inf     « infinito negativo
+-nan     « "not a number", não é um número: 0 / 0 não tem resposta</pre>
+
+<p>Não quebrar não quer dizer que está certo: <code>inf</code> e <code>nan</code> se espalham pelas contas seguintes (<code>inf + 1</code> é <code>inf</code>, qualquer conta com <code>nan</code> dá <code>nan</code>) e estragam o resultado em silêncio. O sinal de menos no <code>-nan</code> é um detalhe da forma como o processador guarda esse valor; em outros sistemas pode aparecer só <code>nan</code>. Veja mais em <a href="ponto-flutuante.html">float e double</a>.</p>
+
+<hr>
+
+<h2>5. A ordem das contas</h2>
+<p>Como na matemática da escola, <strong>multiplicação, divisão e resto vêm antes de soma e subtração</strong>. E, quando os operadores têm a mesma prioridade, a conta é feita <strong>da esquerda para a direita</strong>:</p>
+
+<pre class="file" data-file="ordem.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; 2 + 3 * 4 &lt;&lt; '\n';
+    std::cout &lt;&lt; (2 + 3) * 4 &lt;&lt; '\n';
+    std::cout &lt;&lt; 10 - 4 - 3 &lt;&lt; '\n';
+    std::cout &lt;&lt; 100 / 10 * 2 &lt;&lt; '\n';
+    std::cout &lt;&lt; 7 / 2 * 2 &lt;&lt; '\n';
+    std::cout &lt;&lt; 7 * 2 / 2 &lt;&lt; '\n';
+    std::cout &lt;&lt; -3 * -2 &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ordem.cpp -o ordem
+$ ./ordem
+14       « 3 * 4 primeiro (12), depois 2 + 12
+20       « os parênteses mandam: 5 * 4
+3        « (10 - 4) - 3, da esquerda para a direita
+20       « (100 / 10) * 2, e não 100 / 20
+6        « (7 / 2) * 2 = 3 * 2: a divisão inteira perdeu o 0,5
+7        « (7 * 2) / 2 = 14 / 2: mesma conta em outra ordem, outro resultado
+6        « o menos unário vem antes de tudo</pre>
+
+<p>As linhas 5 e 6 mostram por que a ordem importa ainda mais com inteiros: na matemática, 7 ÷ 2 × 2 e 7 × 2 ÷ 2 são iguais; em C++ com <code>int</code>, não. O caso clássico é a média de duas notas:</p>
+
+<pre class="file" data-file="media.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int nota1 = 8;
+    int nota2 = 9;
+    std::cout &lt;&lt; nota1 + nota2 / 2 &lt;&lt; '\n';
+    std::cout &lt;&lt; (nota1 + nota2) / 2 &lt;&lt; '\n';
+    std::cout &lt;&lt; (nota1 + nota2) / 2.0 &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra media.cpp -o media
+$ ./media
+12       « 8 + (9 / 2) = 8 + 4: a divisão foi feita antes da soma
+8        « parênteses certos, mas divisão inteira: 17 / 2 = 8
+8.5      « parênteses certos e divisão real</pre>
+
+<p>Dois erros diferentes numa conta só. A tabela completa de prioridades (inclusive com comparações e lógicos) está na aula <a href="precedencia.html">Precedência</a>. A regra prática: <strong>na dúvida, coloque parênteses</strong>. Eles não custam nada e deixam a intenção clara.</p>
+
+<h3>O <code>^</code> não é potência</h3>
+<p>Em muitas calculadoras, <code>2^3</code> é "2 elevado a 3". Em C++, <strong>não</strong>: o <code>^</code> é um operador de bits chamado "ou exclusivo" (XOR), que não tem nada a ver com potência. O g++ 15 até reconhece o engano:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat potencia.cpp
+#include &lt;cmath&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; (2 ^ 3) &lt;&lt; '\n';
+    std::cout &lt;&lt; 2 * 2 * 2 &lt;&lt; '\n';
+    std::cout &lt;&lt; std::pow(2, 3) &lt;&lt; '\n';
+}
+$ g++ -std=c++23 -Wall -Wextra potencia.cpp -o potencia
+potencia.cpp: In function ‘int main()’:
+potencia.cpp:5:21: warning: result of ‘2^3’ is 1; did you mean ‘1 &lt;&lt; 3’ (8)? [-Wxor-used-as-pow]
+    5 |     std::cout &lt;&lt; (2 ^ 3) &lt;&lt; '\n';
+      |                     ^
+      |                   -
+      |                   1 &lt;&lt;
+potencia.cpp:5:19: note: you can silence this warning by using a hexadecimal constant (0x2 rather than 2)
+    5 |     std::cout &lt;&lt; (2 ^ 3) &lt;&lt; '\n';
+      |                   ^
+      |                   0x2
+$ ./potencia
+1        « 2 ^ 3 é 1 (XOR), não 8
+8
+8</pre>
+
+<p>"O resultado de <code>2^3</code> é 1; você quis dizer <code>1 &lt;&lt; 3</code> (8)?" O C++ não tem operador de potência. Para potências pequenas, multiplique (<code>x * x</code> para o quadrado); para as outras, use <code>std::pow</code> de <code>&lt;cmath&gt;</code> (aula <a href="matematica.html">Matemática</a>).</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Exceção de ponto flutuante (imagem do núcleo gravada)</code> e código 136</strong>
+<p><strong>O que aconteceu:</strong> uma divisão (<code>/</code>) ou resto (<code>%</code>) com inteiros teve zero do lado direito. O processador recusou a conta e o sistema matou o programa com o sinal SIGFPE (8). O código de saída é 128 + 8 = 136. Tudo o que viria depois daquela linha não rodou.</p>
+<p><strong>Como resolver:</strong> descubra qual divisão tinha zero (o <a href="depuracao-gdb.html">GDB</a> mostra a linha exata) e confira o divisor antes de dividir. Se você pegou o valor do teclado, lembre que uma leitura que falha também dá 0 (veja <a href="entrada-cin.html">Entrada com cin</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>O resultado é 0 (ou menor do que devia), sem nenhum aviso</strong>
+<p><strong>O que aconteceu:</strong> divisão inteira. <code>1 / 2</code> é 0; <code>17 / 2</code> é 8. Guardar num <code>double</code> não ajuda, porque a conta já foi feita.</p>
+<p><strong>Como resolver:</strong> faça um dos lados ser <code>double</code> antes da conta: <code>1.0 / 2</code> ou <code>static_cast&lt;double&gt;(soma) / n</code> (veja <a href="conversao-tipos.html">Conversão de Tipos</a>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: invalid operands of types ‘double’ and ‘int’ to binary ‘operator%’</code></strong>
+<p><strong>O que aconteceu:</strong> você usou <code>%</code> com um <code>double</code>. O <code>%</code> só existe para inteiros.</p>
+<p><strong>Como resolver:</strong> se os valores deveriam ser inteiros, mude o tipo para <code>int</code>. Se precisam ter vírgula, use <code>std::fmod(a, b)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>warning: result of ‘2^3’ is 1; did you mean ‘1 &lt;&lt; 3’ (8)?</code></strong>
+<p><strong>O que aconteceu:</strong> você usou <code>^</code> achando que era potência.</p>
+<p><strong>Como resolver:</strong> <code>std::pow(2, 3)</code> ou <code>2 * 2 * 2</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operador</th><th>Com <code>int</code></th><th>Com <code>double</code></th><th>Cuidado</th></tr>
+<tr><td><code>a + b</code></td><td><code>7 + 2</code> = 9</td><td><code>7.5 + 2</code> = 9.5</td><td>Números muito grandes estouram o <code>int</code> (<a href="inteiros.html">Inteiros</a>).</td></tr>
+<tr><td><code>a - b</code></td><td><code>7 - 2</code> = 5</td><td><code>7.5 - 2</code> = 5.5</td><td></td></tr>
+<tr><td><code>a * b</code></td><td><code>7 * 2</code> = 14</td><td><code>7.5 * 2</code> = 15</td><td></td></tr>
+<tr><td><code>a / b</code></td><td><code>7 / 2</code> = 3 (corta)</td><td><code>7.0 / 2</code> = 3.5</td><td>Inteiro por zero: o programa quebra (SIGFPE). Double por zero: <code>inf</code>/<code>nan</code>.</td></tr>
+<tr><td><code>a % b</code></td><td><code>7 % 2</code> = 1</td><td>Não existe (use <code>std::fmod</code>)</td><td>O sinal do resultado é o do <code>a</code>: <code>-7 % 2</code> = −1.</td></tr>
+<tr><td><code>-a</code></td><td><code>-7</code></td><td><code>-7.5</code></td><td>Troca o sinal.</td></tr>
+</table>
+</div>
+
+<p><strong>Ordem:</strong> <code>-</code> unário → <code>* / %</code> → <code>+ -</code>; na mesma prioridade, da esquerda para a direita. Parênteses mudam a ordem.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Quanto sobra?</h3>
+<p>Qual é o resultado de <code>23 % 4</code>?</p>
+<div class="ex-code"><input data-answer="3" aria-label="resultado"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Divisão inteira</h3>
+<p>Qual é o resultado de <code>23 / 4</code> (dois <code>int</code>)?</p>
+<div class="ex-code"><input data-answer="5" aria-label="resultado"></div>
+</div>
+
+<div class="exercise">
+<h3>3. A ordem</h3>
+<p>Qual é o resultado de <code>10 - 2 * 3 + 1</code>?</p>
+<div class="ex-code"><input data-answer="5" aria-label="resultado"></div>
+</div>
+
+<div class="exercise">
+<h3>4. Último algarismo</h3>
+<p>Complete para <code>ultimo</code> receber o último algarismo de <code>numero</code> (de 2026, o 6):</p>
+<div class="ex-code">int ultimo = numero <input data-answer="% 10|%10" aria-label="operação">;</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Quanto é <code>-9 % 4</code> em C++?</p>
+<label><input type="radio" name="q5"> <code>3</code></label>
+<label><input type="radio" name="q5"> <code>1</code></label>
+<label><input type="radio" name="q5"> <code>-1</code></label>
+<label><input type="radio" name="q5"> Não compila: <code>%</code> não aceita negativos</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">6. <code>int a = 10; int b = 0;</code> O que acontece em <code>std::cout &lt;&lt; a / b;</code>?</p>
+<label><input type="radio" name="q6"> Mostra <code>inf</code></label>
+<label><input type="radio" name="q6"> O programa quebra (no Linux, SIGFPE, código 136)</label>
+<label><input type="radio" name="q6"> Mostra <code>0</code></label>
+<label><input type="radio" name="q6"> Não compila</label>
+</div>
+
+<h3>Missão final: o cronômetro</h3>
+
+<div class="trycpp" data-goal="out:3725 segundos = 1h 2min 5s,src:%">
+<p class="try-task"><strong>Missão:</strong> transforme <code>3725</code> segundos em horas, minutos e segundos, usando <code>/</code> e <code>%</code> (uma hora tem 3600 segundos, um minuto tem 60). A saída deve ser:</p>
+<pre class="out">3725 segundos = 1h 2min 5s</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int total = 3725;
+    int horas = 0;     // troque o 0 pela conta certa
+    int minutos = 0;   // idem
+    int segundos = 0;  // idem
+    std::cout &lt;&lt; total &lt;&lt; " segundos = " &lt;&lt; horas &lt;&lt; "h " &lt;&lt; minutos &lt;&lt; "min " &lt;&lt; segundos &lt;&lt; "s\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int total = 3725;
+    int horas = total / 3600;
+    int minutos = total % 3600 / 60;
+    int segundos = total % 60;
+    std::cout &lt;&lt; total &lt;&lt; " segundos = " &lt;&lt; horas &lt;&lt; "h " &lt;&lt; minutos &lt;&lt; "min " &lt;&lt; segundos &lt;&lt; "s\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>+ - * /</code> são as quatro operações; <code>%</code> dá o <strong>resto</strong> da divisão inteira.</li>
+  <li><code>int / int</code> é divisão inteira: corta a parte fracionária (<code>7 / 2</code> = 3, <code>-7 / 2</code> = −3). Com um <code>double</code> na conta, a divisão é real.</li>
+  <li><code>/</code> e <code>%</code> juntos quebram quantidades: minutos em horas e minutos, centavos em reais e centavos.</li>
+  <li>O resto tem o sinal do número da esquerda: <code>-7 % 3</code> = −1. Para testar ímpar, use <code>n % 2 != 0</code>.</li>
+  <li><code>%</code> só funciona com inteiros; com <code>double</code>, use <code>std::fmod</code>.</li>
+  <li>Inteiro dividido por zero: o programa quebra (SIGFPE, código de saída 136 = 128 + 8). <code>double</code> dividido por zero: <code>inf</code>, <code>-inf</code> ou <code>nan</code>.</li>
+  <li><code>* / %</code> antes de <code>+ -</code>; mesma prioridade, da esquerda para a direita. Na dúvida, parênteses.</li>
+  <li><code>^</code> não é potência: use <code>std::pow</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
