@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Inteiros — int, long, unsigned, limites e overflow | Guia C++</title>
+<meta name="description" content="Números inteiros em C++ para quem nunca programou: short, int, long, long long e unsigned, limites com std::numeric_limits, overflow (comportamento indefinido no signed, volta ao zero no unsigned, flagrado com -fsanitize=undefined), int8_t a uint64_t, divisão inteira e literais como 1'000'000, 0x e 0b, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Inteiros</span></h1>
+
+<p class="intro">Números inteiros (sem vírgula) estão em todo programa: quantidade em estoque, idade, pontos de um jogo, número de alunos. O C++ tem uma <strong>família</strong> de tipos inteiros, de tamanhos diferentes, com e sem sinal de menos. Nesta aula você vai conhecer cada um, descobrir os limites reais de cada caixa e ver o que acontece quando um número não cabe: às vezes ele "dá a volta", às vezes o resultado é imprevisível. Também vai entender por que <code>7 / 2</code> dá <code>3</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Os tipos <code>short</code>, <code>int</code>, <code>long</code>, <code>long long</code> e as versões <code>unsigned</code>.</li>
+  <li>Os limites reais de cada um com <code>std::numeric_limits</code>.</li>
+  <li>O que é <strong>overflow</strong> (estouro): comportamento indefinido nos tipos com sinal, "volta ao zero" nos <code>unsigned</code>, e como flagrá-lo com <code>-fsanitize=undefined</code>.</li>
+  <li>Os tipos de tamanho fixo de <code>&lt;cstdint&gt;</code>: <code>std::int8_t</code> … <code>std::uint64_t</code>.</li>
+  <li>A divisão inteira (<code>7 / 2</code>), o resto (<code>%</code>) e a divisão por zero.</li>
+  <li>Como escrever números: <code>1'000'000</code>, <code>0xFF</code>, <code>0b1010</code>, e a pegadinha do zero à esquerda.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>, Linux 64 bits), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: o hodômetro do carro</h2>
+<p>O hodômetro (o contador de quilômetros) de um carro antigo tem um número fixo de rodinhas, por exemplo 5. Ele conta de <code>00000</code> até <code>99999</code>. Rodando mais 1 km depois de <code>99999</code>, ele não mostra <code>100000</code>: não existe a sexta rodinha. Ele volta para <code>00000</code>.</p>
+
+<p>Os inteiros do computador são assim: cada tipo tem um número fixo de "rodinhas" (bits), e por isso um <strong>maior valor possível</strong>. Mais rodinhas, números maiores, mais memória gasta. Escolher o tipo inteiro é escolher quantas rodinhas a sua caixa tem.</p>
+
+<hr>
+
+<h2>1. A família dos inteiros</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Também se escreve</th><th>Bytes (Linux 64 bits)</th><th>Uso típico</th></tr>
+<tr><td><code>short</code></td><td><code>short int</code>, <code>signed short</code></td><td>2</td><td>Raro hoje; economizar memória em listas enormes</td></tr>
+<tr><td><code>int</code></td><td><code>signed</code>, <code>signed int</code></td><td>4</td><td><strong>O padrão</strong> para inteiros: contagens, idades, quantidades</td></tr>
+<tr><td><code>long</code></td><td><code>long int</code></td><td>8 (no Windows e no editor do guia: 4)</td><td>Evite: o tamanho muda de sistema para sistema</td></tr>
+<tr><td><code>long long</code></td><td><code>long long int</code></td><td>8 (garantido: pelo menos 8)</td><td>Números que passam de 2 bilhões</td></tr>
+</table>
+</div>
+
+<p>Todos esses são <strong>com sinal</strong> (<em>signed</em>): guardam negativos e positivos. As palavras <code>short</code> ("curto") e <code>long</code> ("longo") modificam o <code>int</code>, e por isso o <code>int</code> pode ser omitido: <code>long long</code> e <code>long long int</code> são o mesmo tipo. O tamanho de cada um foi medido com <code>sizeof</code> na aula <a href="tipos-dados.html">Tipos de Dados</a>.</p>
+
+<hr>
+
+<h2>2. Os limites: <code>std::numeric_limits</code></h2>
+<p>Para saber o menor e o maior valor de um tipo, não precisa decorar: pergunte ao C++. O cabeçalho <code>&lt;limits&gt;</code> traz o <code>std::numeric_limits</code> ("limites numéricos"):</p>
+
+<pre class="file" data-file="limites.cpp">#include &lt;iostream&gt;
+#include &lt;limits&gt;
+
+int main() {
+    std::cout &lt;&lt; "short:     " &lt;&lt; std::numeric_limits&lt;short&gt;::min()
+              &lt;&lt; " a " &lt;&lt; std::numeric_limits&lt;short&gt;::max() &lt;&lt; "\n";
+    std::cout &lt;&lt; "int:       " &lt;&lt; std::numeric_limits&lt;int&gt;::min()
+              &lt;&lt; " a " &lt;&lt; std::numeric_limits&lt;int&gt;::max() &lt;&lt; "\n";
+    std::cout &lt;&lt; "long:      " &lt;&lt; std::numeric_limits&lt;long&gt;::min()
+              &lt;&lt; " a " &lt;&lt; std::numeric_limits&lt;long&gt;::max() &lt;&lt; "\n";
+    std::cout &lt;&lt; "long long: " &lt;&lt; std::numeric_limits&lt;long long&gt;::min()
+              &lt;&lt; " a " &lt;&lt; std::numeric_limits&lt;long long&gt;::max() &lt;&lt; "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;limits&gt;</dt><dd>Traz o <code>std::numeric_limits</code>.</dd>
+  <dt>std::numeric_limits&lt;int&gt;</dt><dd>"Os limites do tipo <code>int</code>". O tipo vai entre <code>&lt; &gt;</code>; esse jeito de passar um tipo é um <strong>template</strong> (aula <a href="templates-classe.html">Templates de Classe</a>). Por enquanto, leia como "a ficha técnica do <code>int</code>".</dd>
+  <dt>::min() e ::max()</dt><dd>Perguntas feitas à ficha: o menor e o maior valor. O <code>::</code> quer dizer "de dentro de".</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra limites.cpp -o limites
+$ ./limites
+short:     -32768 a 32767
+int:       -2147483648 a 2147483647
+long:      -9223372036854775808 a 9223372036854775807
+long long: -9223372036854775808 a 9223372036854775807</pre>
+
+<p>Em palavras: um <code>int</code> vai de cerca de <strong>menos 2,1 bilhões a mais 2,1 bilhões</strong>; um <code>long long</code>, até cerca de <strong>9,2 quintilhões</strong> (9 seguido de 18 algarismos). Repare que o lado negativo tem um número a mais (<code>-32768</code> × <code>32767</code>): o zero ocupa uma vaga do lado positivo.</p>
+
+<h3>Quando o valor não cabe na caixa</h3>
+<p>A população do mundo (uns 8,1 bilhões) não cabe num <code>int</code>:</p>
+
+<pre class="file" data-file="populacao.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int populacao = 8'100'000'000;
+    std::cout &lt;&lt; "População mundial: " &lt;&lt; populacao &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra populacao.cpp -o populacao
+populacao.cpp: In function ‘int main()’:
+populacao.cpp:4:21: warning: overflow in conversion from ‘long int’ to ‘int’ changes value from ‘8100000000’ to ‘-489934592’ [-Woverflow]
+    4 |     int populacao = 8'100'000'000;
+      |                     ^~~~~~~~~~~~~
+$ ./populacao
+População mundial: -489934592</pre>
+
+<p><em>Overflow in conversion from ‘long int’ to ‘int’ changes value</em> = "estouro na conversão de <code>long</code> para <code>int</code>: muda o valor de 8100000000 para -489934592". O número escrito (<code>8'100'000'000</code>) é grande demais para ser <code>int</code>, então o próprio C++ o tratou como <code>long</code>; ao guardá-lo na caixa de <code>int</code>, as "rodinhas" que sobraram foram perdidas, e o resultado nem é positivo. Os apóstrofos em <code>8'100'000'000</code> são só separadores para facilitar a leitura (seção 7).</p>
+
+<div class="trycpp" data-goal="out:8100000000,semaviso">
+<p class="try-task"><strong>Missão:</strong> troque o <strong>tipo</strong> da variável para um que caiba 8,1 bilhões, rode e confira <code>População mundial: 8100000000</code>, sem avisos. (O Clang do editor avisa com outras palavras: <code>implicit conversion from 'long long' to 'int' changes value</code>. Lá aparece <code>long long</code>, e não <code>long</code>, porque no editor o <code>long</code> tem só 4 bytes.)</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int populacao = 8'100'000'000;
+    std::cout &lt;&lt; "População mundial: " &lt;&lt; populacao &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    long long populacao = 8'100'000'000;
+    std::cout &lt;&lt; "População mundial: " &lt;&lt; populacao &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. <code>unsigned</code>: só positivos</h2>
+<p>Cada tipo inteiro tem uma versão <strong>sem sinal</strong>: <code>unsigned short</code>, <code>unsigned int</code> (ou só <code>unsigned</code>), <code>unsigned long</code>, <code>unsigned long long</code>. Ela não guarda negativos e, em troca, vai duas vezes mais longe nos positivos:</p>
+
+<pre class="term" data-cwd="~/cpp">$ ./limites-unsigned          « o mesmo programa, com os tipos unsigned
+unsigned short:     0 a 65535
+unsigned int:       0 a 4294967295
+unsigned long long: 0 a 18446744073709551615</pre>
+
+<p>Parece ótimo para um estoque, que nunca é negativo. Mas veja o que acontece quando a Ana vende uma peça a mais do que tinha:</p>
+
+<pre class="file" data-file="estoque.cpp">#include &lt;iostream&gt;
+
+int main() {
+    unsigned int estoque = 10;
+    unsigned int vendidos = 11;
+    unsigned int sobrou = estoque - vendidos;
+    std::cout &lt;&lt; "Sobrou: " &lt;&lt; sobrou &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra estoque.cpp -o estoque
+$ ./estoque
+Sobrou: 4294967295             « 10 - 11 deu mais de 4 bilhões</pre>
+
+<p>Como o <code>unsigned</code> não tem o -1, ele "deu a volta" para trás, como o hodômetro rodando de ré: de <code>0</code> pulou para o <strong>maior</strong> valor possível. Nenhum erro, nenhum aviso: só um estoque de 4 bilhões de peças. O mesmo acontece se você puser um negativo direto:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat negativo.cpp
+#include &lt;iostream&gt;
+
+int main() {
+    unsigned int a = -1;
+    std::cout &lt;&lt; a &lt;&lt; "\n";
+}
+$ g++ -std=c++23 -Wall -Wextra negativo.cpp -o negativo
+$ ./negativo
+4294967295
+$ cat negativo2.cpp
+#include &lt;iostream&gt;
+
+int main() {
+    unsigned int b{-1};
+    std::cout &lt;&lt; b &lt;&lt; "\n";
+}
+$ g++ -std=c++23 -Wall -Wextra negativo2.cpp -o negativo2
+negativo2.cpp: In function ‘int main()’:
+negativo2.cpp:4:20: error: narrowing conversion of ‘-1’ from ‘int’ to ‘unsigned int’ [-Wnarrowing]
+    4 |     unsigned int b{-1};
+      |                    ^~</pre>
+
+<p>Com <code>=</code>, silêncio. Com chaves, o compilador barra: <code>-1</code> não cabe num <code>unsigned</code> (o mesmo <em>narrowing</em> da aula <a href="variaveis.html">Variáveis</a>).</p>
+
+<div class="tip">
+<strong>Na dúvida, use <code>int</code></strong>
+<p>"Nunca é negativo" <strong>não</strong> é motivo suficiente para usar <code>unsigned</code>: uma subtração errada vira um número gigante em vez de um negativo fácil de perceber. As diretrizes da comunidade C++ (as <em>C++ Core Guidelines</em>) recomendam <code>int</code> (ou <code>long long</code>) para quantidades e contas, e <code>unsigned</code> só quando você quer mesmo a "volta ao zero" ou trabalha com bits. Você ainda vai encontrar <code>unsigned</code> na biblioteca: o <code>.size()</code> de um <code>std::string</code> devolve um tipo sem sinal (aula <a href="funcoes-string.html">Funções de String</a>).</p>
+</div>
+
+<hr>
+
+<h2>4. Overflow: quando a conta passa do limite</h2>
+<p><strong>Overflow</strong> ("transbordar") é quando o resultado de uma conta não cabe no tipo. O que acontece depende de o tipo ter sinal ou não, e a diferença é importante.</p>
+
+<h3>Com sinal (<code>int</code>, <code>long long</code>…): comportamento indefinido</h3>
+<pre class="file" data-file="overflow.cpp">#include &lt;iostream&gt;
+#include &lt;limits&gt;
+
+int main() {
+    int pontos = std::numeric_limits&lt;int&gt;::max();
+    std::cout &lt;&lt; "Antes: " &lt;&lt; pontos &lt;&lt; "\n";
+    pontos = pontos + 1;
+    std::cout &lt;&lt; "Depois: " &lt;&lt; pontos &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra overflow.cpp -o overflow
+$ ./overflow
+Antes: 2147483647
+Depois: -2147483648            « o maior positivo + 1 virou o menor negativo</pre>
+
+<p>Parece que deu a volta, como o hodômetro. Mas a norma do C++ diz outra coisa: estourar um inteiro <strong>com sinal</strong> é <strong>comportamento indefinido</strong> (<em>undefined behavior</em>, "UB"). Quer dizer que a linguagem não promete <em>nenhum</em> resultado. Desta vez, com estas opções, saiu <code>-2147483648</code>; com otimização ligada, o compilador tem o direito de supor que o estouro nunca acontece e gerar um programa que faz qualquer outra coisa. A aula <a href="comportamento-indefinido.html">Comportamento Indefinido</a> mostra exemplos disso.</p>
+
+<p>Como achar um overflow que não dá erro? Com o <strong>sanitizer de comportamento indefinido</strong>: a opção <code>-fsanitize=undefined</code> ("sanitizar o indefinido") faz o g++ colocar fiscais no programa, que denunciam o problema na hora em que ele acontece:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -fsanitize=undefined overflow.cpp -o overflow
+$ ./overflow
+Antes: 2147483647
+overflow.cpp:7:12: runtime error: signed integer overflow: 2147483647 + 1 cannot be represented in type 'int'
+Depois: -2147483648
+$ echo $?
+0</pre>
+
+<dl class="anatomy">
+  <dt>overflow.cpp:7:12</dt><dd>Arquivo, linha e coluna da conta culpada: <code>pontos + 1</code>, na linha 7.</dd>
+  <dt>runtime error</dt><dd>"Erro em tempo de execução": achado com o programa <strong>rodando</strong>, e não pelo compilador.</dd>
+  <dt>signed integer overflow</dt><dd>"Estouro de inteiro com sinal".</dd>
+  <dt>2147483647 + 1 cannot be represented in type 'int'</dt><dd>"2147483647 + 1 não pode ser representado no tipo <code>int</code>": a conta exata, com os valores daquele momento.</dd>
+</dl>
+
+<p>Por padrão, o sanitizer avisa e deixa o programa continuar (por isso o código de saída foi 0). Ele deixa o programa mais lento, então é ferramenta de teste, não de entrega. Mais em <a href="sanitizers.html">Sanitizers</a>.</p>
+
+<p>Quando a conta é feita só com números escritos no código, o próprio compilador percebe:</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra literal-overflow.cpp -o literal-overflow     « int x = 2147483647 + 1;
+literal-overflow.cpp: In function ‘int main()’:
+literal-overflow.cpp:4:24: warning: integer overflow in expression of type ‘int’ results in ‘-2147483648’ [-Woverflow]
+    4 |     int x = 2147483647 + 1;
+      |             ~~~~~~~~~~~^~~</pre>
+
+<h3>Sem sinal (<code>unsigned</code>): dá a volta, e isso é garantido</h3>
+<pre class="file" data-file="volta.cpp">#include &lt;iostream&gt;
+#include &lt;limits&gt;
+
+int main() {
+    unsigned int contador = std::numeric_limits&lt;unsigned int&gt;::max();
+    std::cout &lt;&lt; "Antes: " &lt;&lt; contador &lt;&lt; "\n";
+    contador = contador + 1;
+    std::cout &lt;&lt; "Depois: " &lt;&lt; contador &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -fsanitize=undefined volta.cpp -o volta
+$ ./volta
+Antes: 4294967295
+Depois: 0                      « o sanitizer ficou quieto: não é erro da linguagem</pre>
+
+<p>Para <code>unsigned</code>, a norma <strong>define</strong> o hodômetro: passou do máximo, volta a 0; passou do 0 para trás, vai ao máximo. Por isso o sanitizer não reclamou. "Definido" não quer dizer "certo para o seu programa": o estoque de 4 bilhões da seção 3 continua sendo um bug.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Com sinal (<code>int</code>…)</th><th>Sem sinal (<code>unsigned</code>…)</th></tr>
+<tr><td>Passou do máximo</td><td>Comportamento indefinido</td><td>Volta para 0 (garantido)</td></tr>
+<tr><td>Passou do mínimo</td><td>Comportamento indefinido</td><td>Vai para o máximo (garantido)</td></tr>
+<tr><td><code>-fsanitize=undefined</code></td><td>Denuncia: <code>signed integer overflow</code></td><td>Fica quieto</td></tr>
+<tr><td>Como evitar</td><td>Escolha um tipo com folga (<code>long long</code>) ou confira antes de somar</td><td>Confira antes de subtrair</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>5. Tipos de tamanho fixo: <code>&lt;cstdint&gt;</code> <span class="versao">C++11</span></h2>
+<p>Como <code>int</code> e <code>long</code> mudam de tamanho de sistema para sistema, o cabeçalho <code>&lt;cstdint&gt;</code> traz tipos com o tamanho <strong>no nome</strong>:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Bits</th><th>Faixa</th></tr>
+<tr><td><code>std::int8_t</code> / <code>std::uint8_t</code></td><td>8</td><td>-128 a 127 / 0 a 255</td></tr>
+<tr><td><code>std::int16_t</code> / <code>std::uint16_t</code></td><td>16</td><td>-32 768 a 32 767 / 0 a 65 535</td></tr>
+<tr><td><code>std::int32_t</code> / <code>std::uint32_t</code></td><td>32</td><td>cerca de ±2,1 bilhões / 0 a 4,29 bilhões</td></tr>
+<tr><td><code>std::int64_t</code> / <code>std::uint64_t</code></td><td>64</td><td>cerca de ±9,2 quintilhões / 0 a 18,4 quintilhões</td></tr>
+</table>
+</div>
+
+<p>Leia o nome assim: <code>u</code> = <em>unsigned</em> (sem sinal), <code>int</code>, o número de bits e <code>_t</code> (de <em>type</em>, tipo).</p>
+
+<pre class="file" data-file="fixos.cpp">#include &lt;cstdint&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::int8_t pequeno = 100;
+    std::int16_t medio = 30000;
+    std::int32_t normal = 2000000000;
+    std::int64_t grande = 9000000000000000000;
+    std::uint8_t byte = 255;
+    std::uint64_t enorme = 18000000000000000000u;
+    std::cout &lt;&lt; sizeof(pequeno) &lt;&lt; " " &lt;&lt; sizeof(medio) &lt;&lt; " " &lt;&lt; sizeof(normal) &lt;&lt; " "
+              &lt;&lt; sizeof(grande) &lt;&lt; " " &lt;&lt; sizeof(byte) &lt;&lt; " " &lt;&lt; sizeof(enorme) &lt;&lt; "\n";
+    std::cout &lt;&lt; medio &lt;&lt; " " &lt;&lt; normal &lt;&lt; " " &lt;&lt; grande &lt;&lt; " " &lt;&lt; enorme &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra fixos.cpp -o fixos
+$ ./fixos
+1 2 4 8 1 8
+30000 2000000000 9000000000000000000 18000000000000000000</pre>
+
+<p>O <code>u</code> no fim de <code>18000000000000000000u</code> diz "este número é sem sinal": sem ele, o número seria grande demais para qualquer tipo com sinal. Repare também que a segunda linha <strong>não</strong> mostra <code>pequeno</code> nem <code>byte</code>. Há um motivo:</p>
+
+<h3>A pegadinha do <code>int8_t</code></h3>
+<pre class="file" data-file="int8.cpp">#include &lt;cstdint&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::int8_t idade = 65;
+    std::cout &lt;&lt; "Idade: " &lt;&lt; idade &lt;&lt; "\n";
+    std::cout &lt;&lt; "Idade: " &lt;&lt; static_cast&lt;int&gt;(idade) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra int8.cpp -o int8
+$ ./int8
+Idade: A                       « 65 virou a letra A
+Idade: 65</pre>
+
+<p>No g++ (e em praticamente todo sistema), <code>std::int8_t</code> é só outro nome para <code>signed char</code>, um tipo de <strong>caractere</strong>. E o <code>std::cout</code> mostra caracteres como letras: o 65 é o código da letra <code>A</code> (a aula <a href="char.html">Caracteres</a> explica a tabela de códigos). Para ver o número, converta para <code>int</code> com <code>static_cast&lt;int&gt;(...)</code> (aula <a href="conversao-tipos.html">Conversão de Tipos</a>). O mesmo vale para <code>std::uint8_t</code>.</p>
+
+<p><strong>Quando usar os tipos fixos?</strong> Quando o tamanho exato importa: arquivos e protocolos com formato definido, contas que precisam de exatamente 64 bits em qualquer sistema. Para o dia a dia, <code>int</code> e <code>long long</code> bastam.</p>
+
+<hr>
+
+<h2>6. Divisão inteira: <code>7 / 2</code> dá 3</h2>
+<p>Quando os <strong>dois</strong> lados de uma divisão são inteiros, o resultado também é inteiro: a parte depois da vírgula é <strong>jogada fora</strong> (não arredondada). O operador <code>%</code> ("módulo") dá o <strong>resto</strong> dessa divisão:</p>
+
+<pre class="file" data-file="divisao.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "7 / 2 = " &lt;&lt; 7 / 2 &lt;&lt; "\n";
+    std::cout &lt;&lt; "7 % 2 = " &lt;&lt; 7 % 2 &lt;&lt; "\n";
+    std::cout &lt;&lt; "-7 / 2 = " &lt;&lt; -7 / 2 &lt;&lt; "\n";
+    std::cout &lt;&lt; "7.0 / 2 = " &lt;&lt; 7.0 / 2 &lt;&lt; "\n";
+    int pizzas = 3;
+    int pessoas = 4;
+    std::cout &lt;&lt; "Cada um come " &lt;&lt; pizzas / pessoas &lt;&lt; " pizza\n";
+    std::cout &lt;&lt; "Cada um come " &lt;&lt; static_cast&lt;double&gt;(pizzas) / pessoas &lt;&lt; " pizza\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra divisao.cpp -o divisao
+$ ./divisao
+7 / 2 = 3
+7 % 2 = 1
+-7 / 2 = -3
+7.0 / 2 = 3.5
+Cada um come 0 pizza
+Cada um come 0.75 pizza</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Conta</th><th>Resultado</th><th>Por quê</th></tr>
+<tr><td><code>7 / 2</code></td><td><code>3</code></td><td>Inteiro com inteiro: 3,5 perde o ,5.</td></tr>
+<tr><td><code>7 % 2</code></td><td><code>1</code></td><td>7 = 2 × 3 + <strong>1</strong>. O resto mostra se um número é par (<code>n % 2</code> dá 0) ou ímpar.</td></tr>
+<tr><td><code>-7 / 2</code></td><td><code>-3</code></td><td>O corte é sempre "em direção ao zero": -3,5 vira -3 (e não -4).</td></tr>
+<tr><td><code>7.0 / 2</code></td><td><code>3.5</code></td><td>Basta um dos lados ser <code>double</code> para a divisão ter vírgula.</td></tr>
+<tr><td><code>pizzas / pessoas</code></td><td><code>0</code></td><td>3 / 4 = 0,75, cortado para 0. O erro clássico.</td></tr>
+<tr><td><code>static_cast&lt;double&gt;(pizzas) / pessoas</code></td><td><code>0.75</code></td><td>Converter um dos lados para <code>double</code> antes de dividir resolve.</td></tr>
+</table>
+</div>
+
+<div class="trycpp" data-goal="out:Média: 7.66667">
+<p class="try-task"><strong>Missão:</strong> as notas da Ana foram 7, 8 e 8, mas o programa diz que a média é <code>7</code>. A variável já é <code>double</code>; o problema está na divisão. Conserte para sair <code>Média: 7.66667</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int soma = 7 + 8 + 8;
+    double media = soma / 3;
+    std::cout &lt;&lt; "Média: " &lt;&lt; media &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int soma = 7 + 8 + 8;
+    double media = soma / 3.0;
+    std::cout &lt;&lt; "Média: " &lt;&lt; media &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<p>Por que <code>double media</code> não bastou? Porque o C++ calcula o lado direito <strong>primeiro</strong> (<code>23 / 3</code>, inteiro com inteiro, dá <code>7</code>) e só depois guarda o resultado na caixa <code>double</code>: o 7 vira 7.0, e a fração já se perdeu. As contas e a ordem delas são assunto de <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>.</p>
+
+<h3>Dividir um inteiro por zero</h3>
+<pre class="file" data-file="zero.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int balas = 10;
+    int criancas = 0;
+    std::cout &lt;&lt; "Dividindo...\n";
+    std::cout &lt;&lt; balas / criancas &lt;&lt; "\n";
+    std::cout &lt;&lt; "Fim\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra zero.cpp -o zero
+$ ./zero
+Dividindo...
+Exceção de ponto flutuante (imagem do núcleo gravada) ./zero
+$ echo $?
+136</pre>
+
+<p>O programa <strong>morreu</strong> na linha 7: o <code>Fim</code> nunca apareceu. Divisão inteira por zero também é comportamento indefinido; no Linux, o processador se recusa a fazer a conta, e o sistema mata o programa. A mensagem vem do bash, em português, e engana: diz "ponto flutuante" (números com vírgula), mas a conta era de inteiros. É só o nome histórico do sinal <code>SIGFPE</code>. O código de saída <code>136</code> é 128 + 8, onde 8 é o número desse sinal. "Imagem do núcleo gravada" (<em>core dumped</em>) quer dizer que o sistema pode ter salvo uma cópia da memória do programa para análise. Com números <code>double</code>, a divisão por zero não mata o programa; veja <a href="ponto-flutuante.html">float e double</a>. Como evitar: confira o divisor antes, com um <a href="if-else.html">if</a>.</p>
+
+<hr>
+
+<h2>7. Como escrever números inteiros (literais)</h2>
+
+<pre class="file" data-file="literais.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int populacao = 1'000'000;
+    int cor = 0xFF;
+    int bits = 0b1010;
+    int octal = 017;
+    long long distancia = 9'460'730'472'580'800LL;
+    unsigned int positivo = 42u;
+    std::cout &lt;&lt; populacao &lt;&lt; " " &lt;&lt; cor &lt;&lt; " " &lt;&lt; bits &lt;&lt; " " &lt;&lt; octal &lt;&lt; "\n";
+    std::cout &lt;&lt; distancia &lt;&lt; " " &lt;&lt; positivo &lt;&lt; "\n";
+    std::cout &lt;&lt; std::hex &lt;&lt; 255 &lt;&lt; " " &lt;&lt; std::oct &lt;&lt; 15 &lt;&lt; " " &lt;&lt; std::dec &lt;&lt; 255 &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra literais.cpp -o literais
+$ ./literais
+1000000 255 10 15
+9460730472580800 42
+ff 17 255</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Vale</th><th>O que é</th></tr>
+<tr><td><code>1'000'000</code> <span class="versao">C++14</span></td><td>1000000</td><td>O apóstrofo <code>'</code> é só um separador visual, como o ponto de "1.000.000" em português. Pode ir em qualquer lugar do número.</td></tr>
+<tr><td><code>0xFF</code></td><td>255</td><td><strong>Hexadecimal</strong> (base 16, dígitos 0–9 e A–F), muito usado para cores e bytes. <code>0x</code> = "hexa".</td></tr>
+<tr><td><code>0b1010</code> <span class="versao">C++14</span></td><td>10</td><td><strong>Binário</strong> (base 2, só 0 e 1). <code>0b</code> = "binário".</td></tr>
+<tr><td><code>017</code></td><td><strong>15</strong> (!)</td><td>Um zero à esquerda quer dizer <strong>octal</strong> (base 8). Não escreva <code>017</code> pensando em 17.</td></tr>
+<tr><td><code>42u</code></td><td>42</td><td>Sufixo <code>u</code>: sem sinal (<code>unsigned</code>).</td></tr>
+<tr><td><code>42L</code> / <code>42LL</code></td><td>42</td><td>Sufixos de <code>long</code> e <code>long long</code>. Use <code>L</code> maiúsculo: o <code>l</code> minúsculo parece o algarismo 1.</td></tr>
+<tr><td><code>8'100'000'000</code></td><td>8100000000</td><td>Sem sufixo, mas grande demais para <code>int</code>: o C++ escolhe sozinho o primeiro tipo em que cabe (<code>long</code> no Linux; <code>long long</code> no editor do guia).</td></tr>
+</table>
+</div>
+
+<p>A última linha da saída mostra o caminho inverso: <code>std::hex</code>, <code>std::oct</code> e <code>std::dec</code> mudam a <strong>base</strong> em que o <code>std::cout</code> escreve os números (hexadecimal, octal, decimal). Mais em <a href="iomanip.html">Formatar com iomanip</a>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>warning: overflow in conversion from ‘long int’ to ‘int’ changes value</code></strong>
+<p><strong>O que significa:</strong> o número escrito não cabe no tipo da variável.</p>
+<p><strong>Como consertar:</strong> use um tipo maior, normalmente <code>long long</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>runtime error: signed integer overflow: … cannot be represented in type 'int'</code></strong>
+<p><strong>O que significa:</strong> o sanitizer flagrou uma conta que estourou um inteiro com sinal, na linha e coluna indicadas. Sem o sanitizer, o mesmo programa daria um número errado, sem aviso nenhum.</p>
+<p><strong>Como consertar:</strong> use um tipo com mais folga (<code>long long</code>) ou confira, antes da conta, se ela cabe (comparando com <code>std::numeric_limits&lt;int&gt;::max()</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>Um <code>unsigned</code> virou um número gigante, como <code>4294967295</code></strong>
+<p><strong>O que significa:</strong> uma subtração deu negativo numa variável sem sinal, e ela "deu a volta".</p>
+<p><strong>Como consertar:</strong> use <code>int</code> para valores que entram em contas de subtração, ou confira se <code>a &gt;= b</code> antes de calcular <code>a - b</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A divisão deu 0 (ou perdeu a parte decimal)</strong>
+<p><strong>O que significa:</strong> os dois lados eram inteiros, então a divisão foi inteira.</p>
+<p><strong>Como consertar:</strong> escreva um lado com ponto (<code>3.0</code>) ou converta: <code>static_cast&lt;double&gt;(a) / b</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Exceção de ponto flutuante (imagem do núcleo gravada)</code>, código 136</strong>
+<p><strong>O que significa:</strong> divisão (ou <code>%</code>) de inteiro por zero.</p>
+<p><strong>Como consertar:</strong> antes de dividir, confira se o divisor é diferente de zero.</p>
+</div>
+
+<div class="cenario">
+<strong>Um <code>int8_t</code> ou <code>uint8_t</code> aparece como letra (ou como um símbolo estranho)</strong>
+<p><strong>O que significa:</strong> esses tipos são tipos de caractere por dentro, e o <code>std::cout</code> os mostra como letras.</p>
+<p><strong>Como consertar:</strong> <code>std::cout &lt;&lt; static_cast&lt;int&gt;(x)</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>int x = 10;</code></td><td>Inteiro com sinal, 4 bytes (±2,1 bilhões)</td></tr>
+<tr><td><code>long long x = 10;</code></td><td>Inteiro com sinal, 8 bytes (±9,2 quintilhões)</td></tr>
+<tr><td><code>unsigned int x = 10;</code></td><td>Sem sinal: 0 a 4,29 bilhões, dá a volta</td></tr>
+<tr><td><code>std::int64_t x = 10;</code></td><td>Exatamente 64 bits (<code>#include &lt;cstdint&gt;</code>)</td></tr>
+<tr><td><code>std::numeric_limits&lt;int&gt;::max()</code></td><td>Maior valor do tipo (<code>#include &lt;limits&gt;</code>)</td></tr>
+<tr><td><code>a / b</code> e <code>a % b</code></td><td>Divisão inteira (corta a fração) e resto</td></tr>
+<tr><td><code>1'000'000</code>, <code>0xFF</code>, <code>0b1010</code></td><td>Separador, hexadecimal, binário</td></tr>
+<tr><td><code>-fsanitize=undefined</code></td><td>Opção do g++ que denuncia overflow com sinal ao rodar</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Divisão inteira</h3>
+<p>Quanto vale <code>17 / 5</code> em C++?</p>
+<div class="ex-code"><input data-answer="3" aria-label="resultado"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Resto</h3>
+<p>Quanto vale <code>17 % 5</code>?</p>
+<div class="ex-code"><input data-answer="2" aria-label="resultado"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. <code>unsigned int a = 5; unsigned int b = 6;</code> Quanto vale <code>a - b</code> (no Linux 64 bits)?</p>
+<label><input type="radio" name="q3"> -1</label>
+<label><input type="radio" name="q3"> 0</label>
+<label><input type="radio" name="q3"> 4294967295</label>
+<label><input type="radio" name="q3"> Erro de compilação</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O que a norma do C++ diz sobre somar 1 ao maior <code>int</code>?</p>
+<label><input type="radio" name="q4"> Sempre dá o menor <code>int</code>, como um hodômetro</label>
+<label><input type="radio" name="q4"> É comportamento indefinido: nenhum resultado é garantido</label>
+<label><input type="radio" name="q4"> Dá 0</label>
+<label><input type="radio" name="q4"> O compilador sempre recusa</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Quanto vale o literal <code>010</code>?</p>
+<label><input type="radio" name="q5"> 10</label>
+<label><input type="radio" name="q5"> 2</label>
+<label><input type="radio" name="q5"> 16</label>
+<label><input type="radio" name="q5"> 8</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Qual é o tipo mais indicado para guardar a distância em quilômetros da Terra ao Sol (cerca de 150 milhões) e somar distâncias de várias viagens?</p>
+<label><input type="radio" name="q6"> <code>long long</code></label>
+<label><input type="radio" name="q6"> <code>short</code></label>
+<label><input type="radio" name="q6"> <code>std::int8_t</code></label>
+<label><input type="radio" name="q6"> <code>unsigned short</code></label>
+</div>
+
+<h3>Missão final: o cronômetro</h3>
+
+<div class="trycpp" data-goal="out:1 h 2 min 5 s,src:%">
+<p class="try-task"><strong>Missão:</strong> a corrida da Ana durou <code>3725</code> segundos. Usando só divisão inteira (<code>/</code>) e resto (<code>%</code>), calcule as horas, os minutos e os segundos e mostre <code>1 h 2 min 5 s</code>. Dica: uma hora tem 3600 segundos; o resto da divisão por 3600 são os segundos que sobram para os minutos.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int total = 3725;
+    // calcule horas, minutos e segundos
+
+    // mostre no formato: 1 h 2 min 5 s
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int total = 3725;
+    int horas = total / 3600;
+    int minutos = total % 3600 / 60;
+    int segundos = total % 60;
+    std::cout &lt;&lt; horas &lt;&lt; " h " &lt;&lt; minutos &lt;&lt; " min " &lt;&lt; segundos &lt;&lt; " s\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Família: <code>short</code> (2 bytes), <code>int</code> (4, o padrão), <code>long</code> (varia), <code>long long</code> (8). Use <code>int</code> no dia a dia e <code>long long</code> para números acima de 2 bilhões.</li>
+  <li><code>std::numeric_limits&lt;T&gt;::min()</code> e <code>::max()</code> dão os limites reais.</li>
+  <li><code>unsigned</code>: só positivos, o dobro de alcance, e dá a volta (10 - 11 = 4294967295). Na dúvida, prefira <code>int</code>.</li>
+  <li>Overflow com sinal é comportamento indefinido; <code>-fsanitize=undefined</code> denuncia (<code>signed integer overflow</code>). Com <code>unsigned</code>, dar a volta é garantido.</li>
+  <li><code>&lt;cstdint&gt;</code>: <code>std::int8_t</code> … <code>std::uint64_t</code> têm tamanho exato. <code>int8_t</code> aparece como letra no <code>cout</code>.</li>
+  <li>Inteiro dividido por inteiro corta a fração (<code>7 / 2</code> = 3); <code>%</code> dá o resto. Divisão por zero mata o programa.</li>
+  <li>Literais: <code>1'000'000</code>, <code>0xFF</code>, <code>0b1010</code>; cuidado com o zero à esquerda (<code>017</code> = 15).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
