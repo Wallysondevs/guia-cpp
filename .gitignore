@@ -1,3 +1,5 @@
 .autoria/
 tools/.cache*
 node_modules/
+tools/.libcxx-eh/
+tools/.llvm-src/
