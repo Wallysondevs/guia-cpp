@@ -165,6 +165,8 @@ $ echo $?
   <dt>what():  bad optional access</dt><dd>A mensagem que a exceção carrega.</dd>
 </dl>
 
+<p>No editor do guia, que usa outra biblioteca padrão (a libc++ do Clang), o mesmo programa mostra <code>Antes</code> e termina com <code>libc++abi: terminating due to uncaught exception of type std::bad_optional_access: bad_optional_access</code>. As palavras mudam; o significado é o mesmo.</p>
+
 <p>Como toda exceção, ela pode ser capturada com <code>try</code>/<code>catch</code> (aula <a href="excecoes.html">Exceções</a>):</p>
 
 <pre class="file" data-file="value_catch.cpp">#include &lt;iostream&gt;
@@ -262,7 +264,7 @@ terminate called after throwing an instance of 'std::bad_variant_access'
   what():  std::get: wrong index for variant
 Abortado                   (imagem do núcleo gravada) ./get_errado</pre>
 
-<p><em>Wrong index for variant</em> = "índice errado para o variant": você pediu o <code>int</code> (posição 0), mas o que está lá é a string (posição 1). Com <code>try</code>/<code>catch (const std::bad_variant_access&amp; e)</code>, o programa mostraria <code>Erro: std::get: wrong index for variant</code> e continuaria. O jeito tranquilo é perguntar antes:</p>
+<p><em>Wrong index for variant</em> = "índice errado para o variant": você pediu o <code>int</code> (posição 0), mas o que está lá é a string (posição 1). Com <code>try</code>/<code>catch (const std::bad_variant_access&amp; e)</code>, o programa mostraria <code>Erro: std::get: wrong index for variant</code> e continuaria (no editor do guia, o <code>e.what()</code> da libc++ diz só <code>bad_variant_access</code>). O jeito tranquilo é perguntar antes:</p>
 
 <pre class="file" data-file="resposta.cpp">#include &lt;iostream&gt;
 #include &lt;string&gt;

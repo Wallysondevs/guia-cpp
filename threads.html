@@ -35,7 +35,9 @@
 
 <div class="warning">
 <strong>Threads não rodam no editor do guia</strong>
-<p>O editor "Experimente" roda o seu programa dentro do navegador, num ambiente (WebAssembly) que não oferece threads. Por isso, os programas com <code>std::thread</code> desta aula aparecem só no terminal do laboratório, com as saídas reais. As caixas de "Experimente" ensinam as partes que funcionam sem threads: a lógica de uma condição de corrida, simulada passo a passo, e a divisão de um trabalho em partes. Para rodar as threads de verdade, use o g++ no seu computador (aula <a href="instalar-linux.html">Instalar no Linux</a>).</p>
+<p>O editor "Experimente" roda o seu programa dentro do navegador, num ambiente (WebAssembly) que não oferece threads. Um programa com <code>std::thread</code> até compila no editor, mas, ao rodar, termina assim (é a mensagem real do editor, que usa a biblioteca libc++ do Clang):</p>
+<pre class="term">libc++abi: terminating due to uncaught exception of type std::__2::system_error: thread constructor failed: Not supported</pre>
+<p>("O construtor da thread falhou: não suportado".) Por isso, os programas com <code>std::thread</code> desta aula aparecem só no terminal do laboratório, com as saídas reais. As caixas de "Experimente" ensinam as partes que funcionam sem threads: a lógica de uma condição de corrida, simulada passo a passo, e a divisão de um trabalho em partes. Para rodar as threads de verdade, use o g++ no seu computador (aula <a href="instalar-linux.html">Instalar no Linux</a>).</p>
 </div>
 
 <p>Os programas foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com o comando padrão <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Todos usam no máximo duas threads além da principal e terminam em menos de um segundo. Você vai precisar de <a href="funcoes.html">Funções</a>, <a href="passagem-referencia.html">Por Valor × Por Referência</a> e <a href="lambdas.html">Lambdas</a>.</p>
