@@ -383,7 +383,7 @@ terminate called after throwing an instance of 'std::invalid_argument'
 Abortado                   (imagem do núcleo gravada) ./ingressos
 $ echo $?
 134</pre>
-<p><strong>O que aconteceu:</strong> o <code>std::stoi</code> recebeu um texto que não começa com número e lançou uma exceção, que ninguém pegou (veja <a href="excecoes.html">Exceções</a>).</p>
+<p><strong>O que aconteceu:</strong> o <code>std::stoi</code> recebeu um texto que não começa com número e lançou uma exceção, que ninguém pegou (veja <a href="excecoes.html">Exceções</a>). No editor do guia, o mesmo erro aparece como <code>libc++abi: terminating due to uncaught exception of type std::invalid_argument: stoi: no conversion</code>, também com o código 134.</p>
 <p><strong>Como resolver:</strong> coloque o <code>stoi</code> dentro de um <code>try</code> com <code>catch (const std::invalid_argument&amp;)</code> e, de quebra, <code>catch (const std::out_of_range&amp;)</code>.</p>
 </div>
 

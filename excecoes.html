@@ -172,6 +172,11 @@ $ echo $?
 <p>As duas primeiras linhas saem em inglês em qualquer sistema: são escritas pela biblioteca do C++. A terceira vem do terminal e segue o idioma do sistema.</p>
 
 <div class="note">
+<strong>No editor do guia, a mensagem é outra</strong>
+<p>O editor usa o Clang com outra biblioteca do C++ (a <strong>libc++</strong>, do projeto LLVM; o g++ usa a <strong>libstdc++</strong>, do projeto GNU). O mesmo programa termina lá com uma linha só: <code>libc++abi: terminating due to uncaught exception of type std::invalid_argument: divisão por zero</code> ("encerrando por causa de uma exceção não pega do tipo…"), e o código de saída também é 134. Palavras diferentes, mesma informação: o tipo da exceção e a mensagem.</p>
+</div>
+
+<div class="note">
 <strong>Linhas de <code>cout</code> podem sumir quando o programa aborta</strong>
 <p>No terminal, o <code>2.5</code> apareceu antes do erro. Mas se a saída do programa for para um arquivo ou outro programa (<code>./semtry &gt; saida.txt</code>), o <code>cout</code> guarda o texto num buffer e o aborto pode impedir que ele seja escrito. Mais um motivo para tratar as exceções.</p>
 </div>
@@ -297,7 +302,7 @@ out_of_range: vector::_M_range_check: __n (which is 10) &gt;= this-&gt;size() (w
 </table>
 </div>
 
-<p>As mensagens do <code>what()</code> da biblioteca são curtas e técnicas (o <code>stoi</code> só diz o próprio nome). Elas servem para o programador. Para o usuário, mostre uma mensagem sua, em português, como nos exemplos abaixo.</p>
+<p>As mensagens do <code>what()</code> da biblioteca são curtas e técnicas (no g++, o <code>stoi</code> só diz o próprio nome; no editor do guia, com a libc++, ele diz <code>stoi: no conversion</code>, "nenhuma conversão"). Elas servem para o programador. Para o usuário, mostre uma mensagem sua, em português, como nos exemplos abaixo.</p>
 
 <h3>Qual lançar nas suas funções</h3>
 <ul>

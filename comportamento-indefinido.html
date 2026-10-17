@@ -32,6 +32,11 @@
 
 <p>Todos os programas desta aula foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, de dois jeitos: com o comando padrão do guia (<code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>) e com <code>-O2</code> no fim, que liga as <strong>otimizações</strong> (veja <a href="compilar.html">Compilar com g++</a>). Os resultados que você vai ver são os daquele dia, naquela máquina. Esse é justamente o ponto: com UB, outro dia ou outra máquina podem dar outra coisa. O editor do guia usa outro compilador (o Clang) e roda o programa de outro jeito, então lá os resultados podem ser diferentes.</p>
 
+<div class="note">
+<strong>No editor do guia, o UB costuma passar calado</strong>
+<p>O editor roda o programa como WebAssembly, dentro do navegador, onde a memória é organizada de outro jeito. Lá, usar um ponteiro nulo <strong>não</strong> derruba o programa (aparece <code>0</code> e ele segue), e índices fora do array e memória já liberada passam sem nenhum sinal. Por isso as falhas desta aula aparecem só nos terminais do laboratório. Nas missões, o objetivo é sempre <strong>corrigir</strong> o código, não ver o crash.</p>
+</div>
+
 <hr>
 
 <h2>A ideia: um contrato com o compilador</h2>
@@ -434,13 +439,13 @@ $ echo $?
 
 <h3>Missão final: a soma das notas</h3>
 <div class="trycpp" data-goal="out:Soma: 34">
-<p class="try-task"><strong>Missão:</strong> o laço passa uma posição do fim do array e soma lixo. Corrija o programa para a saída ser <code>Soma: 34</code>. Você pode só trocar o <code>&lt;=</code>, mas tente a forma mais segura: um <code>std::vector</code> percorrido com <code>for (int n : notas)</code>, sem índice nenhum.</p>
+<p class="try-task"><strong>Missão:</strong> este laço erra duas vezes: começa no 1 (pulando a primeira nota, a da posição 0) e vai até o 4 (uma posição depois do fim). Corrija o programa para a saída ser <code>Soma: 34</code>. Você pode só consertar os limites do <code>for</code>, mas tente a forma mais segura: um <code>std::vector</code> percorrido com <code>for (int n : notas)</code>, sem índice nenhum. No editor, a posição inexistente costuma valer 0 e a soma sai 27; no g++ do terminal, sai lixo. Os dois estão errados.</p>
 <pre class="script">#include &lt;iostream&gt;
 
 int main() {
     int notas[4] = {7, 8, 9, 10};
     int soma = 0;
-    for (int i = 0; i &lt;= 4; ++i) {
+    for (int i = 1; i &lt;= 4; ++i) {
         soma += notas[i];
     }
     std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';

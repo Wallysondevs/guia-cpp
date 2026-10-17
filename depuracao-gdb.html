@@ -176,7 +176,7 @@ Quit anyway? (y or n) y</pre>
 <p><strong>Diagnóstico:</strong> na linha 26, o <code>main</code> buscou <code>"Zeca"</code>, que não está na turma; <code>buscar</code> devolveu <code>nullptr</code>; <code>mostrar</code> usou o ponteiro nulo sem conferir. Sem um único <code>cout</code> a mais no código.</p>
 
 <div class="trycpp" data-goal="out:Ana: 9.5,out:Aluno não encontrado,out:Fim.,exit:0">
-<p class="try-task"><strong>Missão:</strong> corrija o erro que o GDB encontrou: no começo de <code>mostrar</code>, se <code>a</code> for <code>nullptr</code>, mostre <code>Aluno não encontrado</code> e saia da função com <code>return;</code>. O programa deve chegar ao <code>Fim.</code>. (No editor, o programa sem correção pode não quebrar igual ao do terminal, porque o navegador organiza a memória de outro jeito. O erro é o mesmo.)</p>
+<p class="try-task"><strong>Missão:</strong> corrija o erro que o GDB encontrou: no começo de <code>mostrar</code>, se <code>a</code> for <code>nullptr</code>, mostre <code>Aluno não encontrado</code> e saia da função com <code>return;</code>. O programa deve chegar ao <code>Fim.</code>. (No editor, o ponteiro nulo passa calado: em vez da falha de segmentação, aparece uma linha <code>: 0</code> no lugar do Zeca e o programa segue. O erro é o mesmo; só não dá sinal.)</p>
 <pre class="script">#include &lt;iostream&gt;
 #include &lt;string&gt;
 #include &lt;vector&gt;
