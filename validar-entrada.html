@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Validar a Entrada — cin.fail, clear e ignore | Guia C++</title>
+<meta name="description" content="Validar a entrada do usuário em C++ para quem nunca programou: o que acontece quando o cin recebe letras no lugar de número (cin.fail), o laço infinito clássico, cin.clear() e cin.ignore(), repetir até digitar um número válido, ler a linha inteira com getline e converter com std::stoi dentro de try, e conferir faixas válidas, com sessões reais e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Validar a Entrada</span></h1>
+
+<p class="intro">Você pede a idade e o usuário digita <code>vinte</code>. Pede um número de 1 a 12 e ele digita <code>13</code>. Pede a quantidade e recebe <code>12 cadernos</code>. Usuários erram (e às vezes testam de propósito), e um programa de verdade não pode quebrar, travar ou seguir com valores errados por causa disso. Nesta aula você vai ver o que o <code>std::cin</code> faz quando recebe algo inesperado, como colocá-lo de pé de novo e como escrever um laço que só aceita respostas válidas.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que acontece com <code>std::cin &gt;&gt; idade</code> quando a pessoa digita letras: <code>cin.fail()</code>.</li>
+  <li>Por que um <code>cin</code> em estado de falha cria um laço infinito.</li>
+  <li>Como recuperar o <code>cin</code>: <code>cin.clear()</code> e <code>cin.ignore(…)</code>.</li>
+  <li>Como repetir a pergunta até receber um número válido e dentro da faixa.</li>
+  <li>O jeito mais robusto: ler a linha inteira com <code>getline</code> e converter com <code>std::stoi</code> dentro de <code>try</code>.</li>
+  <li>O que fazer quando a entrada acaba (<kbd>Ctrl</kbd>+<kbd>D</kbd>).</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Nas sessões de terminal, o que vem depois de cada pergunta é o que a Ana digitou. No editor do guia, as respostas já vêm preparadas na caixa (você vai ver as entradas erradas de propósito).</p>
+
+<hr>
+
+<h2>A ideia: o porteiro que confere o ingresso</h2>
+<p>Na entrada de um show, o porteiro não deixa passar qualquer papel. Ele confere: é um ingresso? É deste show? É de hoje? Se algo está errado, ele explica o problema e pede de novo; não deixa a pessoa entrar "mais ou menos".</p>
+
+<p>Validar a entrada é colocar um porteiro na frente do seu programa. Toda informação que vem de fora (teclado, arquivo, rede) passa por duas conferências:</p>
+<ol>
+  <li><strong>Formato</strong>: é mesmo um número? (<code>vinte</code> não é; <code>12 cadernos</code> também não é só um número.)</li>
+  <li><strong>Faixa</strong>: o número faz sentido? (Idade <code>-5</code> ou <code>200</code>, mês <code>13</code>, não fazem.)</li>
+</ol>
+
+<hr>
+
+<h2>1. Quando o <code>cin</code> falha</h2>
+<p>Veja o que acontece quando a Ana digita uma palavra onde o programa espera um número:</p>
+
+<pre class="file" data-file="idade.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int idade = -1;
+    int ano = -1;
+    std::cout &lt;&lt; "Sua idade: ";
+    std::cin &gt;&gt; idade;
+    std::cout &lt;&lt; "Ano de nascimento: ";
+    std::cin &gt;&gt; ano;
+
+    std::cout &lt;&lt; "\nidade = " &lt;&lt; idade &lt;&lt; ", ano = " &lt;&lt; ano &lt;&lt; '\n';
+    std::cout &lt;&lt; "cin.fail() = " &lt;&lt; std::cin.fail() &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra idade.cpp -o idade
+$ ./idade
+Sua idade: vinte
+Ano de nascimento:                « o programa não esperou a Ana digitar o ano!
+idade = 0, ano = -1
+cin.fail() = 1</pre>
+
+<p>Três coisas estranhas aconteceram:</p>
+<ol>
+  <li><strong><code>idade</code> virou 0.</strong> O <code>&gt;&gt;</code> tentou ler um <code>int</code>, encontrou a letra <code>v</code> e desistiu. Desde o C++11, quando a leitura falha, ele guarda <code>0</code> na variável.</li>
+  <li><strong>O <code>cin</code> entrou em estado de falha</strong>, e <code>std::cin.fail()</code> passou a responder <code>1</code> (verdadeiro). A palavra <code>vinte</code> <strong>continua lá</strong>, esperando para ser lida.</li>
+  <li><strong>A segunda leitura nem tentou.</strong> Um <code>cin</code> em estado de falha ignora todas as leituras seguintes, sem esperar o teclado e sem mexer na variável. Por isso <code>ano</code> continuou com o <code>-1</code> do começo.</li>
+</ol>
+
+<p>É como um caixa de supermercado que travou: enquanto ninguém destravar, nenhuma compra passa. O <code>cin</code> não destrava sozinho.</p>
+
+<h3>O laço infinito clássico</h3>
+<p>Agora imagine isso dentro de um menu, que repete até a pessoa escolher "Sair":</p>
+
+<pre class="file" data-file="menu.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int opcao = 0;
+    int voltas = 0;
+    while (opcao != 3) {
+        std::cout &lt;&lt; "1) Ver saldo  2) Depositar  3) Sair\nOpção: ";
+        std::cin &gt;&gt; opcao;
+        ++voltas;
+        if (opcao == 1) std::cout &lt;&lt; "Saldo: R$ 100\n";
+        else if (opcao == 2) std::cout &lt;&lt; "Depósito feito\n";
+    }
+    std::cout &lt;&lt; "Até logo! (" &lt;&lt; voltas &lt;&lt; " voltas)\n";
+}
+</pre>
+
+<p>Se alguém digitar <code>x</code>, o <code>cin</code> falha, <code>opcao</code> vira 0, e o laço volta a perguntar. Mas o <code>cin</code> travado não espera mais nada, então o laço gira sem parar, enchendo a tela. Para ver sem travar o terminal, rodamos com <code>timeout 3</code> (mata o programa em 3 segundos) e <code>head</code> (mostra só o começo):</p>
+
+<pre class="term">$ printf "x\n" | timeout 3 ./menu | head -8
+1) Ver saldo  2) Depositar  3) Sair
+Opção: 1) Ver saldo  2) Depositar  3) Sair
+Opção: 1) Ver saldo  2) Depositar  3) Sair
+Opção: 1) Ver saldo  2) Depositar  3) Sair
+Opção: 1) Ver saldo  2) Depositar  3) Sair
+Opção: 1) Ver saldo  2) Depositar  3) Sair
+Opção: 1) Ver saldo  2) Depositar  3) Sair
+Opção: 1) Ver saldo  2) Depositar  3) Sair
+$ printf "x\n" | timeout 3 ./menu | wc -l
+45366933                          « 45 milhões de linhas em 3 segundos</pre>
+
+<p>O <code>printf "x\n" |</code> entrega a letra <code>x</code> ao programa como se alguém a digitasse. Se isso acontecer com você no terminal, aperte <kbd>Ctrl</kbd>+<kbd>C</kbd> para parar o programa.</p>
+
+<hr>
+
+<h2>2. Destravar: <code>cin.clear()</code> e <code>cin.ignore()</code></h2>
+<p>Para recuperar o <code>cin</code> são precisos <strong>dois</strong> passos, sempre nesta ordem:</p>
+
+<pre class="file" data-file="corrigir.cpp">#include &lt;iostream&gt;
+#include &lt;limits&gt;
+
+int main() {
+    int idade = 0;
+    std::cout &lt;&lt; "Sua idade: ";
+    std::cin &gt;&gt; idade;
+
+    if (std::cin.fail()) {
+        std::cout &lt;&lt; "Isso não é um número.\n";
+        std::cin.clear();
+        std::cin.ignore(std::numeric_limits&lt;std::streamsize&gt;::max(), '\n');
+        std::cout &lt;&lt; "Tente de novo: ";
+        std::cin &gt;&gt; idade;
+    }
+    std::cout &lt;&lt; "Idade: " &lt;&lt; idade &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra corrigir.cpp -o corrigir
+$ ./corrigir
+Sua idade: vinte
+Isso não é um número.
+Tente de novo: 29
+Idade: 29</pre>
+
+<dl class="anatomy">
+  <dt>std::cin.fail()</dt><dd>Pergunta: "a última leitura falhou?". Verdadeiro quando o que foi digitado não servia para o tipo da variável.</dd>
+  <dt>std::cin.clear();</dt><dd><strong>Passo 1: destravar.</strong> Limpa o estado de falha (<em>clear</em> = "limpar"). Depois disso, o <code>cin</code> volta a aceitar leituras. Mas o <code>vinte</code> continua lá, e a próxima leitura daria de cara com ele de novo.</dd>
+  <dt>std::cin.ignore(std::numeric_limits&lt;std::streamsize&gt;::max(), '\n');</dt><dd><strong>Passo 2: jogar fora o que sobrou.</strong> <code>ignore</code> descarta caracteres até encontrar o <code>'\n'</code> (o <kbd>Enter</kbd>), inclusive. O primeiro argumento é o máximo de caracteres a descartar, e <code>std::numeric_limits&lt;std::streamsize&gt;::max()</code> é "o maior número possível", ou seja, "sem limite". Precisa de <code>#include &lt;limits&gt;</code>.</dd>
+</dl>
+
+<div class="warning">
+<strong>A ordem importa: primeiro <code>clear</code>, depois <code>ignore</code></strong>
+<p>Com o <code>cin</code> em falha, <strong>tudo</strong> é ignorado, inclusive o próprio <code>ignore</code>. Se você chamar o <code>ignore</code> antes do <code>clear</code>, ele não faz nada, e o <code>vinte</code> continua lá.</p>
+</div>
+
+<p>Esse programa só dá uma segunda chance. Se a Ana errar de novo, a idade fica 0. Para insistir até acertar, precisamos de um laço.</p>
+
+<hr>
+
+<h2>3. Repetir até receber um número válido</h2>
+
+<pre class="file" data-file="laco.cpp">#include &lt;iostream&gt;
+#include &lt;limits&gt;
+
+int main() {
+    int idade = 0;
+    std::cout &lt;&lt; "Sua idade: ";
+    while (!(std::cin &gt;&gt; idade) || idade &lt; 0 || idade &gt; 130) {
+        if (std::cin.eof()) {
+            std::cout &lt;&lt; "\nEntrada encerrada.\n";
+            return 1;
+        }
+        if (std::cin.fail()) {
+            std::cout &lt;&lt; "Digite um número inteiro.\n";
+            std::cin.clear();
+            std::cin.ignore(std::numeric_limits&lt;std::streamsize&gt;::max(), '\n');
+        } else {
+            std::cout &lt;&lt; "A idade deve estar entre 0 e 130.\n";
+        }
+        std::cout &lt;&lt; "Sua idade: ";
+    }
+    std::cout &lt;&lt; "Idade registrada: " &lt;&lt; idade &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra laco.cpp -o laco
+$ ./laco
+Sua idade: abc
+Digite um número inteiro.
+Sua idade: -5
+A idade deve estar entre 0 e 130.
+Sua idade: 200
+A idade deve estar entre 0 e 130.
+Sua idade: 29
+Idade registrada: 29</pre>
+
+<dl class="anatomy">
+  <dt>while (!(std::cin &gt;&gt; idade) || idade &lt; 0 || idade &gt; 130)</dt><dd>A condição faz a leitura <strong>e</strong> as duas conferências. O <code>std::cin &gt;&gt; idade</code> devolve o próprio <code>cin</code>, que vale "falso" se a leitura falhou; o <code>!</code> inverte. Leia assim: "enquanto a leitura falhar <strong>ou</strong> a idade for menor que 0 <strong>ou</strong> maior que 130, repita". Graças ao <code>||</code> (veja <a href="operadores-logicos.html">Operadores Lógicos</a>), se a leitura falhou, as comparações nem são feitas.</dd>
+  <dt>if (std::cin.eof())</dt><dd>A entrada <strong>acabou</strong> (veja abaixo). Não adianta perguntar de novo: o programa desiste com código 1.</dd>
+  <dt>if (std::cin.fail()) { … } else { … }</dt><dd>Separa os dois problemas: formato errado (destrava e descarta) e faixa errada (o número foi lido direitinho, só não serve).</dd>
+</dl>
+
+<div class="trycpp" data-stdin="oito&#10;11&#10;8.5&#10;" data-goal="out:Nota registrada: 8.5,src:clear,src:ignore">
+<p class="try-task"><strong>Missão:</strong> a caixa vai "digitar" <code>oito</code>, depois <code>11</code>, depois <code>8.5</code>. Do jeito que está, o programa aceita a primeira resposta e registra nota 0. Transforme a leitura num laço, como o <code>laco.cpp</code>, que recusa o que não é número (com <code>clear</code> e <code>ignore</code>) e o que está fora da faixa de 0 a 10, até registrar <code>8.5</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;limits&gt;
+
+int main() {
+    double nota = 0.0;
+    std::cout &lt;&lt; "Nota (0 a 10): ";
+    std::cin &gt;&gt; nota;
+    // transforme a leitura acima num laço que só termina com uma nota válida
+
+    std::cout &lt;&lt; "Nota registrada: " &lt;&lt; nota &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;limits&gt;
+
+int main() {
+    double nota = 0.0;
+    std::cout &lt;&lt; "Nota (0 a 10): ";
+    while (!(std::cin &gt;&gt; nota) || nota &lt; 0 || nota &gt; 10) {
+        if (std::cin.eof()) {
+            return 1;
+        }
+        if (std::cin.fail()) {
+            std::cout &lt;&lt; "Digite um número.\n";
+            std::cin.clear();
+            std::cin.ignore(std::numeric_limits&lt;std::streamsize&gt;::max(), '\n');
+        } else {
+            std::cout &lt;&lt; "A nota vai de 0 a 10.\n";
+        }
+        std::cout &lt;&lt; "Nota (0 a 10): ";
+    }
+    std::cout &lt;&lt; "Nota registrada: " &lt;&lt; nota &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<h3>Quando a entrada acaba: <kbd>Ctrl</kbd>+<kbd>D</kbd></h3>
+<p>No Linux, apertar <kbd>Ctrl</kbd>+<kbd>D</kbd> numa linha vazia diz ao programa "a entrada acabou" (<em>end of file</em>, "fim do arquivo"). O mesmo acontece quando a entrada vem de um arquivo ou de um <code>printf … |</code> e as linhas terminam. Depois disso, nenhuma leitura vai dar certo: o <code>clear</code> destrava, mas não há mais nada para ler. Sem o teste do <code>eof()</code>, o <code>laco.cpp</code> viraria um laço infinito. Com ele:</p>
+
+<pre class="term">$ ./laco
+Sua idade: abc
+Digite um número inteiro.
+Sua idade:                     « aqui a Ana apertou Ctrl+D
+Entrada encerrada.
+$ echo $?
+1</pre>
+
+<hr>
+
+<h2>4. O que sobra na linha</h2>
+<p>O <code>&gt;&gt;</code> lê <strong>o maior pedaço que serve</strong> e para no primeiro caractere que não serve. Isso engana:</p>
+
+<pre class="file" data-file="sobra.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    int quantidade = 0;
+    std::string resto;
+    std::cout &lt;&lt; "Quantidade: ";
+    std::cin &gt;&gt; quantidade;
+    std::getline(std::cin, resto);
+    std::cout &lt;&lt; "quantidade = " &lt;&lt; quantidade &lt;&lt; ", sobrou [" &lt;&lt; resto &lt;&lt; "]\n";
+}
+</pre>
+<pre class="term">$ ./sobra
+Quantidade: 12 cadernos
+quantidade = 12, sobrou [ cadernos]
+$ ./sobra
+Quantidade: 3.7
+quantidade = 3, sobrou [.7]</pre>
+
+<p>Nos dois casos, o <code>cin</code> <strong>não falhou</strong>: ele achou um número no começo e ficou feliz. <code>12 cadernos</code> virou 12 e <code>3.7</code> virou 3, e o resto ficou esperando, pronto para atrapalhar a próxima leitura. O <code>laco.cpp</code> aceitaria <code>29 anos</code> como 29. Às vezes tudo bem; quando não estiver, o jeito da próxima seção resolve.</p>
+
+<hr>
+
+<h2>5. O jeito mais robusto: linha inteira + <code>std::stoi</code></h2>
+<p>Em vez de deixar o <code>&gt;&gt;</code> decidir o que ler, leia <strong>a linha inteira</strong> com <code>std::getline</code> (veja <a href="getline.html">Ler uma Linha</a>) e converta você mesmo com <code>std::stoi</code> (veja <a href="string-numero.html">Texto ↔ Número</a>). Vantagens: o <code>cin</code> nunca entra em falha (um texto sempre "serve" para um <code>std::string</code>), nada sobra na linha, e os erros de conversão chegam como <a href="excecoes.html">exceções</a>, que você trata com <code>try</code>/<code>catch</code>.</p>
+
+<pre class="file" data-file="linha.cpp">#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+
+// Lê uma linha e devolve o número; repete até ser válido e estar entre min e max.
+int ler_inteiro(const std::string&amp; pergunta, int min, int max) {
+    std::string linha;
+    while (true) {
+        std::cout &lt;&lt; pergunta;
+        if (!std::getline(std::cin, linha)) {
+            throw std::runtime_error("a entrada acabou");
+        }
+        try {
+            std::size_t usados = 0;
+            int n = std::stoi(linha, &amp;usados);
+            if (usados != linha.size()) {
+                std::cout &lt;&lt; "Só o número, por favor.\n";
+            } else if (n &lt; min || n &gt; max) {
+                std::cout &lt;&lt; "Digite um valor entre " &lt;&lt; min &lt;&lt; " e " &lt;&lt; max &lt;&lt; ".\n";
+            } else {
+                return n;
+            }
+        } catch (const std::invalid_argument&amp;) {
+            std::cout &lt;&lt; "Isso não é um número.\n";
+        } catch (const std::out_of_range&amp;) {
+            std::cout &lt;&lt; "Número grande demais.\n";
+        }
+    }
+}
+
+int main() {
+    int idade = ler_inteiro("Sua idade: ", 0, 130);
+    int mes = ler_inteiro("Mês do aniversário (1-12): ", 1, 12);
+    std::cout &lt;&lt; "Idade " &lt;&lt; idade &lt;&lt; ", aniversário no mês " &lt;&lt; mes &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra linha.cpp -o linha
+$ ./linha
+Sua idade: abc
+Isso não é um número.
+Sua idade: 29 anos
+Só o número, por favor.
+Sua idade: 99999999999
+Número grande demais.
+Sua idade: 200
+Digite um valor entre 0 e 130.
+Sua idade: 29
+Mês do aniversário (1-12): 13
+Digite um valor entre 1 e 12.
+Mês do aniversário (1-12): 7
+Idade 29, aniversário no mês 7</pre>
+
+<dl class="anatomy">
+  <dt>int ler_inteiro(const std::string&amp; pergunta, int min, int max)</dt><dd>Toda a validação numa <a href="funcoes.html">função</a>, reaproveitada para a idade e para o mês. Escreva uma vez, use sempre.</dd>
+  <dt>if (!std::getline(std::cin, linha))</dt><dd>Se nem a linha deu para ler, a entrada acabou: em vez de repetir para sempre, a função lança uma <code>std::runtime_error</code>.</dd>
+  <dt>std::stoi(linha, &amp;usados)</dt><dd>Converte o texto para <code>int</code>. O segundo argumento, opcional, recebe <strong>quantos caracteres</strong> foram usados na conversão. Em <code>"29 anos"</code>, só 2 dos 7 foram usados.</dd>
+  <dt>if (usados != linha.size())</dt><dd>Sobrou algo depois do número: recusa. É isso que barra o <code>29 anos</code>, que o <code>&gt;&gt;</code> aceitaria.</dd>
+  <dt>catch (const std::invalid_argument&amp;)</dt><dd>O <code>stoi</code> lança esta quando o texto não começa com número (<code>abc</code>). Como não usamos a variável da exceção, ela nem ganhou nome.</dd>
+  <dt>catch (const std::out_of_range&amp;)</dt><dd>E esta quando o número não cabe num <code>int</code> (<code>99999999999</code>).</dd>
+</dl>
+
+<p>Sem o <code>try</code>, o primeiro <code>abc</code> derrubaria o programa (veja a missão final). Repare também: o <code>stoi</code> aceita espaços <strong>antes</strong> do número (<code>" 29"</code> vira 29), mas não depois, por causa do nosso teste com <code>usados</code>.</p>
+
+<hr>
+
+<h2>Qual forma usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Vantagens</th><th>Cuidados</th></tr>
+<tr><td><code>cin &gt;&gt; x</code> + <code>fail</code>/<code>clear</code>/<code>ignore</code></td><td>Curta; lê vários números na mesma linha (<code>3 4 5</code>).</td><td>Aceita "lixo" depois do número (<code>12 cadernos</code>); fácil esquecer o <code>clear</code> e travar.</td></tr>
+<tr><td><code>getline</code> + <code>std::stoi</code>/<code>std::stod</code> em <code>try</code></td><td>Confere a linha inteira; o <code>cin</code> nunca trava; não sobra nada para a próxima leitura.</td><td>Um pouco mais de código (por isso vale uma função como <code>ler_inteiro</code>).</td></tr>
+</table>
+</div>
+
+<p>Para programas interativos (menus, cadastros), prefira <strong><code>getline</code> + conversão</strong>. Ele também evita a armadilha de misturar <code>cin &gt;&gt;</code> com <code>getline</code>, explicada em <a href="getline.html">Ler uma Linha</a>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>O programa "pula" as perguntas seguintes</strong>
+<p><strong>O que aconteceu:</strong> uma leitura com <code>&gt;&gt;</code> falhou e o <code>cin</code> ficou em estado de falha. Todas as leituras seguintes são ignoradas (como o <code>Ano de nascimento:</code> do <code>idade.cpp</code>).</p>
+<p><strong>Como resolver:</strong> teste <code>std::cin.fail()</code> depois de ler, e destrave com <code>clear()</code> + <code>ignore(…)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A tela enche com a mesma pergunta, sem parar</strong>
+<p><strong>O que aconteceu:</strong> o laço pergunta de novo, mas o <code>cin</code> continua em falha (faltou o <code>clear</code>), ou o texto errado continua lá (faltou o <code>ignore</code>), ou a entrada acabou (faltou testar o <code>eof()</code>).</p>
+<p><strong>Como resolver:</strong> <kbd>Ctrl</kbd>+<kbd>C</kbd> para parar. Depois confira os três itens, ou troque para <code>getline</code> + <code>stoi</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"terminate called after throwing an instance of 'std::invalid_argument'" com <code>what(): stoi</code></strong>
+<pre class="term">$ ./ingressos
+Quantos ingressos (1 a 6)? dois
+terminate called after throwing an instance of 'std::invalid_argument'
+  what():  stoi
+Abortado                   (imagem do núcleo gravada) ./ingressos
+$ echo $?
+134</pre>
+<p><strong>O que aconteceu:</strong> o <code>std::stoi</code> recebeu um texto que não começa com número e lançou uma exceção, que ninguém pegou (veja <a href="excecoes.html">Exceções</a>).</p>
+<p><strong>Como resolver:</strong> coloque o <code>stoi</code> dentro de um <code>try</code> com <code>catch (const std::invalid_argument&amp;)</code> e, de quebra, <code>catch (const std::out_of_range&amp;)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Esqueci o <code>#include &lt;limits&gt;</code> e compilou mesmo assim</strong>
+<p><strong>O que aconteceu:</strong> no g++ 15, o <code>&lt;iostream&gt;</code> traz o <code>&lt;limits&gt;</code> "de carona", e o <code>std::numeric_limits</code> funciona sem o <code>#include</code>. Em outro compilador ou outra versão, o mesmo código pode dar <code>error: ‘numeric_limits’ is not a member of ‘std’</code>.</p>
+<p><strong>Como resolver:</strong> inclua sempre o cabeçalho de tudo o que você usa: <code>#include &lt;limits&gt;</code> para o <code>numeric_limits</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Significado</th></tr>
+<tr><td><code>if (std::cin &gt;&gt; x)</code></td><td>Lê e testa: verdadeiro se a leitura deu certo.</td></tr>
+<tr><td><code>std::cin.fail()</code></td><td>A última leitura falhou (formato errado ou fim da entrada).</td></tr>
+<tr><td><code>std::cin.eof()</code></td><td>A entrada acabou (<kbd>Ctrl</kbd>+<kbd>D</kbd>, fim do arquivo).</td></tr>
+<tr><td><code>std::cin.clear();</code></td><td>Destrava o <code>cin</code> (limpa o estado de falha).</td></tr>
+<tr><td><code>std::cin.ignore(std::numeric_limits&lt;std::streamsize&gt;::max(), '\n');</code></td><td>Descarta o resto da linha. Precisa de <code>&lt;limits&gt;</code>.</td></tr>
+<tr><td><code>std::getline(std::cin, linha)</code></td><td>Lê a linha inteira como texto.</td></tr>
+<tr><td><code>std::stoi(texto, &amp;usados)</code></td><td>Converte para <code>int</code> e diz quantos caracteres usou. Lança <code>invalid_argument</code> ou <code>out_of_range</code>.</td></tr>
+<tr><td><code>std::stod(texto)</code></td><td>O mesmo, para <code>double</code>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Destravar</h3>
+<p>Complete o primeiro passo para tirar o <code>cin</code> do estado de falha:</p>
+<div class="ex-code">if (std::cin.fail()) { <input data-answer="std::cin.clear();" aria-label="passo 1"> std::cin.ignore(std::numeric_limits&lt;std::streamsize&gt;::max(), '\n'); }</div>
+</div>
+
+<div class="exercise">
+<h3>2. Conferir a faixa</h3>
+<p>Complete a condição do laço que repete enquanto a leitura falhar ou o mês estiver fora de 1 a 12:</p>
+<div class="ex-code">while (!(std::cin &gt;&gt; mes) || <input data-answer="mes &lt; 1 \|\| mes &gt; 12|mes &lt;= 0 \|\| mes &gt;= 13|mes &gt; 12 \|\| mes &lt; 1" aria-label="condição de faixa">) { … }</div>
+</div>
+
+<div class="exercise">
+<h3>3. Converter a linha</h3>
+<p>Complete para converter o texto <code>linha</code> num <code>int</code>:</p>
+<div class="ex-code">int n = <input data-answer="std::stoi(linha)" aria-label="conversão">;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Com <code>int q; std::cin &gt;&gt; q;</code>, a pessoa digita <code>12 cadernos</code>. O que acontece?</p>
+<label><input type="radio" name="q4"> O <code>cin</code> falha e <code>q</code> vale 0.</label>
+<label><input type="radio" name="q4"> <code>q</code> vale 12 e <code> cadernos</code> fica esperando a próxima leitura.</label>
+<label><input type="radio" name="q4"> O programa lança uma exceção.</label>
+<label><input type="radio" name="q4"> <code>q</code> vale 12 e o resto é descartado sozinho.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Por que o <code>clear()</code> tem de vir antes do <code>ignore()</code>?</p>
+<label><input type="radio" name="q5"> Por ordem alfabética.</label>
+<label><input type="radio" name="q5"> Porque o <code>ignore()</code> apaga o estado de falha.</label>
+<label><input type="radio" name="q5"> Porque, com o <code>cin</code> em falha, o próprio <code>ignore()</code> é ignorado.</label>
+<label><input type="radio" name="q5"> Tanto faz a ordem.</label>
+</div>
+
+<h3>Missão final: venda de ingressos</h3>
+<div class="trycpp" data-stdin="dois&#10;0&#10;3&#10;" data-goal="out:Total: R$ 60,src:catch,exit:0">
+<p class="try-task"><strong>Missão:</strong> a caixa vai digitar <code>dois</code>, depois <code>0</code>, depois <code>3</code>. Rode e veja o programa abortar no <code>dois</code>. Coloque a leitura num laço que repete enquanto a resposta não for um número de 1 a 6: o <code>std::stoi</code> vai dentro de um <code>try</code>, e o <code>catch</code> mostra uma mensagem e deixa o laço continuar. No fim deve aparecer <code>Total: R$ 60</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string linha;
+    int ingressos = 0;
+    std::cout &lt;&lt; "Quantos ingressos (1 a 6)? ";
+    std::getline(std::cin, linha);
+    ingressos = std::stoi(linha);
+    std::cout &lt;&lt; "Total: R$ " &lt;&lt; ingressos * 20 &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string linha;
+    int ingressos = 0;
+    while (true) {
+        std::cout &lt;&lt; "Quantos ingressos (1 a 6)? ";
+        if (!std::getline(std::cin, linha)) {
+            return 1;
+        }
+        try {
+            ingressos = std::stoi(linha);
+            if (ingressos &gt;= 1 &amp;&amp; ingressos &lt;= 6) {
+                break;
+            }
+            std::cout &lt;&lt; "Entre 1 e 6, por favor.\n";
+        } catch (const std::exception&amp;) {
+            std::cout &lt;&lt; "Digite um número.\n";
+        }
+    }
+    std::cout &lt;&lt; "Total: R$ " &lt;&lt; ingressos * 20 &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Toda entrada vinda de fora deve ser conferida em <strong>formato</strong> (é número?) e <strong>faixa</strong> (faz sentido?).</li>
+  <li>Quando <code>cin &gt;&gt; x</code> recebe algo que não serve, <code>x</code> vira 0, <code>cin.fail()</code> fica verdadeiro e <strong>todas</strong> as leituras seguintes são ignoradas.</li>
+  <li>Para recuperar: <code>std::cin.clear();</code> e depois <code>std::cin.ignore(std::numeric_limits&lt;std::streamsize&gt;::max(), '\n');</code>.</li>
+  <li>Repita com <code>while (!(std::cin &gt;&gt; x) || fora_da_faixa)</code>, e teste <code>cin.eof()</code> para não girar para sempre.</li>
+  <li>O <code>&gt;&gt;</code> aceita o começo numérico (<code>12 cadernos</code> → 12) e deixa o resto.</li>
+  <li>O jeito mais robusto: <code>getline</code> + <code>std::stoi</code> em <code>try</code>, conferindo se a linha inteira foi usada.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
