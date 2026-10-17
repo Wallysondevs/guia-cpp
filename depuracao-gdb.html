@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Depurar com o GDB — break, next, print e backtrace | Guia C++</title>
+<meta name="description" content="Depurar programas C++ com o GDB para quem nunca programou: compilar com -g e -O0, rodar dentro do gdb, achar a linha de uma falha de segmentação com backtrace, pausar com break, andar linha a linha com next e step, olhar variáveis com print, continue, finish e quit, com sessões reais do gdb 17 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Depurar com o GDB</span></h1>
+
+<p class="intro">O programa quebrou com "Falha de segmentação" e não disse onde. Ou a média deu 8 quando deveria dar 8,33. Você pode encher o código de <code>std::cout</code> para descobrir o que está acontecendo, ou pode usar um <strong>depurador</strong>: um programa que roda o seu programa em câmera lenta, deixa você parar em qualquer linha e olhar o valor de cada variável. No Linux, o depurador clássico é o <strong>GDB</strong> (<em>GNU Debugger</em>). Nesta aula você vai usá-lo para achar a linha exata de um crash e para caçar um erro de conta, passo a passo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como preparar o programa para depuração: <code>-g</code> e sem otimização (<code>-O0</code>).</li>
+  <li>Como rodar dentro do GDB (<code>gdb ./programa</code>, <code>run</code>) e achar a linha de um crash com <code>backtrace</code>.</li>
+  <li>Como olhar variáveis com <code>print</code> e trocar de função com <code>frame</code>.</li>
+  <li>Como pausar o programa numa linha (<code>break</code>) e andar linha a linha (<code>next</code> e <code>step</code>).</li>
+  <li>Como seguir em frente (<code>continue</code>, <code>finish</code>) e sair (<code>quit</code>).</li>
+  <li>Que as IDEs têm depuradores com botões, que fazem a mesma coisa.</li>
+</ul>
+</div>
+
+<p>Todas as sessões desta aula são reais, feitas com o <strong>GDB 17</strong> e o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp/gdb</code>. O GDB não funciona no editor do guia (ele precisa controlar um programa de verdade no seu sistema); para praticar, instale-o (no Ubuntu: <code>sudo apt install gdb</code>; veja <a href="instalar-linux.html">Instalar no Linux</a>). As missões desta página corrigem, no editor, os erros que o GDB encontrou.</p>
+
+<hr>
+
+<h2>A ideia: pausar o vídeo</h2>
+<p>Assistir a um programa rodar normalmente é como ver um vídeo de uma jogada em velocidade máxima: tudo acontece em milésimos de segundo, e você só vê o resultado. O depurador é o controle remoto:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No controle remoto</th><th>No GDB</th></tr>
+<tr><td>Dar o play</td><td><code>run</code></td></tr>
+<tr><td>Marcar um ponto para pausar sozinho</td><td><code>break</code> (um <strong>ponto de parada</strong>, <em>breakpoint</em>)</td></tr>
+<tr><td>Avançar um quadro</td><td><code>next</code> / <code>step</code></td></tr>
+<tr><td>Dar zoom num detalhe</td><td><code>print variável</code></td></tr>
+<tr><td>Continuar até o próximo ponto marcado</td><td><code>continue</code></td></tr>
+<tr><td>"Como chegamos aqui?"</td><td><code>backtrace</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. Preparar o programa: <code>-g</code></h2>
+<p>O programa compilado normalmente não guarda os nomes das variáveis nem os números das linhas: o processador não precisa disso. Para o depurador poder dizer "linha 20, variável <code>a</code>", compile com a opção <strong><code>-g</code></strong>, que acrescenta essas informações de depuração ao executável:</p>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra -g crash.cpp -o crash</pre>
+
+<p>E deixe as otimizações <strong>desligadas</strong> (é o padrão do g++, chamado <code>-O0</code>). Com <code>-O2</code>, o compilador reorganiza, junta e apaga linhas, e o passo a passo fica confuso (seção 6). Resumo: <strong>para depurar, <code>-g</code> sem <code>-O2</code></strong>.</p>
+
+<hr>
+
+<h2>2. Achar a linha de um crash</h2>
+<p>Este programa procura alunos numa turma. A função <code>buscar</code> devolve um ponteiro para o aluno encontrado, ou <code>nullptr</code> se não achar (veja <a href="nullptr.html">nullptr</a>):</p>
+
+<pre class="file" data-file="crash.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Aluno {
+    std::string nome;
+    double nota = 0.0;
+};
+
+const Aluno* buscar(const std::vector&lt;Aluno&gt;&amp; turma, const std::string&amp; nome) {
+    for (const auto&amp; a : turma) {
+        if (a.nome == nome) {
+            return &amp;a;
+        }
+    }
+    return nullptr;
+}
+
+void mostrar(const Aluno* a) {
+    std::cout &lt;&lt; a-&gt;nome &lt;&lt; ": " &lt;&lt; a-&gt;nota &lt;&lt; '\n';
+}
+
+int main() {
+    std::vector&lt;Aluno&gt; turma = {{"Ana", 9.5}, {"Bruno", 7.0}};
+    mostrar(buscar(turma, "Ana"));
+    mostrar(buscar(turma, "Zeca"));
+    std::cout &lt;&lt; "Fim.\n";
+}
+</pre>
+
+<pre class="term">$ ./crash
+Ana: 9.5
+Falha de segmentação     (imagem do núcleo gravada) ./crash
+$ echo $?
+139</pre>
+
+<p>O programa mostrou a Ana e morreu (sobre a falha de segmentação e o código 139, veja <a href="comportamento-indefinido.html">Comportamento Indefinido</a>). Onde? Vamos perguntar ao GDB.</p>
+
+<h3>Rodar dentro do GDB: <code>run</code></h3>
+<pre class="term">$ gdb -q ./crash
+Reading symbols from ./crash...
+(gdb) run
+Starting program: /home/ana/cpp/gdb/crash
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/usr/lib/x86_64-linux-gnu/libthread_db.so.1".
+Ana: 9.5
+
+Program received signal SIGSEGV, Segmentation fault.
+0x00007ffff7d79764 in std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp; std::operator&lt;&lt; &lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;(std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp;, std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt; const&amp;) ()
+   from /usr/lib/x86_64-linux-gnu/libstdc++.so.6</pre>
+
+<dl class="anatomy">
+  <dt>gdb -q ./crash</dt><dd>Abre o GDB com o programa. O <code>-q</code> (<em>quiet</em>, "quieto") esconde a mensagem de boas-vindas com a licença. O GDB mostra o seu prompt, <code>(gdb)</code>, e espera comandos. O programa ainda <strong>não</strong> está rodando.</dd>
+  <dt>Reading symbols from ./crash...</dt><dd>Leu as informações do <code>-g</code>.</dd>
+  <dt>run</dt><dd>Começa a rodar o programa, dentro do GDB. As duas linhas sobre <code>libthread_db</code> são técnicas e aparecem sempre; pode ignorar.</dd>
+  <dt>Program received signal SIGSEGV, Segmentation fault.</dt><dd>"O programa recebeu o sinal SIGSEGV, falha de segmentação". Em vez de deixar o programa morrer, o GDB o <strong>congelou</strong> no exato instante do erro.</dd>
+  <dt>0x00007ffff7d79764 in std::basic_ostream… from …libstdc++.so.6</dt><dd>Onde ele congelou: dentro do <code>operator&lt;&lt;</code> que escreve um <code>std::string</code>, na biblioteca do C++ (<code>libstdc++</code>). Assustador, mas o erro quase nunca é da biblioteca: ela só recebeu algo estragado do <strong>seu</strong> código. Precisamos saber quem a chamou.</dd>
+</dl>
+
+<h3>"Como chegamos aqui?": <code>backtrace</code></h3>
+<pre class="term">(gdb) backtrace
+#0  0x00007ffff7d79764 in std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp; std::operator&lt;&lt; &lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;(std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp;, std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt; const&amp;) ()
+   from /usr/lib/x86_64-linux-gnu/libstdc++.so.6
+#1  0x0000555555556414 in mostrar (a=0x0) at crash.cpp:20
+#2  0x0000555555556684 in main () at crash.cpp:26</pre>
+
+<p>O <code>backtrace</code> ("rastro para trás", ou <code>bt</code>) mostra a <strong>pilha de chamadas</strong>: quem chamou quem até chegar ao erro. Leia de baixo para cima:</p>
+<ul>
+  <li><code>#2 main () at crash.cpp:26</code>: o <code>main</code>, na linha 26, chamou…</li>
+  <li><code>#1 mostrar (a=0x0) at crash.cpp:20</code>: …a função <code>mostrar</code>, que na linha 20 chamou…</li>
+  <li><code>#0 … operator&lt;&lt; …</code>: …o <code>&lt;&lt;</code> da biblioteca, onde tudo quebrou.</li>
+</ul>
+<p>A primeira linha que é <strong>do seu arquivo</strong> é a pista: <code>crash.cpp:20</code>. E o GDB ainda mostra o valor do parâmetro: <code>a=0x0</code>, ou seja, o ponteiro é <strong>nulo</strong>. Cada linha da pilha se chama <strong>quadro</strong> (<em>frame</em>), numerado a partir de 0.</p>
+
+<h3>Olhar as variáveis: <code>frame</code> e <code>print</code></h3>
+<pre class="term">(gdb) frame 1
+#1  0x0000555555556414 in mostrar (a=0x0) at crash.cpp:20
+20	    std::cout &lt;&lt; a-&gt;nome &lt;&lt; ": " &lt;&lt; a-&gt;nota &lt;&lt; '\n';
+(gdb) print a
+$1 = (const Aluno *) 0x0
+(gdb) print *a
+❌️ Não é possível acessar a memória no endereço 0x0
+(gdb) print turma
+❌️ No symbol "turma" in current context.
+(gdb) frame 2
+#2  0x0000555555556684 in main () at crash.cpp:26
+26	    mostrar(buscar(turma, "Zeca"));
+(gdb) print turma
+$2 = std::vector of length 2, capacity 2 = {{nome = "Ana", nota = 9.5}, {
+    nome = "Bruno", nota = 7}}
+(gdb) print turma[1].nome
+$3 = "Bruno"
+(gdb) quit
+A debugging session is active.
+
+	Inferior 1 [process 14] will be killed.
+
+Quit anyway? (y or n) y</pre>
+
+<dl class="anatomy">
+  <dt>frame 1</dt><dd>"Vá para o quadro 1": a função <code>mostrar</code>. O GDB mostra a linha onde ela estava: a 20, que usa <code>a-&gt;nome</code>.</dd>
+  <dt>print a</dt><dd>Mostra o valor de uma variável (atalho: <code>p a</code>). Cada resultado ganha um número, <code>$1</code>, <code>$2</code>…, que você pode reusar. <code>(const Aluno *) 0x0</code>: um ponteiro para <code>Aluno</code> que vale zero, o <code>nullptr</code>.</dd>
+  <dt>print *a</dt><dd>Tenta ver o aluno apontado. O GDB responde (em português, porque o sistema da Ana está em português): não é possível acessar a memória no endereço 0. É exatamente o que o programa tentou fazer.</dd>
+  <dt>print turma → No symbol "turma" in current context.</dt><dd>"Não existe <code>turma</code> neste contexto": cada quadro só enxerga as variáveis da sua função (veja <a href="escopo.html">Escopo</a>). A <code>turma</code> mora no <code>main</code>, o quadro 2.</dd>
+  <dt>frame 2 / print turma</dt><dd>No <code>main</code>, a <code>turma</code> existe, e o GDB mostra o vetor inteiro, com as structs dentro. Dá até para usar expressões: <code>print turma[1].nome</code>.</dd>
+  <dt>quit</dt><dd>Sai do GDB. Como o programa ainda estava congelado, ele pergunta se pode encerrá-lo: <code>y</code>.</dd>
+</dl>
+
+<p><strong>Diagnóstico:</strong> na linha 26, o <code>main</code> buscou <code>"Zeca"</code>, que não está na turma; <code>buscar</code> devolveu <code>nullptr</code>; <code>mostrar</code> usou o ponteiro nulo sem conferir. Sem um único <code>cout</code> a mais no código.</p>
+
+<div class="trycpp" data-goal="out:Ana: 9.5,out:Aluno não encontrado,out:Fim.,exit:0">
+<p class="try-task"><strong>Missão:</strong> corrija o erro que o GDB encontrou: no começo de <code>mostrar</code>, se <code>a</code> for <code>nullptr</code>, mostre <code>Aluno não encontrado</code> e saia da função com <code>return;</code>. O programa deve chegar ao <code>Fim.</code>. (No editor, o programa sem correção pode não quebrar igual ao do terminal, porque o navegador organiza a memória de outro jeito. O erro é o mesmo.)</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Aluno {
+    std::string nome;
+    double nota = 0.0;
+};
+
+const Aluno* buscar(const std::vector&lt;Aluno&gt;&amp; turma, const std::string&amp; nome) {
+    for (const auto&amp; a : turma) {
+        if (a.nome == nome) {
+            return &amp;a;
+        }
+    }
+    return nullptr;
+}
+
+void mostrar(const Aluno* a) {
+    std::cout &lt;&lt; a-&gt;nome &lt;&lt; ": " &lt;&lt; a-&gt;nota &lt;&lt; '\n';
+}
+
+int main() {
+    std::vector&lt;Aluno&gt; turma = {{"Ana", 9.5}, {"Bruno", 7.0}};
+    mostrar(buscar(turma, "Ana"));
+    mostrar(buscar(turma, "Zeca"));
+    std::cout &lt;&lt; "Fim.\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Aluno {
+    std::string nome;
+    double nota = 0.0;
+};
+
+const Aluno* buscar(const std::vector&lt;Aluno&gt;&amp; turma, const std::string&amp; nome) {
+    for (const auto&amp; a : turma) {
+        if (a.nome == nome) {
+            return &amp;a;
+        }
+    }
+    return nullptr;
+}
+
+void mostrar(const Aluno* a) {
+    if (a == nullptr) {
+        std::cout &lt;&lt; "Aluno não encontrado\n";
+        return;
+    }
+    std::cout &lt;&lt; a-&gt;nome &lt;&lt; ": " &lt;&lt; a-&gt;nota &lt;&lt; '\n';
+}
+
+int main() {
+    std::vector&lt;Aluno&gt; turma = {{"Ana", 9.5}, {"Bruno", 7.0}};
+    mostrar(buscar(turma, "Ana"));
+    mostrar(buscar(turma, "Zeca"));
+    std::cout &lt;&lt; "Fim.\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Atalho: tudo numa linha com <code>-batch</code></h2>
+<p>Quando você só quer saber onde o programa quebrou, dá para passar os comandos direto na linha de comando. <code>-batch</code> roda os comandos e sai; cada <code>-ex</code> é um comando:</p>
+
+<pre class="term">$ gdb -batch -ex run -ex backtrace ./crash
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/usr/lib/x86_64-linux-gnu/libthread_db.so.1".
+Ana: 9.5
+
+Program received signal SIGSEGV, Segmentation fault.
+0x00007ffff7d79764 in std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp; std::operator&lt;&lt; &lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;(std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp;, std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt; const&amp;) () from /usr/lib/x86_64-linux-gnu/libstdc++.so.6
+#0  0x00007ffff7d79764 in std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp; std::operator&lt;&lt; &lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;(std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp;, std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt; const&amp;) () from /usr/lib/x86_64-linux-gnu/libstdc++.so.6
+#1  0x0000555555556414 in mostrar (a=0x0) at crash.cpp:20
+#2  0x0000555555556684 in main () at crash.cpp:26</pre>
+
+<p>Guarde este comando: <code>gdb -batch -ex run -ex backtrace ./programa</code> é a forma mais rápida de transformar "Falha de segmentação" em "linha 20".</p>
+
+<h3>Sem <code>-g</code>, sem linhas</h3>
+<p>O mesmo programa compilado <strong>sem</strong> <code>-g</code> (<code>crash-semg</code>):</p>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra crash.cpp -o crash-semg
+$ gdb -batch -ex run -ex backtrace ./crash-semg
+«… as mesmas linhas até o #0 …»
+#1  0x0000555555556414 in mostrar(Aluno const*) ()
+#2  0x0000555555556684 in main ()</pre>
+<p>O GDB ainda sabe os nomes das funções, mas não as linhas, nem os valores dos parâmetros. Por isso o <code>-g</code>.</p>
+
+<hr>
+
+<h2>4. Andar linha a linha: <code>break</code>, <code>next</code>, <code>step</code></h2>
+<p>Nem todo erro derruba o programa. Este calcula a média de 7, 8 e 10, que é 8,33…, mas mostra 8:</p>
+
+<pre class="file" data-file="media.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+double media(const std::vector&lt;int&gt;&amp; notas) {
+    int soma = 0;
+    for (int n : notas) {
+        soma += n;
+    }
+    return soma / notas.size();
+}
+
+int main() {
+    std::vector&lt;int&gt; notas = {7, 8, 10};
+    double m = media(notas);
+    std::cout &lt;&lt; "Média: " &lt;&lt; m &lt;&lt; '\n';
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra -g media.cpp -o media
+$ ./media
+Média: 8</pre>
+
+<p>Vamos assistir em câmera lenta. Primeiro, um ponto de parada no começo do <code>main</code>, e o programa roda até lá:</p>
+
+<pre class="term">$ gdb -q ./media
+Reading symbols from ./media...
+(gdb) break main
+Ponto de parada 1 at 0x13b1: file media.cpp, line 12.
+(gdb) run
+Starting program: /home/ana/cpp/gdb/media
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/usr/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Breakpoint 1, main () at media.cpp:12
+12	int main() {</pre>
+
+<p><code>break main</code> (atalho: <code>b main</code>) marca um ponto de parada na função <code>main</code>. Também dá para marcar por linha (<code>break 9</code>) ou por arquivo e linha (<code>break media.cpp:9</code>). O <code>run</code> rodou até o ponto e parou. A linha mostrada (<code>12 int main() {</code>) é a <strong>próxima a ser executada</strong>; ela ainda não rodou.</p>
+
+<pre class="term">(gdb) next
+13	    std::vector&lt;int&gt; notas = {7, 8, 10};
+(gdb) next
+14	    double m = media(notas);
+(gdb) step
+media (notas=std::vector of length 3, capacity 3 = {...}) at media.cpp:4
+4	double media(const std::vector&lt;int&gt;&amp; notas) {
+(gdb) next
+5	    int soma = 0;
+(gdb) next
+6	    for (int n : notas) {
+(gdb) next
+7	        soma += n;
+(gdb) next
+6	    for (int n : notas) {
+(gdb) print n
+$1 = 7
+(gdb) print soma
+$2 = 7</pre>
+
+<dl class="anatomy">
+  <dt>next</dt><dd>Executa a linha atual inteira e para na próxima (atalho: <code>n</code>). Se a linha chama uma função, a função roda toda, sem você entrar nela.</dd>
+  <dt>step</dt><dd>Como o <code>next</code>, mas <strong>entra</strong> na função chamada (atalho: <code>s</code>). Na linha 14, o <code>step</code> entrou em <code>media</code>, e o GDB mostrou até o parâmetro recebido.</dd>
+  <dt>7 → 6 → 7…</dt><dd>O laço: a linha 7 soma, a 6 pega o próximo número. Depois da primeira volta, <code>n</code> vale 7 e <code>soma</code> vale 7. Tudo certo até aqui.</dd>
+</dl>
+
+<p>Apertar <code>next</code> três vezes por volta cansa. Vamos marcar um ponto de parada na linha do <code>return</code> e deixar o laço terminar sozinho com <code>continue</code>:</p>
+
+<pre class="term">(gdb) break 9
+Ponto de parada 2 at 0x555555555341: file media.cpp, line 9.
+(gdb) continue
+Continuing.
+
+Breakpoint 2, media (notas=std::vector of length 3, capacity 3 = {...})
+    at media.cpp:9
+9	    return soma / notas.size();
+(gdb) print soma
+$3 = 25
+(gdb) print notas.size()
+$4 = 3
+(gdb) print soma / notas.size()
+$5 = 8
+(gdb) print soma / 3.0
+$6 = 8.3333333333333339</pre>
+
+<p>Achamos! A <code>soma</code> está certa (25) e o tamanho também (3), mas <code>soma / notas.size()</code> dá <code>8</code>: as duas partes são inteiras, então a divisão é <strong>inteira</strong> e joga fora o ",33" (veja <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>). Com um lado <code>double</code> (<code>3.0</code>), o resultado sai certo. O <code>print</code> aceita qualquer expressão do C++, e isso permite testar a correção antes de mexer no código.</p>
+
+<pre class="term">(gdb) finish
+Run till exit from #0  media (
+    notas=std::vector of length 3, capacity 3 = {...}) at media.cpp:9
+0x00005555555553f6 in main () at media.cpp:14
+14	    double m = media(notas);
+Value returned is $7 = 8
+(gdb) continue
+Continuing.
+Média: 8
+[Inferior 1 (process 14) exited normally]
+(gdb) quit</pre>
+
+<dl class="anatomy">
+  <dt>finish</dt><dd>Roda até a função atual terminar, volta para quem chamou e mostra o valor devolvido: <code>Value returned is $7 = 8</code>.</dd>
+  <dt>continue</dt><dd>Segue rodando até o próximo ponto de parada ou até o fim (atalho: <code>c</code>). <code>exited normally</code> = "terminou normalmente", com código 0. O "Inferior 1" é como o GDB chama o programa que ele está controlando.</dd>
+</dl>
+
+<div class="trycpp" data-goal="out:Média: 8.33333">
+<p class="try-task"><strong>Missão:</strong> corrija a divisão inteira que o GDB revelou, para a saída ser <code>Média: 8.33333</code>. Dica: converta a <code>soma</code> para <code>double</code> antes de dividir, com <code>static_cast&lt;double&gt;(soma)</code> (veja <a href="conversao-tipos.html">Conversão de Tipos</a>).</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+double media(const std::vector&lt;int&gt;&amp; notas) {
+    int soma = 0;
+    for (int n : notas) {
+        soma += n;
+    }
+    return soma / notas.size();
+}
+
+int main() {
+    std::vector&lt;int&gt; notas = {7, 8, 10};
+    double m = media(notas);
+    std::cout &lt;&lt; "Média: " &lt;&lt; m &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+double media(const std::vector&lt;int&gt;&amp; notas) {
+    int soma = 0;
+    for (int n : notas) {
+        soma += n;
+    }
+    return static_cast&lt;double&gt;(soma) / notas.size();
+}
+
+int main() {
+    std::vector&lt;int&gt; notas = {7, 8, 10};
+    double m = media(notas);
+    std::cout &lt;&lt; "Média: " &lt;&lt; m &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>5. Cuidado: o <code>step</code> entra até na biblioteca</h2>
+<p>O <code>step</code> entra em <strong>qualquer</strong> função, inclusive nas da biblioteca padrão, que estão escondidas em linhas que parecem simples. Numa das tentativas desta aula, a Ana deu <code>step</code> na linha que cria o vetor:</p>
+
+<pre class="term">(gdb) next
+13	    std::vector&lt;int&gt; notas = {7, 8, 10};
+(gdb) step
+std::allocator&lt;int&gt;::allocator (this=&lt;optimized out&gt;)
+    at /usr/include/c++/15/bits/allocator.h:168
+168	      allocator() _GLIBCXX_NOTHROW { }
+(gdb) next
+main () at media.cpp:13
+13	    std::vector&lt;int&gt; notas = {7, 8, 10};</pre>
+
+<p>Ela caiu dentro do código do <code>std::vector</code> (o arquivo <code>allocator.h</code> da biblioteca). Não há nada de errado aí; é só o lugar errado para procurar. Quando isso acontecer, use <code>finish</code> (ou alguns <code>next</code>) para voltar ao seu código. Regra prática: <strong><code>next</code> por padrão; <code>step</code> só nas linhas que chamam funções suas</strong>.</p>
+
+<hr>
+
+<h2>6. Por que depurar sem <code>-O2</code></h2>
+<p>Com otimização, o compilador reescreve o programa à vontade. O mesmo <code>media.cpp</code>, compilado com <code>-O2 -g</code>:</p>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra -O2 -g media.cpp -o media-O2
+$ gdb -q ./media-O2
+Reading symbols from ./media-O2...
+(gdb) break media.cpp:9
+❌️ No compiled code for line 9 in file "media.cpp".
+Make breakpoint pending on future shared library load? (y or [n]) n
+(gdb) quit</pre>
+
+<p><em>No compiled code for line 9</em> = "não há código compilado para a linha 9": o <code>-O2</code> juntou a linha 9 com outras, e ela deixou de existir como um lugar onde parar (a pergunta seguinte é sobre bibliotecas carregadas depois; responda <code>n</code>). Com otimização, também é comum o GDB mostrar <code>&lt;optimized out&gt;</code> ("removida pela otimização") no lugar de uma variável, e o <code>next</code> pular de um lado para o outro. Para depurar, compile com <code>-g</code> e sem <code>-O2</code> (ou com <code>-Og</code>, uma otimização leve feita para não atrapalhar a depuração).</p>
+
+<hr>
+
+<h2>Depuradores com botões (IDEs)</h2>
+<p>As IDEs têm depuradores visuais (veja <a href="editores.html">Editores e IDEs</a>): você clica na margem para marcar um ponto de parada, usa botões para <em>Step Over</em> (o <code>next</code>), <em>Step Into</em> (o <code>step</code>), <em>Step Out</em> (o <code>finish</code>) e <em>Continue</em>, e vê as variáveis numa janela, sem digitar <code>print</code>. No Linux, a maioria delas (VS Code com a extensão C/C++, CLion, Qt Creator, Code::Blocks) usa o próprio GDB por baixo. No Windows, o Visual Studio tem um depurador próprio; no macOS, o Xcode usa o LLDB, primo do GDB. As ideias desta aula valem para todos.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"No symbol "x" in current context."</strong>
+<p><strong>O que aconteceu:</strong> a variável não existe no quadro atual: ela é de outra função, ou de um bloco que já terminou, ou o programa nem está rodando.</p>
+<p><strong>Como resolver:</strong> veja os quadros com <code>backtrace</code> e mude com <code>frame N</code>. Se o programa não estiver rodando, marque um <code>break</code> e dê <code>run</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"The program is not being run."</strong>
+<p><strong>O que aconteceu:</strong> você deu <code>next</code>, <code>step</code> ou <code>continue</code> antes do <code>run</code>, ou depois de o programa terminar.</p>
+<p><strong>Como resolver:</strong> marque um ponto de parada (<code>break main</code>) e dê <code>run</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O <code>backtrace</code> não mostra arquivos e linhas, só <code>mostrar(Aluno const*) ()</code></strong>
+<p><strong>O que aconteceu:</strong> o programa foi compilado sem <code>-g</code>.</p>
+<p><strong>Como resolver:</strong> compile de novo com <code>-g</code> e repita.</p>
+</div>
+
+<div class="cenario">
+<strong><code>&lt;optimized out&gt;</code>, "No compiled code for line", o <code>next</code> pulando linhas</strong>
+<p><strong>O que aconteceu:</strong> o programa foi compilado com otimização (<code>-O2</code>).</p>
+<p><strong>Como resolver:</strong> compile com <code>-g</code> e sem <code>-O2</code> (ou com <code>-Og</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>"gdb: comando não encontrado"</strong>
+<p><strong>O que aconteceu:</strong> o GDB não está instalado.</p>
+<p><strong>Como resolver:</strong> no Ubuntu e no Debian, <code>sudo apt install gdb</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Comando</th><th>Atalho</th><th>O que faz</th></tr>
+<tr><td><code>g++ … -g arquivo.cpp -o prog</code></td><td></td><td>Compila com informações de depuração (e sem <code>-O2</code>).</td></tr>
+<tr><td><code>gdb -q ./prog</code></td><td></td><td>Abre o programa no GDB.</td></tr>
+<tr><td><code>gdb -batch -ex run -ex backtrace ./prog</code></td><td></td><td>Roda e, se quebrar, mostra onde.</td></tr>
+<tr><td><code>run</code></td><td><code>r</code></td><td>Começa a rodar.</td></tr>
+<tr><td><code>break main</code> / <code>break 9</code> / <code>break arq.cpp:9</code></td><td><code>b</code></td><td>Marca um ponto de parada.</td></tr>
+<tr><td><code>next</code></td><td><code>n</code></td><td>Próxima linha, sem entrar em funções.</td></tr>
+<tr><td><code>step</code></td><td><code>s</code></td><td>Próxima linha, entrando nas funções.</td></tr>
+<tr><td><code>continue</code></td><td><code>c</code></td><td>Segue até o próximo ponto de parada ou o fim.</td></tr>
+<tr><td><code>finish</code></td><td></td><td>Termina a função atual e mostra o valor devolvido.</td></tr>
+<tr><td><code>print expr</code></td><td><code>p</code></td><td>Mostra uma variável ou expressão.</td></tr>
+<tr><td><code>backtrace</code></td><td><code>bt</code></td><td>Mostra a pilha de chamadas.</td></tr>
+<tr><td><code>frame N</code></td><td><code>f</code></td><td>Vai para o quadro N da pilha.</td></tr>
+<tr><td><code>list</code></td><td><code>l</code></td><td>Mostra o código em volta da linha atual.</td></tr>
+<tr><td><code>info locals</code></td><td></td><td>Mostra todas as variáveis locais.</td></tr>
+<tr><td><code>quit</code></td><td><code>q</code></td><td>Sai do GDB.</td></tr>
+</table>
+</div>
+<p>Apertar <kbd>Enter</kbd> sem digitar nada repete o último comando: ótimo para uma sequência de <code>next</code>.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Compilar para depurar</h3>
+<p>Complete a opção que acrescenta as informações de depuração:</p>
+<div class="ex-code">g++ -std=c++23 -Wall -Wextra <input data-answer="-g" aria-label="opção"> prog.cpp -o prog</div>
+</div>
+
+<div class="exercise">
+<h3>2. Onde quebrou?</h3>
+<p>O programa parou com <code>SIGSEGV</code> dentro do GDB. Qual comando mostra a pilha de chamadas?</p>
+<div class="ex-code">(gdb) <input data-answer="backtrace|bt|where" aria-label="comando"></div>
+</div>
+
+<div class="exercise">
+<h3>3. Parar numa linha</h3>
+<p>Complete para marcar um ponto de parada na linha 15 do arquivo <code>loja.cpp</code>:</p>
+<div class="ex-code">(gdb) <input data-answer="break loja.cpp:15|b loja.cpp:15|break 15|b 15" aria-label="comando"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. A linha atual é <code>double m = media(notas);</code> e você quer ver o que acontece <strong>dentro</strong> de <code>media</code>. Qual comando?</p>
+<label><input type="radio" name="q4"> <code>next</code></label>
+<label><input type="radio" name="q4"> <code>step</code></label>
+<label><input type="radio" name="q4"> <code>finish</code></label>
+<label><input type="radio" name="q4"> <code>continue</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. No <code>backtrace</code>, o quadro <code>#0</code> está dentro de <code>libstdc++.so.6</code> e o <code>#1</code> é <code>mostrar (a=0x0) at crash.cpp:20</code>. Onde provavelmente está o erro?</p>
+<label><input type="radio" name="q5"> Na linha 20 do <code>crash.cpp</code>, que passou um ponteiro nulo.</label>
+<label><input type="radio" name="q5"> Na biblioteca <code>libstdc++</code>, que tem um bug.</label>
+<label><input type="radio" name="q5"> No GDB.</label>
+<label><input type="radio" name="q5"> No <code>main</code>, que não tem número de linha.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Compile com <code>-g</code> e sem <code>-O2</code> para depurar.</li>
+  <li><code>gdb -q ./prog</code> abre; <code>run</code> roda; num crash, o GDB congela o programa no ponto do erro.</li>
+  <li><code>backtrace</code> mostra quem chamou quem; a primeira linha com um arquivo seu é a pista. <code>frame N</code> muda de quadro; <code>print</code> mostra variáveis e expressões.</li>
+  <li><code>break</code> pausa numa função ou linha; <code>next</code> anda sem entrar em funções; <code>step</code> entra; <code>continue</code> segue; <code>finish</code> sai da função atual; <code>quit</code> sai.</li>
+  <li>Atalho para crashes: <code>gdb -batch -ex run -ex backtrace ./prog</code>.</li>
+  <li>Os depuradores das IDEs fazem o mesmo, com botões.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
