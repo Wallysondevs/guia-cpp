@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ if e else — decidir o que fazer | Guia C++</title>
+<meta name="description" content="if e else em C++ para quem nunca programou: a condição, o bloco entre chaves, o bug do if sem chaves, o aviso de if (x = 5), o ponto e vírgula depois do if e o if com inicializador do C++17, com saídas e avisos reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">if e else</span></h1>
+
+<p class="intro">Até aqui, seus programas executavam todas as linhas, de cima para baixo, sempre do mesmo jeito. Mas a vida é cheia de decisões: <em>se</em> a nota for 7 ou mais, a aluna passou; <em>senão</em>, vai para a recuperação. Nesta aula você vai ensinar o programa a <strong>decidir</strong> com <code>if</code> ("se") e <code>else</code> ("senão"), entender por que as chaves <code>{ }</code> importam tanto e conhecer três armadilhas clássicas que o compilador ajuda a pegar.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como escrever um <code>if</code>: a condição entre parênteses e o bloco entre chaves.</li>
+  <li>Como dar um caminho alternativo com <code>else</code>.</li>
+  <li>O que pode ser uma condição (comparações, <code>bool</code>, até números).</li>
+  <li>O bug do <code>if</code> sem chaves com duas linhas, e o aviso que o g++ dá.</li>
+  <li>Por que <code>if (x = 5)</code> está errado, e o ponto e vírgula que "desliga" o <code>if</code>.</li>
+  <li>O <code>if</code> com inicializador: <code>if (int n = …; n &gt; 0)</code> <span class="versao">C++17</span>.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Os avisos que aparecem aqui só são mostrados por causa do <code>-Wall -Wextra</code> (aula <a href="avisos.html">Avisos</a>): nunca compile sem eles.</p>
+
+<hr>
+
+<h2>A ideia: a bifurcação na estrada</h2>
+<p>Imagine a Ana dirigindo até chegar a uma bifurcação com uma placa: "<em>Se</em> estiver chovendo, pegue a estrada coberta. <em>Senão</em>, pegue a estrada da praia". Ela olha para o céu (a <strong>condição</strong>), e a resposta só pode ser sim ou não. Conforme a resposta, ela segue por um caminho ou pelo outro. Depois, os dois caminhos voltam a se encontrar e a viagem continua.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na estrada</th><th>No C++</th></tr>
+<tr><td>"Se estiver chovendo"</td><td><code>if (chovendo)</code></td></tr>
+<tr><td>O caminho do "sim"</td><td>o bloco <code>{ … }</code> logo depois do <code>if</code></td></tr>
+<tr><td>"Senão"</td><td><code>else</code></td></tr>
+<tr><td>O caminho do "não"</td><td>o bloco <code>{ … }</code> logo depois do <code>else</code></td></tr>
+<tr><td>Os caminhos se juntam</td><td>a primeira linha depois do <code>if</code>/<code>else</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. O <code>if</code> sozinho</h2>
+
+<pre class="file" data-file="nota.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 8.5;
+
+    if (nota &gt;= 7) {
+        std::cout &lt;&lt; "Aprovada!\n";
+    }
+    std::cout &lt;&lt; "Fim do boletim.\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>if</dt><dd>"Se". Palavra reservada do C++: não pode ser nome de variável.</dd>
+  <dt>(nota &gt;= 7)</dt><dd>A <strong>condição</strong>, sempre entre parênteses. Ela é uma pergunta de sim ou não: "a nota é maior ou igual a 7?". A resposta é um <code>bool</code>: <code>true</code> (verdadeiro) ou <code>false</code> (falso) (aulas <a href="bool.html">Booleanos</a> e <a href="operadores-comparacao.html">Operadores de Comparação</a>).</dd>
+  <dt>{ … }</dt><dd>O <strong>bloco</strong>: as linhas que só rodam se a condição for verdadeira. Pode ter quantas linhas você quiser.</dd>
+  <dt>Sem <code>;</code> depois do <code>)</code></dt><dd>A linha do <code>if</code> não termina com ponto e vírgula. As linhas <strong>dentro</strong> do bloco, sim. (O que acontece se você puser um <code>;</code> ali está na seção 5.)</dd>
+  <dt>Os 4 espaços</dt><dd>O recuo (a <strong>indentação</strong>) mostra a quem lê o que está dentro do bloco. O compilador não liga para os espaços, só para as chaves; mas sem recuo o código fica ilegível.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/decisoes">$ g++ -std=c++23 -Wall -Wextra nota.cpp -o nota
+$ ./nota
+Aprovada!
+Fim do boletim.          « esta linha está fora do if: roda sempre</pre>
+
+<p>Troque a nota para <code>5.5</code>, compile e rode de novo: só aparece <code>Fim do boletim.</code>. O bloco foi <strong>pulado</strong>.</p>
+
+<h3>As condições mais comuns</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Condição</th><th>Lê-se</th><th>Exemplo</th></tr>
+<tr><td><code>a == b</code></td><td>a é igual a b (dois sinais de igual!)</td><td><code>if (senha == 1234)</code></td></tr>
+<tr><td><code>a != b</code></td><td>a é diferente de b</td><td><code>if (resposta != 'S')</code></td></tr>
+<tr><td><code>a &lt; b</code>, <code>a &gt; b</code></td><td>menor, maior</td><td><code>if (idade &lt; 18)</code></td></tr>
+<tr><td><code>a &lt;= b</code>, <code>a &gt;= b</code></td><td>menor ou igual, maior ou igual</td><td><code>if (nota &gt;= 7)</code></td></tr>
+<tr><td><code>c1 &amp;&amp; c2</code></td><td>c1 <strong>e</strong> c2</td><td><code>if (nota &gt;= 7 &amp;&amp; faltas &lt; 10)</code></td></tr>
+<tr><td><code>c1 || c2</code></td><td>c1 <strong>ou</strong> c2</td><td><code>if (dia == 6 || dia == 7)</code></td></tr>
+<tr><td><code>!c</code></td><td><strong>não</strong> c</td><td><code>if (!pagou)</code></td></tr>
+</table>
+</div>
+<p>Os operadores <code>&amp;&amp;</code>, <code>||</code> e <code>!</code> têm aula própria: <a href="operadores-logicos.html">Operadores Lógicos</a>.</p>
+
+<hr>
+
+<h2>2. O caminho alternativo: <code>else</code></h2>
+<p>O <code>else</code> ("senão") vem logo depois do bloco do <code>if</code> e diz o que fazer quando a condição é <strong>falsa</strong>. Um dos dois blocos sempre roda, nunca os dois:</p>
+
+<pre class="file" data-file="nota2.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 5.5;
+
+    if (nota &gt;= 7) {
+        std::cout &lt;&lt; "Aprovada!\n";
+        std::cout &lt;&lt; "Parabéns!\n";
+    } else {
+        std::cout &lt;&lt; "Recuperação.\n";
+        std::cout &lt;&lt; "A prova é dia 10.\n";
+    }
+    std::cout &lt;&lt; "Fim do boletim.\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/decisoes">$ ./nota2
+Recuperação.             « 5.5 &gt;= 7 é falso: rodou o bloco do else
+A prova é dia 10.
+Fim do boletim.</pre>
+
+<ol class="passo">
+  <li>O programa calcula a condição <code>nota &gt;= 7</code> → <code>5.5 &gt;= 7</code> → <code>false</code>.</li>
+  <li>Como é falsa, pula o bloco do <code>if</code> inteiro (as duas linhas).</li>
+  <li>Roda o bloco do <code>else</code> (as duas linhas).</li>
+  <li>Segue para a linha depois do <code>else</code>: <code>Fim do boletim.</code>.</li>
+</ol>
+
+<p>O <code>else</code> não tem condição: ele é simplesmente "todos os outros casos". Se você precisa de mais de dois caminhos (A, B ou C), use <a href="else-if.html">else if</a>, a próxima aula.</p>
+
+<div class="trycpp" data-goal="out:Recuperação,src:else">
+<p class="try-task"><strong>Missão:</strong> com a nota 5.5, este programa não mostra nada sobre a aluna. Acrescente um <code>else</code> que mostre <code>Recuperação</code> quando a nota for menor que 7. Depois, teste com outras notas.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 5.5;
+
+    if (nota &gt;= 7) {
+        std::cout &lt;&lt; "Aprovada\n";
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 5.5;
+
+    if (nota &gt;= 7) {
+        std::cout &lt;&lt; "Aprovada\n";
+    } else {
+        std::cout &lt;&lt; "Recuperação\n";
+    }
+}
+</pre>
+</div>
+
+<h3>Decidir com o que o usuário digitou</h3>
+<p>A decisão fica mais interessante quando o valor vem do teclado, com <code>std::cin</code> (aula <a href="entrada-cin.html">Entrada com cin</a>):</p>
+
+<pre class="file" data-file="cin.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 0;
+    std::cout &lt;&lt; "Sua idade: ";
+    std::cin &gt;&gt; idade;
+
+    if (idade &gt;= 18) {
+        std::cout &lt;&lt; "Pode tirar a carteira de motorista.\n";
+    } else {
+        std::cout &lt;&lt; "Faltam " &lt;&lt; 18 - idade &lt;&lt; " anos.\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/decisoes">$ ./cin
+Sua idade: 15            « a Ana digitou 15 e Enter
+Faltam 3 anos.
+$ ./cin
+Sua idade: 30
+Pode tirar a carteira de motorista.</pre>
+
+<hr>
+
+<h2>3. O que pode ser uma condição</h2>
+<p>A condição precisa resultar em <code>true</code> ou <code>false</code>. Além das comparações, valem:</p>
+<ul>
+  <li><strong>Uma variável <code>bool</code></strong>: <code>bool pagou = true; if (pagou) { … }</code>. Não precisa escrever <code>if (pagou == true)</code>.</li>
+  <li><strong>Um número</strong>: o C++ converte <code>0</code> em <code>false</code> e qualquer outro número em <code>true</code>. Herança da linguagem C.</li>
+</ul>
+
+<pre class="file" data-file="numero.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int estoque = 0;
+    if (estoque) {
+        std::cout &lt;&lt; "Tem no estoque\n";
+    } else {
+        std::cout &lt;&lt; "Esgotado\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/decisoes">$ ./numero
+Esgotado                 « 0 conta como false</pre>
+
+<p>Funciona, mas <code>if (estoque &gt; 0)</code> diz a mesma coisa de um jeito que qualquer pessoa entende. Prefira a comparação explícita com números; deixe o <code>if (x)</code> para variáveis <code>bool</code>.</p>
+
+<hr>
+
+<h2>4. Chaves: com e sem <code>{ }</code></h2>
+<p>Quando o bloco tem <strong>uma linha só</strong>, o C++ deixa você omitir as chaves:</p>
+
+<pre class="file" data-file="curto.cpp">if (nota &gt;= 7)
+    std::cout &lt;&lt; "Aprovada!\n";
+else
+    std::cout &lt;&lt; "Recuperação.\n";
+</pre>
+
+<p>Sem chaves, o <code>if</code> controla <strong>só a próxima instrução</strong>, até o primeiro <code>;</code>. O problema aparece quando alguém, depois, acrescenta uma segunda linha achando que ela também fica "dentro":</p>
+
+<pre class="file" data-file="semchaves.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 5.5;
+
+    if (nota &gt;= 7)
+        std::cout &lt;&lt; "Aprovada!\n";
+        std::cout &lt;&lt; "Parabéns!\n";
+
+    std::cout &lt;&lt; "Fim do boletim.\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/decisoes">$ g++ -std=c++23 -Wall -Wextra semchaves.cpp -o semchaves
+semchaves.cpp: In function ‘int main()’:
+semchaves.cpp:6:5: warning: this ‘if’ clause does not guard... [-Wmisleading-indentation]
+    6 |     if (nota &gt;= 7)
+      |     ^~
+semchaves.cpp:8:9: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the ‘if’
+    8 |         std::cout &lt;&lt; "Parabéns!\n";
+      |         ^~~
+$ ./semchaves
+Parabéns!                « nota 5.5, e mesmo assim deu parabéns!
+Fim do boletim.</pre>
+
+<p>A linha 8 está recuada como se fosse do <code>if</code>, mas para o compilador ela está <strong>fora</strong>: roda sempre. O aviso diz exatamente isso: "esta cláusula <code>if</code> não protege… esta instrução, mas a última está recuada de um jeito enganoso, como se fosse protegida pelo <code>if</code>". <em>Misleading indentation</em> = "indentação enganosa".</p>
+
+<div class="warning">
+<strong>Regra deste guia: chaves sempre</strong>
+<p>Use <code>{ }</code> mesmo com uma linha só. Custa dois caracteres e elimina esse bug. Em 2014, um erro desse tipo (uma linha duplicada depois de um <code>if</code> sem chaves) desligou uma verificação de segurança do sistema da Apple: o famoso bug "goto fail". Sem o <code>-Wall</code>, o g++ nem teria avisado.</p>
+</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode e veja o aviso e o "Parabéns!" indevido. Depois coloque chaves em volta das duas linhas do <code>if</code> e rode de novo.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 5.5;
+
+    if (nota &gt;= 7)
+        std::cout &lt;&lt; "Aprovada!\n";
+        std::cout &lt;&lt; "Parabéns!\n";
+
+    std::cout &lt;&lt; "Fim do boletim.\n";
+}
+</pre>
+</div>
+
+<h3>Onde pôr as chaves</h3>
+<p>Há dois estilos populares, e os dois são corretos. Escolha um e use sempre o mesmo:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Chave na mesma linha (usado neste guia)</th><th>Chave na linha de baixo</th></tr>
+<tr><td><pre>if (nota &gt;= 7) {
+    std::cout &lt;&lt; "Sim\n";
+} else {
+    std::cout &lt;&lt; "Não\n";
+}</pre></td><td><pre>if (nota &gt;= 7)
+{
+    std::cout &lt;&lt; "Sim\n";
+}
+else
+{
+    std::cout &lt;&lt; "Não\n";
+}</pre></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>5. Duas armadilhas: <code>=</code> no lugar de <code>==</code>, e o <code>;</code> depois do <code>if</code></h2>
+
+<h3><code>if (x = 5)</code>: atribuição em vez de comparação</h3>
+<p>Um <code>=</code> é <strong>atribuição</strong> ("x recebe 5"); dois, <code>==</code>, é <strong>comparação</strong> ("x é igual a 5?"). Trocar um pelo outro dentro do <code>if</code> compila, mas faz outra coisa:</p>
+
+<pre class="file" data-file="atrib.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int x = 3;
+    if (x = 5) {
+        std::cout &lt;&lt; "x vale 5\n";
+    }
+    std::cout &lt;&lt; "x agora é " &lt;&lt; x &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/decisoes">$ g++ -std=c++23 -Wall -Wextra atrib.cpp -o atrib
+atrib.cpp: In function ‘int main()’:
+atrib.cpp:5:11: warning: suggest parentheses around assignment used as truth value [-Wparentheses]
+    5 |     if (x = 5) {
+      |         ~~^~~
+$ ./atrib
+x vale 5                 « x valia 3, mas o if "deu certo"
+x agora é 5              « e ainda estragou o valor de x</pre>
+
+<p>O que aconteceu: <code>x = 5</code> guardou 5 em <code>x</code> e "devolveu" 5. Como 5 não é zero, contou como <code>true</code>. O aviso diz: "sugiro parênteses em volta de uma atribuição usada como valor verdade". Em português claro: "você quis mesmo atribuir aqui? Se foi engano, use <code>==</code>".</p>
+<p><strong>Conserto:</strong> <code>if (x == 5)</code>.</p>
+
+<h3><code>if (…);</code>: o ponto e vírgula que desliga o <code>if</code></h3>
+
+<pre class="file" data-file="pontovirgula.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 4.0;
+    if (nota &gt;= 7);
+    {
+        std::cout &lt;&lt; "Aprovada!\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/decisoes">$ g++ -std=c++23 -Wall -Wextra pontovirgula.cpp -o pontovirgula
+pontovirgula.cpp: In function ‘int main()’:
+pontovirgula.cpp:5:19: warning: suggest braces around empty body in an ‘if’ statement [-Wempty-body]
+    5 |     if (nota &gt;= 7);
+      |                   ^
+pontovirgula.cpp:5:5: warning: this ‘if’ clause does not guard... [-Wmisleading-indentation]
+    5 |     if (nota &gt;= 7);
+      |     ^~
+pontovirgula.cpp:6:5: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the ‘if’
+    6 |     {
+      |     ^
+$ ./pontovirgula
+Aprovada!                « com nota 4!</pre>
+
+<p>Aquele <code>;</code> sozinho é uma instrução vazia, e é <strong>ela</strong> que o <code>if</code> controla. O bloco <code>{ … }</code> logo abaixo virou um bloco comum, que roda sempre. O primeiro aviso, do <code>-Wextra</code>, diz: "sugiro chaves em volta do corpo vazio de um <code>if</code>". O segundo é o mesmo da seção 4.</p>
+<p><strong>Conserto:</strong> apague o <code>;</code> do fim da linha do <code>if</code>.</p>
+
+<hr>
+
+<h2>6. <code>if</code> com inicializador <span class="versao">C++17</span></h2>
+<p>Às vezes você calcula um valor só para testá-lo no <code>if</code> e usá-lo dentro dele. Desde o C++17, dá para criar essa variável <strong>dentro dos parênteses do <code>if</code></strong>, antes da condição, separada por <code>;</code>:</p>
+
+<pre class="file" data-file="inicial.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int pontos = 4;
+
+    if (int falta = 10 - pontos; falta &gt; 0) {
+        std::cout &lt;&lt; "Faltam " &lt;&lt; falta &lt;&lt; " pontos para o prêmio.\n";
+    } else {
+        std::cout &lt;&lt; "Prêmio liberado! Sobraram " &lt;&lt; -falta &lt;&lt; " pontos.\n";
+    }
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>int falta = 10 - pontos;</dt><dd>O <strong>inicializador</strong>: cria a variável <code>falta</code> (aqui, <code>6</code>). Termina com <code>;</code>.</dd>
+  <dt>falta &gt; 0</dt><dd>A condição de sempre, que já pode usar <code>falta</code>.</dd>
+  <dt>Dentro do if e do else</dt><dd><code>falta</code> existe nos dois blocos.</dd>
+  <dt>Depois do if</dt><dd><code>falta</code> deixa de existir. Esse é o objetivo: a variável só vive onde é útil, e não "polui" o resto do programa (aula <a href="escopo.html">Escopo</a>).</dd>
+</dl>
+
+<pre class="term" data-cwd="~/decisoes">$ g++ -std=c++23 -Wall -Wextra inicial.cpp -o inicial
+$ ./inicial
+Faltam 6 pontos para o prêmio.</pre>
+
+<p>Tentar usar <code>falta</code> depois do <code>if</code> dá erro:</p>
+
+<pre class="term" data-cwd="~/decisoes">$ g++ -std=c++23 -Wall -Wextra inicial2.cpp -o inicial2      « std::cout &lt;&lt; falta; depois do if
+inicial2.cpp: In function ‘int main()’:
+inicial2.cpp:9:18: error: ‘falta’ was not declared in this scope
+    9 |     std::cout &lt;&lt; falta &lt;&lt; "\n";
+      |                  ^~~~~</pre>
+
+<p>"<code>falta</code> não foi declarada neste escopo": para o compilador, fora do <code>if</code> ela nunca existiu. Com um padrão antigo, como <code>-std=c++14</code>, o g++ aceita mas avisa: <code>warning: init-statement in selection statements only available with ‘-std=c++17’ or ‘-std=gnu++17’ [-Wc++17-extensions]</code>. O jeito antigo era declarar a variável na linha de cima do <code>if</code>; também funciona, mas ela continua existindo até o fim do bloco de fora.</p>
+
+<hr>
+
+<h2>Formas diferentes + qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Quando usar</th></tr>
+<tr><td><code>if</code> com chaves</td><td><code>if (c) { … }</code></td><td>Sempre. É o padrão deste guia.</td></tr>
+<tr><td><code>if</code> sem chaves</td><td><code>if (c) x = 0;</code></td><td>Só uma instrução, na mesma linha. Evite: convida ao bug da seção 4.</td></tr>
+<tr><td><code>if</code> / <code>else</code></td><td><code>if (c) { … } else { … }</code></td><td>Dois caminhos.</td></tr>
+<tr><td><code>else if</code></td><td><code>if (…) {…} else if (…) {…} else {…}</code></td><td>Três ou mais caminhos. Aula <a href="else-if.html">else if</a>.</td></tr>
+<tr><td>Ternário</td><td><code>c ? a : b</code></td><td>Escolher entre dois <strong>valores</strong> numa linha. Aula <a href="ternario.html">Operador Ternário</a>.</td></tr>
+<tr><td><code>switch</code></td><td><code>switch (opcao) { case 1: … }</code></td><td>Comparar uma variável com uma lista de valores fixos. Aula <a href="switch.html">switch</a>.</td></tr>
+<tr><td><code>if</code> com inicializador</td><td><code>if (int r = f(); r &gt; 0)</code></td><td>Quando a variável só é útil para o <code>if</code>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>warning: this ‘if’ clause does not guard... [-Wmisleading-indentation]</code></strong>
+<p><strong>O que significa:</strong> o <code>if</code> não tem chaves, e uma linha recuada como se estivesse dentro dele, na verdade, está fora. Ou há um <code>;</code> logo depois do <code>)</code>.</p>
+<p><strong>Como consertar:</strong> ponha chaves em volta de todas as linhas que devem depender da condição, e confira se não há <code>;</code> depois do <code>)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>warning: suggest parentheses around assignment used as truth value [-Wparentheses]</code></strong>
+<p><strong>O que significa:</strong> há um <code>=</code> (atribuição) dentro da condição. Quase sempre, você queria <code>==</code>.</p>
+<p><strong>Como consertar:</strong> troque por <code>==</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: ‘else’ without a previous ‘if’</code></strong>
+<pre class="file" data-file="elsesolto.cpp">    if (nota &gt;= 7);
+        std::cout &lt;&lt; "Aprovada!\n";
+    else
+        std::cout &lt;&lt; "Recuperação.\n";
+</pre>
+<pre class="term" data-cwd="~/decisoes">$ g++ -std=c++23 -Wall -Wextra elsesolto.cpp -o elsesolto
+<em>…(os dois avisos de -Wempty-body e -Wmisleading-indentation)…</em>
+elsesolto.cpp:7:5: error: ‘else’ without a previous ‘if’
+    7 |     else
+      |     ^~~~</pre>
+<p><strong>O que significa:</strong> "<code>else</code> sem um <code>if</code> antes". Um <code>else</code> precisa vir <strong>imediatamente</strong> depois da instrução (ou do bloco) do <code>if</code>. Aqui, o <code>if</code> terminou no <code>;</code>, depois veio o <code>cout</code> (fora do <code>if</code>), e o <code>else</code> ficou sem par. O mesmo erro aparece quando há duas linhas entre um <code>if</code> sem chaves e o <code>else</code>.</p>
+<p><strong>Como consertar:</strong> tire o <code>;</code> depois do <code>)</code> e use chaves nos dois blocos.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: ‘falta’ was not declared in this scope</code></strong>
+<p><strong>O que significa:</strong> você usou fora do <code>if</code> (ou fora das chaves) uma variável criada dentro dele.</p>
+<p><strong>Como consertar:</strong> se precisa do valor depois, declare a variável <strong>antes</strong> do <code>if</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Comparar <code>double</code> com <code>==</code> dá "falso" quando deveria dar "verdadeiro"</strong>
+<p><strong>O que significa:</strong> <code>0.1 + 0.2 == 0.3</code> é <code>false</code>, porque os números com vírgula são guardados com pequenos erros (aula <a href="ponto-flutuante.html">float e double</a>).</p>
+<p><strong>Como consertar:</strong> com <code>double</code>, prefira <code>&lt;</code>, <code>&gt;=</code> etc. Para "igual", compare a diferença com uma margem: <code>if (std::abs(a - b) &lt; 0.0001)</code> (veja <a href="matematica.html">Matemática</a>).</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>if (cond) { … }</code></td><td>Roda o bloco só se <code>cond</code> for verdadeira</td></tr>
+<tr><td><code>if (cond) { … } else { … }</code></td><td>Um bloco ou o outro, nunca os dois</td></tr>
+<tr><td><code>if (int v = …; cond) { … }</code></td><td>Cria <code>v</code> só para o <code>if</code>/<code>else</code> (C++17)</td></tr>
+<tr><td><code>==</code> / <code>=</code></td><td>Compara / atribui. No <code>if</code>, quase sempre <code>==</code></td></tr>
+<tr><td><code>if (x)</code> com número</td><td><code>0</code> é falso; qualquer outro, verdadeiro</td></tr>
+<tr><td><code>-Wall -Wextra</code></td><td>Liga os avisos <code>-Wmisleading-indentation</code>, <code>-Wparentheses</code> e <code>-Wempty-body</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Complete o if</h3>
+<p>Complete para mostrar "Pode votar" se a idade for 16 ou mais:</p>
+<div class="ex-code"><input data-answer="if" aria-label="palavra"> (idade <input data-answer="&gt;=" aria-label="operador"> 16) { std::cout &lt;&lt; "Pode votar\n"; }</div>
+</div>
+
+<div class="exercise">
+<h3>2. Senão</h3>
+<p>Complete com a palavra que dá o caminho alternativo:</p>
+<div class="ex-code">if (saldo &gt;= preco) { comprar(); } <input data-answer="else" aria-label="palavra"> { avisar(); }</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Com <code>int x = 0;</code>, o que mostra <code>if (x = 1) { std::cout &lt;&lt; "A"; } else { std::cout &lt;&lt; "B"; }</code>?</p>
+<label><input type="radio" name="q3"> <code>B</code>, porque x valia 0</label>
+<label><input type="radio" name="q3"> <code>A</code>, porque <code>x = 1</code> guarda 1 e 1 conta como verdadeiro</label>
+<label><input type="radio" name="q3"> Erro de compilação</label>
+<label><input type="radio" name="q3"> Nada</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Com nota 3, o que este código mostra? <code>if (nota &gt;= 7) std::cout &lt;&lt; "A"; std::cout &lt;&lt; "B";</code></p>
+<label><input type="radio" name="q4"> Nada</label>
+<label><input type="radio" name="q4"> <code>AB</code></label>
+<label><input type="radio" name="q4"> <code>B</code></label>
+<label><input type="radio" name="q4"> <code>A</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Em <code>if (int r = 10 % 3; r == 1) { … }</code>, onde a variável <code>r</code> pode ser usada?</p>
+<label><input type="radio" name="q5"> Na condição e nos blocos do <code>if</code> e do <code>else</code></label>
+<label><input type="radio" name="q5"> Em qualquer lugar do <code>main</code></label>
+<label><input type="radio" name="q5"> Só na condição</label>
+<label><input type="radio" name="q5"> Em lugar nenhum: é erro</label>
+</div>
+
+<h3>Missão final: o frete grátis</h3>
+
+<div class="trycpp" data-goal="out:Faltam R$ 17.50 para o frete grátis.,src:if\s*\(\s*double\s+\w+\s*=[^;]*;,src:else">
+<p class="try-task"><strong>Missão:</strong> a lojinha da Ana dá frete grátis em compras de R$ 100 ou mais. Usando um <code>if</code> com inicializador (<code>if (double falta = …; …)</code>), mostre <code>Faltam R$ 17.50 para o frete grátis.</code> quando faltar dinheiro, e <code>Frete grátis!</code> no <code>else</code>. Depois, mude o total para 120 e confira o outro caminho. Para as duas casas, use <code>std::println</code> com <code>{:.2f}</code> (aula <a href="format-print.html">std::format e std::print</a>).</p>
+<pre class="script">#include &lt;print&gt;
+
+int main() {
+    double total = 82.5;
+    // escreva o if aqui
+}
+</pre>
+<pre class="solucao">#include &lt;print&gt;
+
+int main() {
+    double total = 82.5;
+    if (double falta = 100 - total; falta &gt; 0) {
+        std::println("Faltam R$ {:.2f} para o frete grátis.", falta);
+    } else {
+        std::println("Frete grátis!");
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>if (condição) { … }</code> roda o bloco só se a condição for verdadeira. <code>else { … }</code> roda no caso contrário.</li>
+  <li>A condição vai entre parênteses e resulta em <code>true</code>/<code>false</code>. Números também servem (0 = falso), mas prefira comparações explícitas.</li>
+  <li>Use <strong>sempre</strong> chaves: sem elas, o <code>if</code> controla uma linha só, e a segunda linha roda sempre (<code>-Wmisleading-indentation</code>).</li>
+  <li><code>if (x = 5)</code> atribui em vez de comparar (<code>-Wparentheses</code>). <code>if (…);</code> desliga o <code>if</code> (<code>-Wempty-body</code>).</li>
+  <li><code>if (int v = …; v &gt; 0)</code> <span class="versao">C++17</span> cria uma variável que só existe dentro do <code>if</code>/<code>else</code>.</li>
+  <li>Compile sempre com <code>-Wall -Wextra</code>: os três avisos desta aula pegam bugs reais.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
