@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Templates de Classe — Caixa&lt;T&gt;, CTAD e por que ficam no .h | Guia C++</title>
+<meta name="description" content="Templates de classe em C++ para quem nunca programou: template &lt;typename T&gt; class Caixa, Caixa&lt;int&gt;, dedução pelo construtor (CTAD, C++17), std::vector como template e por que o template fica no .h, com o erro real de ligação do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Templates de Classe</span></h1>
+
+<p class="intro">Na aula <a href="templates-funcao.html">Templates de Função</a>, você escreveu uma função-molde que serve para qualquer tipo. A mesma ideia vale para <strong>classes</strong>: uma classe <code>Caixa</code> que guarda um <code>int</code>, ou um texto, ou um preço, escrita uma vez só. Você já usa isso desde o Nível 1 sem saber: <code>std::vector&lt;int&gt;</code> é um template de classe, e o <code>&lt;int&gt;</code> é você dizendo qual "massa" vai na forma.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como escrever um template de classe: <code>template &lt;typename T&gt; class Caixa</code>.</li>
+  <li>Como criar objetos dele: <code>Caixa&lt;int&gt;</code>, <code>Caixa&lt;std::string&gt;</code>.</li>
+  <li>Como o C++17 descobre o tipo pelo construtor (<code>Caixa c{5};</code>), a "CTAD", e a armadilha do texto entre aspas.</li>
+  <li>Por que <code>std::vector</code> é um template, e o que o <code>&lt;int&gt;</code> significa.</li>
+  <li>Como escrever os métodos fora da classe.</li>
+  <li>Por que templates ficam no arquivo <code>.h</code>, e o erro real de ligação (<code>referência não definida</code>) quando você os separa.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Você precisa conhecer <a href="classes-objetos.html">Classes e Objetos</a>, <a href="construtores.html">Construtores</a> e <a href="metodos-const.html">Métodos const</a>.</p>
+
+<hr>
+
+<h2>A ideia: a caixa de presente</h2>
+<p>Uma loja vende caixas de presente do mesmo modelo: tampa, laço, etiqueta. Numa vai um livro, noutra um perfume, noutra um par de meias. O <strong>modelo da caixa</strong> é o mesmo; muda o que vai dentro.</p>
+
+<p>Um template de classe é o projeto da caixa. Na hora de usar, você diz o que vai dentro: <code>Caixa&lt;int&gt;</code> é "uma caixa que guarda um <code>int</code>"; <code>Caixa&lt;std::string&gt;</code> é "uma caixa que guarda um texto". Para o compilador, essas são <strong>duas classes diferentes</strong>, geradas a partir do mesmo molde.</p>
+
+<hr>
+
+<h2>1. O primeiro template de classe</h2>
+
+<pre class="file" data-file="caixa.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+template &lt;typename T&gt;
+class Caixa {
+public:
+    Caixa(T valor) : conteudo{valor} {}
+
+    T pegar() const {
+        return conteudo;
+    }
+
+    void trocar(T novo) {
+        conteudo = novo;
+    }
+
+private:
+    T conteudo;
+};
+
+int main() {
+    Caixa&lt;int&gt; moedas{25};
+    Caixa&lt;std::string&gt; bilhete{"Feliz aniversário!"};
+    Caixa&lt;double&gt; peso{1.75};
+
+    std::cout &lt;&lt; moedas.pegar() &lt;&lt; '\n';
+    std::cout &lt;&lt; bilhete.pegar() &lt;&lt; '\n';
+    std::cout &lt;&lt; peso.pegar() &lt;&lt; '\n';
+
+    moedas.trocar(40);
+    std::cout &lt;&lt; moedas.pegar() &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>template &lt;typename T&gt;</dt><dd>A mesma linha dos templates de função: "o que vem abaixo é um molde, e <code>T</code> é o tipo em branco".</dd>
+  <dt>class Caixa { … };</dt><dd>Uma classe comum, só que pode usar <code>T</code> em qualquer lugar onde usaria um tipo.</dd>
+  <dt>Caixa(T valor) : conteudo{valor} {}</dt><dd>O <a href="construtores.html">construtor</a> recebe um <code>T</code> e guarda em <code>conteudo</code> (a lista depois dos <code>:</code> inicializa o atributo).</dd>
+  <dt>T pegar() const</dt><dd>Um método que devolve o que está na caixa. O <code>const</code> promete não mexer no objeto (aula <a href="metodos-const.html">Métodos const</a>).</dd>
+  <dt>void trocar(T novo)</dt><dd>Troca o conteúdo por outro <strong>do mesmo tipo</strong> <code>T</code>.</dd>
+  <dt>T conteudo;</dt><dd>O atributo <a href="encapsulamento.html">privado</a>: um <code>int</code> numa <code>Caixa&lt;int&gt;</code>, um <code>std::string</code> numa <code>Caixa&lt;std::string&gt;</code>.</dd>
+  <dt>Caixa&lt;int&gt; moedas{25};</dt><dd>Cria um objeto. O <code>&lt;int&gt;</code> diz o que vai no lugar de <code>T</code>. O nome completo do tipo é <code>Caixa&lt;int&gt;</code>; <code>Caixa</code> sozinho é só o molde.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra caixa.cpp -o caixa
+$ ./caixa
+25
+Feliz aniversário!
+1.75
+40</pre>
+
+<p>Com um molde, três classes: <code>Caixa&lt;int&gt;</code>, <code>Caixa&lt;std::string&gt;</code> e <code>Caixa&lt;double&gt;</code>. E cada uma é rígida com o seu tipo. Tente pôr um texto na caixa de moedas:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra caixa-errada.cpp -o caixa-errada     « moedas.trocar("quarenta");
+caixa-errada.cpp: In function ‘int main()’:
+caixa-errada.cpp:14:19: error: invalid conversion from ‘const char*’ to ‘int’ [-fpermissive]
+   14 |     moedas.trocar("quarenta");
+      |                   ^~~~~~~~~~
+      |                   |
+      |                   const char*
+caixa-errada.cpp:7:19: note: initializing argument 1 of ‘void Caixa&lt;T&gt;::trocar(T) [with T = int]’
+    7 |     void trocar(T novo) { conteudo = novo; }
+      |                 ~~^~~~</pre>
+
+<p>"Conversão inválida de <code>const char*</code> (um texto entre aspas) para <code>int</code>." A nota explica onde: no argumento 1 de <code>Caixa&lt;T&gt;::trocar(T)</code> <strong>com <code>T = int</code></strong>. Depois que você escolheu <code>int</code>, a <code>moedas</code> é uma caixa de inteiros para sempre. É a mesma proteção do <code>std::vector&lt;int&gt;</code>, que não aceita textos.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> crie uma <code>Caixa&lt;char&gt;</code> com a letra <code>'A'</code> e mostre o conteúdo. Depois crie uma <code>Caixa&lt;bool&gt;</code> com <code>true</code> e mostre (o <code>cout</code> escreve <code>1</code>). Por fim, tente <code>moedas.trocar(2.9);</code>: compila? O que aparece?</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+template &lt;typename T&gt;
+class Caixa {
+public:
+    Caixa(T valor) : conteudo{valor} {}
+    T pegar() const { return conteudo; }
+    void trocar(T novo) { conteudo = novo; }
+private:
+    T conteudo;
+};
+
+int main() {
+    Caixa&lt;int&gt; moedas{25};
+    std::cout &lt;&lt; moedas.pegar() &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. CTAD: deixar o compilador descobrir o <code>T</code> <span class="versao">C++17</span></h2>
+<p>Com templates de função, o compilador deduz o tipo pelos argumentos. Até o C++14, isso <strong>não</strong> valia para classes: era obrigatório escrever <code>Caixa&lt;int&gt;</code>. Desde o C++17, o compilador deduz pelo que você passa ao construtor. O nome técnico é <strong>CTAD</strong> (<em>Class Template Argument Deduction</em>, "dedução de argumentos de template de classe").</p>
+
+<pre class="file" data-file="ctad.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+template &lt;typename T&gt;
+class Caixa {
+public:
+    Caixa(T valor) : conteudo{valor} {}
+    T pegar() const { return conteudo; }
+private:
+    T conteudo;
+};
+
+int main() {
+    Caixa a{5};
+    Caixa b{2.5};
+    Caixa c{std::string("Ana")};
+    std::vector notas{7, 9, 10};
+
+    std::cout &lt;&lt; a.pegar() &lt;&lt; ' ' &lt;&lt; b.pegar() &lt;&lt; ' ' &lt;&lt; c.pegar() &lt;&lt; '\n';
+    std::cout &lt;&lt; notas.size() &lt;&lt; " notas\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ctad.cpp -o ctad
+$ ./ctad
+5 2.5 Ana
+3 notas</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você escreveu</th><th>O compilador entendeu</th><th>Por quê</th></tr>
+<tr><td><code>Caixa a{5};</code></td><td><code>Caixa&lt;int&gt; a{5};</code></td><td><code>5</code> é <code>int</code></td></tr>
+<tr><td><code>Caixa b{2.5};</code></td><td><code>Caixa&lt;double&gt; b{2.5};</code></td><td><code>2.5</code> é <code>double</code></td></tr>
+<tr><td><code>Caixa c{std::string("Ana")};</code></td><td><code>Caixa&lt;std::string&gt; c{…};</code></td><td>o argumento é um <code>std::string</code></td></tr>
+<tr><td><code>std::vector notas{7, 9, 10};</code></td><td><code>std::vector&lt;int&gt; notas{7, 9, 10};</code></td><td>os elementos são <code>int</code></td></tr>
+</table>
+</div>
+
+<p>Com um padrão mais antigo, o mesmo arquivo nem compila. O g++ reclama que <strong>faltam os argumentos do template</strong>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++14 -Wall -Wextra ctad.cpp -o ctad
+ctad.cpp: In function ‘int main()’:
+ctad.cpp:15:11: error: missing template arguments before ‘a’
+   15 |     Caixa a{5};
+      |           ^
+ctad.cpp:16:11: error: missing template arguments before ‘b’
+   16 |     Caixa b{2.5};
+      |           ^
+ctad.cpp:17:11: error: missing template arguments before ‘c’
+   17 |     Caixa c{std::string("Ana")};
+      |           ^
+ctad.cpp:18:17: error: missing template arguments before ‘notas’
+   18 |     std::vector notas{7, 9, 10};
+      |                 ^~~~~
+ctad.cpp:20:18: error: ‘a’ was not declared in this scope
+   20 |     std::cout &lt;&lt; a.pegar() &lt;&lt; ' ' &lt;&lt; b.pegar() &lt;&lt; ' ' &lt;&lt; c.pegar() &lt;&lt; '\n';
+      |                  ^
+ctad.cpp:20:38: error: ‘b’ was not declared in this scope
+   20 |     std::cout &lt;&lt; a.pegar() &lt;&lt; ' ' &lt;&lt; b.pegar() &lt;&lt; ' ' &lt;&lt; c.pegar() &lt;&lt; '\n';
+      |                                      ^
+ctad.cpp:20:58: error: ‘c’ was not declared in this scope
+   20 |     std::cout &lt;&lt; a.pegar() &lt;&lt; ' ' &lt;&lt; b.pegar() &lt;&lt; ' ' &lt;&lt; c.pegar() &lt;&lt; '\n';
+      |                                                          ^
+ctad.cpp:21:18: error: ‘notas’ was not declared in this scope
+   21 |     std::cout &lt;&lt; notas.size() &lt;&lt; " notas\n";
+      |                  ^~~~~</pre>
+
+<p>Oito erros, mas só quatro de verdade: os quatro <code>missing template arguments</code> ("faltam argumentos de template antes de…"). Os outros (<code>‘a’ was not declared</code>) são consequência: como a linha 15 falhou, <code>a</code> nunca existiu. Esse é o motivo de o guia compilar sempre com <code>-std=c++23</code>.</p>
+
+<h3>A armadilha do texto entre aspas</h3>
+<p>Por que o exemplo escreveu <code>std::string("Ana")</code> e não só <code>"Ana"</code>? Porque um texto entre aspas não é um <code>std::string</code>; é um ponteiro para caracteres, herança do C. Veja o que a CTAD deduz:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ctad-texto.cpp -o ctad-texto     « Caixa nome{"Ana"};  e depois  nome.pegar().size()
+ctad-texto.cpp: In function ‘int main()’:
+ctad-texto.cpp:15:31: error: request for member ‘size’ in ‘nome.Caixa&lt;const char*&gt;::pegar()’, which is of non-class type ‘const char*’
+   15 |     std::cout &lt;&lt; nome.pegar().size() &lt;&lt; '\n';
+      |                               ^~~~</pre>
+
+<p>A mensagem entrega o que aconteceu: <code>Caixa&lt;const char*&gt;</code>. O <code>T</code> virou <code>const char*</code>, que não tem <code>.size()</code> ("pedido do membro <code>size</code> em algo que não é classe"). Quando quiser texto, diga <code>Caixa&lt;std::string&gt; nome{"Ana"};</code> ou passe um <code>std::string</code>.</p>
+
+<div class="tip">
+<strong>Quando escrever o tipo, quando deixar a CTAD trabalhar</strong>
+<p>Use a CTAD quando o tipo é óbvio pelo valor (<code>std::vector notas{7, 9, 10}</code>). Escreva o tipo quando ele não é óbvio, quando o valor engana (textos entre aspas) ou quando o objeto começa vazio: <code>std::vector&lt;int&gt; notas;</code> não tem valor nenhum para o compilador olhar.</p>
+</div>
+
+<p>Por falar em "começar vazio": a CTAD precisa de um argumento para olhar. Sem argumento, ela falha:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sem-args.cpp -o sem-args     « Caixa vazia;
+sem-args.cpp: In function ‘int main()’:
+sem-args.cpp:10:11: error: class template argument deduction failed:
+   10 |     Caixa vazia;
+      |           ^~~~~
+sem-args.cpp:10:11: error: no matching function for call to ‘Caixa()’
+sem-args.cpp:10:11: note: there are 2 candidates
+sem-args.cpp:4:5: note: candidate 1: ‘template&lt;class T&gt; Caixa(T) -&gt; Caixa&lt;T&gt;’
+    4 |     Caixa(T valor) : conteudo{valor} {}
+      |     ^~~~~
+sem-args.cpp:4:5: note: candidate expects 1 argument, 0 provided
+sem-args.cpp:2:7: note: candidate 2: ‘template&lt;class T&gt; Caixa(Caixa&lt;T&gt;) -&gt; Caixa&lt;T&gt;’
+    2 | class Caixa {
+      |       ^~~~~
+sem-args.cpp:2:7: note: candidate expects 1 argument, 0 provided</pre>
+
+<p>"A dedução de argumentos de template de classe falhou." As notas mostram as "regras de dedução" que o compilador criou a partir dos construtores (<code>Caixa(T) -&gt; Caixa&lt;T&gt;</code>: "se receber um <code>T</code>, é uma <code>Caixa&lt;T&gt;</code>") e dizem que todas esperam 1 argumento, e você deu 0.</p>
+
+<hr>
+
+<h2>3. <code>std::vector</code> é um template</h2>
+<p>Agora o <code>std::vector&lt;int&gt;</code> da aula <a href="vector.html">std::vector</a> faz sentido por inteiro: <code>vector</code> é um template de classe da biblioteca padrão, e <code>&lt;int&gt;</code> é o argumento do template. Dá para ver a primeira linha dele no cabeçalho que vem com o g++:</p>
+
+<pre class="term" data-cwd="~/cpp">$ sed -n 457,458p /usr/include/c++/15/bits/stl_vector.h
+  template&lt;typename _Tp, typename _Alloc = std::allocator&lt;_Tp&gt; &gt;
+    class vector : protected _Vector_base&lt;_Tp, _Alloc&gt;</pre>
+
+<dl class="anatomy">
+  <dt>template&lt;typename _Tp, …&gt;</dt><dd>O mesmo <code>template &lt;typename T&gt;</code> que você escreveu. A biblioteca chama o tipo de <code>_Tp</code> (nomes com <code>_</code> no começo são reservados para ela).</dd>
+  <dt>typename _Alloc = std::allocator&lt;_Tp&gt;</dt><dd>Um <strong>segundo</strong> parâmetro, com <strong>valor padrão</strong> (o <code>=</code>), como os <a href="valor-padrao.html">valores padrão</a> de funções. Ele diz como o vetor pede memória. Você quase nunca mexe nele; por isso escreve só <code>std::vector&lt;int&gt;</code>.</dd>
+  <dt>class vector</dt><dd>A classe em si. O resto (<code>protected _Vector_base…</code>) é <a href="heranca.html">herança</a>, um detalhe interno.</dd>
+</dl>
+
+<p>Quase tudo na biblioteca padrão é template: <code>std::vector&lt;T&gt;</code>, <code>std::map&lt;Chave, Valor&gt;</code> (aula <a href="map.html">std::map</a>), <code>std::optional&lt;T&gt;</code>, <code>std::unique_ptr&lt;T&gt;</code> (aula <a href="smart-pointers.html">Ponteiros Inteligentes</a>). Até <code>std::string</code> é um apelido para <code>std::basic_string&lt;char&gt;</code>. Por isso os nomes nas mensagens de erro ficam tão compridos.</p>
+
+<div class="note">
+<strong>Parâmetros que não são tipos</strong>
+<p>Um template também pode receber um <strong>número</strong>. O <a href="std-array.html">std::array</a> é assim: em <code>std::array&lt;int, 5&gt;</code>, o <code>int</code> é o tipo e o <code>5</code> é o tamanho, fixo, conhecido na compilação. Você escreveria algo como <code>template &lt;typename T, int N&gt; class Prateleira</code>. É menos comum no dia a dia; basta reconhecer.</p>
+</div>
+
+<hr>
+
+<h2>4. Métodos escritos fora da classe</h2>
+<p>Numa classe comum, você pode declarar o método dentro e escrever o corpo fora, com <code>Classe::metodo</code> (aula <a href="metodos.html">Métodos</a>). Num template, a linha <code>template &lt;typename T&gt;</code> precisa ser <strong>repetida</strong> antes de cada corpo, e o nome da classe vira <code>Caixa&lt;T&gt;</code>:</p>
+
+<pre class="file" data-file="caixa.h">#pragma once
+
+template &lt;typename T&gt;
+class Caixa {
+public:
+    Caixa(T valor);
+    T pegar() const;
+private:
+    T conteudo;
+};
+
+template &lt;typename T&gt;
+Caixa&lt;T&gt;::Caixa(T valor) : conteudo{valor} {}
+
+template &lt;typename T&gt;
+T Caixa&lt;T&gt;::pegar() const {
+    return conteudo;
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>Caixa(T valor);</dt><dd>Dentro da classe, só a <strong>declaração</strong> (sem corpo, com <code>;</code>).</dd>
+  <dt>template &lt;typename T&gt;</dt><dd>Repetido antes de cada corpo escrito fora: cada corpo também é um molde.</dd>
+  <dt>Caixa&lt;T&gt;::pegar()</dt><dd>"O método <code>pegar</code> da <code>Caixa&lt;T&gt;</code>". Esquecer o <code>&lt;T&gt;</code> aqui é um erro comum.</dd>
+  <dt>#pragma once</dt><dd>Impede que o cabeçalho seja incluído duas vezes (aula <a href="headers.html">Arquivos .h e .cpp</a>).</dd>
+</dl>
+
+<p>Repare que, aqui, os corpos estão <strong>no mesmo arquivo <code>.h</code></strong>, logo abaixo da classe. Isso não é descuido. É o assunto da próxima seção.</p>
+
+<hr>
+
+<h2>5. Por que templates ficam no <code>.h</code></h2>
+<p>Na aula <a href="headers.html">Arquivos .h e .cpp</a>, você aprendeu a regra: declarações no <code>.h</code>, corpos no <code>.cpp</code>. A Ana seguiu a regra com a <code>Caixa</code>:</p>
+
+<pre class="file" data-file="caixa-separada/caixa.h">#pragma once
+
+template &lt;typename T&gt;
+class Caixa {
+public:
+    Caixa(T valor);
+    T pegar() const;
+private:
+    T conteudo;
+};
+</pre>
+
+<pre class="file" data-file="caixa-separada/caixa.cpp">#include "caixa.h"
+
+template &lt;typename T&gt;
+Caixa&lt;T&gt;::Caixa(T valor) : conteudo{valor} {}
+
+template &lt;typename T&gt;
+T Caixa&lt;T&gt;::pegar() const {
+    return conteudo;
+}
+</pre>
+
+<pre class="file" data-file="caixa-separada/main.cpp">#include &lt;iostream&gt;
+#include "caixa.h"
+
+int main() {
+    Caixa&lt;int&gt; moedas{25};
+    std::cout &lt;&lt; moedas.pegar() &lt;&lt; '\n';
+}
+</pre>
+
+<p>Cada arquivo compila sem erro. Mas na hora de juntar:</p>
+
+<pre class="term" data-cwd="~/cpp/caixa-separada">$ g++ -std=c++23 -Wall -Wextra caixa.cpp main.cpp -o caixa
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccMfHt4T.o: na função "main":
+main.cpp:(.text+0x28): referência não definida para "Caixa&lt;int&gt;::Caixa(int)"
+/usr/bin/x86_64-linux-gnu-ld.bfd: main.cpp:(.text+0x34): referência não definida para "Caixa&lt;int&gt;::pegar() const"
+collect2: error: ld returned 1 exit status</pre>
+
+<dl class="anatomy">
+  <dt>/usr/bin/x86_64-linux-gnu-ld.bfd</dt><dd>Quem reclama não é o compilador: é o <strong>ligador</strong> (<code>ld</code>, de <em>linker</em>), o programa que junta os pedaços compilados num executável (aula <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>). O ligador do Ubuntu fala português, por isso essa parte saiu traduzida.</dd>
+  <dt>/tmp/ccMfHt4T.o: na função "main"</dt><dd>O pedaço compilado do <code>main.cpp</code> (um arquivo temporário, com nome sorteado), dentro da função <code>main</code>.</dd>
+  <dt>referência não definida para "Caixa&lt;int&gt;::Caixa(int)"</dt><dd>"O <code>main</code> chama o construtor de <code>Caixa&lt;int&gt;</code>, e eu não achei o corpo dele em lugar nenhum." O mesmo para <code>pegar()</code>.</dd>
+  <dt>collect2: error: ld returned 1 exit status</dt><dd>O resumo: a ligação falhou, nenhum executável foi criado.</dd>
+</dl>
+
+<h3>O que aconteceu, passo a passo</h3>
+<p>Lembre: um template é um <strong>molde</strong>, e o compilador só "assa" uma função quando vê alguém usando o molde com um tipo. E o g++ compila <strong>cada <code>.cpp</code> sozinho</strong>, sem olhar os outros. Dá para ver o que saiu de cada um com <code>-c</code> (só compilar, sem ligar) e o <code>nm</code> (lista as funções de um arquivo compilado):</p>
+
+<pre class="term" data-cwd="~/cpp/caixa-separada">$ g++ -std=c++23 -Wall -Wextra -c caixa.cpp
+$ nm -C caixa.o                                  « vazio: nenhuma função foi gerada!
+$ g++ -std=c++23 -Wall -Wextra -c main.cpp
+$ nm -C main.o | grep Caixa
+                 U Caixa&lt;int&gt;::Caixa(int)       « U = undefined: "preciso disto, alguém tem?"
+                 U Caixa&lt;int&gt;::pegar() const</pre>
+
+<ol class="passo">
+  <li>Ao compilar <code>caixa.cpp</code>, o compilador vê os moldes, mas <strong>ninguém</strong> ali usa <code>Caixa&lt;int&gt;</code>. Ele não sabe que tipos você vai querer, então não gera nada. O <code>caixa.o</code> sai vazio.</li>
+  <li>Ao compilar <code>main.cpp</code>, ele vê o uso de <code>Caixa&lt;int&gt;</code>, mas o <code>caixa.h</code> só tem as <strong>declarações</strong>. Sem o corpo, não dá para assar. Ele anota "preciso de <code>Caixa&lt;int&gt;::pegar()</code>" e confia que algum outro arquivo vai ter.</li>
+  <li>O ligador procura <code>Caixa&lt;int&gt;::pegar()</code> nos dois arquivos e não acha: <code>referência não definida</code>.</li>
+</ol>
+
+<p><strong>A solução:</strong> o corpo do template precisa estar visível onde ele é usado. Na prática, <strong>o template inteiro vai no <code>.h</code></strong> (como no <code>caixa.h</code> da seção 4), e não existe <code>caixa.cpp</code>:</p>
+
+<pre class="term" data-cwd="~/cpp/caixa-junta">$ g++ -std=c++23 -Wall -Wextra main.cpp -o caixa
+$ ./caixa
+25</pre>
+
+<p>É por isso que os cabeçalhos da biblioteca padrão (<code>&lt;vector&gt;</code>, <code>&lt;map&gt;</code>) são enormes e cheios de código: são templates, e templates moram no cabeçalho.</p>
+
+<div class="note">
+<strong>Existe outro jeito (raro)</strong>
+<p>Se você sabe de antemão todos os tipos que vai usar, pode manter o <code>caixa.cpp</code> e pedir a geração explicitamente, no fim dele: <code>template class Caixa&lt;int&gt;;</code> ("instanciação explícita"). A Ana testou: com essa linha, o mesmo comando liga e o programa mostra <code>25</code>. Mas aí uma <code>Caixa&lt;double&gt;</code> volta a dar <code>referência não definida</code>. Para começar, fique com "template inteiro no <code>.h</code>".</p>
+</div>
+
+<hr>
+
+<h2>6. Formas diferentes, e qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Quando usar</th></tr>
+<tr><td>Tipo escrito</td><td><code>Caixa&lt;int&gt; moedas{25};</code></td><td>Sempre funciona. Use quando o tipo não é óbvio, quando o objeto começa vazio ou com textos entre aspas.</td></tr>
+<tr><td>CTAD <span class="versao">C++17</span></td><td><code>Caixa moedas{25};</code></td><td>Quando o valor deixa o tipo óbvio.</td></tr>
+<tr><td>Métodos dentro da classe</td><td><code>T pegar() const { return conteudo; }</code></td><td>Métodos curtos. O jeito mais simples.</td></tr>
+<tr><td>Métodos fora da classe, no mesmo <code>.h</code></td><td><code>template &lt;typename T&gt; T Caixa&lt;T&gt;::pegar() const {…}</code></td><td>Classes grandes, para a declaração da classe ficar curta de ler.</td></tr>
+<tr><td>Corpos num <code>.cpp</code> separado</td><td><code>caixa.cpp</code></td><td>Não use com templates (dá <code>referência não definida</code>), salvo com instanciação explícita.</td></tr>
+</table>
+</div>
+
+<div class="trycpp" data-goal="out:9,out:4.99,src:template\s*&lt;\s*(typename|class)\s+T\s*&gt;\s*class\s+Dupla">
+<p class="try-task"><strong>Missão:</strong> transforme a classe <code>Dupla</code> (que hoje só guarda <code>int</code>) num template, para que o <code>main</code> funcione com notas inteiras <strong>e</strong> com preços. A saída deve ser <code>9</code> e <code>4.99</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+class Dupla {
+public:
+    Dupla(int a, int b) : primeiro{a}, segundo{b} {}
+
+    int maior() const {
+        return primeiro &gt; segundo ? primeiro : segundo;
+    }
+
+private:
+    int primeiro;
+    int segundo;
+};
+
+int main() {
+    Dupla&lt;int&gt; notas{7, 9};
+    Dupla precos{4.99, 3.50};
+    std::cout &lt;&lt; notas.maior() &lt;&lt; '\n';
+    std::cout &lt;&lt; precos.maior() &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+template &lt;typename T&gt;
+class Dupla {
+public:
+    Dupla(T a, T b) : primeiro{a}, segundo{b} {}
+
+    T maior() const {
+        return primeiro &gt; segundo ? primeiro : segundo;
+    }
+
+private:
+    T primeiro;
+    T segundo;
+};
+
+int main() {
+    Dupla&lt;int&gt; notas{7, 9};
+    Dupla precos{4.99, 3.50};
+    std::cout &lt;&lt; notas.maior() &lt;&lt; '\n';
+    std::cout &lt;&lt; precos.maior() &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>referência não definida para "Caixa&lt;int&gt;::pegar() const"</code> (<code>undefined reference</code>)</strong>
+<p><strong>O que significa:</strong> o corpo do template está num <code>.cpp</code> separado, e o arquivo que usa o template só viu a declaração. (Num sistema em inglês, a mensagem é <code>undefined reference to</code>.)</p>
+<p><strong>Como consertar:</strong> mova os corpos para o <code>.h</code>, logo abaixo da classe, e apague o <code>.cpp</code> do template.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: missing template arguments before ‘a’</code></strong>
+<p><strong>O que significa:</strong> você escreveu <code>Caixa a{5};</code> num padrão anterior ao C++17, que não tem CTAD.</p>
+<p><strong>Como consertar:</strong> compile com <code>-std=c++23</code>, ou escreva o tipo: <code>Caixa&lt;int&gt; a{5};</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: class template argument deduction failed</code></strong>
+<p><strong>O que significa:</strong> você pediu a CTAD (sem <code>&lt;tipo&gt;</code>) e não deu nenhum valor do qual o tipo possa ser deduzido, como em <code>Caixa vazia;</code> ou <code>std::vector lista;</code>.</p>
+<p><strong>Como consertar:</strong> escreva o tipo: <code>std::vector&lt;int&gt; lista;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>request for member ‘size’ in … which is of non-class type ‘const char*’</code></strong>
+<p><strong>O que significa:</strong> a CTAD deduziu <code>const char*</code> de um texto entre aspas, e esse tipo não tem métodos.</p>
+<p><strong>Como consertar:</strong> <code>Caixa&lt;std::string&gt; nome{"Ana"};</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: invalid conversion from ‘const char*’ to ‘int’</code> com <code>[with T = int]</code></strong>
+<p><strong>O que significa:</strong> o objeto foi criado com um tipo (<code>Caixa&lt;int&gt;</code>) e você tentou guardar outro.</p>
+<p><strong>Como consertar:</strong> crie outro objeto, do tipo certo (<code>Caixa&lt;std::string&gt;</code>). Um objeto nunca muda de tipo.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>template &lt;typename T&gt; class Caixa { … };</code></td><td>Declara um template de classe</td></tr>
+<tr><td><code>Caixa&lt;int&gt; c{5};</code></td><td>Objeto de <code>Caixa</code> com <code>T = int</code></td></tr>
+<tr><td><code>Caixa c{5};</code> <span class="versao">C++17</span></td><td>CTAD: <code>T</code> deduzido pelo construtor</td></tr>
+<tr><td><code>template &lt;typename T&gt; T Caixa&lt;T&gt;::pegar() const { … }</code></td><td>Corpo de método escrito fora da classe</td></tr>
+<tr><td><code>template &lt;typename T, typename U = int&gt;</code></td><td>Dois parâmetros, o segundo com valor padrão</td></tr>
+<tr><td><code>template &lt;typename T, int N&gt;</code></td><td>Parâmetro que é um número (como em <code>std::array&lt;int, 5&gt;</code>)</td></tr>
+<tr><td><code>template class Caixa&lt;int&gt;;</code></td><td>Instanciação explícita (gera <code>Caixa&lt;int&gt;</code> naquele <code>.cpp</code>)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Usar o template</h3>
+<p>Complete para criar uma caixa de <code>double</code> com o valor 9.90, escrevendo o tipo:</p>
+<div class="ex-code">Caixa<input data-answer="&lt;double&gt;" aria-label="tipo"> preco{9.90};</div>
+</div>
+
+<div class="exercise">
+<h3>2. Corpo fora da classe</h3>
+<p>Complete a primeira linha do corpo do método <code>trocar</code>, escrito fora da classe:</p>
+<div class="ex-code">template &lt;typename T&gt;<br>void <input data-answer="Caixa&lt;T&gt;::trocar" aria-label="nome">(T novo) { conteudo = novo; }</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Com C++17 ou mais novo, qual é o tipo de <code>c</code> em <code>Caixa c{7.5};</code>?</p>
+<label><input type="radio" name="q3"> <code>Caixa</code></label>
+<label><input type="radio" name="q3"> <code>Caixa&lt;int&gt;</code></label>
+<label><input type="radio" name="q3"> <code>Caixa&lt;double&gt;</code></label>
+<label><input type="radio" name="q3"> Não compila</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. A Ana pôs a classe template em <code>caixa.h</code> e os corpos dos métodos em <code>caixa.cpp</code>. O que acontece ao compilar <code>g++ caixa.cpp main.cpp</code>?</p>
+<label><input type="radio" name="q4"> Funciona normalmente</label>
+<label><input type="radio" name="q4"> Erro de ligação: <code>referência não definida</code> (<code>undefined reference</code>)</label>
+<label><input type="radio" name="q4"> Erro <code>missing template arguments</code></label>
+<label><input type="radio" name="q4"> Erro <code>‘T’ does not name a type</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Em <code>std::vector&lt;std::string&gt; nomes;</code>, o que é <code>std::string</code>?</p>
+<label><input type="radio" name="q5"> O argumento do template <code>vector</code>, o tipo que vai no lugar do <code>T</code> dele</label>
+<label><input type="radio" name="q5"> O nome da variável</label>
+<label><input type="radio" name="q5"> Uma herança</label>
+<label><input type="radio" name="q5"> Um valor padrão</label>
+</div>
+
+<h3>Missão final: o template no lugar certo</h3>
+
+<div class="trycpp" data-goal="out:Ana,out:42">
+<p class="try-task"><strong>Missão:</strong> este projeto tem três arquivos (veja as abas). Rode: a ligação falha, porque os corpos do template estão em <code>caixa.cpp</code>. Mova os dois corpos para o fim do <code>caixa.h</code> e deixe o <code>caixa.cpp</code> vazio (só um comentário). O programa deve mostrar <code>Ana</code> e <code>42</code>.</p>
+<pre class="script" data-file="main.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include "caixa.h"
+
+int main() {
+    Caixa&lt;std::string&gt; nome{"Ana"};
+    Caixa&lt;int&gt; idade{42};
+    std::cout &lt;&lt; nome.pegar() &lt;&lt; '\n';
+    std::cout &lt;&lt; idade.pegar() &lt;&lt; '\n';
+}
+</pre>
+<pre class="script" data-file="caixa.h">#pragma once
+
+template &lt;typename T&gt;
+class Caixa {
+public:
+    Caixa(T valor);
+    T pegar() const;
+private:
+    T conteudo;
+};
+</pre>
+<pre class="script" data-file="caixa.cpp">#include "caixa.h"
+
+template &lt;typename T&gt;
+Caixa&lt;T&gt;::Caixa(T valor) : conteudo{valor} {}
+
+template &lt;typename T&gt;
+T Caixa&lt;T&gt;::pegar() const {
+    return conteudo;
+}
+</pre>
+<pre class="solucao" data-file="caixa.h">#pragma once
+
+template &lt;typename T&gt;
+class Caixa {
+public:
+    Caixa(T valor);
+    T pegar() const;
+private:
+    T conteudo;
+};
+
+template &lt;typename T&gt;
+Caixa&lt;T&gt;::Caixa(T valor) : conteudo{valor} {}
+
+template &lt;typename T&gt;
+T Caixa&lt;T&gt;::pegar() const {
+    return conteudo;
+}
+</pre>
+<pre class="solucao" data-file="caixa.cpp">// vazio: o template inteiro mora no caixa.h
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um <strong>template de classe</strong> é o molde de uma classe: <code>template &lt;typename T&gt; class Caixa { … };</code>.</li>
+  <li>Cada tipo gera uma classe diferente: <code>Caixa&lt;int&gt;</code> e <code>Caixa&lt;std::string&gt;</code> não se misturam.</li>
+  <li>Desde o C++17, a <strong>CTAD</strong> deduz o tipo pelo construtor: <code>Caixa c{5};</code>. Cuidado com textos entre aspas (viram <code>const char*</code>) e objetos vazios (escreva o tipo).</li>
+  <li><code>std::vector</code>, <code>std::map</code>, <code>std::string</code>… são templates. O <code>&lt;int&gt;</code> de <code>std::vector&lt;int&gt;</code> é o argumento do template.</li>
+  <li>Corpos fora da classe repetem <code>template &lt;typename T&gt;</code> e usam <code>Caixa&lt;T&gt;::</code>.</li>
+  <li><strong>Templates ficam inteiros no <code>.h</code>.</strong> Separados num <code>.cpp</code>, dão <code>referência não definida</code> na ligação, porque o compilador só gera o código onde vê o corpo e o uso juntos.</li>
+  <li>Próximo passo: dizer <strong>quais</strong> tipos um template aceita, em <a href="concepts.html">Concepts</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
