@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Números Aleatórios — random, mt19937 e dados | Guia C++</title>
+<meta name="description" content="Números aleatórios em C++ para quem nunca programou: std::random_device, std::mt19937, uniform_int_distribution (um dado de 1 a 6), uniform_real_distribution, semente fixa para repetir resultados e por que evitar rand e srand(time(0)), com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Números Aleatórios</span></h1>
+
+<p class="intro">Jogar um dado, sortear o ganhador da rifa, embaralhar as perguntas de um quiz: tudo isso precisa de <strong>números aleatórios</strong>, números que o programa não sabe de antemão. Mas um computador é uma máquina que segue instruções à risca: como ele pode "tirar a sorte"? Nesta aula você vai entender o truque e usar a biblioteca <code>&lt;random&gt;</code> do C++, peça por peça, até montar um dado de verdade. No fim, vai conhecer o jeito antigo (<code>rand()</code>), que ainda aparece em muitos tutoriais, e por que é melhor evitá-lo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um gerador de números "pseudoaleatórios" e o que é a <strong>semente</strong>.</li>
+  <li>As três peças da <code>&lt;random&gt;</code>: <code>std::random_device</code>, <code>std::mt19937</code> e as distribuições.</li>
+  <li>Como fazer um dado de 1 a 6 com <code>std::uniform_int_distribution</code>.</li>
+  <li>Como sortear números com vírgula com <code>std::uniform_real_distribution</code>.</li>
+  <li>Como usar uma <strong>semente fixa</strong> para repetir os mesmos sorteios (ótimo para testar).</li>
+  <li>O antigo <code>rand()</code>/<code>srand(time(0))</code> e os problemas dele.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Quando o programa usa uma semente que muda a cada vez, os números que você vai ver no seu computador serão outros: é esse o objetivo.</p>
+
+<hr>
+
+<h2>A ideia: o livro de números e a página em que você abre</h2>
+<p>Imagine um livro grosso cheio de números embaralhados, página após página: <code>3 5 6 2 5 1 4…</code>. Se você abre numa página qualquer e vai lendo, os números parecem não ter padrão nenhum. Mas, se outra pessoa abrir <strong>na mesma página</strong>, vai ler exatamente os mesmos números.</p>
+
+<p>O gerador de números do computador funciona assim:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No livro</th><th>No C++</th><th>Nome técnico</th></tr>
+<tr><td>O livro de números embaralhados</td><td>Uma fórmula que, a partir de um número, calcula o próximo, e o próximo…</td><td><strong>gerador pseudoaleatório</strong> (<code>std::mt19937</code>)</td></tr>
+<tr><td>A página em que você abre</td><td>O número de partida da fórmula</td><td><strong>semente</strong> (em inglês, <em>seed</em>)</td></tr>
+<tr><td>Alguém que abre o livro numa página "de surpresa"</td><td>Um dispositivo que dá um número imprevisível para servir de semente</td><td><code>std::random_device</code></td></tr>
+</table>
+</div>
+
+<p>"Pseudo" quer dizer "falso": os números <strong>parecem</strong> aleatórios, mas são calculados. A mesma semente sempre dá a mesma sequência. Isso, que parece defeito, é muito útil: com uma semente fixa, você consegue <strong>repetir</strong> um sorteio para testar o programa. Para um jogo de verdade, você usa uma semente diferente a cada vez.</p>
+
+<hr>
+
+<h2>1. O dado de 1 a 6</h2>
+<p>Comece pelo programa completo. Depois, cada linha é explicada.</p>
+
+<pre class="file" data-file="dado.cpp">#include &lt;iostream&gt;
+#include &lt;random&gt;
+
+int main() {
+    std::random_device semente;
+    std::mt19937 gerador(semente());
+    std::uniform_int_distribution&lt;int&gt; dado(1, 6);
+
+    std::cout &lt;&lt; dado(gerador) &lt;&lt; " ";
+    std::cout &lt;&lt; dado(gerador) &lt;&lt; " ";
+    std::cout &lt;&lt; dado(gerador) &lt;&lt; " ";
+    std::cout &lt;&lt; dado(gerador) &lt;&lt; " ";
+    std::cout &lt;&lt; dado(gerador) &lt;&lt; "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;random&gt;</dt><dd>A biblioteca de números aleatórios (C++11).</dd>
+  <dt>std::random_device semente;</dt><dd>Cria um <code>random_device</code> ("dispositivo aleatório") chamado <code>semente</code>. Ele pede ao sistema operacional (ou ao próprio processador) um número realmente imprevisível, tirado de "ruído" do hardware. É lento demais para usar o tempo todo, então serve só para escolher a <strong>página do livro</strong>.</dd>
+  <dt>semente()</dt><dd>Os parênteses <strong>pedem</strong> um número ao dispositivo. Cada vez, sai um diferente.</dd>
+  <dt>std::mt19937 gerador(semente());</dt><dd>Cria o <strong>gerador</strong> (o livro), chamado <code>gerador</code>, aberto na página que o <code>random_device</code> sorteou. O nome estranho vem do algoritmo <em>Mersenne Twister</em>, criado em 1997; o 19937 vem de um número da fórmula. Ele é rápido e produz números de 0 a 4294967295.</dd>
+  <dt>std::uniform_int_distribution&lt;int&gt; dado(1, 6);</dt><dd>Cria uma <strong>distribuição</strong> chamada <code>dado</code>: a peça que transforma os números enormes do gerador em números <strong>inteiros</strong> (<code>&lt;int&gt;</code>) de <strong>1 a 6</strong>, incluindo o 1 e o 6. <em>Uniform</em> ("uniforme") quer dizer que todos têm a mesma chance, como num dado honesto.</dd>
+  <dt>dado(gerador)</dt><dd>Joga o dado: a distribuição pega um número do gerador e o converte para 1 a 6. Cada chamada é uma jogada nova.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/sorteio">$ g++ -std=c++23 -Wall -Wextra dado.cpp -o dado
+$ ./dado; ./dado
+5 1 2 1 3
+1 1 2 4 6                « cada execução, uma sequência diferente</pre>
+
+<p>Rodando de novo, sai outra sequência. No seu computador, os números serão outros. Repare que números repetidos (<code>1 1</code>) são normais: num dado de verdade também acontece.</p>
+
+<div class="tip">
+<strong>Por que três peças, e não uma função <code>sortear(1, 6)</code>?</strong>
+<p>Porque cada peça faz uma coisa só, e você pode trocar uma sem mexer nas outras: o mesmo gerador serve para um dado de 6 faces, um de 20, um preço com centavos… Você cria <strong>um gerador só</strong> no começo do programa e quantas distribuições quiser.</p>
+</div>
+
+<div class="trycpp" data-goal="compila,src:uniform_int_distribution&lt;int&gt;\s*\w+\s*\(\s*1\s*\,\s*20\s*\)">
+<p class="try-task"><strong>Missão:</strong> rode algumas vezes e veja os números mudarem. Depois, transforme o dado de 6 faces num dado de <strong>20 faces</strong> (os de RPG), trocando só os números da distribuição.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;random&gt;
+
+int main() {
+    std::random_device semente;
+    std::mt19937 gerador(semente());
+    std::uniform_int_distribution&lt;int&gt; dado(1, 6);
+
+    std::cout &lt;&lt; dado(gerador) &lt;&lt; " ";
+    std::cout &lt;&lt; dado(gerador) &lt;&lt; " ";
+    std::cout &lt;&lt; dado(gerador) &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;random&gt;
+
+int main() {
+    std::random_device semente;
+    std::mt19937 gerador(semente());
+    std::uniform_int_distribution&lt;int&gt; dado(1, 20);
+
+    std::cout &lt;&lt; dado(gerador) &lt;&lt; " ";
+    std::cout &lt;&lt; dado(gerador) &lt;&lt; " ";
+    std::cout &lt;&lt; dado(gerador) &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Semente fixa: repetir os mesmos sorteios</h2>
+<p>Agora troque o <code>random_device</code> por um número escrito no código, por exemplo <code>42</code>. É como combinar com todo mundo: "abram o livro na página 42".</p>
+
+<pre class="file" data-file="fixa.cpp">#include &lt;iostream&gt;
+#include &lt;random&gt;
+
+int main() {
+    std::mt19937 gerador(42);
+    std::uniform_int_distribution&lt;int&gt; dado(1, 6);
+
+    std::cout &lt;&lt; dado(gerador) &lt;&lt; " ";
+    std::cout &lt;&lt; dado(gerador) &lt;&lt; " ";
+    std::cout &lt;&lt; dado(gerador) &lt;&lt; " ";
+    std::cout &lt;&lt; dado(gerador) &lt;&lt; " ";
+    std::cout &lt;&lt; dado(gerador) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/sorteio">$ g++ -std=c++23 -Wall -Wextra fixa.cpp -o fixa
+$ ./fixa; ./fixa
+3 5 6 2 5
+3 5 6 2 5                « mesma semente, mesma sequência, sempre</pre>
+
+<p>Quando a semente fixa é útil:</p>
+<ul>
+  <li><strong>Testar e consertar o programa.</strong> Um bug que só aparece "às vezes" é um pesadelo. Com semente fixa, ele aparece toda vez, do mesmo jeito.</li>
+  <li><strong>Simulações que outra pessoa precisa conferir.</strong> Basta dizer qual semente você usou.</li>
+  <li><strong>Jogos com "fase do dia"</strong>, em que todo mundo recebe o mesmo desafio: a semente pode ser a data.</li>
+</ul>
+
+<p>Duas variáveis-gerador com a mesma semente também andam juntas, cada uma no seu próprio livro:</p>
+
+<pre class="file" data-file="dois.cpp">#include &lt;iostream&gt;
+#include &lt;random&gt;
+
+int main() {
+    std::uniform_int_distribution&lt;int&gt; dado(1, 6);
+
+    std::mt19937 g1(7);
+    std::cout &lt;&lt; dado(g1) &lt;&lt; " " &lt;&lt; dado(g1) &lt;&lt; " " &lt;&lt; dado(g1) &lt;&lt; "\n";
+
+    std::mt19937 g2(7);
+    std::cout &lt;&lt; dado(g2) &lt;&lt; " " &lt;&lt; dado(g2) &lt;&lt; " " &lt;&lt; dado(g2) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/sorteio">$ ./dois
+1 2 5
+1 2 5</pre>
+
+<p>É por isso que você deve criar o gerador <strong>uma vez só</strong>, no começo. Se criar um gerador novo com a mesma semente toda vez que for jogar o dado (por exemplo, dentro de uma repetição, aula <a href="for.html">for</a>), vai tirar sempre o mesmo número.</p>
+
+<div class="warning">
+<strong>A mesma semente, outro compilador: números diferentes</strong>
+<p>O gerador <code>std::mt19937</code> é igual em todo lugar: com a semente 42, o primeiro número "cru" (<code>gerador()</code>, sem distribuição) é sempre <code>1608637542</code>, em qualquer compilador. Já as <strong>distribuições</strong> podem ser implementadas de jeitos diferentes por cada biblioteca padrão. Então o <code>3 5 6 2 5</code> acima vale para o g++ do Linux; no editor do guia (Clang, no navegador) ou no Visual Studio, a mesma semente 42 pode dar outros números, que também se repetem a cada execução. Por isso as missões desta aula não dependem do valor sorteado.</p>
+</div>
+
+<pre class="file" data-file="cru.cpp">#include &lt;iostream&gt;
+#include &lt;random&gt;
+
+int main() {
+    std::mt19937 gerador(42);
+    std::cout &lt;&lt; gerador() &lt;&lt; "\n";
+    std::cout &lt;&lt; gerador() &lt;&lt; "\n";
+    std::cout &lt;&lt; gerador.min() &lt;&lt; " a " &lt;&lt; gerador.max() &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/sorteio">$ ./cru
+1608637542               « o mesmo em qualquer compilador
+3421126067
+0 a 4294967295           « a faixa do gerador "cru"</pre>
+
+<hr>
+
+<h2>3. Números com vírgula: <code>uniform_real_distribution</code></h2>
+<p>Para sortear um preço entre R$ 10 e R$ 20, ou uma chance entre 0 e 1, use a distribuição de números <strong>reais</strong> (com vírgula):</p>
+
+<pre class="file" data-file="real.cpp">#include &lt;iostream&gt;
+#include &lt;random&gt;
+
+int main() {
+    std::mt19937 gerador(42);
+    std::uniform_real_distribution&lt;double&gt; preco(10.0, 20.0);
+    std::uniform_real_distribution&lt;double&gt; zero_um(0.0, 1.0);
+
+    std::cout &lt;&lt; preco(gerador) &lt;&lt; "\n";
+    std::cout &lt;&lt; preco(gerador) &lt;&lt; "\n";
+    std::cout &lt;&lt; zero_um(gerador) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/sorteio">$ ./real; ./real
+17.9654
+11.8343
+0.779691
+17.9654                  « semente fixa: repetiu
+11.8343
+0.779691</pre>
+
+<dl class="anatomy">
+  <dt>uniform_real_distribution&lt;double&gt;</dt><dd>Distribuição uniforme de números <code>double</code>.</dd>
+  <dt>preco(10.0, 20.0)</dt><dd>Números a partir de 10.0 e <strong>menores</strong> que 20.0. Diferente da versão de inteiros, o limite de cima <strong>não</strong> entra (na prática, a diferença é invisível).</dd>
+  <dt>zero_um(gerador)</dt><dd>Um número entre 0 e 1. Serve para "chances": se sair menor que <code>0.3</code>, aconteceu algo que tem 30% de chance. Você vai fazer isso com um <a href="if-else.html">if</a>.</dd>
+</dl>
+
+<p>Para mostrar o preço com duas casas (<code>17.97</code>), veja <a href="iomanip.html">Formatar com iomanip</a>.</p>
+
+<hr>
+
+<h2>4. O jeito antigo: <code>rand()</code> e <code>srand(time(0))</code></h2>
+<p>Em livros e tutoriais antigos (e em muito código da linguagem C), você vai encontrar isto:</p>
+
+<pre class="file" data-file="velho.cpp">#include &lt;iostream&gt;
+#include &lt;cstdlib&gt;
+#include &lt;ctime&gt;
+
+int main() {
+    std::srand(std::time(0));
+    std::cout &lt;&lt; std::rand() % 6 + 1 &lt;&lt; " ";
+    std::cout &lt;&lt; std::rand() % 6 + 1 &lt;&lt; " ";
+    std::cout &lt;&lt; std::rand() % 6 + 1 &lt;&lt; "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>&lt;cstdlib&gt;, &lt;ctime&gt;</dt><dd>Bibliotecas herdadas do C: a de utilidades gerais e a de tempo.</dd>
+  <dt>std::time(0)</dt><dd>A hora atual, em <strong>segundos</strong> contados desde 1º de janeiro de 1970.</dd>
+  <dt>std::srand(...)</dt><dd><em>seed rand</em>: escolhe a semente do gerador antigo. Aqui, a hora atual.</dd>
+  <dt>std::rand()</dt><dd>Devolve um número de 0 a <code>RAND_MAX</code> (no Linux, 2147483647).</dd>
+  <dt>% 6 + 1</dt><dd>O resto da divisão por 6 dá de 0 a 5 (aula <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>); somando 1, de 1 a 6.</dd>
+</dl>
+
+<p>Funciona… mais ou menos. Olhe o que acontece quando a Ana roda o programa duas vezes seguidas e, depois, espera um segundo:</p>
+
+<pre class="term" data-cwd="~/sorteio">$ ./velho; ./velho; sleep 1; ./velho
+2 3 6
+2 3 6                    « no mesmo segundo, a mesma semente: o mesmo "sorteio"
+2 2 6</pre>
+
+<p>E sem o <code>srand</code>, o "sorteio" é sempre igual, em todo computador Linux:</p>
+
+<pre class="file" data-file="semsrand.cpp">#include &lt;iostream&gt;
+#include &lt;cstdlib&gt;
+
+int main() {
+    std::cout &lt;&lt; std::rand() &lt;&lt; "\n";
+    std::cout &lt;&lt; std::rand() &lt;&lt; "\n";
+    std::cout &lt;&lt; RAND_MAX &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/sorteio">$ ./semsrand; ./semsrand
+1804289383
+846930886
+2147483647
+1804289383               « a mesma coisa de novo
+846930886
+2147483647</pre>
+
+<h3>Por que evitar o <code>rand()</code></h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Problema</th><th>O que acontece</th></tr>
+<tr><td>Semente pelo relógio</td><td><code>time(0)</code> muda só uma vez por segundo. Dois programas iniciados no mesmo segundo "sorteiam" igual (você viu acima).</td></tr>
+<tr><td>Faixa pequena e indefinida</td><td><code>RAND_MAX</code> pode ser só <code>32767</code> em alguns sistemas (no Windows, é). No Linux é maior, mas você não controla isso.</td></tr>
+<tr><td>O <code>% 6</code> é "viciado"</td><td>Se a faixa do gerador não é divisível por 6, alguns resultados saem um pouquinho mais que outros. O <code>uniform_int_distribution</code> corrige isso.</td></tr>
+<tr><td>Qualidade fraca</td><td>O padrão C++ não exige nada do algoritmo do <code>rand()</code>; em alguns sistemas, os números têm padrões visíveis.</td></tr>
+<tr><td>Um gerador só, para o programa todo</td><td>Qualquer parte do programa que chame <code>rand()</code> muda a sequência de todas as outras.</td></tr>
+</table>
+</div>
+
+<p>Resumo: <strong>reconheça</strong> o <code>rand()</code> quando aparecer em código antigo, mas, no seu código, use a <code>&lt;random&gt;</code>.</p>
+
+<hr>
+
+<h2>Formas diferentes + qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Objetivo</th><th>Forma</th><th>Quando usar</th></tr>
+<tr><td>Sorteio diferente a cada execução</td><td><code>std::mt19937 g(std::random_device{}());</code></td><td>Jogos, sorteios de verdade. (O <code>std::random_device{}()</code> cria o dispositivo e pede um número numa linha só.)</td></tr>
+<tr><td>Sorteio repetível</td><td><code>std::mt19937 g(42);</code></td><td>Testes, depuração, simulações para conferir.</td></tr>
+<tr><td>Inteiro de a até b</td><td><code>std::uniform_int_distribution&lt;int&gt; d(a, b);</code></td><td>Dados, rifas, posição numa lista. Inclui a e b.</td></tr>
+<tr><td>Número com vírgula</td><td><code>std::uniform_real_distribution&lt;double&gt; d(a, b);</code></td><td>Preços, chances, coordenadas. Inclui a, não inclui b.</td></tr>
+<tr><td>Número imprevisível direto</td><td><code>std::random_device rd; rd();</code></td><td>Só para a semente. Para muitos números, é lento.</td></tr>
+<tr><td>Jeito antigo</td><td><code>std::srand(std::time(0)); std::rand() % 6 + 1</code></td><td>Evite. Só para entender código antigo.</td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>Segurança: senhas e códigos secretos</strong>
+<p>O <code>mt19937</code> é ótimo para jogos, mas <strong>não</strong> serve para gerar senhas, códigos de recuperação ou chaves: quem vê alguns números consegue calcular os próximos. Para isso, use bibliotecas de criptografia, que pedem números diretamente ao sistema operacional.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: no match for call to ‘(std::uniform_int_distribution&lt;int&gt;) ()’</code></strong>
+<pre class="file" data-file="errogerador.cpp">    std::mt19937 gerador(42);
+    std::uniform_int_distribution&lt;int&gt; dado(1, 6);
+    std::cout &lt;&lt; dado() &lt;&lt; "\n";
+</pre>
+<pre class="term" data-cwd="~/sorteio">$ g++ -std=c++23 -Wall -Wextra errogerador.cpp -o errogerador
+errogerador.cpp: In function ‘int main()’:
+errogerador.cpp:7:22: error: no match for call to ‘(std::uniform_int_distribution&lt;int&gt;) ()’
+    7 |     std::cout &lt;&lt; dado() &lt;&lt; "\n";
+      |                  ~~~~^~
+<em>…</em>
+/usr/include/c++/15/bits/uniform_int_dist.h:203:9: note: candidate expects 1 argument, 0 provided
+<em>…</em>
+/usr/include/c++/15/bits/uniform_int_dist.h:208:9: note: candidate expects 2 arguments, 0 provided</pre>
+<p><strong>O que significa:</strong> "nenhuma combinação para chamar <code>dado()</code> sem nada entre os parênteses". As notas dizem que a versão que existe "espera 1 argumento, e 0 foram dados". A distribuição não sorteia sozinha: ela precisa do gerador.</p>
+<p><strong>Como consertar:</strong> passe o gerador: <code>dado(gerador)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: static assertion failed: template argument must be an integral type</code></strong>
+<pre class="file" data-file="errodouble.cpp">    std::uniform_int_distribution&lt;double&gt; nota(0, 10);
+</pre>
+<pre class="term" data-cwd="~/sorteio">$ g++ -std=c++23 -Wall -Wextra errodouble.cpp -o errodouble
+In file included from /usr/include/c++/15/bits/stl_algo.h:65,
+                 from /usr/include/c++/15/bits/unicode.h:39,
+                 from /usr/include/c++/15/format:61,
+                 from /usr/include/c++/15/ostream:44,
+                 from /usr/include/c++/15/iostream:43,
+                 from errodouble.cpp:1:
+/usr/include/c++/15/bits/uniform_int_dist.h: In instantiation of ‘class std::uniform_int_distribution&lt;double&gt;’:
+errodouble.cpp:6:47:   required from here
+    6 |     std::uniform_int_distribution&lt;double&gt; nota(0, 10);
+      |                                               ^
+/usr/include/c++/15/bits/uniform_int_dist.h:90:49: error: static assertion failed: template argument must be an integral type
+   90 |       static_assert(std::is_integral&lt;_IntType&gt;::value,
+      |                                                 ^~~~~
+/usr/include/c++/15/bits/uniform_int_dist.h:90:49: note: ‘std::integral_constant&lt;bool, false&gt;::value’ evaluates to false</pre>
+<p><strong>O que significa:</strong> o erro aparece dentro de um arquivo da biblioteca (<code>uniform_int_dist.h</code>), mas a culpa é sua: a linha <code>required from here</code> aponta a sua linha 6. "Afirmação estática falhou: o tipo precisa ser inteiro". A distribuição <code>_int_</code> só aceita tipos inteiros, e recebeu <code>double</code>.</p>
+<p><strong>Como consertar:</strong> para números com vírgula, use <code>std::uniform_real_distribution&lt;double&gt;</code>. Para inteiros, <code>uniform_int_distribution&lt;int&gt;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O "sorteio" sai sempre igual</strong>
+<p><strong>O que significa:</strong> o gerador está com semente fixa (<code>std::mt19937 gerador(42);</code>), ou sem semente nenhuma (<code>std::mt19937 gerador;</code> usa uma semente padrão, sempre a mesma), ou você está criando um gerador novo a cada jogada.</p>
+<p><strong>Como consertar:</strong> crie <strong>um</strong> gerador no começo, com <code>std::random_device</code> como semente, e use-o para todas as jogadas.</p>
+</div>
+
+<div class="cenario">
+<strong>O dado tira 0 ou 7</strong>
+<p><strong>O que significa:</strong> com o jeito antigo, a conta ficou errada: <code>rand() % 6</code> dá de 0 a 5, e <code>rand() % 7</code> dá de 0 a 6.</p>
+<p><strong>Como consertar:</strong> use <code>std::uniform_int_distribution&lt;int&gt; dado(1, 6);</code>, em que você escreve os limites diretamente, sem conta.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>#include &lt;random&gt;</code></td><td>Traz geradores e distribuições</td></tr>
+<tr><td><code>std::random_device rd;</code></td><td>Cria a fonte de números imprevisíveis</td></tr>
+<tr><td><code>rd()</code></td><td>Pede um número imprevisível (use como semente)</td></tr>
+<tr><td><code>std::mt19937 g(rd());</code></td><td>Gerador com semente imprevisível</td></tr>
+<tr><td><code>std::mt19937 g(42);</code></td><td>Gerador com semente fixa (sequência repetível)</td></tr>
+<tr><td><code>std::uniform_int_distribution&lt;int&gt; d(1, 6);</code></td><td>Inteiros de 1 a 6, todos com a mesma chance</td></tr>
+<tr><td><code>std::uniform_real_distribution&lt;double&gt; d(0.0, 1.0);</code></td><td>Reais de 0 até (sem incluir) 1</td></tr>
+<tr><td><code>d(g)</code></td><td>Sorteia um número</td></tr>
+<tr><td><code>std::srand(std::time(0)); std::rand()</code></td><td>Jeito antigo (C); evite</td></tr>
+</table>
+</div>
+<p>A <code>&lt;random&gt;</code> tem outras distribuições, por exemplo <code>std::normal_distribution</code> (a "curva do sino", para simular alturas ou notas em torno de uma média) e <code>std::bernoulli_distribution</code> (sim ou não, com uma chance). E <code>std::shuffle</code> (de <code>&lt;algorithm&gt;</code>) embaralha uma lista inteira com um gerador; você vai precisar de listas, que chegam em <a href="vector.html">std::vector</a>.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A distribuição</h3>
+<p>Complete para criar uma distribuição de inteiros de 1 a 100:</p>
+<div class="ex-code">std::<input data-answer="uniform_int_distribution" aria-label="distribuição">&lt;int&gt; rifa(1, 100);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Semente fixa</h3>
+<p>Complete para criar o gerador com a semente fixa <code>2026</code>:</p>
+<div class="ex-code">std::<input data-answer="mt19937" aria-label="gerador"> gerador(2026);</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Para que serve o <code>std::random_device</code> num programa típico?</p>
+<label><input type="radio" name="q3"> Para gerar todos os números do jogo</label>
+<label><input type="radio" name="q3"> Para dar uma semente imprevisível ao gerador</label>
+<label><input type="radio" name="q3"> Para limitar os números de 1 a 6</label>
+<label><input type="radio" name="q3"> Para mostrar os números na tela</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O programa usa <code>std::mt19937 g(42);</code> e é executado duas vezes no mesmo computador. Os números sorteados…</p>
+<label><input type="radio" name="q4"> …mudam a cada execução</label>
+<label><input type="radio" name="q4"> …são sempre 42</label>
+<label><input type="radio" name="q4"> …são os mesmos nas duas execuções</label>
+<label><input type="radio" name="q4"> …dão erro de compilação</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Por que <code>std::srand(std::time(0))</code> pode dar o mesmo sorteio em dois programas?</p>
+<label><input type="radio" name="q5"> Porque <code>time(0)</code> só muda uma vez por segundo, e a semente fica igual</label>
+<label><input type="radio" name="q5"> Porque <code>srand</code> sempre usa a semente 0</label>
+<label><input type="radio" name="q5"> Porque <code>rand()</code> não é aleatório nunca</label>
+<label><input type="radio" name="q5"> Porque faltou <code>#include &lt;random&gt;</code></label>
+</div>
+
+<h3>Missão final: a rifa da escola</h3>
+
+<div class="trycpp" data-goal="outre:Número sorteado: \d+,outre:Desconto: \d+(\.\d+)?%,src:mt19937\s+\w+\s*\(\s*2026\s*\),src:uniform_int_distribution,src:uniform_real_distribution">
+<p class="try-task"><strong>Missão:</strong> a escola da Ana vai sortear um número da rifa (de 1 a 100) e um desconto entre 5% e 15% (com vírgula) na cantina. Para poderem conferir o sorteio depois, use um gerador com a <strong>semente fixa 2026</strong>. Mostre <code>Número sorteado: </code> seguido do número e <code>Desconto: </code> seguido do desconto e de <code>%</code>. Os valores exatos dependem do compilador; a missão confere só o formato.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;random&gt;
+
+int main() {
+    // 1. crie o gerador com a semente 2026
+
+    // 2. crie as duas distribuições
+
+    // 3. sorteie e mostre
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;random&gt;
+
+int main() {
+    std::mt19937 gerador(2026);
+
+    std::uniform_int_distribution&lt;int&gt; rifa(1, 100);
+    std::uniform_real_distribution&lt;double&gt; desconto(5.0, 15.0);
+
+    std::cout &lt;&lt; "Número sorteado: " &lt;&lt; rifa(gerador) &lt;&lt; "\n";
+    std::cout &lt;&lt; "Desconto: " &lt;&lt; desconto(gerador) &lt;&lt; "%\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>O computador calcula números que <strong>parecem</strong> aleatórios a partir de uma <strong>semente</strong>. Mesma semente, mesma sequência.</li>
+  <li>Três peças: <code>std::random_device</code> (semente imprevisível) → <code>std::mt19937</code> (gerador, crie um só) → distribuição (a faixa que você quer).</li>
+  <li><code>std::uniform_int_distribution&lt;int&gt; dado(1, 6);</code> e <code>dado(gerador)</code>: um dado honesto, 1 e 6 incluídos.</li>
+  <li><code>std::uniform_real_distribution&lt;double&gt;</code>: números com vírgula; o limite de cima não entra.</li>
+  <li>Semente fixa (<code>std::mt19937 g(42);</code>) repete os sorteios: ótimo para testar. O valor exato pode mudar de um compilador para outro.</li>
+  <li><code>rand()</code> e <code>srand(time(0))</code> são o jeito antigo: semente que só muda a cada segundo, faixa indefinida e resultado viciado com <code>%</code>. Evite.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
