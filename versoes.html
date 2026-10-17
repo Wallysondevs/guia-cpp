@@ -93,7 +93,7 @@
 <table class="ref">
 <tr><th>Compilador</th><th>Comando</th><th>De quem</th><th>Versão no guia</th></tr>
 <tr><td><strong>GCC</strong> (<em>GNU Compiler Collection</em>)</td><td><code>g++</code></td><td>Projeto GNU, software livre</td><td>15.2 (a do Ubuntu 26.04)</td></tr>
-<tr><td><strong>Clang</strong> (projeto LLVM)</td><td><code>clang++</code></td><td>Comunidade LLVM (Apple, Google e outros), software livre</td><td>21.1 (no terminal e no editor do guia)</td></tr>
+<tr><td><strong>Clang</strong> (projeto LLVM)</td><td><code>clang++</code></td><td>Comunidade LLVM (Apple, Google e outros), software livre</td><td>21.1 no terminal; 22 no editor do guia</td></tr>
 <tr><td><strong>MSVC</strong> (<em>Microsoft Visual C++</em>)</td><td><code>cl</code></td><td>Microsoft, vem com o Visual Studio</td><td>(não usado no guia)</td></tr>
 </table>
 </div>
@@ -184,7 +184,7 @@ Olá, Ana!</pre>
 
 <p>Confira no editor do guia. Esta caixa mostra o <code>__cplusplus</code> do compilador do navegador:</p>
 
-<div class="trycpp" data-goal="out:202302">
+<div class="trycpp" data-goal="out:202302,outre:\n2023\n">
 <p class="try-task"><strong>Missão:</strong> rode e confira que o número é <code>202302</code>, o do C++23. Depois acrescente uma linha que mostre o ano sozinho: <code>std::cout &lt;&lt; __cplusplus / 100 &lt;&lt; "\n";</code> (dividir por 100 "corta" os dois últimos dígitos, o mês). Deve aparecer <code>2023</code>.</p>
 <pre class="script">#include &lt;iostream&gt;
 
