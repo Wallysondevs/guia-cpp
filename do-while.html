@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ do-while — repetir pelo menos uma vez | Guia C++</title>
+<meta name="description" content="O laço do-while em C++ para quem nunca programou: o corpo roda pelo menos uma vez, validar uma nota, menu de opções com switch, perguntar se deseja continuar, a diferença para o while e os erros reais do g++ 15 (ponto e vírgula, variável fora do escopo).">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">do-while</span></h1>
+
+<p class="intro">Na aula <a href="while.html">while</a>, a condição é testada <strong>antes</strong> de cada volta, e por isso o corpo pode não rodar nenhuma vez. Muitas vezes, porém, você <strong>precisa</strong> fazer a coisa ao menos uma vez antes de decidir se repete: mostrar um menu, pedir uma nota, perguntar "quer mais um?". Para esses casos, o C++ tem o <code>do-while</code>: "<strong>faça</strong> isto, e repita <strong>enquanto</strong>…".</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como escrever um <code>do-while</code> (e onde vai o ponto e vírgula).</li>
+  <li>Por que o corpo de um <code>do-while</code> roda <strong>pelo menos uma vez</strong>.</li>
+  <li>Como pedir um valor até ele ser válido (uma nota de 0 a 10).</li>
+  <li>Como montar um <strong>menu de opções</strong> com <code>do-while</code> e <code>switch</code>.</li>
+  <li>Quando usar <code>do-while</code> e quando usar <code>while</code>.</li>
+  <li>Os dois erros mais comuns: o <code>;</code> esquecido e a variável criada dentro do bloco.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Nos programas que leem do teclado, o que aparece depois de cada pergunta foi digitado pela Ana.</p>
+
+<hr>
+
+<h2>A ideia: provar a comida antes de pôr mais sal</h2>
+<p>Quem cozinha não pergunta "a comida está sem sal?" antes de provar. Primeiro prova, <strong>depois</strong> decide:</p>
+<ol class="passo">
+  <li><strong>Prova</strong> a comida.</li>
+  <li>Está sem sal? <strong>Sim</strong> → põe uma pitada e volta ao passo 1.</li>
+  <li>Está sem sal? <strong>Não</strong> → pronto, desliga o fogo.</li>
+</ol>
+<p>Você sempre prova <strong>pelo menos uma vez</strong>, porque só sabe a resposta depois de provar. É essa a diferença entre os dois laços:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>while</code></th><th><code>do-while</code></th></tr>
+<tr><td>Ordem</td><td>pergunta → faz → pergunta → faz…</td><td>faz → pergunta → faz → pergunta…</td></tr>
+<tr><td>No dia a dia</td><td>"Enquanto tiver louça, lave um prato" (pia vazia: não lava nenhum)</td><td>"Prove; enquanto estiver sem sal, ponha sal e prove de novo"</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. A forma do <code>do-while</code></h2>
+
+<pre class="file" data-file="contar.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int i = 1;
+    do {
+        std::cout &lt;&lt; "Volta " &lt;&lt; i &lt;&lt; '\n';
+        i++;
+    } while (i &lt;= 5);
+    std::cout &lt;&lt; "Fim!\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>do</dt><dd>"Faça". Marca o começo do laço. Não tem condição aqui: o programa entra direto no corpo.</dd>
+  <dt>{ … }</dt><dd>O <strong>corpo</strong>: as linhas que se repetem. Roda uma vez antes de qualquer pergunta.</dd>
+  <dt>while</dt><dd>"Enquanto". Vem <strong>depois</strong> da chave que fecha o corpo.</dd>
+  <dt>(i &lt;= 5)</dt><dd>A condição. É testada <strong>no fim</strong> de cada volta: se for verdadeira, o programa volta para o <code>do</code>; se for falsa, segue em frente.</dd>
+  <dt>;</dt><dd>O ponto e vírgula <strong>obrigatório</strong> no fim. Ele existe porque o <code>do-while</code> termina numa condição, não numa chave. É o detalhe que mais se esquece (veja <a href="#erros">Quando dá errado</a>).</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra contar.cpp -o contar
+$ ./contar
+Volta 1
+Volta 2
+Volta 3
+Volta 4
+Volta 5
+Fim!</pre>
+
+<p>A saída é igual à do <code>while</code> da aula anterior. Quando a condição é verdadeira no começo, os dois laços se comportam do mesmo jeito. A diferença aparece quando ela já começa <strong>falsa</strong>.</p>
+
+<hr>
+
+<h2>2. Pelo menos uma vez: a diferença na prática</h2>
+<p>Este programa faz a mesma coisa com os dois laços. Nos dois, a variável começa em 10 e a condição é "menor que 5", que já é falsa desde o início:</p>
+
+<pre class="file" data-file="comparar.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int a = 10;
+    while (a &lt; 5) {
+        std::cout &lt;&lt; "while: " &lt;&lt; a &lt;&lt; '\n';
+        a++;
+    }
+
+    int b = 10;
+    do {
+        std::cout &lt;&lt; "do-while: " &lt;&lt; b &lt;&lt; '\n';
+        b++;
+    } while (b &lt; 5);
+
+    std::cout &lt;&lt; "Fim\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra comparar.cpp -o comparar
+$ ./comparar
+do-while: 10
+Fim</pre>
+
+<ul>
+  <li>O <code>while</code> perguntou primeiro: <code>10 &lt; 5</code>? Não. O corpo <strong>não rodou</strong>, e nada apareceu.</li>
+  <li>O <code>do-while</code> rodou o corpo primeiro (mostrou <code>do-while: 10</code>, <code>b</code> virou 11) e só então perguntou: <code>11 &lt; 5</code>? Não. Parou depois de <strong>uma</strong> volta.</li>
+</ul>
+<p>Essa é a regra inteira do <code>do-while</code>: o corpo roda <strong>no mínimo uma vez</strong>, não importa a condição.</p>
+
+<hr>
+
+<h2>3. Pedir até a resposta ser válida</h2>
+<p>O uso mais comum do <code>do-while</code> é <strong>validar uma entrada</strong>. A Ana está lançando notas, que vão de 0 a 10. Se ela digitar algo fora disso, o programa deve perguntar de novo. Repare que a pergunta precisa ser feita pelo menos uma vez: é o caso perfeito.</p>
+
+<pre class="file" data-file="nota.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int nota = 0;
+    do {
+        std::cout &lt;&lt; "Digite a nota (0 a 10): ";
+        std::cin &gt;&gt; nota;
+    } while (nota &lt; 0 || nota &gt; 10);
+    std::cout &lt;&lt; "Nota registrada: " &lt;&lt; nota &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>int nota = 0;</dt><dd>A variável é criada <strong>antes</strong> do <code>do</code>, porque a condição do <code>while</code>, lá embaixo, precisa enxergá-la. (Criá-la dentro das chaves dá erro, como você vai ver.)</dd>
+  <dt>std::cin &gt;&gt; nota;</dt><dd>Lê a nota (veja <a href="entrada-cin.html">Entrada com cin</a>). Aparece <strong>uma vez só</strong> no código, ao contrário da versão com <code>while</code>.</dd>
+  <dt>nota &lt; 0 || nota &gt; 10</dt><dd>"A nota é menor que 0 <strong>ou</strong> maior que 10", ou seja, inválida (o <code>||</code> está em <a href="operadores-logicos.html">Operadores Lógicos</a>). Enquanto ela for inválida, repete.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra nota.cpp -o nota
+$ ./nota
+Digite a nota (0 a 10): 15
+Digite a nota (0 a 10): -2
+Digite a nota (0 a 10): 8
+Nota registrada: 8</pre>
+
+<p>A condição do <code>while</code> descreve quando <strong>repetir</strong>, não quando parar. Por isso ela é "a nota é inválida". Uma dica para escrever: pense na condição de parada ("nota entre 0 e 10") e escreva o contrário dela.</p>
+
+<h3>Avisando o erro</h3>
+<p>Repetir a pergunta sem explicação confunde. Um <code>if</code> dentro do corpo resolve:</p>
+
+<pre class="file" data-file="nota2.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int nota = 0;
+    do {
+        std::cout &lt;&lt; "Digite a nota (0 a 10): ";
+        std::cin &gt;&gt; nota;
+        if (nota &lt; 0 || nota &gt; 10) {
+            std::cout &lt;&lt; "Nota inválida! Tente de novo.\n";
+        }
+    } while (nota &lt; 0 || nota &gt; 10);
+    std::cout &lt;&lt; "Nota registrada: " &lt;&lt; nota &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra nota2.cpp -o nota2
+$ ./nota2
+Digite a nota (0 a 10): 15
+Nota inválida! Tente de novo.
+Digite a nota (0 a 10): -2
+Nota inválida! Tente de novo.
+Digite a nota (0 a 10): 8
+Nota registrada: 8</pre>
+
+<p>A condição aparece duas vezes (no <code>if</code> e no <code>while</code>). Para não repetir, você poderia guardá-la numa variável <code>bool invalida = nota &lt; 0 || nota &gt; 10;</code>, mas aí ela precisaria ser criada antes do <code>do</code>. Para quem está começando, repetir a condição é aceitável.</p>
+
+<div class="note">
+<strong>E se a Ana digitar uma letra?</strong>
+<p>Este programa só se protege de números fora do intervalo. Se a entrada não for um número, o <code>std::cin</code> entra em estado de falha e é preciso "limpá-lo". Isso tem aula própria: <a href="validar-entrada.html">Validar a Entrada</a>.</p>
+</div>
+
+<div class="trycpp" data-stdin="15 -2 8" data-goal="out:Nota registrada: 8,src:do\s*\{">
+<p class="try-task"><strong>Missão:</strong> este programa aceita qualquer nota: com a entrada <code>15 -2 8</code>, ele registra o 15. Coloque a pergunta e o <code>std::cin</code> dentro de um <code>do { … } while ( … );</code> para repetir enquanto a nota for menor que 0 ou maior que 10. O resultado deve ser <code>Nota registrada: 8</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int nota = 0;
+    std::cout &lt;&lt; "Digite a nota (0 a 10): ";
+    std::cin &gt;&gt; nota;
+    std::cout &lt;&lt; "Nota registrada: " &lt;&lt; nota &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int nota = 0;
+    do {
+        std::cout &lt;&lt; "Digite a nota (0 a 10): ";
+        std::cin &gt;&gt; nota;
+    } while (nota &lt; 0 || nota &gt; 10);
+    std::cout &lt;&lt; "Nota registrada: " &lt;&lt; nota &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>4. A soma até o 0, sem repetir a leitura</h2>
+<p>Na aula <a href="while.html">while</a>, a soma até o usuário digitar 0 tinha a pergunta e o <code>std::cin</code> escritos <strong>duas vezes</strong>. Com <code>do-while</code>, uma vez basta:</p>
+
+<pre class="file" data-file="soma.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int numero = 0;
+    int soma = 0;
+    do {
+        std::cout &lt;&lt; "Digite um número (0 para parar): ";
+        std::cin &gt;&gt; numero;
+        soma += numero;
+    } while (numero != 0);
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra soma.cpp -o soma
+$ ./soma
+Digite um número (0 para parar): 10
+Digite um número (0 para parar): 25
+Digite um número (0 para parar): 7
+Digite um número (0 para parar): 0
+Soma: 42</pre>
+
+<p>Repare num detalhe: aqui o <code>0</code> <strong>entra</strong> na soma, porque o <code>soma += numero</code> acontece antes do teste. Somar 0 não muda nada, então o resultado está certo. Mas se a sentinela fosse <code>-1</code>, a soma sairia errada (ficaria 1 a menos). Nesse caso, ou você usa a versão com <code>while</code>, ou soma só <code>if (numero != -1)</code>.</p>
+
+<hr>
+
+<h2>5. Menu de opções</h2>
+<p>Todo programa de terminal com menu tem o mesmo formato: mostra as opções, lê a escolha, faz o que foi pedido e <strong>mostra o menu de novo</strong>, até a pessoa escolher "Sair". O menu precisa aparecer pelo menos uma vez, então é <code>do-while</code>. Para tratar cada opção, o <a href="switch.html">switch</a> é a ferramenta natural:</p>
+
+<pre class="file" data-file="menu.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int opcao = 0;
+    int itens = 0;
+    do {
+        std::cout &lt;&lt; "\n=== Lojinha da Ana ===\n";
+        std::cout &lt;&lt; "1 - Adicionar um item\n";
+        std::cout &lt;&lt; "2 - Ver o carrinho\n";
+        std::cout &lt;&lt; "0 - Sair\n";
+        std::cout &lt;&lt; "Opção: ";
+        std::cin &gt;&gt; opcao;
+
+        switch (opcao) {
+            case 1:
+                itens++;
+                std::cout &lt;&lt; "Item adicionado.\n";
+                break;
+            case 2:
+                std::cout &lt;&lt; "Itens no carrinho: " &lt;&lt; itens &lt;&lt; '\n';
+                break;
+            case 0:
+                std::cout &lt;&lt; "Até logo!\n";
+                break;
+            default:
+                std::cout &lt;&lt; "Opção inválida.\n";
+        }
+    } while (opcao != 0);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra menu.cpp -o menu
+$ ./menu
+
+=== Lojinha da Ana ===
+1 - Adicionar um item
+2 - Ver o carrinho
+0 - Sair
+Opção: 1
+Item adicionado.
+
+=== Lojinha da Ana ===
+1 - Adicionar um item
+2 - Ver o carrinho
+0 - Sair
+Opção: 1
+Item adicionado.
+
+=== Lojinha da Ana ===
+1 - Adicionar um item
+2 - Ver o carrinho
+0 - Sair
+Opção: 2
+Itens no carrinho: 2
+
+=== Lojinha da Ana ===
+1 - Adicionar um item
+2 - Ver o carrinho
+0 - Sair
+Opção: 7
+Opção inválida.
+
+=== Lojinha da Ana ===
+1 - Adicionar um item
+2 - Ver o carrinho
+0 - Sair
+Opção: 0
+Até logo!</pre>
+
+<p>Pontos importantes deste programa:</p>
+<ul>
+  <li><code>itens</code> e <code>opcao</code> nascem <strong>fora</strong> do laço. <code>itens</code> precisa sobreviver entre as voltas (é um acumulador); <code>opcao</code> precisa ser vista pela condição do <code>while</code>.</li>
+  <li>O <code>break</code> de cada <code>case</code> sai <strong>só do <code>switch</code></strong>, não do laço. É por isso que, depois de "Item adicionado.", o menu aparece de novo. (Mais sobre isso em <a href="break-continue.html">break e continue</a>.)</li>
+  <li>A opção <code>0</code> mostra "Até logo!" no <code>switch</code> e, em seguida, a condição <code>opcao != 0</code> fica falsa: o laço termina.</li>
+  <li>O <code>\n</code> no começo do título deixa uma linha em branco entre um menu e outro, para facilitar a leitura.</li>
+</ul>
+
+<div class="trycpp" data-stdin="1 1 1 2 0">
+<p class="try-task"><strong>Experimente:</strong> a entrada já vem pronta: <code>1 1 1 2 0</code> (três itens, ver o carrinho, sair). Acrescente uma opção <code>3 - Esvaziar o carrinho</code>, que faz <code>itens = 0;</code>, e mude a entrada para testá-la.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int opcao = 0;
+    int itens = 0;
+    do {
+        std::cout &lt;&lt; "\n=== Lojinha da Ana ===\n";
+        std::cout &lt;&lt; "1 - Adicionar um item\n";
+        std::cout &lt;&lt; "2 - Ver o carrinho\n";
+        std::cout &lt;&lt; "0 - Sair\n";
+        std::cout &lt;&lt; "Opção: ";
+        std::cin &gt;&gt; opcao;
+
+        switch (opcao) {
+            case 1:
+                itens++;
+                std::cout &lt;&lt; "Item adicionado.\n";
+                break;
+            case 2:
+                std::cout &lt;&lt; "Itens no carrinho: " &lt;&lt; itens &lt;&lt; '\n';
+                break;
+            case 0:
+                std::cout &lt;&lt; "Até logo!\n";
+                break;
+            default:
+                std::cout &lt;&lt; "Opção inválida.\n";
+        }
+    } while (opcao != 0);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>6. "Deseja continuar?"</h2>
+<p>Outra forma clássica: fazer algo e perguntar se a pessoa quer repetir. A resposta é um caractere (<code>char</code>, veja <a href="char.html">Caracteres</a>). Aceitar <code>s</code> e <code>S</code> evita irritar quem está com o Caps Lock ligado:</p>
+
+<pre class="file" data-file="continuar.cpp">#include &lt;iostream&gt;
+
+int main() {
+    char resposta = 'n';
+    int pedidos = 0;
+    do {
+        pedidos++;
+        std::cout &lt;&lt; "Pedido " &lt;&lt; pedidos &lt;&lt; " anotado. Mais um? (s/n) ";
+        std::cin &gt;&gt; resposta;
+    } while (resposta == 's' || resposta == 'S');
+    std::cout &lt;&lt; "Total de pedidos: " &lt;&lt; pedidos &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra continuar.cpp -o continuar
+$ ./continuar
+Pedido 1 anotado. Mais um? (s/n) s
+Pedido 2 anotado. Mais um? (s/n) S
+Pedido 3 anotado. Mais um? (s/n) n
+Total de pedidos: 3</pre>
+
+<p>Qualquer resposta que não seja <code>s</code> ou <code>S</code> encerra: <code>n</code>, <code>x</code>, <code>9</code>… Isso é proposital: na dúvida, o programa para.</p>
+
+<hr>
+
+<h2>Qual usar: <code>do-while</code> × <code>while</code></h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>while (cond) { … }</code></th><th><code>do { … } while (cond);</code></th></tr>
+<tr><td>Quando testa</td><td>Antes de cada volta</td><td>Depois de cada volta</td></tr>
+<tr><td>Mínimo de voltas</td><td><strong>0</strong></td><td><strong>1</strong></td></tr>
+<tr><td>Ponto e vírgula no fim</td><td>Não (termina em <code>}</code>)</td><td><strong>Sim</strong> (termina em <code>);</code>)</td></tr>
+<tr><td>A variável da condição</td><td>Precisa ter valor antes do laço</td><td>Pode receber o valor dentro do corpo, mas deve ser <strong>criada</strong> antes</td></tr>
+<tr><td>Bom para</td><td>Processar enquanto houver algo (estoque, saldo, dados)</td><td>Menus, validar entrada, "deseja continuar?"</td></tr>
+<tr><td>Frequência no código real</td><td>Muito usado</td><td>Bem menos usado</td></tr>
+</table>
+</div>
+
+<p>Na dúvida, comece pelo <code>while</code>. Se você perceber que está escrevendo a mesma linha antes do laço e no fim do corpo (como a leitura da soma), troque por <code>do-while</code>. Uma terceira opção, que muita gente prefere para menus, é o <code>while (true)</code> com <code>break</code>, que você vai ver em <a href="break-continue.html">break e continue</a>.</p>
+
+<hr>
+
+<h2 id="erros">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"expected ‘;’ before ‘std’" (esqueceu o ponto e vírgula)</strong>
+<pre class="file" data-file="semponto.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int i = 1;
+    do {
+        std::cout &lt;&lt; i &lt;&lt; '\n';
+        i++;
+    } while (i &lt;= 3)
+    std::cout &lt;&lt; "Fim\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semponto.cpp -o semponto
+semponto.cpp: In function ‘int main()’:
+semponto.cpp:8:21: error: expected ‘;’ before ‘std’
+    8 |     } while (i &lt;= 3)
+      |                     ^
+      |                     ;
+    9 |     std::cout &lt;&lt; "Fim\n";
+      |     ~~~              </pre>
+<p><strong>O que significa:</strong> "esperava <code>;</code> antes de <code>std</code>". O compilador chegou ao fim do <code>while (i &lt;= 3)</code>, esperava o ponto e vírgula e encontrou o <code>std</code> da linha seguinte. Ele até desenha o <code>;</code> no lugar onde ele falta (linha 8, coluna 21).</p>
+<p><strong>No editor do guia</strong>, o Clang é ainda mais direto: <code>error: expected ';' after do/while statement</code> ("esperava <code>;</code> depois da instrução do/while").</p>
+<p><strong>Como consertar:</strong> <code>} while (i &lt;= 3);</code>. Lembre: no <code>do-while</code> o <code>;</code> é obrigatório; no <code>while</code> comum, ele é um erro (vira um laço vazio, veja <a href="while.html#erros">while</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>"‘opcao’ was not declared in this scope" (variável criada dentro do bloco)</strong>
+<pre class="file" data-file="escopo.cpp">#include &lt;iostream&gt;
+
+int main() {
+    do {
+        int opcao = 0;
+        std::cout &lt;&lt; "Opção: ";
+        std::cin &gt;&gt; opcao;
+    } while (opcao != 0);
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra escopo.cpp -o escopo
+escopo.cpp: In function ‘int main()’:
+escopo.cpp:8:14: error: ‘opcao’ was not declared in this scope
+    8 |     } while (opcao != 0);
+      |              ^~~~~</pre>
+<p><strong>O que significa:</strong> "<code>opcao</code> não foi declarada neste escopo". Uma variável criada entre <code>{</code> e <code>}</code> só existe <strong>até a <code>}</code></strong>. A condição do <code>while</code> fica <strong>depois</strong> da chave que fecha o corpo, onde <code>opcao</code> já não existe. É um erro muito comum, porque a condição parece "fazer parte" do laço. (A ideia de escopo tem aula própria: <a href="escopo.html">Escopo</a>.)</p>
+<p><strong>No editor do guia:</strong> <code>error: use of undeclared identifier 'opcao'</code> ("uso de identificador não declarado").</p>
+<p><strong>Como consertar:</strong> crie a variável antes do <code>do</code> (<code>int opcao = 0;</code>) e, dentro do corpo, só leia o valor (<code>std::cin &gt;&gt; opcao;</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>O menu volta mesmo depois de "Sair" (ou nunca volta)</strong>
+<p><strong>O que aconteceu:</strong> a condição do <code>while</code> não combina com a opção de saída. Se o menu diz "0 - Sair" mas a condição é <code>while (opcao != 9)</code>, o 0 não encerra. Se a condição é <code>while (opcao == 0)</code>, o laço só repete quando a pessoa pede para sair, o contrário do que se quer.</p>
+<p><strong>Como consertar:</strong> leia a condição em voz alta: "repita enquanto a opção for <strong>diferente</strong> da de sair" → <code>while (opcao != 0)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Laço infinito na validação</strong>
+<p><strong>O que aconteceu:</strong> se o <code>std::cin &gt;&gt; nota;</code> ficar <strong>fora</strong> do <code>do { … }</code>, a nota inválida nunca é lida de novo: o corpo repete para sempre com o mesmo valor. Teste com <code>timeout 3 ./nota</code> e pare com <kbd>Ctrl</kbd>+<kbd>C</kbd> (veja <a href="while.html#infinito">o laço infinito</a>).</p>
+<p><strong>Como consertar:</strong> a linha que muda a variável da condição precisa estar <strong>dentro</strong> do corpo.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que faz</th></tr>
+<tr><td><code>do { … } while (condição);</code></td><td>Roda o corpo, depois testa; se verdadeira, repete. Roda pelo menos 1 vez.</td></tr>
+<tr><td><code>do { std::cin &gt;&gt; x; } while (x &lt; 0 || x &gt; 10);</code></td><td>Pede até o valor ser válido.</td></tr>
+<tr><td><code>do { menu; std::cin &gt;&gt; op; switch (op) { … } } while (op != 0);</code></td><td>Menu que repete até a opção de sair.</td></tr>
+<tr><td><code>do { …; std::cin &gt;&gt; r; } while (r == 's' || r == 'S');</code></td><td>"Deseja continuar?"</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O que falta?</h3>
+<p>Complete o fim do laço (a condição já está escrita):</p>
+<div class="ex-code">do { i++; } while (i &lt; 10)<input data-answer=";" aria-label="o que falta" size="3"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Condição da validação</h3>
+<p>Complete para repetir enquanto a idade for <strong>negativa</strong>:</p>
+<div class="ex-code">do { std::cin &gt;&gt; idade; } while (<input data-answer="idade &lt; 0|idade&lt;0|0 &gt; idade" aria-label="condição">);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Quantas voltas?</h3>
+<p>Quantas vezes o corpo roda em <code>int x = 100; do { x++; } while (x &lt; 50);</code>?</p>
+<div class="ex-code"><input data-answer="1|uma" aria-label="número de voltas"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Qual é a diferença essencial entre <code>while</code> e <code>do-while</code>?</p>
+<label><input type="radio" name="q4"> O <code>do-while</code> é mais rápido.</label>
+<label><input type="radio" name="q4"> O <code>do-while</code> testa a condição depois do corpo, então roda pelo menos uma vez.</label>
+<label><input type="radio" name="q4"> O <code>while</code> não aceita condições com <code>||</code>.</label>
+<label><input type="radio" name="q4"> O <code>do-while</code> nunca pode virar laço infinito.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Para um menu que aparece, executa a opção e aparece de novo até o usuário escolher "Sair", o mais natural é:</p>
+<label><input type="radio" name="q5"> um <code>if</code></label>
+<label><input type="radio" name="q5"> um <code>while</code> com a condição falsa no começo</label>
+<label><input type="radio" name="q5"> um <code>do-while</code></label>
+<label><input type="radio" name="q5"> um <code>switch</code> sozinho</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. O g++ disse <code>‘resposta’ was not declared in this scope</code> apontando para o <code>while (resposta == 's')</code> de um <code>do-while</code>. O que provavelmente aconteceu?</p>
+<label><input type="radio" name="q6"> Faltou o <code>#include &lt;iostream&gt;</code>.</label>
+<label><input type="radio" name="q6"> Faltou o <code>;</code> no fim.</label>
+<label><input type="radio" name="q6"> <code>char</code> não pode ser comparado com <code>'s'</code>.</label>
+<label><input type="radio" name="q6"> A variável <code>resposta</code> foi criada dentro das chaves do <code>do</code>.</label>
+</div>
+
+<h3>Missão final: o jogo de adivinhação</h3>
+<div class="trycpp" data-stdin="3 9 7" data-goal="out:Acertou em 3 tentativas!,src:do\s*\{">
+<p class="try-task"><strong>Missão:</strong> o número secreto é <code>7</code>. Com um <code>do-while</code>, peça um palpite, conte a tentativa e diga <code>É maior!</code> ou <code>É menor!</code>, repetindo enquanto o palpite for diferente do secreto. No fim, mostre <code>Acertou em N tentativas!</code>. A entrada já traz os palpites <code>3 9 7</code>, então a resposta deve ser <code>Acertou em 3 tentativas!</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    const int secreto = 7;
+    int palpite = 0;
+    int tentativas = 0;
+    // escreva o do-while aqui
+
+    std::cout &lt;&lt; "Acertou em " &lt;&lt; tentativas &lt;&lt; " tentativas!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    const int secreto = 7;
+    int palpite = 0;
+    int tentativas = 0;
+    do {
+        std::cout &lt;&lt; "Seu palpite: ";
+        std::cin &gt;&gt; palpite;
+        tentativas++;
+        if (palpite &lt; secreto) {
+            std::cout &lt;&lt; "É maior!\n";
+        } else if (palpite &gt; secreto) {
+            std::cout &lt;&lt; "É menor!\n";
+        }
+    } while (palpite != secreto);
+    std::cout &lt;&lt; "Acertou em " &lt;&lt; tentativas &lt;&lt; " tentativas!\n";
+}
+</pre>
+</div>
+
+<p>No terminal, com a Ana digitando os palpites, a solução fica assim:</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra adivinha.cpp -o adivinha
+$ ./adivinha
+Seu palpite: 3
+É maior!
+Seu palpite: 9
+É menor!
+Seu palpite: 7
+Acertou em 3 tentativas!</pre>
+<p>Um jogo de verdade sorteia o número secreto: veja <a href="aleatorios.html">Números Aleatórios</a> e o projeto <a href="projeto-adivinhacao.html">Jogo de Adivinhação</a>.</p>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>do { corpo } while (condição);</code> roda o corpo e <strong>depois</strong> testa. O corpo roda <strong>pelo menos uma vez</strong>.</li>
+  <li>O <code>;</code> no fim é obrigatório; sem ele, o g++ diz <code>expected ‘;’</code>.</li>
+  <li>A variável usada na condição deve ser <strong>criada antes</strong> do <code>do</code>: o que nasce dentro das chaves não existe na linha do <code>while</code>.</li>
+  <li>Usos típicos: validar entrada ("pergunte até ser válido"), menus, "deseja continuar?".</li>
+  <li>A condição diz quando <strong>repetir</strong> (nota inválida, opção diferente de 0), não quando parar.</li>
+  <li>Na dúvida, <code>while</code>; se a mesma linha aparece antes do laço e no fim do corpo, <code>do-while</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
