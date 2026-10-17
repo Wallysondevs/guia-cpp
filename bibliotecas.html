@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Usar Bibliotecas Externas — apt, -l, pkg-config e find_package | Guia C++</title>
+<meta name="description" content="Usar bibliotecas externas em C++ para quem nunca programou: header-only × compiladas, instalar pelo apt (pacotes -dev), apt-cache policy e apt-get -s, compilar e ligar com -l (zlib com -lz), a ordem do -l, pkg-config, find_package no CMake e gerenciadores como vcpkg e Conan, com saídas reais do Ubuntu 26.04.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Usar Bibliotecas Externas</span></h1>
+
+<p class="intro">A biblioteca padrão do C++ é grande, mas não tem tudo: não comprime arquivos, não desenha janelas, não conversa com bancos de dados. Para isso existem milhares de <strong>bibliotecas externas</strong>, código pronto, testado e gratuito, escrito por outras pessoas. Usar uma em C++ dá um pouco mais de trabalho do que em outras linguagens, porque a biblioteca precisa chegar em <strong>duas</strong> etapas: os cabeçalhos na compilação e o código já compilado na ligação. Nesta aula você vai entender essas duas partes, instalar bibliotecas pelo <code>apt</code>, ligá-las com <code>-l</code> e deixar o <code>pkg-config</code> e o CMake encontrarem tudo por você.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A diferença entre bibliotecas <strong>header-only</strong> e <strong>compiladas</strong>.</li>
+  <li>Como achar e instalar uma biblioteca pelo <code>apt</code>, e por que o pacote certo termina em <code>-dev</code>.</li>
+  <li>Como compilar e ligar com <code>-l</code> (exemplo real: a zlib, com <code>-lz</code>), e por que a posição do <code>-l</code> importa.</li>
+  <li>Como o <code>pkg-config</code> descobre as opções certas.</li>
+  <li>Como o CMake faz isso com <code>find_package</code>.</li>
+  <li>O que são os gerenciadores de pacotes vcpkg e Conan.</li>
+</ul>
+</div>
+
+<p>Os comandos desta aula foram executados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), um <strong>Ubuntu 26.04</strong> com o <strong>g++ 15.2</strong> e o <strong>CMake 4.2</strong>. Nela, a biblioteca de compressão <strong>zlib</strong> já está instalada (com o pacote de desenvolvimento), e a biblioteca de formatação <strong>fmt</strong> <strong>não</strong> está; os exemplos com a fmt instalada estão marcados como <strong>ilustrativos</strong>.</p>
+
+<hr>
+
+<h2>A ideia: comprar pronto</h2>
+<p>A Ana quer pôr um bolo de casamento no cardápio da lojinha. Ela pode fazer tudo do zero, ou comprar a massa pronta de uma confeitaria e só montar. Uma biblioteca é isso: alguém já fez a parte difícil (e testou muito), e você só usa.</p>
+
+<p>Em C++, uma biblioteca chega de um destes dois jeitos:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><strong>Header-only</strong> ("só cabeçalho")</th><th><strong>Compilada</strong></th></tr>
+<tr><td>O que vem</td><td>só arquivos <code>.h</code>, com todo o código dentro (funções <code>inline</code>, templates)</td><td>arquivos <code>.h</code> (as declarações) <strong>e</strong> um arquivo binário (<code>.so</code> ou <code>.a</code> no Linux) com o código já compilado</td></tr>
+<tr><td>Na compilação</td><td><code>#include</code></td><td><code>#include</code></td></tr>
+<tr><td>Na ligação</td><td>nada</td><td>é preciso pedir a biblioteca: <code>-l…</code></td></tr>
+<tr><td>Vantagem</td><td>fácil: copie o arquivo para a pasta e pronto</td><td>compila rápido (o código pesado já está pronto)</td></tr>
+<tr><td>Exemplos</td><td>doctest, nlohmann/json, a maior parte do Boost</td><td>zlib, SQLite, OpenSSL, Qt, fmt (que também tem um modo header-only)</td></tr>
+</table>
+</div>
+
+<p>Você já usou uma header-only na aula <a href="testes.html">Testes Automatizados</a>: a doctest é um único arquivo <code>doctest.h</code>, baixado para a pasta do projeto. E se lembra das duas partes de um projeto com vários arquivos (<a href="headers.html">Arquivos .h e .cpp</a>)? Uma biblioteca compilada é a mesma coisa, só que o <code>.cpp</code> foi compilado por outra pessoa e você recebe o resultado pronto.</p>
+
+<hr>
+
+<h2>1. Header-only: só incluir</h2>
+<p>Uma biblioteca header-only é simplesmente um <code>.h</code> com tudo dentro. Para ver como é por dentro, a Ana escreveu uma bem pequena, para mostrar preços em reais:</p>
+
+<pre class="file" data-file="moeda.h">#pragma once
+// moeda.h: uma "biblioteca" header-only. Tudo está aqui; não há nada para ligar.
+#include &lt;format&gt;
+#include &lt;string&gt;
+
+namespace moeda {
+
+inline std::string reais(double valor) {
+    std::string texto = std::format("{:.2f}", valor);   // por exemplo, "27.50"
+    for (char&amp; c : texto) {
+        if (c == '.') {
+            c = ',';
+        }
+    }
+    return "R$ " + texto;
+}
+
+}
+</pre>
+
+<p>Repare nos ingredientes: <code>#pragma once</code>, um <a href="namespaces.html">namespace</a> próprio (para não colidir com nomes de quem usa) e funções <code>inline</code> (para poderem ser incluídas por vários <code>.cpp</code> sem o erro "múltiplas definições"). É exatamente o que as bibliotecas header-only de verdade fazem, só que com milhares de linhas.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> a aba <code>moeda.h</code> é a biblioteca, e o <code>main.cpp</code> só a inclui. Rode. Depois acrescente à biblioteca uma função <code>inline std::string centavos(int c)</code> que devolve <code>reais(c / 100.0)</code> e use-a no <code>main</code> com <code>moeda::centavos(1990)</code>.</p>
+<pre class="script" data-file="main.cpp">#include &lt;iostream&gt;
+#include "moeda.h"
+
+int main() {
+    std::cout &lt;&lt; "Pão: " &lt;&lt; moeda::reais(0.75) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Total: " &lt;&lt; moeda::reais(27.5) &lt;&lt; '\n';
+}
+</pre>
+<pre class="script" data-file="moeda.h">#pragma once
+// moeda.h: uma "biblioteca" header-only. Tudo está aqui; não há nada para ligar.
+#include &lt;format&gt;
+#include &lt;string&gt;
+
+namespace moeda {
+
+inline std::string reais(double valor) {
+    std::string texto = std::format("{:.2f}", valor);   // por exemplo, "27.50"
+    for (char&amp; c : texto) {
+        if (c == '.') {
+            c = ',';
+        }
+    }
+    return "R$ " + texto;
+}
+
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Instalar uma biblioteca compilada pelo <code>apt</code></h2>
+<p>No Ubuntu, as bibliotecas mais conhecidas estão no repositório de pacotes, prontas para instalar com o <code>apt</code> (veja o <a href="instalar-linux.html">Instalar no Linux</a>). Cada biblioteca costuma vir em <strong>dois</strong> pacotes:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pacote</th><th>Exemplo</th><th>O que traz</th><th>Quem precisa</th></tr>
+<tr><td>a biblioteca (<em>runtime</em>)</td><td><code>libfmt10</code></td><td>só o binário <code>.so</code></td><td>quem <strong>roda</strong> programas que usam a biblioteca</td></tr>
+<tr><td>o de desenvolvimento, terminado em <code>-dev</code></td><td><code>libfmt-dev</code></td><td>os cabeçalhos <code>.h</code>, o <code>.so</code> para ligar, o arquivo do <code>pkg-config</code> e o do CMake</td><td>quem <strong>compila</strong> programas com a biblioteca: você</td></tr>
+</table>
+</div>
+
+<h3>Procurar e conferir</h3>
+<p>Para achar o nome do pacote, use <code>apt-cache search</code>. A opção <code>--names-only</code> procura só nos nomes, e o <code>^</code> quer dizer "começando com":</p>
+
+<pre class="term">$ apt-cache search --names-only '^libfmt'
+libfmt-dev - fast type-safe C++ formatting library -- development files
+libfmt-doc - fast type-safe C++ formatting library -- documentation
+libfmt-ocaml - OCaml Format pretty-printer combinators (runtime)
+libfmt-ocaml-dev - OCaml Format pretty-printer combinators (development)
+libfmt10 - fast type-safe C++ formatting library -- library
+$ apt-cache show libfmt-dev | grep -E '^(Description|Homepage)' | head -3
+Homepage: https://fmt.dev/
+Description-en: fast type-safe C++ formatting library -- development files
+Description-md5: 7963a4ca548a609af43ee9bd78ee3acd</pre>
+
+<p>Os dois <code>libfmt-ocaml</code> são de outra linguagem, com nome parecido: leia a descrição. O que interessa é o <code>libfmt-dev</code> ("arquivos de desenvolvimento"). Para saber se ele está instalado e qual versão viria, use <code>apt-cache policy</code>:</p>
+
+<pre class="term">$ apt-cache policy libfmt-dev
+libfmt-dev:
+  Instalado: (nenhum)
+  Candidato: 10.1.1+ds1-4build1
+  Tabela de versão:
+     10.1.1+ds1-4build1 500
+        500 http://archive.ubuntu.com/ubuntu resolute/universe amd64 Packages</pre>
+
+<dl class="anatomy">
+  <dt>Instalado: (nenhum)</dt><dd>Não está instalado.</dd>
+  <dt>Candidato: 10.1.1+ds1-4build1</dt><dd>A versão que o <code>apt install</code> instalaria: a fmt 10.1.1 (o resto é a numeração do pacote no Ubuntu).</dd>
+  <dt>resolute/universe</dt><dd>Vem do repositório <em>universe</em> do Ubuntu 26.04 (codinome <em>resolute</em>), mantido pela comunidade.</dd>
+</dl>
+
+<p>Compare com a zlib, que a Ana já tem:</p>
+
+<pre class="term">$ apt-cache policy zlib1g-dev
+zlib1g-dev:
+  Instalado: 1:1.3.dfsg+really1.3.1-1ubuntu3.1
+  Candidato: 1:1.3.dfsg+really1.3.1-1ubuntu3.1
+  Tabela de versão:
+ *** 1:1.3.dfsg+really1.3.1-1ubuntu3.1 500
+        500 http://archive.ubuntu.com/ubuntu resolute-updates/main amd64 Packages
+        500 http://security.ubuntu.com/ubuntu resolute-security/main amd64 Packages
+        100 /var/lib/dpkg/status
+     1:1.3.dfsg+really1.3.1-1ubuntu3 500
+        500 http://archive.ubuntu.com/ubuntu resolute/main amd64 Packages</pre>
+
+<p>Os <code>***</code> marcam a versão instalada (a zlib 1.3.1, com uma atualização de segurança).</p>
+
+<h3>Ver o que seria instalado, sem instalar</h3>
+<p><code>apt-get -s install</code> faz uma <strong>simulação</strong> (<code>-s</code>): mostra o que aconteceria, sem mudar nada e sem pedir senha. É um bom hábito antes de instalar:</p>
+
+<pre class="term">$ apt-get -s install libfmt-dev
+NOTA: Esta é apenas uma simulação!
+      apt-get precisa de privilégios de root para execução real.
+      Lembre-se também de que a trava está desativada e,
+      portanto, não dependa da relevância para a situação real atual!
+Lendo listas de pacotes...
+Construindo árvore de dependências...
+Lendo informação de estado...
+Resolvendo dependências...
+Os pacotes adicionais a seguir serão instalados:
+  libfmt10
+Pacotes sugeridos:
+  libfmt-doc
+Os NOVOS pacotes a seguir serão instalados:
+  libfmt-dev libfmt10
+0 pacotes atualizados, 2 pacotes novos instalados, 0 a serem removidos e 12 não atualizados.
+Inst libfmt10 (10.1.1+ds1-4build1 Ubuntu:26.04/resolute [amd64])
+Inst libfmt-dev (10.1.1+ds1-4build1 Ubuntu:26.04/resolute [amd64])
+Conf libfmt10 (10.1.1+ds1-4build1 Ubuntu:26.04/resolute [amd64])
+Conf libfmt-dev (10.1.1+ds1-4build1 Ubuntu:26.04/resolute [amd64])</pre>
+
+<p>Pedindo o <code>libfmt-dev</code>, o <code>apt</code> traz junto o <code>libfmt10</code> (a biblioteca em si), como explicado na tabela acima. As linhas <code>Inst</code> (instalar) e <code>Conf</code> (configurar) são o plano. Para instalar de verdade: <code>sudo apt install libfmt-dev</code>.</p>
+
+<h3>O que tem dentro de um pacote <code>-dev</code></h3>
+<p>O <code>dpkg -L</code> lista os arquivos de um pacote instalado. Filtrando os que interessam, da zlib:</p>
+
+<pre class="term">$ dpkg -L zlib1g-dev | grep -E '\.(h|so|a|pc)$'
+/usr/include/zconf.h
+/usr/include/zlib.h                                   « o cabeçalho que você inclui
+/usr/lib/x86_64-linux-gnu/libz.a                      « a biblioteca estática
+/usr/lib/x86_64-linux-gnu/pkgconfig/zlib.pc           « o arquivo do pkg-config
+/usr/share/doc/zlib1g-dev/examples/gzlog.h
+/usr/share/doc/zlib1g-dev/examples/zran.h
+/usr/lib/x86_64-linux-gnu/libz.so                     « a biblioteca compartilhada</pre>
+
+<p>O <code>zlib.h</code> está em <code>/usr/include</code>, uma das pastas onde o <code>#include &lt;…&gt;</code> procura (lembra da lista em <a href="preprocessador.html">O Pré-processador</a>?). Por isso basta <code>#include &lt;zlib.h&gt;</code>, sem <code>-I</code>.</p>
+
+<hr>
+
+<h2>3. Compilar e ligar com <code>-l</code></h2>
+<p>A <strong>zlib</strong> é a biblioteca de compressão por trás do formato <code>.gz</code>, do PNG e de boa parte da internet. A Ana a usou para ver quanto uma lista de compras repetida encolhe:</p>
+
+<pre class="file" data-file="zip.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;zlib.h&gt;
+
+int main() {
+    std::string texto;
+    for (int i = 0; i &lt; 50; ++i) {
+        texto += "pão, leite, café; ";
+    }
+
+    uLongf tamanho = compressBound(texto.size());
+    std::vector&lt;Bytef&gt; comprimido(tamanho);
+    int resultado = compress(comprimido.data(), &amp;tamanho,
+                             reinterpret_cast&lt;const Bytef*&gt;(texto.data()), texto.size());
+    if (resultado != Z_OK) {
+        std::cout &lt;&lt; "Erro ao comprimir: " &lt;&lt; resultado &lt;&lt; '\n';
+        return 1;
+    }
+
+    std::cout &lt;&lt; "zlib versão " &lt;&lt; zlibVersion() &lt;&lt; '\n';
+    std::cout &lt;&lt; "Original:   " &lt;&lt; texto.size() &lt;&lt; " bytes\n";
+    std::cout &lt;&lt; "Comprimido: " &lt;&lt; tamanho &lt;&lt; " bytes\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;zlib.h&gt;</dt><dd>As declarações da zlib: as funções <code>compress</code>, <code>compressBound</code>, <code>zlibVersion</code> e os tipos <code>uLongf</code> e <code>Bytef</code> (números e bytes, nos nomes que a zlib usa).</dd>
+  <dt>compressBound(texto.size())</dt><dd>"No pior caso, quantos bytes a versão comprimida pode ter?" Usado para reservar espaço no <code>vector</code>.</dd>
+  <dt>compress(destino, &amp;tamanho, origem, tamanhoOrigem)</dt><dd>Comprime. A zlib é uma biblioteca em C, que trabalha com bytes e <a href="ponteiros.html">ponteiros</a>: o <code>reinterpret_cast&lt;const Bytef*&gt;</code> diz "trate as letras do texto como bytes", e o <code>&amp;tamanho</code> deixa a função escrever no <code>tamanho</code> quantos bytes realmente usou.</dd>
+  <dt>Z_OK</dt><dd>A constante que a zlib devolve quando deu certo. Bibliotecas em C avisam erros assim, por um número.</dd>
+</dl>
+
+<p>Compilando do jeito de sempre:</p>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra zip.cpp -o zip
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccdRfd5K.o: na função "main":
+zip.cpp:(.text+0x6e): referência não definida para "compressBound"
+/usr/bin/x86_64-linux-gnu-ld.bfd: zip.cpp:(.text+0xd9): referência não definida para "compress"
+/usr/bin/x86_64-linux-gnu-ld.bfd: zip.cpp:(.text+0x152): referência não definida para "zlibVersion"
+collect2: error: ld returned 1 exit status</pre>
+
+<p>A <strong>compilação</strong> passou: o <code>zlib.h</code> foi achado e declarou as funções. Quem falhou foi a <strong>ligação</strong>: é o <code>undefined reference</code> ("referência não definida") de <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>. O corpo das funções está no <code>libz.so</code>, e ninguém pediu ao ligador para olhar lá. É para isso que serve o <code>-l</code>:</p>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra zip.cpp -o zip -lz
+$ ./zip
+zlib versão 1.3.1
+Original:   1000 bytes
+Comprimido: 38 bytes</pre>
+
+<p>Mil bytes (50 repetições de 20 bytes; o <code>ã</code> e o <code>é</code> ocupam 2 bytes cada em <a href="acentos-utf8.html">UTF-8</a>) viraram 38: texto repetido comprime muito bem.</p>
+
+<dl class="anatomy">
+  <dt>-lz</dt><dd><code>-l</code> (de <em>library</em>, "biblioteca") seguido do nome <strong>curto</strong> da biblioteca, colado. O ligador transforma <code>-lz</code> em <code>libz.so</code> (ou <code>libz.a</code>): põe <code>lib</code> na frente e a extensão no fim. Do mesmo jeito, <code>-lfmt</code> procura <code>libfmt.so</code> e <code>-lsqlite3</code> procura <code>libsqlite3.so</code>.</dd>
+  <dt>a posição: no fim</dt><dd>Depois dos arquivos que usam a biblioteca. Veja o porquê logo abaixo.</dd>
+</dl>
+
+<p>Os arquivos que o <code>-lz</code> pode encontrar:</p>
+<pre class="term">$ ls /usr/lib/x86_64-linux-gnu/libz.*
+/usr/lib/x86_64-linux-gnu/libz.a
+/usr/lib/x86_64-linux-gnu/libz.so
+/usr/lib/x86_64-linux-gnu/libz.so.1
+/usr/lib/x86_64-linux-gnu/libz.so.1.3.1</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Arquivo</th><th>Tipo</th><th>Como funciona</th></tr>
+<tr><td><code>libz.so</code> (<em>shared object</em>)</td><td>biblioteca <strong>compartilhada</strong> (dinâmica)</td><td>o programa guarda só uma referência; a biblioteca é carregada quando ele roda. Um programa menor, e todos os programas do sistema usam a mesma cópia (e recebem as atualizações de segurança dela). É a escolhida por padrão.</td></tr>
+<tr><td><code>libz.a</code> (<em>archive</em>)</td><td>biblioteca <strong>estática</strong></td><td>um pacote de arquivos <code>.o</code>, copiados para dentro do programa na ligação. O programa fica maior, mas não depende de nada na hora de rodar.</td></tr>
+<tr><td><code>libz.so.1</code>, <code>libz.so.1.3.1</code></td><td>a mesma <code>.so</code>, com a versão no nome</td><td>atalhos (<em>links</em>) para a versão instalada</td></tr>
+</table>
+</div>
+
+<p>O comando <code>ldd</code> lista as bibliotecas compartilhadas de que um programa precisa para rodar:</p>
+<pre class="term">$ ldd ./zip | grep libz
+	libz.so.1 =&gt; /usr/lib/x86_64-linux-gnu/libz.so.1 (0x0000788107b45000)</pre>
+<p>(O número entre parênteses é o endereço onde ela foi carregada na memória, que muda a cada execução.) É por isso que existe o pacote <code>zlib1g</code>, sem <code>-dev</code>: quem só roda o <code>zip</code> precisa do <code>libz.so.1</code>, não dos cabeçalhos.</p>
+
+<div class="cenario">
+<strong>O <code>-l</code> no lugar errado</strong>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra -lz zip.cpp -o zip2
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccMg9oec.o: na função "main":
+zip.cpp:(.text+0x6e): referência não definida para "compressBound"
+/usr/bin/x86_64-linux-gnu-ld.bfd: zip.cpp:(.text+0xd9): referência não definida para "compress"
+/usr/bin/x86_64-linux-gnu-ld.bfd: zip.cpp:(.text+0x152): referência não definida para "zlibVersion"
+collect2: error: ld returned 1 exit status</pre>
+<p><strong>O que aconteceu:</strong> o <code>-lz</code> está lá, mas <strong>antes</strong> do <code>zip.cpp</code>. O ligador lê o comando da esquerda para a direita. Quando chegou na zlib, ainda ninguém tinha pedido nada dela (o <code>zip.cpp</code> vem depois), e ele a deixou de lado. Quando o <code>zip.cpp</code> pediu as funções, a zlib já tinha ficado para trás.</p>
+<p><strong>Como resolver:</strong> as bibliotecas vão <strong>depois</strong> dos arquivos que as usam; na dúvida, no fim do comando. É a exceção à regra "a ordem não importa", que vale para <code>.cpp</code> e <code>.o</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"não foi possível localizar -lzlib"</strong>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra zip.cpp -o zip -lzlib
+/usr/bin/x86_64-linux-gnu-ld.bfd: não foi possível localizar -lzlib: Arquivo ou diretório inexistente
+collect2: error: ld returned 1 exit status</pre>
+<p><strong>O que significa:</strong> o ligador procurou <code>libzlib.so</code> e <code>libzlib.a</code>, que não existem (em inglês: <code>cannot find -lzlib</code>). O nome do <code>-l</code> é o do <strong>arquivo</strong> (<code>libz</code>), não o do projeto (zlib).</p>
+<p><strong>Como resolver:</strong> descubra o nome do arquivo com <code>dpkg -L pacote-dev</code> ou, melhor, pergunte ao <code>pkg-config</code> (próxima seção). Se o erro for com o nome certo, falta instalar o pacote <code>-dev</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Biblioteca não instalada: "fatal error: fmt/core.h"</strong>
+<p>A Ana tentou um exemplo da fmt sem ter o <code>libfmt-dev</code>:</p>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra ola.cpp -o ola -lfmt
+ola.cpp:1:10: fatal error: fmt/core.h: Arquivo ou diretório inexistente
+    1 | #include &lt;fmt/core.h&gt;
+      |          ^~~~~~~~~~~~
+compilation terminated.</pre>
+<p><strong>O que significa:</strong> o erro acontece antes de chegar no <code>-lfmt</code>: o cabeçalho não existe em nenhuma pasta do sistema. (O <code>fmt/</code> no nome quer dizer que os cabeçalhos da fmt ficam numa subpasta, <code>/usr/include/fmt/</code>.)</p>
+<p><strong>Como resolver:</strong> <code>sudo apt install libfmt-dev</code>. Se a biblioteca foi instalada em outro lugar (compilada à mão, por exemplo), indique as pastas: <code>-I</code> para os cabeçalhos e <code>-L</code> para os binários, como em <code>g++ … -I/opt/fmt/include … -L/opt/fmt/lib -lfmt</code>.</p>
+</div>
+
+<hr>
+
+<h2>4. <code>pkg-config</code>: "quais opções essa biblioteca precisa?"</h2>
+<p>Cada biblioteca tem as suas manias: uma precisa de <code>-I</code> com uma pasta especial, outra de duas <code>-l</code>, outra de uma opção de compilação. Decorar isso não dá. O <code>pkg-config</code> é um programa que guarda essas receitas: cada pacote <code>-dev</code> instala um arquivo <code>.pc</code> (como o <code>zlib.pc</code> que apareceu no <code>dpkg -L</code>), e você pergunta:</p>
+
+<pre class="term">$ pkg-config --modversion zlib
+1.3.1
+$ pkg-config --cflags --libs zlib
+ -lz</pre>
+
+<dl class="anatomy">
+  <dt>--modversion</dt><dd>A versão instalada.</dd>
+  <dt>--cflags</dt><dd>As opções de <strong>compilação</strong> (por exemplo, <code>-I…</code>). A zlib não precisa de nenhuma, porque o cabeçalho está em <code>/usr/include</code>; por isso só sai um espaço.</dd>
+  <dt>--libs</dt><dd>As opções de <strong>ligação</strong>: <code>-lz</code>.</dd>
+</dl>
+
+<p>O truque é pôr a pergunta dentro do comando do g++ com <code>$( … )</code> (a "substituição de comando" do terminal, que troca o trecho pela saída dele):</p>
+
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra zip.cpp -o zip3 $(pkg-config --cflags --libs zlib)
+$ ./zip3 | head -1
+zlib versão 1.3.1</pre>
+
+<p>Assim, o comando funciona para qualquer biblioteca com <code>.pc</code>, sem você saber os detalhes. Para ver quantas o sistema conhece: <code>pkg-config --list-all</code> (na máquina da Ana, 84). Se o pacote não estiver instalado:</p>
+
+<pre class="term">$ pkg-config --libs fmt
+Package fmt was not found in the pkg-config search path.
+Perhaps you should add the directory containing `fmt.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'fmt' not found
+$ echo $?
+1</pre>
+
+<p>"O pacote fmt não foi encontrado." O conselho sobre o <code>PKG_CONFIG_PATH</code> só serve para bibliotecas instaladas fora do lugar padrão; aqui, falta mesmo o <code>sudo apt install libfmt-dev</code>, que instala o <code>fmt.pc</code>. Depois disso, o mesmo comando daria as opções da fmt.</p>
+
+<p>Com a fmt instalada, o exemplo dela compilaria assim (<strong>ilustrativo</strong>: a fmt não está instalada na máquina da Ana):</p>
+<pre class="file" data-file="ola.cpp">#include &lt;fmt/core.h&gt;
+
+int main() {
+    fmt::print("Olá, {}! Você tem {} itens.\n", "Ana", 3);
+}
+</pre>
+<pre class="term">$ g++ -std=c++23 -Wall -Wextra ola.cpp -o ola $(pkg-config --cflags --libs fmt)     « ilustrativo
+$ ./ola
+Olá, Ana! Você tem 3 itens.</pre>
+
+<p>A fmt foi a inspiração do <a href="format-print.html"><code>std::format</code> e do <code>std::print</code></a>, que entraram na biblioteca padrão no C++20 e no C++23. Com o g++ 15 e <code>-std=c++23</code>, você já tem quase tudo isso sem biblioteca externa. Muitos projetos ainda usam a fmt por terem nascido antes, ou para compiladores mais antigos.</p>
+
+<hr>
+
+<h2>5. No CMake: <code>find_package</code></h2>
+<p>No <a href="cmake.html">CMake</a>, a pergunta "onde está a biblioteca e como ligo?" é feita com <code>find_package</code> ("encontre o pacote"), e a ligação, com o <code>target_link_libraries</code> que você já conhece:</p>
+
+<pre class="file" data-file="CMakeLists.txt">cmake_minimum_required(VERSION 3.25)
+project(Zip LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+find_package(ZLIB REQUIRED)
+
+add_executable(zip zip.cpp)
+target_link_libraries(zip PRIVATE ZLIB::ZLIB)
+</pre>
+
+<dl class="anatomy">
+  <dt>find_package(ZLIB REQUIRED)</dt><dd>Procura a zlib no sistema. <code>REQUIRED</code> ("obrigatório"): se não achar, pare com erro. O nome (<code>ZLIB</code>, em maiúsculas) é o que a documentação da biblioteca indica.</dd>
+  <dt>ZLIB::ZLIB</dt><dd>Um alvo <strong>importado</strong>, criado pelo <code>find_package</code>, que carrega tudo o que a biblioteca precisa: pastas de cabeçalhos, o arquivo para ligar e opções. O <code>::</code> no nome é a marca desses alvos.</dd>
+</dl>
+
+<pre class="term">$ cmake -B build -G Ninja
+-- The CXX compiler identification is GNU 15.2.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Found ZLIB: /usr/lib/x86_64-linux-gnu/libz.so (found version "1.3.1")
+-- Configuring done (0.4s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/ana/cpp/libs/build
+$ cmake --build build
+[1/2] Building CXX object CMakeFiles/zip.dir/zip.cpp.o
+[2/2] Linking CXX executable zip
+$ ./build/zip
+zlib versão 1.3.1
+Original:   1000 bytes
+Comprimido: 38 bytes</pre>
+
+<p>Repare na linha <code>-- Found ZLIB:</code> ("encontrei a zlib"), com o caminho e a versão. Para a fmt, o <code>CMakeLists.txt</code> seria igual, com <code>find_package(fmt REQUIRED)</code> e <code>target_link_libraries(ola PRIVATE fmt::fmt)</code>. Sem o <code>libfmt-dev</code>, a configuração para assim:</p>
+
+<pre class="term">$ cmake -B build -G Ninja
+«… detecções do compilador …»
+CMake Error at CMakeLists.txt:6 (find_package):
+  By not providing "Findfmt.cmake" in CMAKE_MODULE_PATH this project has
+  asked CMake to find a package configuration file provided by "fmt", but
+  CMake did not find one.
+
+  Could not find a package configuration file provided by "fmt" with any of
+  the following names:
+
+    fmtConfig.cmake
+    fmt-config.cmake
+
+  Add the installation prefix of "fmt" to CMAKE_PREFIX_PATH or set "fmt_DIR"
+  to a directory containing one of the above files.  If "fmt" provides a
+  separate development package or SDK, be sure it has been installed.
+
+
+-- Configuring incomplete, errors occurred!</pre>
+
+<p>A mensagem é longa, mas a última frase é a que importa: "se o fmt tem um pacote de desenvolvimento separado, confira se ele está instalado". O <code>fmtConfig.cmake</code> que o CMake procurou vem dentro do <code>libfmt-dev</code>. Depois do <code>sudo apt install libfmt-dev</code>, a configuração passaria, mostrando a fmt encontrada (<strong>ilustrativo</strong>).</p>
+
+<hr>
+
+<h2>6. Gerenciadores de pacotes: vcpkg e Conan</h2>
+<p>O <code>apt</code> resolve bem no Linux, mas tem limites: a versão é a que o Ubuntu escolheu (a fmt 10.1, enquanto o projeto pode querer outra), e não existe no Windows nem no macOS. Para isso surgiram os gerenciadores de pacotes próprios do C++:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ferramenta</th><th>De quem</th><th>Como funciona</th></tr>
+<tr><td><strong>vcpkg</strong></td><td>Microsoft (livre, multiplataforma)</td><td>você lista as bibliotecas num arquivo <code>vcpkg.json</code>; o vcpkg baixa e compila cada uma, e o CMake as encontra pelo mesmo <code>find_package</code></td></tr>
+<tr><td><strong>Conan</strong></td><td>JFrog (livre, multiplataforma)</td><td>você lista as bibliotecas num <code>conanfile.txt</code> ou <code>conanfile.py</code>; ele baixa versões já compiladas quando existem e gera os arquivos para o CMake</td></tr>
+<tr><td><code>FetchContent</code> do CMake</td><td>o próprio CMake</td><td>o <code>CMakeLists.txt</code> baixa o código da biblioteca (do GitHub, por exemplo) e a compila junto com o projeto</td></tr>
+</table>
+</div>
+
+<p>Para projetos de estudo no Linux, o <code>apt</code> basta. Quando o projeto precisar rodar em vários sistemas ou de versões exatas, vale aprender um desses.</p>
+
+<div class="tip">
+<strong>Antes de escolher uma biblioteca</strong>
+<ul>
+  <li><strong>A biblioteca padrão já faz?</strong> <code>std::format</code>, <code>std::filesystem</code>, <code>std::chrono</code>, <code>&lt;random&gt;</code>… cobrem muita coisa.</li>
+  <li><strong>Está viva?</strong> Atualizações recentes, documentação, gente usando.</li>
+  <li><strong>A licença permite o seu uso?</strong> MIT, BSD, zlib e Boost são bem permissivas.</li>
+  <li><strong>Está no <code>apt</code>, no vcpkg ou no Conan?</strong> Isso facilita muito a vida.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Comando</th><th>O que faz</th></tr>
+<tr><td><code>apt-cache search --names-only '^lib…'</code></td><td>procura pacotes pelo nome</td></tr>
+<tr><td><code>apt-cache policy pacote</code></td><td>instalado? qual versão viria?</td></tr>
+<tr><td><code>apt-get -s install pacote</code></td><td>simula a instalação</td></tr>
+<tr><td><code>sudo apt install pacote-dev</code></td><td>instala a biblioteca para desenvolvimento</td></tr>
+<tr><td><code>dpkg -L pacote</code></td><td>lista os arquivos de um pacote instalado</td></tr>
+<tr><td><code>g++ … arquivo.cpp -o prog -lnome</code></td><td>liga com <code>libnome.so</code> (o <code>-l</code> depois dos arquivos)</td></tr>
+<tr><td><code>-I pasta</code> / <code>-L pasta</code></td><td>pasta extra de cabeçalhos / de bibliotecas</td></tr>
+<tr><td><code>pkg-config --cflags --libs nome</code></td><td>as opções certas para a biblioteca</td></tr>
+<tr><td><code>ldd ./prog</code></td><td>as bibliotecas compartilhadas de que o programa precisa</td></tr>
+<tr><td><code>find_package(Nome REQUIRED)</code></td><td>(CMake) procura a biblioteca</td></tr>
+<tr><td><code>target_link_libraries(prog PRIVATE Nome::Nome)</code></td><td>(CMake) liga com ela</td></tr>
+</table>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem</th><th>Fase</th><th>Causa</th></tr>
+<tr><td><code>fatal error: x.h: Arquivo ou diretório inexistente</code></td><td>compilação</td><td>pacote <code>-dev</code> não instalado, ou falta <code>-I</code></td></tr>
+<tr><td><code>referência não definida para</code> / <code>undefined reference to</code></td><td>ligação</td><td>faltou o <code>-l</code>, ou ele está antes dos arquivos</td></tr>
+<tr><td><code>não foi possível localizar -lx</code> / <code>cannot find -lx</code></td><td>ligação</td><td>nome errado no <code>-l</code>, pacote não instalado, ou falta <code>-L</code></td></tr>
+<tr><td><code>Package x was not found in the pkg-config search path</code></td><td>pkg-config</td><td>pacote <code>-dev</code> não instalado</td></tr>
+<tr><td><code>Could not find a package configuration file provided by "x"</code></td><td>CMake</td><td>pacote <code>-dev</code> não instalado</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O nome do <code>-l</code></h3>
+<p>O arquivo da biblioteca SQLite se chama <code>libsqlite3.so</code>. Complete a opção de ligação:</p>
+<div class="ex-code">g++ -std=c++23 -Wall -Wextra banco.cpp -o banco <input data-answer="-lsqlite3" aria-label="opção"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Perguntar ao pkg-config</h3>
+<p>Complete para obter as opções de compilação e de ligação da zlib:</p>
+<div class="ex-code">pkg-config <input data-answer="--cflags --libs|--libs --cflags" aria-label="opções"> zlib</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Qual pacote instalar para <strong>compilar</strong> programas com a fmt?</p>
+<label><input type="radio" name="q3"> <code>libfmt10</code></label>
+<label><input type="radio" name="q3"> <code>libfmt-dev</code></label>
+<label><input type="radio" name="q3"> <code>libfmt-doc</code></label>
+<label><input type="radio" name="q3"> <code>libfmt-ocaml</code></label>
+</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="3">
+<p class="mc-q">4. <code>g++ -lz zip.cpp -o zip</code> dá <code>referência não definida para "compress"</code>, mas <code>g++ zip.cpp -o zip -lz</code> funciona. Por quê?</p>
+<label><input type="radio" name="q4"> O <code>-lz</code> só funciona no fim por ser uma regra do C++23.</label>
+<label><input type="radio" name="q4"> No primeiro comando, o <code>zlib.h</code> não foi encontrado.</label>
+<label><input type="radio" name="q4"> O ligador lê da esquerda para a direita, e a biblioteca tem que vir depois de quem a usa.</label>
+<label><input type="radio" name="q4"> O <code>-o zip</code> precisa vir antes do <code>-lz</code>.</label>
+</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="1">
+<p class="mc-q">5. O que caracteriza uma biblioteca header-only?</p>
+<label><input type="radio" name="q5"> Todo o código está nos <code>.h</code>; basta incluir, sem <code>-l</code>.</label>
+<label><input type="radio" name="q5"> Ela só tem declarações, sem código.</label>
+<label><input type="radio" name="q5"> Ela precisa ser instalada pelo <code>apt</code>.</label>
+<label><input type="radio" name="q5"> Ela é sempre uma biblioteca estática (<code>.a</code>).</label>
+</div>
+</div>
+
+<h3>Missão final: da fmt para a biblioteca padrão</h3>
+
+<div class="trycpp" data-goal="compila,out:Olá\, Ana! Você tem 3 itens.,src:std::print">
+<p class="try-task"><strong>Missão:</strong> o editor do guia não tem a fmt instalada, como a máquina da Ana. Rode e veja o <code>fatal error</code> do cabeçalho que não existe (o Clang diz <code>'fmt/core.h' file not found</code>, "arquivo não encontrado"). Depois troque a fmt pela biblioteca padrão do C++23, que tem a mesma ideia: o cabeçalho <code>&lt;print&gt;</code> e a função <code>std::print</code> (com <code>{}</code> no lugar de cada valor). A saída deve ser <code>Olá, Ana! Você tem 3 itens.</code></p>
+<pre class="script">#include &lt;fmt/core.h&gt;
+
+int main() {
+    fmt::print("Olá, {}! Você tem {} itens.\n", "Ana", 3);
+}
+</pre>
+<pre class="solucao">#include &lt;print&gt;
+
+int main() {
+    std::print("Olá, {}! Você tem {} itens.\n", "Ana", 3);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma biblioteca <strong>header-only</strong> é só <code>.h</code>: copie e inclua. Uma <strong>compilada</strong> tem <code>.h</code> (para compilar) e <code>.so</code>/<code>.a</code> (para ligar).</li>
+  <li>No Ubuntu, instale o pacote <code>-dev</code> (<code>sudo apt install libfmt-dev</code>). Antes, confira com <code>apt-cache policy</code> e simule com <code>apt-get -s install</code>.</li>
+  <li>Ligue com <code>-lnome</code> (procura <code>libnome.so</code>), <strong>depois</strong> dos arquivos: <code>g++ zip.cpp -o zip -lz</code>. Sem ele: <code>undefined reference</code> ("referência não definida").</li>
+  <li><code>pkg-config --cflags --libs nome</code> dá as opções certas; use dentro do comando com <code>$( … )</code>.</li>
+  <li>No CMake: <code>find_package(Nome REQUIRED)</code> + <code>target_link_libraries(prog PRIVATE Nome::Nome)</code>.</li>
+  <li>vcpkg, Conan e o <code>FetchContent</code> do CMake trazem bibliotecas em qualquer sistema e com a versão que você escolher.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
