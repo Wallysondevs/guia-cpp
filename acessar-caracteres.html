@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Acessar Caracteres — s[0], at, front, back e percorrer | Guia C++</title>
+<meta name="description" content="Como pegar e mudar um caractere de uma string em C++ para quem nunca programou: índices a partir de 0, s[i], s.at(i) e o std::out_of_range, o comportamento indefinido de s[10], front e back, e como percorrer a string com for e com for (char c : s), com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Acessar Caracteres</span></h1>
+
+<p class="intro">Uma string é um "colar" de caracteres em ordem (aula <a href="strings.html">Strings</a>). Muitas vezes você precisa de <strong>uma conta só</strong> desse colar: a primeira letra do nome para fazer as iniciais, a última letra para saber se a palavra termina em "s", cada letra da senha para trocá-la por <code>*</code>. Nesta aula você vai aprender a pegar um caractere pela posição, a trocá-lo, a passar por todos eles, um por um, e o que acontece quando você pede uma posição que não existe.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um <strong>índice</strong> e por que a primeira posição é <strong>0</strong>.</li>
+  <li>Como pegar um caractere com <code>s[0]</code> e com <code>s.at(0)</code>, e a diferença entre os dois.</li>
+  <li>O que acontece com <code>s.at(10)</code> (a exceção <code>std::out_of_range</code>) e com <code>s[10]</code> (comportamento indefinido).</li>
+  <li>Os atalhos <code>.front()</code> e <code>.back()</code>.</li>
+  <li>Como trocar um caractere: <code>s[0] = 'p';</code>.</li>
+  <li>Como percorrer a string com <code>for</code> e com <code>for (char c : s)</code>.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com o comando padrão <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: casas numeradas a partir do zero</h2>
+<p>Imagine os caracteres de <code>"Bruno"</code> em caixinhas lado a lado, cada uma com um número na frente. Esse número é o <strong>índice</strong> (a "posição") do caractere. Em C++, como em quase todas as linguagens, a contagem começa do <strong>0</strong>, não do 1:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Índice</th><td><code>0</code></td><td><code>1</code></td><td><code>2</code></td><td><code>3</code></td><td><code>4</code></td></tr>
+<tr><th>Caractere</th><td><code>B</code></td><td><code>r</code></td><td><code>u</code></td><td><code>n</code></td><td><code>o</code></td></tr>
+</table>
+</div>
+
+<p>Pense no índice como "quantos passos andar a partir do começo". Para chegar no <code>B</code>, você não anda nada: índice 0. Para o <code>r</code>, anda um passo: índice 1. Daí vêm as duas regras que você vai usar o tempo todo:</p>
+<ul>
+  <li>o <strong>primeiro</strong> caractere está no índice <code>0</code>;</li>
+  <li>o <strong>último</strong> está no índice <code>size() - 1</code>. <code>"Bruno"</code> tem 5 caracteres, então o último é o 4. <strong>Não existe</strong> índice 5.</li>
+</ul>
+
+<hr>
+
+<h2>1. Pegar um caractere com colchetes: <code>s[i]</code></h2>
+
+<pre class="file" data-file="indice.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Bruno";
+    std::cout &lt;&lt; nome[0] &lt;&lt; '\n';
+    std::cout &lt;&lt; nome[1] &lt;&lt; '\n';
+    std::cout &lt;&lt; nome[4] &lt;&lt; '\n';
+    std::cout &lt;&lt; nome.at(2) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra indice.cpp -o indice
+$ ./indice
+B
+r
+o
+u</pre>
+
+<dl class="anatomy">
+  <dt>nome[0]</dt><dd>"O caractere de <code>nome</code> na posição 0". Os <strong>colchetes</strong> <code>[ ]</code> recebem o índice. O resultado é um <code>char</code> (um caractere só, veja <a href="char.html">Caracteres</a>), não uma string.</dd>
+  <dt>nome[4]</dt><dd>O último caractere de <code>"Bruno"</code>: índice 4 = <code>size() - 1</code>.</dd>
+  <dt>nome.at(2)</dt><dd>Outra forma de pegar o caractere da posição 2. <code>at</code> quer dizer "em" ("o caractere <strong>em</strong> 2"). Faz o mesmo que <code>nome[2]</code>, com uma diferença importante que você vai ver na seção 3.</dd>
+</dl>
+
+<p>O índice pode ser qualquer conta que dê um número inteiro: <code>nome[nome.size() - 1]</code> é o último caractere, seja qual for o tamanho da string.</p>
+
+<div class="warning">
+<strong>Acentos ocupam duas caixinhas</strong>
+<p>Os índices contam <strong>bytes</strong>, como o <code>.size()</code>. Em <code>"maçã"</code>, o <code>ç</code> ocupa as posições 2 <strong>e</strong> 3, e <code>s[2]</code> pega só a metade dele. A aula <a href="acentos-utf8.html">Acentos e UTF-8</a> mostra o que aparece na tela nesse caso. Nesta aula, os exemplos usam palavras sem acento.</p>
+</div>
+
+<hr>
+
+<h2>2. O primeiro e o último: <code>.front()</code> e <code>.back()</code></h2>
+<p>Pegar a primeira e a última letra é tão comum que existem dois atalhos: <code>front</code> ("frente") e <code>back</code> ("fundo", "costas").</p>
+
+<pre class="file" data-file="ultimo.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string fruta = "banana";
+    std::cout &lt;&lt; "primeira: " &lt;&lt; fruta.front() &lt;&lt; '\n';
+    std::cout &lt;&lt; "última: " &lt;&lt; fruta.back() &lt;&lt; '\n';
+    std::cout &lt;&lt; "última (com índice): " &lt;&lt; fruta[fruta.size() - 1] &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ultimo.cpp -o ultimo
+$ ./ultimo
+primeira: b
+última: a
+última (com índice): a</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Atalho</th><th>É o mesmo que</th><th>Em <code>"banana"</code></th></tr>
+<tr><td><code>s.front()</code></td><td><code>s[0]</code></td><td><code>b</code></td></tr>
+<tr><td><code>s.back()</code></td><td><code>s[s.size() - 1]</code></td><td><code>a</code></td></tr>
+</table>
+</div>
+
+<p>Prefira <code>.back()</code> a <code>s[s.size() - 1]</code>: é mais curto e não dá chance de esquecer o <code>- 1</code>.</p>
+
+<div class="warning">
+<strong>Nunca numa string vazia</strong>
+<p>Uma string vazia não tem primeiro nem último caractere. <code>.front()</code>, <code>.back()</code> e <code>s[0]</code> numa string vazia são comportamento indefinido (seção 3). Antes, pergunte com <code>if (!s.empty())</code> (veja <a href="strings.html">Strings</a> e <a href="if-else.html">if e else</a>).</p>
+</div>
+
+<hr>
+
+<h2>3. Fora do intervalo: <code>at</code> × colchetes</h2>
+<p>E se você pedir uma posição que não existe? É aqui que <code>[ ]</code> e <code>.at()</code> se separam.</p>
+
+<h3><code>.at()</code> confere e "lança uma exceção"</h3>
+
+<pre class="file" data-file="at.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana";
+    std::cout &lt;&lt; "antes\n";
+    std::cout &lt;&lt; nome.at(10) &lt;&lt; '\n';
+    std::cout &lt;&lt; "depois\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra at.cpp -o at
+$ ./at
+antes
+terminate called after throwing an instance of 'std::out_of_range'
+  what():  basic_string::at: __n (which is 10) &gt;= this-&gt;size() (which is 3)
+Abortado                   (imagem do núcleo gravada) ./at
+$ echo $?
+134</pre>
+
+<p>Vamos ler essa mensagem linha por linha:</p>
+<dl class="anatomy">
+  <dt>antes</dt><dd>A primeira linha rodou normalmente.</dd>
+  <dt>terminate called after throwing an instance of 'std::out_of_range'</dt><dd>"<code>terminate</code> chamado depois de lançar um <code>std::out_of_range</code>". O <code>.at()</code> percebeu que 10 está fora e <strong>lançou uma exceção</strong>: um "alarme" do C++ que diz "deu errado, alguém precisa tratar isso". <code>out_of_range</code> = "fora do intervalo". Como ninguém tratou o alarme, o C++ chamou <code>terminate</code> ("encerrar") e o programa morreu.</dd>
+  <dt>what():  basic_string::at: __n (which is 10) &gt;= this-&gt;size() (which is 3)</dt><dd>O <code>what()</code> ("o quê") é a explicação: o índice pedido (<code>__n</code>) foi 10, e ele é maior ou igual ao tamanho, que é 3. É exatamente o seu erro, com os números.</dd>
+  <dt>Abortado (imagem do núcleo gravada)</dt><dd>Esta linha é do <strong>Bash</strong>, não do programa: ele avisa que o programa foi abortado (o sinal <code>SIGABRT</code>). "Imagem do núcleo" (<em>core dump</em>) é uma fotografia da memória que o sistema pode guardar para depuração.</dd>
+  <dt>134</dt><dd>O código de saída de um programa abortado (128 + 6, o número do sinal). O <code>depois</code> nunca apareceu.</dd>
+</dl>
+
+<p>Parece ruim, mas é o comportamento <strong>bom</strong>: o programa parou no lugar certo, com uma mensagem que diz o que aconteceu. Uma exceção também pode ser <strong>capturada</strong> e tratada, para o programa continuar ("índice inválido, tente de novo"); isso é assunto de <a href="excecoes.html">Exceções (try e catch)</a>.</p>
+
+<h3>Colchetes não prometem nada: comportamento indefinido</h3>
+<p>O mesmo programa com colchetes:</p>
+
+<pre class="file" data-file="colchete.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana";
+    std::cout &lt;&lt; "antes\n";
+    std::cout &lt;&lt; "[" &lt;&lt; nome[10] &lt;&lt; "]\n";
+    std::cout &lt;&lt; "depois\n";
+}
+</pre>
+
+<p>Os colchetes <strong>não conferem</strong> o índice. Eles foram feitos para ser rápidos: calculam "começo + 10" e leem o que estiver lá. Ler fora da string é <strong>comportamento indefinido</strong> (em inglês, <em>undefined behavior</em>, ou UB): a regra do C++ diz que, a partir daí, o programa pode fazer <strong>qualquer coisa</strong>. Mostrar lixo, mostrar nada, travar, ou parecer funcionar e falhar meses depois. Veja o mesmo código, compilado de dois jeitos:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra colchete.cpp -o colchete
+$ ./colchete
+antes
+/usr/include/c++/15/bits/basic_string.h:1369: constexpr std::__cxx11::basic_string&lt;_CharT, _Traits, _Alloc&gt;::reference std::__cxx11::basic_string&lt;_CharT, _Traits, _Alloc&gt;::operator[](size_type) [with _CharT = char; _Traits = std::char_traits&lt;char&gt;; _Alloc = std::allocator&lt;char&gt;; reference = char&amp;; size_type = long unsigned int]: Assertion '__pos &lt;= size()' failed.
+Abortado                   (imagem do núcleo gravada) ./colchete</pre>
+
+<p>Sem otimização, a biblioteca do g++ 15 liga umas <strong>conferências extras</strong> (as <em>assertions</em>) e parou o programa: "<code>Assertion '__pos &lt;= size()' failed</code>" = "a conferência <em>posição ≤ tamanho</em> falhou". Agora com <code>-O2</code>, a opção que deixa o programa mais rápido (veja <a href="compilar.html">Compilar com g++</a>):</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -O2 colchete.cpp -o colchete
+colchete.cpp: In function ‘int main()’:
+colchete.cpp:7:37: warning: ‘((__gnu_cxx::__alloc_traits&lt;std::allocator&lt;char&gt;, char&gt;::value_type*)((char*)&amp;nome + offsetof(std::__cxx11::string, std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;::&lt;unnamed&gt;)))[10]’ is used uninitialized [-Wuninitialized]
+    7 |     std::cout &lt;&lt; "[" &lt;&lt; nome[10] &lt;&lt; "]\n";
+      |                                     ^~~~~
+colchete.cpp:5:17: note: ‘nome’ declared here
+    5 |     std::string nome = "Ana";
+      |                 ^~~~
+$ ./colchete | od -c
+0000000   a   n   t   e   s  \n   [ 260   ]  \n   d   e   p   o   i   s
+0000020  \n
+0000021</pre>
+
+<p>Desta vez o programa <strong>não parou</strong>: entre os colchetes saiu um byte de lixo (o <code>260</code> que o <code>od -c</code> mostra; na tela ele aparece como nada ou como <code>�</code>), e o <code>depois</code> foi impresso como se tudo estivesse bem. O aviso do compilador, apesar de assustador, diz o essencial: "o caractere 10 de <code>nome</code> é usado sem ter sido inicializado". As conferências extras somem com <code>-O2</code>, e em outros compiladores elas nem existem. <strong>Não conte com elas.</strong></p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>s[i]</code></th><th><code>s.at(i)</code></th></tr>
+<tr><td>Índice válido</td><td>Devolve o caractere</td><td>Devolve o caractere</td></tr>
+<tr><td>Índice fora</td><td><strong>Comportamento indefinido</strong>: lixo, travamento ou nada</td><td>Lança <code>std::out_of_range</code>, sempre</td></tr>
+<tr><td>Velocidade</td><td>A mais rápida</td><td>Um tiquinho mais lenta (faz uma comparação)</td></tr>
+<tr><td>Quando usar</td><td>Quando o índice <strong>com certeza</strong> é válido, como num laço de <code>0</code> a <code>size() - 1</code></td><td>Quando o índice vem de fora (o usuário digitou, veio de um arquivo, de uma conta)</td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>Curiosidade: <code>s[s.size()]</code> é permitido</strong>
+<p>Uma única posição "fora" é válida com colchetes: <code>s[s.size()]</code> devolve o caractere nulo <code>'\0'</code>, que todo <code>std::string</code> guarda escondido no fim, por compatibilidade com a linguagem C (aula <a href="strings.html">Strings</a>). Por isso a conferência da biblioteca diz <code>__pos &lt;= size()</code>, com "menor <strong>ou igual</strong>". Mas não há motivo para ler esse <code>'\0'</code>; e com <code>.at(s.size())</code>, é exceção.</p>
+</div>
+
+<p>Comportamento indefinido é um dos assuntos mais importantes do C++, e tem uma aula só para ele: <a href="comportamento-indefinido.html">Comportamento Indefinido</a>. Lá você também vai ver os <a href="sanitizers.html">sanitizers</a>, que pegam esse tipo de erro na hora.</p>
+
+<hr>
+
+<h2>4. Mudar um caractere</h2>
+<p>Os colchetes (e o <code>.at()</code>, o <code>.front()</code> e o <code>.back()</code>) também servem para <strong>escrever</strong>. Basta colocá-los do lado esquerdo do <code>=</code>:</p>
+
+<pre class="file" data-file="mudar.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string palavra = "gato";
+    palavra[0] = 'p';
+    std::cout &lt;&lt; palavra &lt;&lt; '\n';
+    palavra.back() = 'a';
+    std::cout &lt;&lt; palavra &lt;&lt; '\n';
+    palavra.at(1) = 'i';
+    std::cout &lt;&lt; palavra &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra mudar.cpp -o mudar
+$ ./mudar
+pato
+pata
+pita</pre>
+
+<dl class="anatomy">
+  <dt>palavra[0] = 'p';</dt><dd>Troca o caractere da posição 0 (<code>g</code>) por <code>p</code>. O valor é um <code>char</code>, então vai entre <strong>aspas simples</strong>.</dd>
+  <dt>palavra.back() = 'a';</dt><dd>Troca o último (<code>o</code>) por <code>a</code>.</dd>
+  <dt>palavra.at(1) = 'i';</dt><dd>Troca a posição 1 (<code>a</code>) por <code>i</code>, com conferência de índice.</dd>
+</dl>
+
+<p>Assim você troca um caractere por <strong>um</strong> caractere; o tamanho da string não muda. Para trocar um <strong>pedaço</strong> por outro de tamanho diferente (por exemplo, <code>"gato"</code> por <code>"cachorro"</code> no meio de uma frase), use <code>.replace()</code>, em <a href="funcoes-string.html">Funções de String</a>.</p>
+
+<div class="trycpp" data-goal="out:Ana Souza,src:\[\s*0\s*\]\s*=|front\s*\(\s*\)\s*=">
+<p class="try-task"><strong>Missão:</strong> alguém digitou o nome todo em minúsculas. Sem reescrever as strings, troque a <strong>primeira</strong> letra de cada uma por maiúscula (<code>'A'</code> e <code>'S'</code>), usando <code>[0]</code> ou <code>.front()</code>, para o programa mostrar <code>Ana Souza</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "ana";
+    std::string sobrenome = "souza";
+    // troque as primeiras letras aqui
+
+    std::cout &lt;&lt; nome &lt;&lt; " " &lt;&lt; sobrenome &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "ana";
+    std::string sobrenome = "souza";
+    nome[0] = 'A';
+    sobrenome[0] = 'S';
+    std::cout &lt;&lt; nome &lt;&lt; " " &lt;&lt; sobrenome &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>5. Percorrer a string com <code>for</code></h2>
+<p>Para fazer algo com <strong>cada</strong> caractere (mostrar, contar, trocar), você precisa de uma <strong>repetição</strong>: "para cada posição de 0 até o fim, faça isto". O <code>for</code> faz exatamente isso. Ele tem uma aula própria mais adiante (<a href="for.html">for</a>); aqui basta entender este modelo, que você vai usar muito:</p>
+
+<pre class="file" data-file="percorrer.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Bia";
+    for (std::size_t i = 0; i &lt; nome.size(); i++) {
+        std::cout &lt;&lt; i &lt;&lt; ": " &lt;&lt; nome[i] &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra percorrer.cpp -o percorrer
+$ ./percorrer
+0: B
+1: i
+2: a</pre>
+
+<dl class="anatomy">
+  <dt>for ( … ; … ; … )</dt><dd>"Para": repete o bloco entre <code>{ }</code>. Os parênteses têm três partes separadas por <code>;</code>.</dd>
+  <dt>std::size_t i = 0</dt><dd>Começo: cria o contador <code>i</code> valendo 0, o primeiro índice. <code>std::size_t</code> é o tipo de número que o <code>.size()</code> devolve: um inteiro <strong>sem sinal</strong> (nunca negativo), feito para tamanhos e posições (veja <a href="inteiros.html">Inteiros</a>).</dd>
+  <dt>i &lt; nome.size()</dt><dd>Condição: repete enquanto <code>i</code> for <strong>menor</strong> que o tamanho. Com tamanho 3, <code>i</code> passa por 0, 1 e 2, e para antes do 3, que não existe. É <code>&lt;</code>, nunca <code>&lt;=</code>.</dd>
+  <dt>i++</dt><dd>Depois de cada volta, soma 1 em <code>i</code> (veja <a href="incremento.html">++ e --</a>).</dd>
+  <dt>nome[i]</dt><dd>O caractere da posição atual. Aqui os colchetes são seguros: a condição garante que <code>i</code> é sempre um índice válido.</dd>
+</dl>
+
+<div class="cenario">
+<strong>E se o contador for <code>int</code>?</strong>
+<p>Muita gente escreve <code>int i</code>. Funciona, mas o <code>-Wall</code> avisa:</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra percorrer2.cpp -o percorrer2
+percorrer2.cpp: In function ‘int main()’:
+percorrer2.cpp:6:23: warning: comparison of integer expressions of different signedness: ‘int’ and ‘std::__cxx11::basic_string&lt;char&gt;::size_type’ {aka ‘long unsigned int’} [-Wsign-compare]
+    6 |     for (int i = 0; i &lt; nome.size(); i++) {
+      |                     ~~^~~~~~~~~~~~~
+$ ./percorrer2
+0: B
+1: i
+2: a</pre>
+<p>"Comparação de inteiros com sinais diferentes: <code>int</code> (com sinal, pode ser negativo) e <code>size_type</code> (sem sinal)". Comparar os dois pode dar resultados errados com números negativos (veja <a href="avisos.html">Avisos</a>). A solução é usar <code>std::size_t</code> no contador, como no exemplo acima.</p>
+</div>
+
+<hr>
+
+<h2>6. O jeito mais curto: <code>for (char c : s)</code></h2>
+<p>Quando você só precisa de cada caractere, e não da posição dele, existe uma forma mais simples, o <strong>for de intervalo</strong> (<em>range-for</em>, aula <a href="for-range.html">for de Intervalo</a>). Leia como: "para cada <code>char c</code> em <code>palavra</code>".</p>
+
+<pre class="file" data-file="rangefor.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string palavra = "banana";
+    int quantos = 0;
+    for (char c : palavra) {
+        std::cout &lt;&lt; c &lt;&lt; ' ';
+        if (c == 'a') {
+            quantos++;
+        }
+    }
+    std::cout &lt;&lt; '\n' &lt;&lt; "letras a: " &lt;&lt; quantos &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra rangefor.cpp -o rangefor
+$ ./rangefor
+b a n a n a
+letras a: 3</pre>
+
+<dl class="anatomy">
+  <dt>for (char c : palavra)</dt><dd>Repete o bloco uma vez para cada caractere. Na primeira volta, <code>c</code> vale <code>'b'</code>; na segunda, <code>'a'</code>; e assim até o fim. Não tem índice, não tem <code>size()</code>, não tem como sair do intervalo.</dd>
+  <dt>if (c == 'a')</dt><dd>"Se <code>c</code> for igual a <code>'a'</code>" (veja <a href="if-else.html">if e else</a>). Compare um <code>char</code> com outro <code>char</code>: aspas <strong>simples</strong>.</dd>
+  <dt>quantos++</dt><dd>Conta mais um.</dd>
+</dl>
+
+<h3>Para mudar os caracteres: <code>char&amp;</code></h3>
+<p>No <code>for (char c : s)</code>, o <code>c</code> é uma <strong>cópia</strong> de cada caractere. Mudar a cópia não muda a string. Veja:</p>
+
+<pre class="file" data-file="refor.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string senha = "segredo";
+    for (char c : senha) {
+        c = '*';
+    }
+    std::cout &lt;&lt; senha &lt;&lt; '\n';
+    for (char&amp; c : senha) {
+        c = '*';
+    }
+    std::cout &lt;&lt; senha &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra refor.cpp -o refor
+refor.cpp: In function ‘int main()’:
+refor.cpp:6:15: warning: variable ‘c’ set but not used [-Wunused-but-set-variable]
+    6 |     for (char c : senha) {
+      |               ^
+$ ./refor
+segredo            « o primeiro laço só mudou cópias
+*******            « o segundo, com char&amp;, mudou a string</pre>
+
+<p>O compilador até avisou: "a variável <code>c</code> recebe valor mas nunca é usada", porque mudar uma cópia que ninguém lê não serve para nada. O <code>&amp;</code> em <code>char&amp; c</code> transforma o <code>c</code> numa <strong>referência</strong>: um "outro nome" para o próprio caractere dentro da string, e não uma cópia. Referências têm aula própria no Nível 2 (<a href="referencias.html">Referências</a>); por enquanto, guarde: <strong>para ler, <code>char c</code>; para mudar, <code>char&amp; c</code></strong>.</p>
+
+<h3>Qual laço usar?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Laço</th><th>Quando usar</th></tr>
+<tr><td><code>for (char c : s)</code></td><td>Só ler cada caractere (contar, procurar, mostrar). O mais simples e seguro.</td></tr>
+<tr><td><code>for (char&amp; c : s)</code></td><td>Mudar cada caractere (esconder senha, passar para maiúsculas).</td></tr>
+<tr><td><code>for (std::size_t i = 0; i &lt; s.size(); i++)</code></td><td>Quando você precisa da <strong>posição</strong> (mostrar o índice, olhar o vizinho <code>s[i + 1]</code>, pular de dois em dois).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>terminate called after throwing an instance of 'std::out_of_range'</code></strong>
+<p><strong>O que significa:</strong> um <code>.at(i)</code> recebeu um índice maior ou igual ao tamanho. A linha <code>what():</code> mostra os dois números: <code>__n (which is 10) &gt;= this-&gt;size() (which is 3)</code>.</p>
+<p><strong>Como consertar:</strong> lembre que o último índice é <code>size() - 1</code>. Se o índice vem do usuário, confira antes com <code>if (i &lt; s.size())</code>, ou trate a exceção (<a href="excecoes.html">Exceções</a>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>Assertion '__pos &lt;= size()' failed.</code></strong>
+<p><strong>O que significa:</strong> um <code>s[i]</code> com índice fora da string. A biblioteca do g++ 15 pegou o erro porque o programa foi compilado sem otimização. Com <code>-O2</code>, ou em outro compilador, o mesmo erro passaria em silêncio, mostrando lixo.</p>
+<p><strong>Como consertar:</strong> o mesmo que acima. Num laço, confira se a condição é <code>i &lt; s.size()</code> (e não <code>&lt;=</code>). Quando o índice não é garantido, use <code>.at()</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: ISO C++ forbids comparison between pointer and integer</code></strong>
+<pre class="file" data-file="aspasdupla.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana";
+    if (nome[0] == "A") {
+        std::cout &lt;&lt; "Começa com A\n";
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra aspasdupla.cpp -o aspasdupla
+aspasdupla.cpp: In function ‘int main()’:
+aspasdupla.cpp:6:17: warning: comparison with string literal results in unspecified behavior [-Waddress]
+    6 |     if (nome[0] == "A") {
+aspasdupla.cpp:6:17: error: ISO C++ forbids comparison between pointer and integer [-fpermissive]</pre>
+<p><strong>O que significa:</strong> <code>nome[0]</code> é um <code>char</code> (que, por dentro, é um número inteiro) e <code>"A"</code>, com aspas duplas, é um literal de texto (que vira um endereço, um "ponteiro"). O C++ proíbe comparar os dois.</p>
+<p><strong>Como consertar:</strong> um caractere se compara com um caractere: <code>nome[0] == 'A'</code>, com aspas <strong>simples</strong>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>warning: comparison of integer expressions of different signedness</code></strong>
+<p><strong>O que significa:</strong> o contador do laço é <code>int</code> e o <code>.size()</code> é sem sinal.</p>
+<p><strong>Como consertar:</strong> use <code>std::size_t i</code>, ou troque o laço por <code>for (char c : s)</code>, que não tem contador.</p>
+</div>
+
+<div class="cenario">
+<strong>O laço "muda" os caracteres, mas a string continua igual</strong>
+<p><strong>O que significa:</strong> você escreveu <code>for (char c : s)</code> e mudou o <code>c</code>, que é uma cópia. O sinal é o aviso <code>variable ‘c’ set but not used</code>.</p>
+<p><strong>Como consertar:</strong> <code>for (char&amp; c : s)</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th><th>Fora do intervalo</th></tr>
+<tr><td><code>s[i]</code></td><td>Caractere da posição <code>i</code> (0 = primeiro)</td><td>Comportamento indefinido</td></tr>
+<tr><td><code>s.at(i)</code></td><td>O mesmo, conferindo o índice</td><td>Lança <code>std::out_of_range</code></td></tr>
+<tr><td><code>s.front()</code></td><td>Primeiro caractere (<code>s[0]</code>)</td><td>String vazia: indefinido</td></tr>
+<tr><td><code>s.back()</code></td><td>Último caractere (<code>s[s.size() - 1]</code>)</td><td>String vazia: indefinido</td></tr>
+<tr><td><code>s[i] = 'x';</code></td><td>Troca o caractere da posição <code>i</code></td><td>Como <code>s[i]</code></td></tr>
+<tr><td><code>for (std::size_t i = 0; i &lt; s.size(); i++)</code></td><td>Percorre com a posição</td><td>Seguro com <code>&lt;</code></td></tr>
+<tr><td><code>for (char c : s)</code></td><td>Percorre lendo cópias</td><td>Sempre seguro</td></tr>
+<tr><td><code>for (char&amp; c : s)</code></td><td>Percorre podendo mudar</td><td>Sempre seguro</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O primeiro índice</h3>
+<p>Complete para mostrar a <strong>primeira</strong> letra de <code>nome</code>:</p>
+<div class="ex-code">std::cout &lt;&lt; nome[<input data-answer="0" aria-label="índice">];</div>
+</div>
+
+<div class="exercise">
+<h3>2. O último, com atalho</h3>
+<p>Complete para mostrar a <strong>última</strong> letra de <code>nome</code>:</p>
+<div class="ex-code">std::cout &lt;&lt; nome.<input data-answer="back()" aria-label="função">;</div>
+</div>
+
+<div class="exercise">
+<h3>3. Percorrer mudando</h3>
+<p>Complete o laço para poder <strong>mudar</strong> cada caractere de <code>s</code>:</p>
+<div class="ex-code">for (<input data-answer="char&amp;|char &amp;" aria-label="tipo"> c : s) { c = '*'; }</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Em <code>std::string s = "sol";</code>, qual é o índice do <code>l</code>?</p>
+<label><input type="radio" name="q4"> 3</label>
+<label><input type="radio" name="q4"> 1</label>
+<label><input type="radio" name="q4"> 2</label>
+<label><input type="radio" name="q4"> 0</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. O que acontece com <code>std::string s = "sol"; std::cout &lt;&lt; s.at(3);</code>?</p>
+<label><input type="radio" name="q5"> Mostra <code>l</code></label>
+<label><input type="radio" name="q5"> Lança <code>std::out_of_range</code> e, sem tratamento, o programa é encerrado</label>
+<label><input type="radio" name="q5"> Mostra lixo</label>
+<label><input type="radio" name="q5"> Erro de compilação</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. E com <code>s[10]</code> na mesma string?</p>
+<label><input type="radio" name="q6"> Sempre lança <code>std::out_of_range</code></label>
+<label><input type="radio" name="q6"> Sempre mostra um espaço</label>
+<label><input type="radio" name="q6"> Erro de compilação</label>
+<label><input type="radio" name="q6"> Comportamento indefinido: pode mostrar lixo, abortar ou parecer funcionar</label>
+</div>
+
+<h3>Missão final: o raio-x da palavra</h3>
+
+<div class="trycpp" data-goal="out:Primeira: p,out:Última: o,out:Letras e: 3,src:for\s*\(">
+<p class="try-task"><strong>Missão:</strong> para a palavra <code>"paralelepipedo"</code>, mostre a primeira letra, a última e quantas letras <code>e</code> ela tem, contando com um laço <code>for</code> (nada de contar com o dedo e escrever o número):</p>
+<pre class="out">Primeira: p
+Última: o
+Letras e: 3</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string palavra = "paralelepipedo";
+    int quantos = 0;
+    // seu código aqui
+
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string palavra = "paralelepipedo";
+    int quantos = 0;
+    for (char c : palavra) {
+        if (c == 'e') {
+            quantos++;
+        }
+    }
+    std::cout &lt;&lt; "Primeira: " &lt;&lt; palavra.front() &lt;&lt; '\n';
+    std::cout &lt;&lt; "Última: " &lt;&lt; palavra.back() &lt;&lt; '\n';
+    std::cout &lt;&lt; "Letras e: " &lt;&lt; quantos &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Cada caractere tem um <strong>índice</strong>: o primeiro é <code>0</code>, o último é <code>size() - 1</code>. Índices contam bytes (acentos ocupam dois).</li>
+  <li><code>s[i]</code> e <code>s.at(i)</code> pegam (e trocam) o caractere da posição <code>i</code>. O resultado é um <code>char</code>: compare com aspas simples.</li>
+  <li><code>.at()</code> fora do intervalo lança <code>std::out_of_range</code>. <code>[ ]</code> fora do intervalo é <strong>comportamento indefinido</strong>: o g++ 15 sem otimização aborta com <code>Assertion</code>, mas com <code>-O2</code> sai lixo.</li>
+  <li><code>.front()</code> e <code>.back()</code> são o primeiro e o último; nunca numa string vazia.</li>
+  <li>Percorra com <code>for (char c : s)</code> para ler, <code>for (char&amp; c : s)</code> para mudar e <code>for (std::size_t i = 0; i &lt; s.size(); i++)</code> quando precisar da posição.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
