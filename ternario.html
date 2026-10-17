@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Operador Ternário — cond ? a : b | Guia C++</title>
+<meta name="description" content="O operador ternário do C++ para quem nunca programou: cond ? a : b, quando usá-lo no lugar do if, por que precisa de parênteses dentro do cout (com o erro real), tipos diferentes nos dois lados e o ternário aninhado, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Operador Ternário</span></h1>
+
+<p class="intro">Muitas vezes, um <code>if</code>/<code>else</code> serve só para escolher entre <strong>dois valores</strong>: "Aprovada" ou "Recuperação", "item" ou "itens", "Bom dia" ou "Boa tarde". Escrever cinco linhas para isso é muito. O C++ tem um atalho para essa escolha: o <strong>operador ternário</strong>, <code>condição ? valor_se_sim : valor_se_não</code>. Nesta aula você vai usá-lo, descobrir por que ele precisa de parênteses dentro do <code>cout</code> e onde ele deixa de ajudar e passa a atrapalhar.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A forma <code>cond ? a : b</code> e como ela é lida.</li>
+  <li>A diferença entre o ternário (escolhe um <strong>valor</strong>) e o <code>if</code> (escolhe o que <strong>fazer</strong>).</li>
+  <li>Por que <code>std::cout &lt;&lt; nota &gt;= 7 ? … : …</code> não compila, e o erro silencioso dos parênteses no lugar errado.</li>
+  <li>O que acontece quando os dois lados têm tipos diferentes.</li>
+  <li>O ternário aninhado, e por que evitá-lo.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: a pergunta com duas respostas prontas</h2>
+<p>Na lanchonete, a atendente pergunta: "Vai comer aqui? Se sim, bandeja; se não, saquinho". A pergunta já vem com as duas respostas. O ternário é isso, numa linha:</p>
+
+<pre class="file" data-file="ideia.cpp">comer_aqui ? "bandeja" : "saquinho"
+</pre>
+
+<p>Leia o <code>?</code> como "<strong>então</strong>" e o <code>:</code> como "<strong>senão</strong>": "comer aqui? então bandeja, senão saquinho". O nome "ternário" vem de <strong>três</strong> partes (a condição e os dois valores). É o único operador do C++ com três partes; por isso, muita gente o chama simplesmente de "o ternário".</p>
+
+<hr>
+
+<h2>1. A forma básica</h2>
+
+<pre class="file" data-file="situacao.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    double nota = 8.5;
+    std::string situacao = (nota &gt;= 7) ? "Aprovada" : "Recuperação";
+    std::cout &lt;&lt; situacao &lt;&lt; "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>(nota &gt;= 7)</dt><dd>A condição. Os parênteses aqui são opcionais, mas ajudam a enxergar onde ela termina.</dd>
+  <dt>?</dt><dd>"Então". Separa a condição dos valores.</dd>
+  <dt>"Aprovada"</dt><dd>O valor do ternário se a condição for <strong>verdadeira</strong>.</dd>
+  <dt>:</dt><dd>"Senão".</dd>
+  <dt>"Recuperação"</dt><dd>O valor se a condição for <strong>falsa</strong>.</dd>
+  <dt>std::string situacao = …</dt><dd>O ternário inteiro <strong>vira um valor</strong>, que aqui vai para a variável <code>situacao</code>.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/ternario">$ g++ -std=c++23 -Wall -Wextra situacao.cpp -o situacao
+$ ./situacao
+Aprovada</pre>
+
+<p>Com <code>if</code>/<code>else</code>, o mesmo programa precisaria de mais linhas e de uma variável criada vazia antes:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Com <code>if</code>/<code>else</code></th><th>Com o ternário</th></tr>
+<tr><td><pre>std::string situacao;
+if (nota &gt;= 7) {
+    situacao = "Aprovada";
+} else {
+    situacao = "Recuperação";
+}</pre></td><td><pre>std::string situacao =
+    (nota &gt;= 7) ? "Aprovada" : "Recuperação";</pre></td></tr>
+</table>
+</div>
+
+<h3>Ternário × <code>if</code>: valor × ação</h3>
+<p>A diferença fundamental: o <code>if</code> escolhe <strong>o que fazer</strong> (rodar um bloco ou outro); o ternário escolhe <strong>um valor</strong>. Por isso o ternário pode ficar no meio de uma conta, de uma atribuição ou de uma mensagem, onde um <code>if</code> não cabe.</p>
+
+<pre class="file" data-file="maior.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int a = 12, b = 30;
+    int maior = (a &gt; b) ? a : b;
+    std::cout &lt;&lt; "Maior: " &lt;&lt; maior &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/ternario">$ ./maior
+Maior: 30</pre>
+
+<p>(Para "o maior de dois", o C++ já tem <code>std::max(a, b)</code>, visto em <a href="matematica.html">Matemática</a>; o exemplo serve para mostrar a forma.)</p>
+
+<hr>
+
+<h2>2. Dentro do <code>cout</code>: parênteses obrigatórios</h2>
+<p>O uso mais comum do ternário é direto na mensagem. Por exemplo, para escrever "1 item" ou "3 itens":</p>
+
+<pre class="file" data-file="plural.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int a = 1, b = 3;
+    std::cout &lt;&lt; a &lt;&lt; (a == 1 ? " item" : " itens") &lt;&lt; "\n";
+    std::cout &lt;&lt; b &lt;&lt; (b == 1 ? " item" : " itens") &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/ternario">$ ./plural
+1 item
+3 itens</pre>
+
+<p>Repare nos <strong>parênteses em volta do ternário inteiro</strong>. Eles não são enfeite. Veja o que acontece sem eles:</p>
+
+<pre class="file" data-file="semparen.cpp">#include &lt;iostream&gt;
+
+int main() {
+    double nota = 8.5;
+    std::cout &lt;&lt; nota &gt;= 7 ? "Aprovada" : "Recuperação";
+    std::cout &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/ternario">$ g++ -std=c++23 -Wall -Wextra semparen.cpp -o semparen
+semparen.cpp: In function ‘int main()’:
+semparen.cpp:5:23: error: no match for ‘operator&gt;=’ (operand types are ‘std::basic_ostream&lt;char&gt;::__ostream_type’ {aka ‘std::basic_ostream&lt;char&gt;’} and ‘int’)
+    5 |     std::cout &lt;&lt; nota &gt;= 7 ? "Aprovada" : "Recuperação";
+      |     ~~~~~~~~~~~~~~~~~ ^~ ~
+      |               |          |
+      |               |          int
+      |               std::basic_ostream&lt;char&gt;::__ostream_type {aka std::basic_ostream&lt;char&gt;}
+semparen.cpp:5:23: note: there are 22 candidates
+<em>…mais de 160 linhas de "candidates"…</em></pre>
+
+<dl class="anatomy">
+  <dt>no match for ‘operator&gt;=’</dt><dd>"Nenhum <code>&gt;=</code> combina com estes tipos".</dd>
+  <dt>operand types are ‘std::basic_ostream&lt;char&gt;’ and ‘int’</dt><dd>O lado esquerdo do <code>&gt;=</code> é… o <code>cout</code> (<code>basic_ostream</code> é o tipo dele), e o direito é o <code>7</code>. Os desenhos <code>~~~~</code> e <code>|</code> embaixo mostram exatamente isso: <code>std::cout &lt;&lt; nota</code> de um lado, <code>7</code> do outro.</dd>
+</dl>
+
+<p>Por quê? Porque o <code>&lt;&lt;</code> tem <strong>prioridade maior</strong> que o <code>&gt;=</code> e que o <code>?:</code> (aula <a href="precedencia.html">Precedência</a>). O C++ leu a linha assim:</p>
+
+<pre class="file" data-file="leitura.cpp">((std::cout &lt;&lt; nota) &gt;= 7) ? "Aprovada" : "Recuperação";
+</pre>
+
+<p>Ou seja: "mostre a nota; depois compare o <code>cout</code> com 7", o que não faz sentido. O editor do guia (Clang) dá um aviso mais direto antes do erro: <code>warning: overloaded operator &lt;&lt; has higher precedence than comparison operator [-Woverloaded-shift-op-parentheses]</code> ("o operador <code>&lt;&lt;</code> tem precedência maior que o de comparação").</p>
+
+<div class="warning">
+<strong>Parênteses no lugar errado: compila, e mostra <code>1</code></strong>
+<p>Um conserto pela metade, pondo parênteses só na condição, é ainda pior, porque <strong>compila</strong>:</p>
+<pre class="file" data-file="meioparen.cpp">    std::cout &lt;&lt; (nota &gt;= 7) ? "Aprovada" : "Recuperação";
+</pre>
+<pre class="term" data-cwd="~/ternario">$ g++ -std=c++23 -Wall -Wextra meioparen.cpp -o meioparen
+meioparen.cpp: In function ‘int main()’:
+meioparen.cpp:5:32: warning: second operand of conditional expression has no effect [-Wunused-value]
+    5 |     std::cout &lt;&lt; (nota &gt;= 7) ? "Aprovada" : "Recuperação";
+      |                                ^~~~~~~~~~
+meioparen.cpp:5:45: warning: third operand of conditional expression has no effect [-Wunused-value]
+    5 |     std::cout &lt;&lt; (nota &gt;= 7) ? "Aprovada" : "Recuperação";
+      |                                             ^~~~~~~~~~~~~
+$ ./meioparen
+1                        « mostrou o resultado da comparação (true = 1)</pre>
+<p>O C++ fez <code>std::cout &lt;&lt; (nota &gt;= 7)</code> (mostrou <code>1</code>), e o ternário escolheu entre dois textos que ninguém usa. Os avisos dizem: "o segundo/terceiro operando da expressão condicional não tem efeito". Por isso a regra é: <strong>parênteses em volta do ternário inteiro</strong>.</p>
+</div>
+
+<pre class="file" data-file="certo.cpp">#include &lt;iostream&gt;
+#include &lt;print&gt;
+
+int main() {
+    double nota = 8.5;
+    std::cout &lt;&lt; (nota &gt;= 7 ? "Aprovada" : "Recuperação") &lt;&lt; "\n";
+    std::println("{}", nota &gt;= 7 ? "Aprovada" : "Recuperação");
+}
+</pre>
+
+<pre class="term" data-cwd="~/ternario">$ ./certo
+Aprovada
+Aprovada</pre>
+
+<p>No <code>std::println</code> (aula <a href="format-print.html">std::format e std::print</a>), o ternário é um argumento separado por vírgula, sem <code>&lt;&lt;</code> por perto: não precisa de parênteses. Mesmo assim, muita gente os coloca, para ler melhor.</p>
+
+<div class="trycpp" data-goal="outre:1 maçã[^s],out:4 maçãs,src:\?">
+<p class="try-task"><strong>Missão:</strong> o programa escreve "1 maçãs". Use um ternário (entre parênteses!) para escrever <code>maçã</code> quando a quantidade for 1 e <code>maçãs</code> nos outros casos. A saída deve ser <code>1 maçã</code> e <code>4 maçãs</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int a = 1, b = 4;
+    std::cout &lt;&lt; a &lt;&lt; " maçãs\n";
+    std::cout &lt;&lt; b &lt;&lt; " maçãs\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int a = 1, b = 4;
+    std::cout &lt;&lt; a &lt;&lt; (a == 1 ? " maçã" : " maçãs") &lt;&lt; "\n";
+    std::cout &lt;&lt; b &lt;&lt; (b == 1 ? " maçã" : " maçãs") &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Os dois lados precisam combinar</h2>
+<p>O ternário vira <strong>um</strong> valor, de <strong>um</strong> tipo. Por isso, o C++ precisa achar um tipo comum para os dois lados.</p>
+
+<h3>Tipos que não combinam: erro</h3>
+<pre class="file" data-file="tipos2.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int qtd = 0;
+    std::cout &lt;&lt; (qtd &gt; 0 ? qtd : "nenhum") &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/ternario">$ g++ -std=c++23 -Wall -Wextra tipos2.cpp -o tipos2
+tipos2.cpp: In function ‘int main()’:
+tipos2.cpp:5:27: error: operands to ‘?:’ have different types ‘int’ and ‘const char*’
+    5 |     std::cout &lt;&lt; (qtd &gt; 0 ? qtd : "nenhum") &lt;&lt; "\n";
+      |                   ~~~~~~~~^~~~~~~~~~~~~~~~</pre>
+
+<p>"Os operandos do <code>?:</code> têm tipos diferentes: <code>int</code> e <code>const char*</code>" (<code>const char*</code> é o tipo de um texto entre aspas). Um número e um texto não têm tipo comum. <strong>Conserto:</strong> deixe os dois lados texto, por exemplo com <code>std::to_string(qtd)</code> (aula <a href="string-numero.html">Texto ↔ Número</a>), ou use um <code>if</code>.</p>
+
+<h3>Tipos numéricos diferentes: o C++ escolhe o "maior", sem avisar</h3>
+<pre class="file" data-file="tipos.cpp">#include &lt;iostream&gt;
+
+int main() {
+    bool inteiro = true;
+    std::cout &lt;&lt; (inteiro ? 7 : 2.5) / 2 &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/ternario">$ ./tipos
+3.5                      « 7 / 2 com inteiros daria 3</pre>
+
+<p>Um lado é <code>int</code> (<code>7</code>) e o outro é <code>double</code> (<code>2.5</code>). O tipo do ternário passa a ser <code>double</code>, mesmo quando o lado escolhido é o <code>7</code>. Aí <code>7.0 / 2</code> dá <code>3.5</code>, e não <code>3</code> (a divisão de inteiros, aula <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>).</p>
+
+<p>Pior ainda com <code>unsigned</code> (inteiro sem sinal, aula <a href="inteiros.html">Inteiros</a>):</p>
+
+<pre class="file" data-file="tipos3.cpp">#include &lt;iostream&gt;
+
+int main() {
+    bool devendo = true;
+    unsigned int credito = 2;
+    std::cout &lt;&lt; (devendo ? -1 : credito) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/ternario">$ g++ -std=c++23 -Wall -Wextra tipos3.cpp -o tipos3
+$ ./tipos3
+4294967295               « o -1 virou unsigned: nenhum aviso!</pre>
+
+<p>O tipo comum de <code>int</code> e <code>unsigned int</code> é <code>unsigned int</code>, que não tem números negativos: o <code>-1</code> "deu a volta" e virou o maior valor possível. Regra prática: <strong>deixe os dois lados do mesmo tipo</strong>.</p>
+
+<hr>
+
+<h2>4. Ternário aninhado: evite</h2>
+<p>Como o ternário é um valor, dá para colocar outro ternário no lugar do "senão" e fazer uma cadeia, como o <a href="else-if.html">else if</a>:</p>
+
+<pre class="file" data-file="aninhado.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    double nota = 6.8;
+    std::string conceito = nota &gt;= 9 ? "A" : nota &gt;= 7 ? "B" : nota &gt;= 5 ? "C" : "D";
+    std::cout &lt;&lt; conceito &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/ternario">$ ./aninhado
+C</pre>
+
+<p>Funciona: o C++ lê de fora para dentro, "nota &gt;= 9? então A, senão (nota &gt;= 7? então B, senão (…))". Mas pare e tente achar onde está o conceito C sem contar os <code>?</code> e <code>:</code>. Esse é o problema: é difícil de ler, de conferir a ordem das faixas e de mudar depois. Para mais de duas opções, use <code>else if</code>, que mostra cada faixa numa linha.</p>
+
+<div class="tip">
+<strong>Quando o ternário vale a pena</strong>
+<ul>
+  <li>Escolher entre <strong>dois valores</strong> simples: singular/plural, sim/não, mínimo/máximo.</li>
+  <li>Inicializar uma variável (especialmente uma <code>const</code>, que não pode ser preenchida depois por um <code>if</code>): <code>const double taxa = vip ? 0.05 : 0.10;</code>.</li>
+  <li>Quando a linha continua fácil de ler em voz alta.</li>
+</ul>
+<p>Se o ternário precisa de quebras de linha, de outro ternário dentro ou faz alguma <strong>ação</strong> (como mostrar algo na tela), troque por <code>if</code>.</p>
+</div>
+
+<hr>
+
+<h2>Formas diferentes + qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th><th>Exemplo</th></tr>
+<tr><td>Escolher entre dois valores</td><td>Ternário</td><td><code>qtd == 1 ? "item" : "itens"</code></td></tr>
+<tr><td>Escolher entre duas ações</td><td><code>if</code>/<code>else</code></td><td><code>if (pagou) { entregar(); } else { cobrar(); }</code></td></tr>
+<tr><td>Três ou mais opções por faixa</td><td><code>else if</code></td><td>Conceitos A, B, C, D</td></tr>
+<tr><td>Maior/menor de dois números</td><td><code>std::max</code> / <code>std::min</code></td><td><code>std::max(a, b)</code></td></tr>
+<tr><td>Valor de uma <code>const</code> que depende de uma condição</td><td>Ternário</td><td><code>const int limite = vip ? 10 : 3;</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: no match for ‘operator&gt;=’ (operand types are ‘std::basic_ostream&lt;char&gt;’ … and ‘int’)</code></strong>
+<p><strong>O que significa:</strong> o ternário está dentro de um <code>cout</code> sem parênteses. O <code>&lt;&lt;</code> "roubou" a variável da condição, e o C++ tentou comparar o próprio <code>cout</code>. Com <code>&lt;</code>, a mensagem é a mesma com <code>‘operator&lt;’</code>; com <code>==</code>, <code>‘operator==’</code>.</p>
+<p><strong>Como consertar:</strong> <code>std::cout &lt;&lt; (cond ? a : b)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>warning: second operand of conditional expression has no effect [-Wunused-value]</code>, e aparece <code>1</code> ou <code>0</code></strong>
+<p><strong>O que significa:</strong> os parênteses estão só na condição. O <code>cout</code> mostrou a condição (<code>1</code>/<code>0</code>) e os dois valores foram jogados fora.</p>
+<p><strong>Como consertar:</strong> parênteses em volta do ternário <strong>inteiro</strong>, não só da condição.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: operands to ‘?:’ have different types ‘int’ and ‘const char*’</code></strong>
+<p><strong>O que significa:</strong> um lado é número e o outro, texto. O ternário precisa de um tipo comum.</p>
+<p><strong>Como consertar:</strong> converta um dos lados (<code>std::to_string(qtd)</code>) ou use <code>if</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O número sai com vírgula, ou um <code>-1</code> vira <code>4294967295</code></strong>
+<p><strong>O que significa:</strong> os dois lados têm tipos numéricos diferentes, e o C++ converteu ambos para o "maior" (<code>double</code>, <code>unsigned</code>).</p>
+<p><strong>Como consertar:</strong> use o mesmo tipo dos dois lados (<code>7.0</code> e <code>2.5</code>; <code>int</code> e <code>int</code>).</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>cond ? a : b</code></td><td>Vale <code>a</code> se <code>cond</code> for verdadeira, senão <code>b</code></td></tr>
+<tr><td><code>x = cond ? a : b;</code></td><td>Guarda o valor escolhido</td></tr>
+<tr><td><code>std::cout &lt;&lt; (cond ? a : b);</code></td><td>Mostra o valor escolhido (parênteses obrigatórios)</td></tr>
+<tr><td><code>std::println("{}", cond ? a : b);</code></td><td>Mostra o valor escolhido (parênteses opcionais)</td></tr>
+<tr><td><code>c1 ? a : c2 ? b : c</code></td><td>Aninhado: funciona, mas prefira <code>else if</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Complete o ternário</h3>
+<p>Complete para guardar <code>"maior"</code> ou <code>"menor"</code> de idade:</p>
+<div class="ex-code">std::string s = idade &gt;= 18 <input data-answer="?" aria-label="símbolo"> "maior" <input data-answer=":" aria-label="símbolo"> "menor";</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">2. Qual destas linhas mostra "par" ou "ímpar" corretamente?</p>
+<label><input type="radio" name="q2"> <code>std::cout &lt;&lt; n % 2 == 0 ? "par" : "ímpar";</code></label>
+<label><input type="radio" name="q2"> <code>std::cout &lt;&lt; (n % 2 == 0 ? "par" : "ímpar");</code></label>
+<label><input type="radio" name="q2"> <code>std::cout &lt;&lt; (n % 2 == 0) ? "par" : "ímpar";</code></label>
+<label><input type="radio" name="q2"> <code>std::cout &lt;&lt; n % 2 == 0 ? ("par") : ("ímpar");</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">3. Quanto vale <code>(true ? 9 : 0.5) / 2</code>?</p>
+<label><input type="radio" name="q3"> <code>4</code></label>
+<label><input type="radio" name="q3"> <code>0.25</code></label>
+<label><input type="radio" name="q3"> Erro de compilação</label>
+<label><input type="radio" name="q3"> <code>4.5</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. Quando é melhor usar <code>if</code>/<code>else</code> em vez do ternário?</p>
+<label><input type="radio" name="q4"> Quando há mais de duas opções ou quando cada caminho faz uma ação</label>
+<label><input type="radio" name="q4"> Sempre que a condição usa <code>&gt;=</code></label>
+<label><input type="radio" name="q4"> Quando os dois valores são textos</label>
+<label><input type="radio" name="q4"> Nunca: o ternário é sempre melhor</label>
+</div>
+
+<h3>Missão final: a saudação</h3>
+
+<div class="trycpp" data-goal="compila,out:Boa tarde\, Ana!,src:\?">
+<p class="try-task"><strong>Missão:</strong> este programa deveria dizer "Bom dia" antes do meio-dia e "Boa tarde" depois, mas não compila. Rode, leia o erro e conserte com os parênteses no lugar certo. Com <code>hora = 15</code>, deve aparecer <code>Boa tarde, Ana!</code>; troque para 9 e confira o "Bom dia".</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int hora = 15;
+    std::cout &lt;&lt; hora &lt; 12 ? "Bom dia" : "Boa tarde" &lt;&lt; ", Ana!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int hora = 15;
+    std::cout &lt;&lt; (hora &lt; 12 ? "Bom dia" : "Boa tarde") &lt;&lt; ", Ana!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>cond ? a : b</code>: "cond? então a, senão b". O ternário inteiro vira <strong>um valor</strong>.</li>
+  <li>Use para escolher entre dois valores; para escolher entre ações, use <code>if</code>.</li>
+  <li>Dentro do <code>cout</code>, coloque <strong>parênteses em volta do ternário inteiro</strong>. Sem eles, erro (<code>no match for ‘operator&gt;=’</code>); com parênteses só na condição, compila e mostra <code>1</code>.</li>
+  <li>Os dois lados precisam ter um tipo comum: número e texto dá erro; <code>int</code> e <code>double</code> vira <code>double</code>; <code>int</code> e <code>unsigned</code> estraga os negativos.</li>
+  <li>Ternário aninhado funciona, mas é difícil de ler: prefira <code>else if</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
