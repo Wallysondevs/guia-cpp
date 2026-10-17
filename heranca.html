@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Herança — class Livro : public Produto, protected, ordem de construção e final | Guia C++</title>
+<meta name="description" content="Herança em C++ para quem está começando: criar uma classe a partir de outra (class Livro : public Produto), reaproveitar e estender, chamar o construtor da classe base, protected, a ordem real de construção e destruição, herança pública × privada e final, com os erros reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Herança</span></h1>
+
+<p class="intro">A lojinha da Ana vende canetas, cadernos e livros. Todo produto tem nome e preço; mas o livro tem também um <strong>autor</strong>. Você poderia copiar a classe <code>Produto</code> inteira, colar com o nome <code>Livro</code> e acrescentar o autor. Funciona, até o dia em que você corrige um erro no cálculo do desconto em uma e esquece da outra. A <strong>herança</strong> resolve isso: você diz "um <code>Livro</code> é um <code>Produto</code>, com algo a mais", e a classe nova recebe tudo da antiga, sem copiar uma linha.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como criar uma classe a partir de outra: <code>class Livro : public Produto</code>.</li>
+  <li>O que a classe filha herda, o que ela acrescenta e o que ela não pode tocar.</li>
+  <li>Como chamar o construtor da classe base na lista de inicialização.</li>
+  <li>O nível de acesso <code>protected</code>, entre o <code>public</code> e o <code>private</code>.</li>
+  <li>A ordem real em que as partes nascem e morrem.</li>
+  <li>Como redefinir um método e ainda usar a versão da base (<code>Produto::mostrar()</code>).</li>
+  <li>A ideia da herança pública × privada, e como proibir a herança com <code>final</code>.</li>
+</ul>
+</div>
+
+<p>Antes, é bom conhecer <a href="classes-objetos.html">Classes e Objetos</a>, <a href="construtores.html">Construtores</a> e <a href="encapsulamento.html">public e private</a>. Os programas foram compilados com o <strong>g++ 15</strong> na máquina da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: "é um"</h2>
+<p>Na escola você aprendeu que "todo cachorro é um mamífero": ele tem tudo o que um mamífero tem (respira, mama quando filhote) e mais algumas coisas só dele (late). Herança é isso em código:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Nome</th><th>Também chamada de</th><th>No exemplo</th></tr>
+<tr><td><strong>Classe base</strong></td><td>classe mãe, superclasse</td><td><code>Produto</code>: nome, preço, desconto</td></tr>
+<tr><td><strong>Classe derivada</strong></td><td>classe filha, subclasse</td><td><code>Livro</code>: tudo do <code>Produto</code> + autor</td></tr>
+</table>
+</div>
+
+<p>Antes de usar herança, faça o <strong>teste do "é um"</strong>: a frase "um <em>Livro</em> é um <em>Produto</em>" faz sentido? Sim: herança serve. "Um <em>Carro</em> é um <em>Motor</em>"? Não: o carro <strong>tem</strong> um motor. Nesse caso, o motor vira um atributo do carro (isso se chama <strong>composição</strong>), e não uma classe base.</p>
+
+<hr>
+
+<h2>1. A primeira herança</h2>
+
+<pre class="file" data-file="livro.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(std::string nome, double preco) : nome_{nome}, preco_{preco} {}
+
+    std::string nome() const { return nome_; }
+    double preco() const { return preco_; }
+    void aplicar_desconto(double pct) { preco_ -= preco_ * pct / 100; }
+    void mostrar() const {
+        std::cout &lt;&lt; nome_ &lt;&lt; " — R$ " &lt;&lt; preco_ &lt;&lt; '\n';
+    }
+private:
+    std::string nome_;
+    double preco_;
+};
+
+class Livro : public Produto {
+public:
+    Livro(std::string nome, double preco, std::string autor)
+        : Produto{nome, preco}, autor_{autor} {}
+
+    std::string autor() const { return autor_; }
+private:
+    std::string autor_;
+};
+
+int main() {
+    Produto caneta{"Caneta azul", 3.5};
+    Livro livro{"Dom Casmurro", 40, "Machado de Assis"};
+
+    caneta.mostrar();
+    livro.mostrar();                       // herdado de Produto
+    livro.aplicar_desconto(10);            // herdado de Produto
+    std::cout &lt;&lt; livro.nome() &lt;&lt; ", de " &lt;&lt; livro.autor()
+              &lt;&lt; ", agora custa R$ " &lt;&lt; livro.preco() &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>class Livro</dt><dd>Uma classe nova, como qualquer outra.</dd>
+  <dt>:</dt><dd>Os dois-pontos depois do nome querem dizer "derivada de".</dd>
+  <dt>public</dt><dd>O tipo de herança: o que era <code>public</code> no <code>Produto</code> continua <code>public</code> no <code>Livro</code>. É o que você vai usar em 99% dos casos (a seção 6 mostra a outra opção).</dd>
+  <dt>Produto</dt><dd>A classe base.</dd>
+  <dt>: Produto{nome, preco}</dt><dd>Na lista de inicialização do construtor do <code>Livro</code>: chama o construtor do <code>Produto</code>, para montar a "parte produto" do livro.</dd>
+  <dt>autor_{autor}</dt><dd>Depois, inicializa o que é só do livro.</dd>
+  <dt>std::string autor() const</dt><dd>Um método novo, que só o <code>Livro</code> tem.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra livro.cpp -o livro
+$ ./livro
+Caneta azul — R$ 3.5
+Dom Casmurro — R$ 40
+Dom Casmurro, de Machado de Assis, agora custa R$ 36</pre>
+
+<p>A classe <code>Livro</code> tem só um atributo e um método escritos nela, mas o objeto <code>livro</code> usou <code>mostrar()</code>, <code>aplicar_desconto()</code>, <code>nome()</code> e <code>preco()</code>, todos herdados. Por dentro, todo <code>Livro</code> carrega um <code>Produto</code> completo, com mais um pedaço no fim:</p>
+
+<pre class="file" data-file="o objeto livro na memória">┌─────────── Livro ────────────┐
+│ ┌──────── Produto ─────────┐ │
+│ │ nome_  = "Dom Casmurro"  │ │
+│ │ preco_ = 36              │ │
+│ └──────────────────────────┘ │
+│ autor_ = "Machado de Assis"  │
+└──────────────────────────────┘
+</pre>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode como está. Depois chame <code>livro.aplicar_desconto(50);</code> e mostre de novo. Para ir além, crie uma classe <code>Caderno : public Produto</code> com um atributo <code>int folhas_</code> e um método <code>folhas()</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(std::string nome, double preco) : nome_{nome}, preco_{preco} {}
+
+    std::string nome() const { return nome_; }
+    double preco() const { return preco_; }
+    void aplicar_desconto(double pct) { preco_ -= preco_ * pct / 100; }
+    void mostrar() const {
+        std::cout &lt;&lt; nome_ &lt;&lt; " — R$ " &lt;&lt; preco_ &lt;&lt; '\n';
+    }
+private:
+    std::string nome_;
+    double preco_;
+};
+
+class Livro : public Produto {
+public:
+    Livro(std::string nome, double preco, std::string autor)
+        : Produto{nome, preco}, autor_{autor} {}
+
+    std::string autor() const { return autor_; }
+private:
+    std::string autor_;
+};
+
+int main() {
+    Livro livro{"Dom Casmurro", 40, "Machado de Assis"};
+    livro.mostrar();
+    std::cout &lt;&lt; "Autor: " &lt;&lt; livro.autor() &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. O construtor da classe base</h2>
+<p>Construtores <strong>não</strong> são herdados como os outros métodos: o <code>Livro</code> precisa do seu próprio. E ele tem a obrigação de construir a parte <code>Produto</code> que carrega por dentro. O lugar para isso é a <strong>lista de inicialização</strong>, antes dos atributos:</p>
+
+<pre class="file" data-file="trecho">Livro(std::string nome, double preco, std::string autor)
+    : Produto{nome, preco},   // 1º: a parte Produto
+      autor_{autor}           // 2º: o que é só do Livro
+{}
+</pre>
+
+<p>Se você esquecer o <code>Produto{…}</code>, o C++ tenta usar um construtor <strong>sem parâmetros</strong> do <code>Produto</code>. Como ele não existe, o g++ reclama (o erro completo está em <a href="#erros">Quando dá errado</a>):</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra h3.cpp -o h3
+h3.cpp: In constructor ‘Livro::Livro(std::string, double, std::string)’:
+h3.cpp:15:23: error: no matching function for call to ‘Produto::Produto()’
+   15 |         : autor_{autor} {}
+      |                       ^</pre>
+
+<div class="tip">
+<strong>Atalho: herdar os construtores <span class="versao">C++11</span></strong>
+<p>Se a classe filha não acrescenta atributos que precisem de valor, ela pode reaproveitar os construtores da base com uma linha: <code>using Produto::Produto;</code>. Aí <code>Brinde b{"Chaveiro", 0};</code> chama direto o construtor do <code>Produto</code>.</p>
+</div>
+
+<hr>
+
+<h2>3. O que a filha pode tocar: <code>protected</code></h2>
+<p>A classe <code>Livro</code> herdou <code>preco_</code>, mas ele é <code>private</code> no <code>Produto</code>. <strong>Privado quer dizer "só a própria classe"</strong>, e a filha é outra classe. Tente usar <code>preco_</code> num método do <code>Livro</code>:</p>
+
+<pre class="file" data-file="h1.cpp">class Livro : public Produto {
+public:
+    // ... construtor
+    void etiqueta() const {
+        std::cout &lt;&lt; nome() &lt;&lt; " (" &lt;&lt; autor_ &lt;&lt; ") R$ " &lt;&lt; preco_ &lt;&lt; '\n';
+    }
+private:
+    std::string autor_;
+};
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra h1.cpp -o h1
+h1.cpp: In member function ‘void Livro::etiqueta() const’:
+h1.cpp:19:61: error: ‘double Produto::preco_’ is private within this context
+   19 |         std::cout &lt;&lt; nome() &lt;&lt; " (" &lt;&lt; autor_ &lt;&lt; ") R$ " &lt;&lt; preco_ &lt;&lt; '\n';
+      |                                                             ^~~~~~
+h1.cpp:10:12: note: declared private here
+   10 |     double preco_;
+      |            ^~~~~~</pre>
+
+<p>"<code>Produto::preco_</code> é privado neste contexto". A parte <code>Produto</code> existe dentro do livro, mas o código do <code>Livro</code> não pode mexer nela diretamente. Há dois caminhos:</p>
+<ol>
+  <li><strong>Usar os métodos públicos</strong> da base: <code>preco()</code> em vez de <code>preco_</code>. É o caminho mais seguro, porque o <code>Produto</code> continua no controle das próprias regras.</li>
+  <li><strong>Marcar o atributo como <code>protected</code></strong> ("protegido"): fica invisível para o resto do programa, mas visível para as classes filhas.</li>
+</ol>
+
+<pre class="file" data-file="h2.cpp">class Produto {
+public:
+    Produto(std::string nome, double preco) : nome_{nome}, preco_{preco} {}
+    std::string nome() const { return nome_; }
+private:
+    std::string nome_;
+protected:
+    double preco_;          // filhas podem usar; o main, não
+};
+</pre>
+
+<p>Com isso, <code>etiqueta()</code> compila. Mas o <code>main</code> continua barrado:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra h2.cpp -o h2
+h2.cpp: In function ‘int main()’:
+h2.cpp:29:11: error: ‘double Produto::preco_’ is protected within this context
+   29 |     livro.preco_ = 0;
+      |           ^~~~~~
+h2.cpp:11:12: note: declared protected here
+   11 |     double preco_;
+      |            ^~~~~~</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Acesso</th><th>A própria classe</th><th>Classes filhas</th><th>Resto do programa</th></tr>
+<tr><td><code>public</code></td><td>sim</td><td>sim</td><td>sim</td></tr>
+<tr><td><code>protected</code></td><td>sim</td><td>sim</td><td>não</td></tr>
+<tr><td><code>private</code></td><td>sim</td><td>não</td><td>não</td></tr>
+</table>
+</div>
+
+<div class="warning">
+<strong>Use <code>protected</code> com parcimônia</strong>
+<p>Um atributo <code>protected</code> pode ser alterado por qualquer classe filha, inclusive as que outras pessoas escreverem daqui a um ano. Se o <code>Produto</code> tem uma regra ("preço nunca negativo"), ela só é garantida enquanto o atributo for <code>private</code>. A recomendação comum: atributos <code>private</code>; métodos <code>protected</code> quando forem ferramentas só para as filhas.</p>
+</div>
+
+<hr>
+
+<h2>4. A ordem de construção e destruição</h2>
+<p>Se o livro carrega um produto por dentro, quem nasce primeiro? Vamos perguntar ao programa:</p>
+
+<pre class="file" data-file="ordem.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(std::string nome) : nome_{nome} {
+        std::cout &lt;&lt; "  Produto(" &lt;&lt; nome_ &lt;&lt; ")\n";
+    }
+    ~Produto() {
+        std::cout &lt;&lt; "  ~Produto(" &lt;&lt; nome_ &lt;&lt; ")\n";
+    }
+private:
+    std::string nome_;
+};
+
+class Livro : public Produto {
+public:
+    Livro(std::string nome, std::string autor) : Produto{nome}, autor_{autor} {
+        std::cout &lt;&lt; "  Livro(" &lt;&lt; autor_ &lt;&lt; ")\n";
+    }
+    ~Livro() {
+        std::cout &lt;&lt; "  ~Livro(" &lt;&lt; autor_ &lt;&lt; ")\n";
+    }
+private:
+    std::string autor_;
+};
+
+int main() {
+    std::cout &lt;&lt; "Criando o livro:\n";
+    Livro livro{"Dom Casmurro", "Machado de Assis"};
+    std::cout &lt;&lt; "Fim do main:\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ordem.cpp -o ordem
+$ ./ordem
+Criando o livro:
+  Produto(Dom Casmurro)        « primeiro a base (o alicerce)...
+  Livro(Machado de Assis)      « ...depois a filha
+Fim do main:
+  ~Livro(Machado de Assis)     « na destruição, ao contrário: primeiro a filha...
+  ~Produto(Dom Casmurro)       « ...depois a base</pre>
+
+<p>Pense numa casa: primeiro o alicerce, depois as paredes; na demolição, primeiro as paredes, depois o alicerce. A base nasce primeiro porque a filha pode precisar dela já no próprio construtor; e morre por último porque o destrutor da filha ainda pode usá-la. É a mesma regra de "ordem inversa" da aula <a href="destrutores-raii.html">Destrutores e RAII</a>.</p>
+
+<hr>
+
+<h2>5. Redefinir um método da base</h2>
+<p>O <code>mostrar()</code> herdado não sabe do autor. A filha pode escrever um método com o <strong>mesmo nome</strong>; para o <code>Livro</code>, ele passa a valer no lugar do da base. E, dentro dele, <code>Produto::mostrar()</code> chama a versão original, para não repetir código:</p>
+
+<pre class="file" data-file="redefinir.cpp">class Livro : public Produto {
+public:
+    Livro(std::string nome, double preco, std::string autor)
+        : Produto{nome, preco}, autor_{autor} {}
+
+    void mostrar() const {
+        Produto::mostrar();                    // a versão da classe base
+        std::cout &lt;&lt; "  autor: " &lt;&lt; autor_ &lt;&lt; '\n';
+    }
+private:
+    std::string autor_;
+};
+
+void imprimir_etiqueta(const Produto&amp; p) {
+    p.mostrar();
+}
+
+int main() {
+    Livro livro{"Dom Casmurro", 40, "Machado de Assis"};
+    livro.mostrar();
+    std::cout &lt;&lt; "Pela função imprimir_etiqueta:\n";
+    imprimir_etiqueta(livro);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra redefinir.cpp -o redefinir
+$ ./redefinir
+Dom Casmurro — R$ 40
+  autor: Machado de Assis
+Pela função imprimir_etiqueta:
+Dom Casmurro — R$ 40           « o autor sumiu!</pre>
+
+<p>Duas coisas aconteceram:</p>
+<ul>
+  <li><strong>Um <code>Livro</code> pode ser passado onde se espera um <code>Produto</code>.</strong> A função <code>imprimir_etiqueta</code> recebe <code>const Produto&amp;</code>, e aceitou o livro sem reclamar. Faz sentido: todo livro <em>é um</em> produto.</li>
+  <li><strong>Mas, lá dentro, rodou o <code>mostrar()</code> do <code>Produto</code></strong>, e o autor não apareceu. Para a função, <code>p</code> é "um produto qualquer", e o C++ escolheu o método olhando o tipo da referência, não o objeto de verdade.</li>
+</ul>
+<p>Fazer o C++ olhar o objeto de verdade é o assunto da próxima aula, <a href="polimorfismo.html">Polimorfismo (virtual)</a>, e é onde a herança mostra toda a sua força.</p>
+
+<hr>
+
+<h2>6. Herança pública × privada (só a ideia)</h2>
+<p>A palavra depois dos dois-pontos decide como o que é público na base aparece na filha:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O <code>public</code> da base vira, na filha…</th><th>Significado</th></tr>
+<tr><td><code>class Livro : public Produto</code></td><td><code>public</code></td><td>"Livro <strong>é um</strong> Produto". Todo mundo pode tratar o livro como produto.</td></tr>
+<tr><td><code>class Livro : protected Produto</code></td><td><code>protected</code></td><td>Raríssimo.</td></tr>
+<tr><td><code>class Livro : private Produto</code></td><td><code>private</code></td><td>"Livro <strong>usa</strong> um Produto por dentro", mas não quer que ninguém saiba.</td></tr>
+</table>
+</div>
+
+<p>A herança privada é rara: quase sempre um atributo (composição) faz o mesmo de forma mais clara. Ela importa porque é o <strong>padrão</strong> de <code>class</code>: se você esquecer a palavra <code>public</code>, a herança vira privada sem aviso, e os métodos herdados ficam inacessíveis no <code>main</code> (cenário em <a href="#erros">Quando dá errado</a>). Com <code>struct</code>, o padrão é <code>public</code>.</p>
+
+<div class="note">
+<strong>E herdar de duas classes?</strong>
+<p>O C++ permite <strong>herança múltipla</strong>: <code>class Ebook : public Livro, public Arquivo</code>. É poderosa e cheia de detalhes (o que acontece se as duas bases tiverem um método com o mesmo nome?). O uso mais comum e seguro é herdar de uma classe e de várias "interfaces", que você vai conhecer em <a href="classes-abstratas.html">Classes Abstratas</a>.</p>
+</div>
+
+<hr>
+
+<h2>7. <code>final</code>: ninguém herda daqui <span class="versao">C++11</span></h2>
+<p>Às vezes uma classe não foi pensada para ser base de outras. Escreva <code>final</code> depois do nome, e o compilador recusa qualquer tentativa de herdar dela:</p>
+
+<pre class="file" data-file="final.cpp">class Livro final : public Produto {
+    // ...
+};
+
+class Ebook : public Livro {        // tentativa de herdar de Livro
+    // ...
+};
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra final.cpp -o final
+final.cpp:20:7: error: cannot derive from ‘final’ base ‘Livro’ in derived type ‘Ebook’
+   20 | class Ebook : public Livro {
+      |       ^~~~~</pre>
+
+<p>"Não é possível derivar da base <code>final</code> <code>Livro</code> no tipo derivado <code>Ebook</code>". O Clang do editor diz <code>base 'Livro' is marked 'final'</code>. O <code>final</code> também vale para um método só, como você vai ver em <a href="polimorfismo.html">Polimorfismo</a>.</p>
+
+<hr>
+
+<h2 id="erros">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"no matching function for call to ‘Produto::Produto()’"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra h3.cpp -o h3
+h3.cpp: In constructor ‘Livro::Livro(std::string, double, std::string)’:
+h3.cpp:15:23: error: no matching function for call to ‘Produto::Produto()’
+   15 |         : autor_{autor} {}
+      |                       ^
+h3.cpp:15:23: note: there are 3 candidates
+h3.cpp:6:5: note: candidate 1: ‘Produto::Produto(std::string, double)’
+    6 |     Produto(std::string nome, double preco) : nome_{nome}, preco_{preco} {}
+      |     ^~~~~~~
+h3.cpp:6:5: note: candidate expects 2 arguments, 0 provided
+h3.cpp:4:7: note: candidate 2: ‘constexpr Produto::Produto(const Produto&amp;)’
+    4 | class Produto {
+      |       ^~~~~~~
+h3.cpp:4:7: note: candidate expects 1 argument, 0 provided
+h3.cpp:4:7: note: candidate 3: ‘constexpr Produto::Produto(Produto&amp;&amp;)’
+h3.cpp:4:7: note: candidate expects 1 argument, 0 provided
+h3.cpp:14:23: warning: unused parameter ‘nome’ [-Wunused-parameter]
+   14 |     Livro(std::string nome, double preco, std::string autor)
+      |           ~~~~~~~~~~~~^~~~
+h3.cpp:14:36: warning: unused parameter ‘preco’ [-Wunused-parameter]
+   14 |     Livro(std::string nome, double preco, std::string autor)
+      |                             ~~~~~~~^~~~~</pre>
+<p><strong>O que significa:</strong> o construtor do <code>Livro</code> não disse como construir a parte <code>Produto</code>, então o C++ procurou um <code>Produto()</code> sem argumentos. Os três "candidatos" são os construtores que existem: o seu (2 argumentos), o de cópia e o de movimento (1 argumento cada). Nenhum aceita 0. Os avisos de parâmetros não usados são a pista: <code>nome</code> e <code>preco</code> chegaram e ninguém os usou. O Clang resume: <code>constructor for 'Livro' must explicitly initialize the base class 'Produto' which does not have a default constructor</code>.</p>
+<p><strong>Como consertar:</strong> acrescente <code>Produto{nome, preco}</code> no começo da lista de inicialização.</p>
+</div>
+
+<div class="cenario">
+<strong>"is private within this context" dentro da classe filha</strong>
+<p><strong>O que significa:</strong> a filha tentou usar um atributo <code>private</code> da base (o <code>h1.cpp</code> da seção 3). O Clang diz <code>'preco_' is a private member of 'Produto'</code>.</p>
+<p><strong>Como consertar:</strong> use um método público da base (<code>preco()</code>), ou, se fizer sentido, troque o atributo para <code>protected</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Esqueci o <code>public</code>: "is inaccessible within this context"</strong>
+<pre class="file" data-file="h4.cpp">class Livro : Produto {     // faltou o public
+    // ...
+};
+
+int main() {
+    Livro livro{"Dom Casmurro", 40, "Machado de Assis"};
+    livro.mostrar();
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra h4.cpp -o h4
+h4.cpp: In function ‘int main()’:
+h4.cpp:23:18: error: ‘void Produto::mostrar() const’ is inaccessible within this context
+   23 |     livro.mostrar();
+      |     ~~~~~~~~~~~~~^~
+h4.cpp:7:10: note: declared here
+    7 |     void mostrar() const { std::cout &lt;&lt; nome_ &lt;&lt; " — R$ " &lt;&lt; preco_ &lt;&lt; '\n'; }
+      |          ^~~~~~~
+h4.cpp:23:18: error: ‘Produto’ is not an accessible base of ‘Livro’
+   23 |     livro.mostrar();
+      |     ~~~~~~~~~~~~~^~</pre>
+<p><strong>O que significa:</strong> "<code>mostrar</code> é inacessível aqui" e "<code>Produto</code> não é uma base acessível de <code>Livro</code>". Sem a palavra <code>public</code>, uma <code>class</code> herda de forma <strong>privada</strong>: o <code>mostrar()</code>, que era público, virou privado dentro do <code>Livro</code>. (Clang: <code>'mostrar' is a private member of 'Produto'</code>.)</p>
+<p><strong>Como consertar:</strong> <code>class Livro : public Produto</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"cannot derive from ‘final’ base"</strong>
+<p><strong>O que significa:</strong> a classe de que você tentou herdar foi marcada com <code>final</code> (seção 7).</p>
+<p><strong>Como consertar:</strong> se a classe é sua e você decidiu que ela pode ter filhas, tire o <code>final</code>. Se não é sua (uma biblioteca), use composição: guarde um objeto dela como atributo.</p>
+</div>
+
+<div class="cenario">
+<strong>Redefini o método, mas a versão da base continua rodando</strong>
+<p><strong>O que significa:</strong> você chamou o método por uma referência ou ponteiro do tipo da base (<code>const Produto&amp;</code>, <code>Produto*</code>), como no <code>imprimir_etiqueta</code> da seção 5. Sem <code>virtual</code>, o C++ escolhe o método pelo tipo da referência.</p>
+<p><strong>Como consertar:</strong> marque o método da base como <code>virtual</code>. A explicação completa está em <a href="polimorfismo.html">Polimorfismo</a>.</p>
+</div>
+
+<hr>
+
+<h2>Missão</h2>
+
+<div class="trycpp" data-goal="out:Superinteressante — R$ 25,out:Edição 42,src:class\s+Revista\s*:\s*public\s+Produto">
+<p class="try-task"><strong>Missão:</strong> crie a classe <code>Revista</code>, filha de <code>Produto</code>, com um atributo <code>int edicao_</code>. O construtor recebe nome, preço e edição e chama o construtor do <code>Produto</code>. Redefina <code>mostrar()</code> para chamar o <code>Produto::mostrar()</code> e depois mostrar <code>  Edição 42</code>. Por fim, tire as barras <code>//</code> das duas linhas do <code>main</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(std::string nome, double preco) : nome_{nome}, preco_{preco} {}
+    void mostrar() const {
+        std::cout &lt;&lt; nome_ &lt;&lt; " — R$ " &lt;&lt; preco_ &lt;&lt; '\n';
+    }
+private:
+    std::string nome_;
+    double preco_;
+};
+
+// escreva a classe Revista aqui
+
+int main() {
+    Produto caneta{"Caneta azul", 3.5};
+    caneta.mostrar();
+    // Revista revista{"Superinteressante", 25, 42};
+    // revista.mostrar();
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Produto {
+public:
+    Produto(std::string nome, double preco) : nome_{nome}, preco_{preco} {}
+    void mostrar() const {
+        std::cout &lt;&lt; nome_ &lt;&lt; " — R$ " &lt;&lt; preco_ &lt;&lt; '\n';
+    }
+private:
+    std::string nome_;
+    double preco_;
+};
+
+class Revista : public Produto {
+public:
+    Revista(std::string nome, double preco, int edicao)
+        : Produto{nome, preco}, edicao_{edicao} {}
+
+    void mostrar() const {
+        Produto::mostrar();
+        std::cout &lt;&lt; "  Edição " &lt;&lt; edicao_ &lt;&lt; '\n';
+    }
+private:
+    int edicao_;
+};
+
+int main() {
+    Produto caneta{"Caneta azul", 3.5};
+    caneta.mostrar();
+    Revista revista{"Superinteressante", 25, 42};
+    revista.mostrar();
+}
+</pre>
+</div>
+
+<p>A saída da solução no laboratório:</p>
+<pre class="term" data-cwd="~/cpp">$ ./revista
+Caneta azul — R$ 3.5
+Superinteressante — R$ 25
+  Edição 42</pre>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>O que faz</th></tr>
+<tr><td><code>class Filha : public Base { … };</code></td><td>Herança pública: "Filha é uma Base"</td></tr>
+<tr><td><code>Filha(…) : Base{…}, atributo_{…} {}</code></td><td>Constrói a parte da base, depois os atributos da filha</td></tr>
+<tr><td><code>using Base::Base;</code></td><td>Herda os construtores da base</td></tr>
+<tr><td><code>protected:</code></td><td>Visível para a classe e as filhas; invisível para o resto</td></tr>
+<tr><td><code>Base::metodo();</code></td><td>Chama a versão da base de um método redefinido</td></tr>
+<tr><td><code>class X final : public Base</code></td><td>Proíbe que alguém herde de <code>X</code></td></tr>
+<tr><td><code>class Filha : Base</code></td><td>Herança <strong>privada</strong> (padrão de <code>class</code>)</td></tr>
+<tr><td>Ordem</td><td>Constrói base → filha; destrói filha → base</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A declaração</h3>
+<p>Complete para declarar <code>Cachorro</code> como filha pública de <code>Animal</code>:</p>
+<div class="ex-code">class Cachorro <input data-answer=": public Animal|:public Animal" aria-label="herança"> { … };</div>
+</div>
+
+<div class="exercise">
+<h3>2. Chamar o construtor da base</h3>
+<p>O construtor de <code>Animal</code> recebe o nome. Complete a lista de inicialização do <code>Cachorro</code>:</p>
+<div class="ex-code">Cachorro(std::string nome, std::string raca) : <input data-answer="Animal{nome}|Animal(nome)" aria-label="base">, raca_{raca} {}</div>
+</div>
+
+<div class="exercise">
+<h3>3. O nível certo</h3>
+<p>Qual palavra deixa um membro visível para as classes filhas, mas não para o <code>main</code>?</p>
+<div class="ex-code"><input data-answer="protected|protected:" aria-label="acesso"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Ao criar um <code>Livro</code> (filho de <code>Produto</code>) e deixá-lo sair do escopo, em que ordem rodam construtores e destrutores?</p>
+<label><input type="radio" name="q4"> Livro, Produto, ~Livro, ~Produto</label>
+<label><input type="radio" name="q4"> Produto, Livro, ~Produto, ~Livro</label>
+<label><input type="radio" name="q4"> Produto, Livro, ~Livro, ~Produto</label>
+<label><input type="radio" name="q4"> Livro, Produto, ~Produto, ~Livro</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Qual destes pares <strong>não</strong> passa no teste do "é um"?</p>
+<label><input type="radio" name="q5"> <code>Livro</code> e <code>Produto</code></label>
+<label><input type="radio" name="q5"> <code>Carro</code> e <code>Roda</code></label>
+<label><input type="radio" name="q5"> <code>Gerente</code> e <code>Funcionario</code></label>
+<label><input type="radio" name="q5"> <code>Circulo</code> e <code>Forma</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Você escreveu <code>class Livro : Produto</code> (sem <code>public</code>) e <code>livro.mostrar()</code> no <code>main</code> deu erro. Por quê?</p>
+<label><input type="radio" name="q6"> Em <code>class</code>, a herança padrão é privada: o <code>mostrar()</code> ficou privado no <code>Livro</code>.</label>
+<label><input type="radio" name="q6"> Faltou escrever o <code>mostrar()</code> de novo no <code>Livro</code>.</label>
+<label><input type="radio" name="q6"> Construtores não são herdados.</label>
+<label><input type="radio" name="q6"> O <code>Produto</code> é <code>final</code>.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>class Filha : public Base</code> cria uma classe que recebe tudo da base e pode acrescentar atributos e métodos.</li>
+  <li>Use herança quando a frase "Filha <strong>é uma</strong> Base" faz sentido; quando é "tem um", use um atributo.</li>
+  <li>O construtor da filha chama o da base na lista de inicialização: <code>: Base{…}, atributo_{…}</code>.</li>
+  <li><code>private</code> da base é proibido até para a filha; <code>protected</code> libera só para as filhas.</li>
+  <li>A base nasce primeiro e morre por último.</li>
+  <li>Um método com o mesmo nome na filha substitui o da base; <code>Base::metodo()</code> chama o original. Por uma referência da base, sem <code>virtual</code>, roda o da base.</li>
+  <li>Sem <code>public</code>, a herança de uma <code>class</code> é privada. <code>final</code> proíbe herdar.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
