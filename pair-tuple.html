@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ pair, tuple e Desestruturação — juntar valores e separá-los | Guia C++</title>
+<meta name="description" content="std::pair e std::tuple em C++ para quem está começando: first e second, make_pair, std::get, devolver vários valores de uma função e structured bindings (auto [nome, nota]) com pair, tuple, struct e map, com saídas e erros reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">pair, tuple e Desestruturação</span></h1>
+
+<p class="intro">Às vezes dois ou três valores andam sempre juntos: o nome do aluno e a nota, o produto e a quantidade, o menor e o maior número de uma lista. Criar uma <a href="structs.html">struct</a> para cada combinação dá trabalho. Para esses casos rápidos, o C++ tem o <code>std::pair</code> (par: dois valores) e o <code>std::tuple</code> (tupla: quantos você quiser). E, desde o C++17, uma forma elegante de "desmontar" esses pacotes em variáveis com nome: <code>auto [nome, nota] = …;</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Criar um <code>std::pair</code> e ler as duas partes com <code>.first</code> e <code>.second</code>; o que faz o <code>std::make_pair</code>.</li>
+  <li>Criar um <code>std::tuple</code> e ler cada parte com <code>std::get&lt;0&gt;</code>, <code>std::get&lt;1&gt;</code>…</li>
+  <li>Usar <code>pair</code> e <code>tuple</code> para uma função <strong>devolver vários valores</strong>.</li>
+  <li>Desmontar tudo isso com <strong>structured bindings</strong> (<code>auto [a, b] = …;</code>): com pair, tuple, struct e no <code>for</code> de um <code>std::map</code>.</li>
+  <li>Quando é melhor usar uma struct.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: o envelope com dois papéis</h2>
+<p>Pense num envelope com duas folhas dentro: a primeira com o nome do aluno, a segunda com a nota. Você entrega o envelope inteiro, e quem recebe abre e tira as duas folhas. Um <code>pair</code> é esse envelope. Um <code>tuple</code> é um envelope que cabe três, quatro, quantas folhas forem necessárias. E as <em>structured bindings</em> são o gesto de abrir o envelope e dar um nome a cada folha.</p>
+
+<hr>
+
+<h2>1. <code>std::pair</code>: dois valores juntos</h2>
+
+<pre class="file" data-file="par.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+
+int main() {
+    std::pair&lt;std::string, double&gt; aluno = {"Ana", 9.5};
+
+    std::cout &lt;&lt; "Nome: " &lt;&lt; aluno.first &lt;&lt; '\n';
+    std::cout &lt;&lt; "Nota: " &lt;&lt; aluno.second &lt;&lt; '\n';
+
+    aluno.second = 10.0;
+    std::cout &lt;&lt; aluno.first &lt;&lt; " agora tem " &lt;&lt; aluno.second &lt;&lt; '\n';
+
+    auto outro = std::make_pair(std::string("Bruno"), 7.0);
+    std::cout &lt;&lt; outro.first &lt;&lt; ": " &lt;&lt; outro.second &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;utility&gt;</dt><dd>O cabeçalho do <code>std::pair</code> (<em>utility</em> = "utilidades").</dd>
+  <dt>std::pair&lt;std::string, double&gt;</dt><dd>Um par cuja primeira parte é um texto e a segunda, um número com vírgula. Os dois tipos podem ser diferentes.</dd>
+  <dt>= {"Ana", 9.5};</dt><dd>Os dois valores, na ordem.</dd>
+  <dt>aluno.first</dt><dd>A primeira parte (<em>first</em> = "primeiro").</dd>
+  <dt>aluno.second</dt><dd>A segunda parte (<em>second</em> = "segundo"). Dá para ler e também mudar: <code>aluno.second = 10.0;</code>.</dd>
+  <dt>std::make_pair(a, b)</dt><dd>Cria um par descobrindo os tipos pelos valores. Era muito usado antes do C++17; hoje, a forma com chaves é mais comum.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra par.cpp -o par
+$ ./par
+Nome: Ana
+Nota: 9.5
+Ana agora tem 10
+Bruno: 7</pre>
+
+<p>Você já encontrou pares sem saber: cada elemento de um <a href="map.html">std::map</a> é um <code>pair</code> de chave e valor, por isso se escreve <code>item.first</code> e <code>item.second</code> ao percorrer um map.</p>
+
+<h3>Pares sabem se comparar</h3>
+<p>Dois pares são comparados primeiro pelo <code>first</code>; só em caso de empate, pelo <code>second</code>. Por isso um vetor de pares pode ser ordenado direto com <a href="algoritmos.html"><code>std::sort</code></a>:</p>
+
+<pre class="file" data-file="pares_ordenar.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::pair&lt;std::string, int&gt;&gt; estoque = {
+        {"maçã", 12}, {"banana", 30}, {"abacate", 4}, {"banana", 8}
+    };
+
+    std::sort(estoque.begin(), estoque.end());
+    for (const auto&amp; item : estoque) {
+        std::cout &lt;&lt; item.first &lt;&lt; ": " &lt;&lt; item.second &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra pares_ordenar.cpp -o pares_ordenar
+$ ./pares_ordenar
+abacate: 4
+banana: 8                            « empate em "banana": desempata pelo número
+banana: 30
+maçã: 12</pre>
+
+<div class="warning">
+<strong>Cuidado com <code>std::pair p{"Ana", 9.5};</code> sem os tipos</strong>
+<p>Desde o C++17, você pode omitir os tipos e deixar o compilador deduzir. Mas <code>"Ana"</code>, escrito assim, não é um <code>std::string</code>: é um texto "cru" do C, do tipo <code>const char*</code> (aula <a href="strings.html">Strings</a>). O par sai com o tipo errado, e métodos de string não existem:</p>
+<pre class="term" data-cwd="~/cpp">$ cat ctad.cpp
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+
+int main() {
+    std::pair p{"Ana", 9.5};
+    std::string nome = p.first;
+    std::cout &lt;&lt; nome &lt;&lt; ' ' &lt;&lt; p.second &lt;&lt; '\n';
+    std::cout &lt;&lt; p.first.size() &lt;&lt; '\n';
+}
+$ g++ -std=c++23 -Wall -Wextra ctad.cpp -o ctad
+ctad.cpp: In function ‘int main()’:
+ctad.cpp:9:26: error: request for member ‘size’ in ‘p.std::pair&lt;const char*, double&gt;::first’, which is of non-class type ‘const char*’
+    9 |     std::cout &lt;&lt; p.first.size() &lt;&lt; '\n';
+      |                          ^~~~</pre>
+<p>A mensagem entrega o segredo: o par virou <code>std::pair&lt;const char*, double&gt;</code>. Escreva os tipos (<code>std::pair&lt;std::string, double&gt;</code>) quando houver texto.</p>
+</div>
+
+<hr>
+
+<h2>2. <code>std::tuple</code>: três ou mais valores</h2>
+<p>O <code>std::tuple</code> (cabeçalho <code>&lt;tuple&gt;</code>) é a generalização do par. Como as partes não têm nome (não existe <code>.third</code>), você as pega pela <strong>posição</strong>, contando a partir de 0, com <code>std::get&lt;posição&gt;</code>:</p>
+
+<pre class="file" data-file="tupla.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;tuple&gt;
+
+int main() {
+    std::tuple&lt;std::string, int, double&gt; produto = {"caderno", 3, 12.9};
+
+    std::cout &lt;&lt; "Produto: " &lt;&lt; std::get&lt;0&gt;(produto) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Quantidade: " &lt;&lt; std::get&lt;1&gt;(produto) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Preço: " &lt;&lt; std::get&lt;2&gt;(produto) &lt;&lt; '\n';
+
+    std::get&lt;1&gt;(produto) = 5;
+    std::cout &lt;&lt; "Nova quantidade: " &lt;&lt; std::get&lt;1&gt;(produto) &lt;&lt; '\n';
+
+    auto outro = std::make_tuple(std::string("caneta"), 10, 2.5);
+    std::cout &lt;&lt; std::get&lt;0&gt;(outro) &lt;&lt; " x" &lt;&lt; std::get&lt;1&gt;(outro) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tupla.cpp -o tupla
+$ ./tupla
+Produto: caderno
+Quantidade: 3
+Preço: 12.9
+Nova quantidade: 5
+caneta x10</pre>
+
+<dl class="anatomy">
+  <dt>std::tuple&lt;std::string, int, double&gt;</dt><dd>Três partes: posição 0 é texto, 1 é inteiro, 2 é <code>double</code>.</dd>
+  <dt>std::get&lt;0&gt;(produto)</dt><dd>A parte da posição 0. O número vai entre <code>&lt; &gt;</code>, não entre parênteses.</dd>
+  <dt>std::get&lt;1&gt;(produto) = 5;</dt><dd>Também serve para mudar a parte.</dd>
+  <dt>std::make_tuple(…)</dt><dd>Como o <code>make_pair</code>: cria a tupla deduzindo os tipos.</dd>
+</dl>
+
+<p>Por que <code>&lt;0&gt;</code> e não <code>[0]</code>, como num vetor? Porque cada posição tem um <strong>tipo diferente</strong>, e o compilador precisa saber, <strong>ao compilar</strong>, qual tipo vai sair dali. Por isso a posição tem de ser um número fixo, escrito no código. Uma variável não serve:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat tupla_i.cpp
+#include &lt;iostream&gt;
+#include &lt;tuple&gt;
+
+int main() {
+    std::tuple&lt;int, int, int&gt; t = {1, 2, 3};
+    for (int i = 0; i &lt; 3; ++i) {
+        std::cout &lt;&lt; std::get&lt;i&gt;(t) &lt;&lt; '\n';
+    }
+}
+$ g++ -std=c++23 -Wall -Wextra tupla_i.cpp -o tupla_i
+tupla_i.cpp: In function ‘int main()’:
+tupla_i.cpp:7:33: error: no matching function for call to ‘get&lt;i&gt;(std::tuple&lt;int, int, int&gt;&amp;)’
+    7 |         std::cout &lt;&lt; std::get&lt;i&gt;(t) &lt;&lt; '\n';
+      |                      ~~~~~~~~~~~^~~
+tupla_i.cpp:7:33: note: there are 27 candidates
+                                     « … (a mensagem tem 312 linhas, quase todas notes sobre os 27 candidatos; no meio delas:)
+tupla_i.cpp:7:33: error: the value of ‘i’ is not usable in a constant expression
+    7 |         std::cout &lt;&lt; std::get&lt;i&gt;(t) &lt;&lt; '\n';
+      |                      ~~~~~~~~~~~^~~
+tupla_i.cpp:6:14: note: ‘int i’ is not const
+    6 |     for (int i = 0; i &lt; 3; ++i) {
+      |              ^</pre>
+
+<p><em>The value of ‘i’ is not usable in a constant expression</em> = "o valor de <code>i</code> não pode ser usado numa expressão constante", ou seja, num valor conhecido na compilação. Esse é o assunto de <a href="constexpr.html">constexpr e consteval</a>. Se você precisa percorrer com um índice, o que você quer é um <code>std::vector</code> ou um <code>std::array</code>, não uma tupla.</p>
+
+<hr>
+
+<h2>3. Devolver vários valores de uma função</h2>
+<p>Uma função só tem um <code>return</code> e devolve uma coisa só (aula <a href="retorno.html">Retorno</a>). Mas essa "coisa" pode ser um par ou uma tupla, e aí cabem vários valores:</p>
+
+<pre class="file" data-file="minmax.cpp">#include &lt;iostream&gt;
+#include &lt;tuple&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+std::pair&lt;int, int&gt; menor_e_maior(const std::vector&lt;int&gt;&amp; v) {
+    int menor = v[0];
+    int maior = v[0];
+    for (int x : v) {
+        if (x &lt; menor) menor = x;
+        if (x &gt; maior) maior = x;
+    }
+    return {menor, maior};
+}
+
+std::tuple&lt;int, int, double&gt; resumo(const std::vector&lt;int&gt;&amp; v) {
+    int soma = 0;
+    for (int x : v) soma += x;
+    double media = static_cast&lt;double&gt;(soma) / v.size();
+    return {static_cast&lt;int&gt;(v.size()), soma, media};
+}
+
+int main() {
+    std::vector&lt;int&gt; notas = {7, 10, 4, 8};
+
+    auto extremos = menor_e_maior(notas);
+    std::cout &lt;&lt; "Menor: " &lt;&lt; extremos.first &lt;&lt; ", maior: " &lt;&lt; extremos.second &lt;&lt; '\n';
+
+    auto r = resumo(notas);
+    std::cout &lt;&lt; std::get&lt;0&gt;(r) &lt;&lt; " notas, soma " &lt;&lt; std::get&lt;1&gt;(r)
+              &lt;&lt; ", média " &lt;&lt; std::get&lt;2&gt;(r) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra minmax.cpp -o minmax
+$ ./minmax
+Menor: 4, maior: 10
+4 notas, soma 29, média 7.25</pre>
+
+<p>O <code>return {menor, maior};</code> monta o par direto, porque o compilador já sabe, pela primeira linha da função, que ela devolve um <code>std::pair&lt;int, int&gt;</code>. Funciona, mas repare como o <code>main</code> ficou difícil de ler: <code>extremos.first</code> é o menor? <code>std::get&lt;1&gt;(r)</code> era a soma ou a média? A próxima seção resolve isso.</p>
+
+<hr>
+
+<h2>4. Structured bindings: <code>auto [a, b] = …;</code> <span class="versao">C++17</span></h2>
+<p>A "desestruturação" (em inglês, <em>structured bindings</em>, "ligações estruturadas") abre o pacote e dá um <strong>nome</strong> a cada parte, numa linha só:</p>
+
+<pre class="file" data-file="bindings.cpp">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+#include &lt;tuple&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+struct Ponto {
+    int x;
+    int y;
+};
+
+std::pair&lt;int, int&gt; menor_e_maior(const std::vector&lt;int&gt;&amp; v) {
+    int menor = v[0], maior = v[0];
+    for (int x : v) {
+        if (x &lt; menor) menor = x;
+        if (x &gt; maior) maior = x;
+    }
+    return {menor, maior};
+}
+
+int main() {
+    // 1. com pair
+    std::pair&lt;std::string, double&gt; aluno = {"Ana", 9.5};
+    auto [nome, nota] = aluno;
+    std::cout &lt;&lt; nome &lt;&lt; " tirou " &lt;&lt; nota &lt;&lt; '\n';
+
+    // 2. com o retorno de uma função
+    auto [menor, maior] = menor_e_maior({7, 10, 4, 8});
+    std::cout &lt;&lt; "De " &lt;&lt; menor &lt;&lt; " a " &lt;&lt; maior &lt;&lt; '\n';
+
+    // 3. com tuple
+    std::tuple&lt;std::string, int, double&gt; produto = {"caderno", 3, 12.9};
+    auto [item, qtd, preco] = produto;
+    std::cout &lt;&lt; qtd &lt;&lt; "x " &lt;&lt; item &lt;&lt; " = " &lt;&lt; qtd * preco &lt;&lt; '\n';
+
+    // 4. com struct
+    Ponto p = {3, -2};
+    auto [x, y] = p;
+    std::cout &lt;&lt; "x=" &lt;&lt; x &lt;&lt; " y=" &lt;&lt; y &lt;&lt; '\n';
+
+    // 5. com map, no for
+    std::map&lt;std::string, int&gt; estoque = {{"banana", 30}, {"maçã", 12}};
+    for (const auto&amp; [fruta, quantidade] : estoque) {
+        std::cout &lt;&lt; fruta &lt;&lt; ": " &lt;&lt; quantidade &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra bindings.cpp -o bindings
+$ ./bindings
+Ana tirou 9.5
+De 4 a 10
+3x caderno = 38.7
+x=3 y=-2
+banana: 30
+maçã: 12</pre>
+
+<dl class="anatomy">
+  <dt>auto</dt><dd>Obrigatório: o tipo de cada nome é deduzido sozinho (aula <a href="auto.html">auto</a>). Não dá para escrever <code>std::string [nome, …]</code>.</dd>
+  <dt>[nome, nota]</dt><dd>Os nomes que você escolhe, um para cada parte, <strong>na ordem</strong>: o primeiro recebe o <code>first</code> (ou a posição 0, ou o primeiro campo da struct), o segundo recebe o seguinte, e assim por diante.</dd>
+  <dt>= aluno;</dt><dd>O pacote a abrir: um pair, uma tuple, uma struct com campos públicos, um <code>std::array</code> ou o retorno de uma função.</dd>
+  <dt>const auto&amp; [fruta, quantidade] : estoque</dt><dd>No <code>for</code> de um map, cada elemento é um par chave/valor; aqui ele é aberto direto em dois nomes. O <code>const auto&amp;</code> evita copiar cada par.</dd>
+</dl>
+
+<p>Compare o item 5 com a forma antiga, <code>for (const auto&amp; item : estoque) { … item.first … item.second … }</code>. Com nomes, o código "fala" o que está fazendo. Isso é o que torna as structured bindings uma das novidades mais queridas do C++17.</p>
+
+<h3>Cópia ou referência?</h3>
+<p>Com <code>auto [a, b]</code>, os nomes se referem a uma <strong>cópia</strong> do pacote. Para mudar o original, use <code>auto&amp;</code>:</p>
+
+<pre class="file" data-file="bind_ref.cpp">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::map&lt;std::string, int&gt; estoque = {{"banana", 30}, {"maçã", 12}};
+
+    for (auto [fruta, qtd] : estoque) {
+        qtd = 0;
+    }
+    std::cout &lt;&lt; "Depois da cópia: banana=" &lt;&lt; estoque["banana"] &lt;&lt; '\n';
+
+    for (auto&amp; [fruta, qtd] : estoque) {
+        qtd = 0;
+    }
+    std::cout &lt;&lt; "Depois da referência: banana=" &lt;&lt; estoque["banana"] &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra bind_ref.cpp -o bind_ref
+$ ./bind_ref
+Depois da cópia: banana=30           « zerou só a cópia
+Depois da referência: banana=0       « zerou o estoque de verdade</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Quando usar</th></tr>
+<tr><td><code>auto [a, b] = x;</code></td><td>Valores pequenos que você só quer ler (ou uma cópia para mexer à vontade).</td></tr>
+<tr><td><code>const auto&amp; [a, b] = x;</code></td><td>Ler sem copiar. O padrão no <code>for</code> de um map ou de um vetor de pares.</td></tr>
+<tr><td><code>auto&amp; [a, b] = x;</code></td><td>Mudar o original através dos nomes.</td></tr>
+</table>
+</div>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode como está. Depois acrescente uma terceira fruta ao map. Por fim, troque <code>const auto&amp;</code> por <code>auto&amp;</code> e, dentro do <code>for</code>, some 10 a <code>quantidade</code> antes de mostrar.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::map&lt;std::string, int&gt; estoque = {{"banana", 30}, {"pera", 12}};
+
+    for (const auto&amp; [fruta, quantidade] : estoque) {
+        std::cout &lt;&lt; fruta &lt;&lt; ": " &lt;&lt; quantidade &lt;&lt; '\n';
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>pair, tuple ou struct? Qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th><th>Por quê</th></tr>
+<tr><td>Dois valores, uso rápido e local (o retorno de uma função auxiliar, um par chave/valor)</td><td><code>std::pair</code></td><td>Pronto, compara e ordena sozinho.</td></tr>
+<tr><td>Três ou mais valores, uso rápido e local</td><td><code>std::tuple</code></td><td>Idem, sem limite de partes.</td></tr>
+<tr><td>Os dados aparecem em várias partes do programa</td><td><code>struct</code></td><td><code>aluno.nota</code> diz muito mais que <code>aluno.second</code> ou <code>std::get&lt;1&gt;(aluno)</code>.</td></tr>
+<tr><td>A função pode não ter resultado (busca que não acha)</td><td><code>std::optional</code></td><td>Aula <a href="optional-variant.html">optional e variant</a>.</td></tr>
+</table>
+</div>
+<p>Com structured bindings, quem <strong>usa</strong> o pair/tuple ganha nomes. Mas quem <strong>lê a assinatura</strong> da função <code>std::tuple&lt;int, int, double&gt; resumo(…)</code> continua sem saber o que é cada <code>int</code>. Se a função é importante, uma struct com campos nomeados documenta melhor, e ela também funciona com <code>auto [a, b, c] = …;</code>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: only 2 names provided for structured binding</code></strong>
+<pre class="term" data-cwd="~/cpp">$ cat bind_erro.cpp
+#include &lt;string&gt;
+#include &lt;tuple&gt;
+
+int main() {
+    std::tuple&lt;std::string, int, double&gt; produto = {"caderno", 3, 12.9};
+    auto [item, qtd] = produto;
+}
+$ g++ -std=c++23 -Wall -Wextra bind_erro.cpp -o bind_erro
+bind_erro.cpp: In function ‘int main()’:
+bind_erro.cpp:6:10: error: only 2 names provided for structured binding
+    6 |     auto [item, qtd] = produto;
+      |          ^~~~~~~~~~~
+bind_erro.cpp:6:10: note: while ‘std::tuple&lt;std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;, int, double&gt;’ decomposes into 3 elements</pre>
+<p><strong>O que significa:</strong> "só 2 nomes foram dados", enquanto a tupla "se decompõe em 3 elementos". (O nome comprido <code>std::__cxx11::basic_string&lt;char, …&gt;</code> é como o g++ escreve <code>std::string</code> por extenso.)</p>
+<p><strong>Como consertar:</strong> um nome para cada parte, sem pular. Se uma parte não interessa, dê um nome qualquer a ela mesmo assim.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: static assertion failed: tuple index must be in range</code></strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tupla_erro.cpp -o tupla_erro      « std::get&lt;3&gt; numa tupla de 3 partes
+In file included from /usr/include/c++/15/bits/uses_allocator_args.h:41,
+                                     « … (cortamos umas 10 linhas de "required by")
+tupla_erro.cpp:6:23:   required from here
+    6 |     return std::get&lt;3&gt;(produto);
+      |            ~~~~~~~~~~~^~~~~~~~~
+/usr/include/c++/15/tuple:2421:25: error: static assertion failed: tuple index must be in range
+ 2421 |       static_assert(__i &lt; sizeof...(_Types), "tuple index must be in range");
+      |                     ~~~~^~~~~~~~~~~~~~~~~~~
+/usr/include/c++/15/tuple:2421:25: note: the comparison reduces to ‘(3 &lt; 3)’
+                                     « … e mais 28 linhas com outros erros da mesma causa</pre>
+<p><strong>O que significa:</strong> "o índice da tupla precisa estar dentro do intervalo". As posições de uma tupla de 3 partes são 0, 1 e 2; a 3 não existe. A nota <em>the comparison reduces to ‘(3 &lt; 3)’</em> mostra a conta que deu falso. Procure a linha com <code>required from here</code>: é a sua.</p>
+<p><strong>Como consertar:</strong> conte a partir de 0. Melhor ainda: troque os <code>std::get</code> por <code>auto [a, b, c] = …;</code>, que não tem número para errar.</p>
+</div>
+
+<div class="cenario">
+<strong><code>request for member ‘size’ in … which is of non-class type ‘const char*’</code></strong>
+<p><strong>O que significa:</strong> o par ou a tupla foi criado sem os tipos (<code>std::pair p{"Ana", 9.5}</code>) e o texto virou <code>const char*</code>, que não tem métodos.</p>
+<p><strong>Como consertar:</strong> escreva os tipos (<code>std::pair&lt;std::string, double&gt;</code>) ou use <code>std::string("Ana")</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>std::pair&lt;A, B&gt; p = {a, b};</code></td><td>Cria um par (<code>&lt;utility&gt;</code>)</td></tr>
+<tr><td><code>p.first</code>, <code>p.second</code></td><td>As duas partes</td></tr>
+<tr><td><code>std::make_pair(a, b)</code></td><td>Cria um par deduzindo os tipos</td></tr>
+<tr><td><code>std::tuple&lt;A, B, C&gt; t = {a, b, c};</code></td><td>Cria uma tupla (<code>&lt;tuple&gt;</code>)</td></tr>
+<tr><td><code>std::get&lt;0&gt;(t)</code></td><td>A parte da posição 0 (número fixo, conhecido na compilação)</td></tr>
+<tr><td><code>std::make_tuple(a, b, c)</code></td><td>Cria uma tupla deduzindo os tipos</td></tr>
+<tr><td><code>return {a, b};</code></td><td>Devolve um par/tupla montado na hora</td></tr>
+<tr><td><code>auto [x, y] = algo;</code></td><td>Desmonta em cópias com nome</td></tr>
+<tr><td><code>const auto&amp; [x, y] = algo;</code></td><td>Desmonta sem copiar, só leitura</td></tr>
+<tr><td><code>auto&amp; [x, y] = algo;</code></td><td>Desmonta com acesso ao original</td></tr>
+<tr><td><code>for (const auto&amp; [k, v] : mapa)</code></td><td>Percorre um map com nomes para chave e valor</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A segunda parte</h3>
+<p>Complete para mostrar a nota guardada no par <code>aluno</code>:</p>
+<div class="ex-code">std::cout &lt;&lt; aluno.<input data-answer="second" aria-label="membro"> &lt;&lt; '\n';</div>
+</div>
+
+<div class="exercise">
+<h3>2. Pegar da tupla</h3>
+<p>Complete para pegar a <strong>terceira</strong> parte da tupla <code>t</code>:</p>
+<div class="ex-code">std::get&lt;<input data-answer="2" aria-label="posição">&gt;(t)</div>
+</div>
+
+<div class="exercise">
+<h3>3. Desmontar</h3>
+<p>Complete para abrir o par devolvido por <code>dividir(17, 5)</code> em <code>q</code> e <code>r</code>:</p>
+<div class="ex-code"><input data-answer="auto" aria-label="palavra"> [q, r] = dividir(17, 5);</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Um vetor de pares <code>{{"b", 2}, {"a", 9}, {"b", 1}}</code> é ordenado com <code>std::sort</code>. Qual a ordem final?</p>
+<label><input type="radio" name="q4"> <code>{"b",1} {"b",2} {"a",9}</code></label>
+<label><input type="radio" name="q4"> <code>{"b",1} {"a",9} {"b",2}</code></label>
+<label><input type="radio" name="q4"> <code>{"a",9} {"b",1} {"b",2}</code></label>
+<label><input type="radio" name="q4"> Não compila: pares não se comparam</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Num <code>for (auto [k, v] : mapa) { v = 0; }</code>, o que acontece com os valores do <code>mapa</code>?</p>
+<label><input type="radio" name="q5"> Todos viram 0</label>
+<label><input type="radio" name="q5"> Nada: <code>v</code> é uma cópia</label>
+<label><input type="radio" name="q5"> Erro de compilação</label>
+<label><input type="radio" name="q5"> Só o primeiro vira 0</label>
+</div>
+
+<h3>Missão: dividir com resto</h3>
+
+<div class="trycpp" data-goal="out:17 / 5 = 3\, resto 2,src:auto\s*\[\s*q\s*\,\s*r\s*\]">
+<p class="try-task"><strong>Missão:</strong> complete a função <code>dividir</code> para devolver o quociente (<code>a / b</code>) e o resto (<code>a % b</code>) num par. No <code>main</code>, abra o resultado com <code>auto [q, r] = dividir(17, 5);</code>. A saída deve ser <code>17 / 5 = 3, resto 2</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;utility&gt;
+
+std::pair&lt;int, int&gt; dividir(int a, int b) {
+    return {0, 0}; // conserte aqui
+}
+
+int main() {
+    // abra o resultado de dividir(17, 5) em q e r
+    std::cout &lt;&lt; "17 / 5 = " &lt;&lt; 0 &lt;&lt; ", resto " &lt;&lt; 0 &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;utility&gt;
+
+std::pair&lt;int, int&gt; dividir(int a, int b) {
+    return {a / b, a % b};
+}
+
+int main() {
+    auto [q, r] = dividir(17, 5);
+    std::cout &lt;&lt; "17 / 5 = " &lt;&lt; q &lt;&lt; ", resto " &lt;&lt; r &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<h3>Missão final: o carrinho de compras</h3>
+
+<div class="trycpp" data-goal="out:2x caderno = 25,out:5x caneta = 10,out:1x mochila = 89.9,out:Total: 124.9,src:auto\s*&amp;?\s*\[">
+<p class="try-task"><strong>Missão:</strong> cada item do carrinho é uma tupla (produto, quantidade, preço). Percorra o vetor com <code>for (const auto&amp; [produto, qtd, preco] : carrinho)</code>, mostre <code>2x caderno = 25</code> para cada item e, no fim, <code>Total: 124.9</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;tuple&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::tuple&lt;std::string, int, double&gt;&gt; carrinho = {
+        {"caderno", 2, 12.5},
+        {"caneta", 5, 2.0},
+        {"mochila", 1, 89.9}
+    };
+
+    double total = 0.0;
+    // percorra o carrinho aqui
+
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;tuple&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::tuple&lt;std::string, int, double&gt;&gt; carrinho = {
+        {"caderno", 2, 12.5},
+        {"caneta", 5, 2.0},
+        {"mochila", 1, 89.9}
+    };
+
+    double total = 0.0;
+    for (const auto&amp; [produto, qtd, preco] : carrinho) {
+        double subtotal = qtd * preco;
+        std::cout &lt;&lt; qtd &lt;&lt; "x " &lt;&lt; produto &lt;&lt; " = " &lt;&lt; subtotal &lt;&lt; '\n';
+        total += subtotal;
+    }
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<p>A solução, no laboratório:</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra carrinho.cpp -o carrinho
+$ ./carrinho
+2x caderno = 25
+5x caneta = 10
+1x mochila = 89.9
+Total: 124.9</pre>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>std::pair&lt;A, B&gt;</code> junta dois valores: <code>.first</code> e <code>.second</code>. Pares se comparam pelo <code>first</code> e desempatam pelo <code>second</code>.</li>
+  <li><code>std::tuple&lt;A, B, C…&gt;</code> junta quantos você quiser: <code>std::get&lt;posição&gt;(t)</code>, com posição fixa a partir de 0.</li>
+  <li>Uma função devolve vários valores devolvendo um pair ou tuple: <code>return {a, b};</code>.</li>
+  <li><code>auto [a, b] = …;</code> dá nomes às partes de um pair, tuple, struct ou array. <code>const auto&amp;</code> para ler sem copiar; <code>auto&amp;</code> para mudar o original.</li>
+  <li>No <code>for</code> de um map: <code>for (const auto&amp; [chave, valor] : mapa)</code>.</li>
+  <li>Com texto, escreva os tipos do pair: sem eles, <code>"Ana"</code> vira <code>const char*</code>.</li>
+  <li>Dados que aparecem no programa todo merecem uma struct com nomes.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

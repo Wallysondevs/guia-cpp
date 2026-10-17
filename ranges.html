@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Ranges — ranges::sort, views e encadeamento (C++20) | Guia C++</title>
+<meta name="description" content="Ranges do C++20 para quem está começando: std::ranges::sort sem begin e end, as views filter, transform, take, reverse e iota, encadear etapas com | (avaliação preguiçosa) e std::ranges::to do C++23, com comparação antes × depois e saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Ranges</span> <span class="versao">C++20</span></h1>
+
+<p class="intro">Na aula de <a href="algoritmos.html">Algoritmos</a>, todo algoritmo recebia <code>v.begin(), v.end()</code>. Funciona, mas é repetitivo, e fazer uma tarefa em etapas ("pegue as notas aprovadas, some 1 ponto, fique com as 3 primeiras") exige vetores intermediários e laços. O C++20 trouxe os <strong>ranges</strong> ("intervalos"): algoritmos que recebem o vetor inteiro de uma vez e <strong>views</strong> ("vistas") que você encaixa uma na outra com o símbolo <code>|</code>, como canos de uma tubulação.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A forma curta dos algoritmos: <code>std::ranges::sort(v)</code>, sem <code>begin</code>/<code>end</code>.</li>
+  <li>O que é uma <strong>view</strong> e as cinco mais usadas: <code>filter</code>, <code>transform</code>, <code>take</code>, <code>reverse</code> e <code>iota</code>.</li>
+  <li>Como encadear views com <code>|</code>, e por que se diz que elas são "preguiçosas".</li>
+  <li>Como transformar o resultado num vetor de verdade com <code>std::ranges::to</code> <span class="versao">C++23</span>.</li>
+  <li>A comparação antes × depois: o mesmo programa com laço e com ranges.</li>
+</ul>
+</div>
+
+<p>Tudo foi conferido com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. O <code>-std=c++23</code> é obrigatório aqui: o g++ 15 usa C++17 se você não pedir outro padrão, e o C++17 não tem ranges (veja "Quando dá errado"). Para esta aula você precisa de <a href="lambdas.html">Lambdas</a> e <a href="algoritmos.html">Algoritmos</a>.</p>
+
+<hr>
+
+<h2>A ideia: a esteira da fábrica</h2>
+<p>Imagine uma esteira de frutas. As frutas passam por estações: a primeira <strong>separa</strong> as estragadas (um filtro), a segunda <strong>descasca</strong> (uma transformação), a última <strong>pega só 3</strong> para a caixa. Ninguém descasca todas as frutas antes de começar a encher a caixa: cada fruta anda pela esteira inteira, uma de cada vez, e a máquina para quando a caixa enche.</p>
+
+<p>As views são essas estações, e o <code>|</code> (a barra vertical, chamada "pipe", cano) é a esteira que liga uma à outra:</p>
+
+<pre class="file" data-file="ideia.cpp">auto caixa = frutas
+    | std::views::filter(boa)          // separa
+    | std::views::transform(descascar) // descasca
+    | std::views::take(3);             // só 3
+</pre>
+
+<hr>
+
+<h2>1. Algoritmos sem <code>begin</code> e <code>end</code></h2>
+<p>Quase todo algoritmo de <code>&lt;algorithm&gt;</code> tem uma versão "irmã" dentro de <code>std::ranges</code>, que recebe o container direto:</p>
+
+<pre class="file" data-file="ordenar.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas = {7, 10, 4, 8, 6};
+
+    std::ranges::sort(notas);
+    for (int n : notas) std::cout &lt;&lt; n &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+
+    auto it = std::ranges::find(notas, 8);
+    if (it != notas.end()) {
+        std::cout &lt;&lt; "Achei o 8 na posição " &lt;&lt; (it - notas.begin()) &lt;&lt; '\n';
+    }
+
+    auto aprovados = std::ranges::count_if(notas, [](int n) { return n &gt;= 6; });
+    std::cout &lt;&lt; "Aprovados: " &lt;&lt; aprovados &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ordenar.cpp -o ordenar
+$ ./ordenar
+4 6 7 8 10
+Achei o 8 na posição 3
+Aprovados: 4</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Antes (clássico)</th><th>Depois (ranges)</th></tr>
+<tr><td><code>std::sort(notas.begin(), notas.end());</code></td><td><code>std::ranges::sort(notas);</code></td></tr>
+<tr><td><code>std::find(notas.begin(), notas.end(), 8)</code></td><td><code>std::ranges::find(notas, 8)</code></td></tr>
+<tr><td><code>std::count_if(notas.begin(), notas.end(), f)</code></td><td><code>std::ranges::count_if(notas, f)</code></td></tr>
+<tr><td><code>std::reverse(v.begin(), v.end());</code></td><td><code>std::ranges::reverse(v);</code></td></tr>
+</table>
+</div>
+
+<p>A versão de ranges não é só mais curta: ela também evita um erro clássico, passar o <code>begin</code> de um vetor e o <code>end</code> de <strong>outro</strong> (<code>std::sort(a.begin(), b.end())</code>), que compila sem aviso e é <a href="comportamento-indefinido.html">comportamento indefinido</a>. Com <code>std::ranges::sort(a)</code>, não há como misturar. O <code>find</code> continua devolvendo um iterador, e você continua comparando com <code>end()</code>, igual à aula anterior. A versão com <code>begin</code>/<code>end</code> continua válida e muito usada; o cabeçalho continua sendo <code>&lt;algorithm&gt;</code>.</p>
+
+<h3>Ordenar por um campo: a projeção</h3>
+<p>Os algoritmos de ranges aceitam um último argumento chamado <strong>projeção</strong>: "compare os elementos olhando só este campo". Ordenar alunos pela nota, que antes pedia uma lambda de dois parâmetros, fica assim:</p>
+
+<pre class="file" data-file="projecao.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Aluno {
+    std::string nome;
+    double nota;
+};
+
+int main() {
+    std::vector&lt;Aluno&gt; turma = {{"Bruno", 7.5}, {"Ana", 9.0}, {"Carla", 6.0}};
+
+    std::ranges::sort(turma, {}, &amp;Aluno::nota);
+    for (const auto&amp; a : turma) std::cout &lt;&lt; a.nome &lt;&lt; ' ' &lt;&lt; a.nota &lt;&lt; '\n';
+
+    auto melhor = std::ranges::max_element(turma, {}, &amp;Aluno::nota);
+    std::cout &lt;&lt; "Melhor: " &lt;&lt; melhor-&gt;nome &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra projecao.cpp -o projecao
+$ ./projecao
+Carla 6
+Bruno 7.5
+Ana 9
+Melhor: Ana</pre>
+
+<dl class="anatomy">
+  <dt>turma</dt><dd>O que ordenar.</dd>
+  <dt>{}</dt><dd>A comparação. As chaves vazias querem dizer "a de sempre" (menor primeiro). Para maior primeiro, coloque <code>std::ranges::greater{}</code>.</dd>
+  <dt>&amp;Aluno::nota</dt><dd>A projeção: "de cada aluno, olhe o campo <code>nota</code>". Lê-se "o membro <code>nota</code> de <code>Aluno</code>".</dd>
+  <dt>melhor-&gt;nome</dt><dd><code>melhor</code> é um iterador; a seta <code>-&gt;</code> pega um campo do elemento para onde ele aponta (é o mesmo que <code>(*melhor).nome</code>).</dd>
+</dl>
+
+<hr>
+
+<h2>2. Views: olhar os dados de outro jeito, sem copiar</h2>
+<p>Uma <strong>view</strong> não guarda elementos. Ela é uma "janela" que mostra os elementos de outro container filtrados, transformados, cortados ou ao contrário, <strong>sem copiar e sem mudar o original</strong>. As views ficam no cabeçalho <code>&lt;ranges&gt;</code>, dentro de <code>std::views</code>.</p>
+
+<pre class="file" data-file="filtrar.cpp">#include &lt;iostream&gt;
+#include &lt;ranges&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; numeros = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    auto pares = numeros | std::views::filter([](int n) { return n % 2 == 0; });
+    for (int n : pares) std::cout &lt;&lt; n &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+
+    auto dobro = numeros | std::views::transform([](int n) { return n * 2; });
+    for (int n : dobro) std::cout &lt;&lt; n &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+
+    for (int n : numeros | std::views::take(3)) std::cout &lt;&lt; n &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+
+    for (int n : numeros | std::views::reverse) std::cout &lt;&lt; n &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+
+    for (int n : std::views::iota(1, 6)) std::cout &lt;&lt; n &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+
+    std::cout &lt;&lt; "Original: ";
+    for (int n : numeros) std::cout &lt;&lt; n &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra filtrar.cpp -o filtrar
+$ ./filtrar
+2 4 6 8                              « filter: só os que passam no teste
+2 4 6 8 10 12 14 16                  « transform: cada um vezes 2
+1 2 3                                « take(3): os 3 primeiros
+8 7 6 5 4 3 2 1                      « reverse: de trás para frente
+1 2 3 4 5                            « iota(1, 6): de 1 até 5 (o 6 fica de fora)
+Original: 1 2 3 4 5 6 7 8            « o vetor não mudou</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>View</th><th>O que mostra</th><th>Parecido com</th></tr>
+<tr><td><code>std::views::filter(pred)</code></td><td>Só os elementos em que a lambda responde <code>true</code></td><td><code>std::copy_if</code>, <code>if</code> dentro do <code>for</code></td></tr>
+<tr><td><code>std::views::transform(f)</code></td><td>O resultado de <code>f</code> em cada elemento</td><td><code>std::transform</code></td></tr>
+<tr><td><code>std::views::take(n)</code></td><td>Os <code>n</code> primeiros (ou menos, se não houver)</td><td><code>break</code> depois de n voltas</td></tr>
+<tr><td><code>std::views::reverse</code></td><td>Os elementos de trás para frente (sem parênteses!)</td><td><code>std::reverse</code>, mas sem mexer no original</td></tr>
+<tr><td><code>std::views::iota(a, b)</code></td><td>Os números <code>a</code>, <code>a+1</code>, …, <code>b-1</code></td><td><code>for (int i = a; i &lt; b; ++i)</code></td></tr>
+</table>
+</div>
+
+<p>O nome <code>iota</code> vem da letra grega ι, usada para sequências de números na linguagem APL, dos anos 1960. Ela é diferente das outras: não olha para um container, ela <strong>gera</strong> os números. Com um só argumento, <code>std::views::iota(1)</code>, a sequência não tem fim (1, 2, 3, … para sempre); veremos já já como isso pode ser útil.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode e veja os números ímpares. Depois troque a condição do filtro para pegar os <strong>maiores que 4</strong>. Em seguida, troque o <code>filter</code> por <code>std::views::transform([](int n) { return n * n; })</code> para ver os quadrados.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;ranges&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; numeros = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    auto escolhidos = numeros | std::views::filter([](int n) { return n % 2 == 1; });
+
+    for (int n : escolhidos) {
+        std::cout &lt;&lt; n &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Encadear com <code>|</code></h2>
+<p>A graça das views está em ligar várias. O resultado de uma view pode entrar em outra, quantas vezes você quiser:</p>
+
+<pre class="file" data-file="encadear.cpp">#include &lt;iostream&gt;
+#include &lt;ranges&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas = {7, 3, 10, 5, 8, 4, 9};
+
+    // as 3 primeiras notas aprovadas, com 1 ponto de bônus
+    auto resultado = notas
+        | std::views::filter([](int n) { return n &gt;= 6; })
+        | std::views::transform([](int n) { return n + 1; })
+        | std::views::take(3);
+
+    for (int n : resultado) std::cout &lt;&lt; n &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra encadear.cpp -o encadear
+$ ./encadear
+8 11 9                               « 7, 10 e 8 passaram; +1 em cada; parou no 3º</pre>
+
+<p>Leia de cima para baixo, como uma receita: "das <code>notas</code>, filtre as maiores ou iguais a 6, some 1 a cada uma, pegue 3". A ordem das etapas importa: <code>take(3)</code> antes do <code>filter</code> pegaria as 3 primeiras notas (7, 3, 10) e só depois filtraria, sobrando 7 e 10.</p>
+
+<h3>Antes × depois</h3>
+<p>O mesmo programa sem ranges, como se escrevia antes do C++20:</p>
+
+<pre class="file" data-file="antigo.cpp">std::vector&lt;int&gt; aprovadas;
+for (int n : notas) {
+    if (n &gt;= 6) {
+        aprovadas.push_back(n + 1);
+    }
+}
+if (aprovadas.size() &gt; 3) {
+    aprovadas.resize(3);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ ./antigo
+8 11 9                               « mesmo resultado</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Com laço</th><th>Com views</th></tr>
+<tr><td>Vetor extra</td><td>Sim (<code>aprovadas</code>), com cópias</td><td>Não: nada é copiado</td></tr>
+<tr><td>Trabalho feito</td><td>Passa por <strong>todas</strong> as notas</td><td>Para assim que tem 3</td></tr>
+<tr><td>Leitura</td><td>Você precisa "rodar o laço na cabeça"</td><td>Cada etapa tem um nome: filtrar, transformar, pegar</td></tr>
+<tr><td>Quando é melhor</td><td>Lógica com muitos <code>if</code>/<code>else</code> misturados, ou para quem ainda não conhece views</td><td>Etapas simples em sequência</td></tr>
+</table>
+</div>
+
+<p>Nenhuma das duas formas é "errada". Views brilham em sequências de etapas simples; para lógica complicada, um laço bem escrito costuma ser mais claro.</p>
+
+<hr>
+
+<h2>4. Preguiçosas: nada acontece até você pedir</h2>
+<p>Criar uma view não calcula nada. As lambdas só rodam quando alguém <strong>pede</strong> um elemento (no <code>for</code>, por exemplo). Isso se chama <strong>avaliação preguiçosa</strong> (<em>lazy</em>). Para ver acontecer, coloque um <code>cout</code> dentro da lambda do filtro:</p>
+
+<pre class="file" data-file="preguica.cpp">#include &lt;iostream&gt;
+#include &lt;ranges&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; numeros = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+
+    auto pipeline = numeros
+        | std::views::filter([](int n) {
+              std::cout &lt;&lt; "  filtrando " &lt;&lt; n &lt;&lt; '\n';
+              return n % 2 == 0;
+          })
+        | std::views::take(2);
+
+    std::cout &lt;&lt; "Pipeline montado. Nada foi calculado ainda.\n";
+
+    for (int n : pipeline) {
+        std::cout &lt;&lt; "Recebi " &lt;&lt; n &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra preguica.cpp -o preguica
+$ ./preguica
+Pipeline montado. Nada foi calculado ainda.   « nenhum "filtrando" antes daqui
+  filtrando 1
+  filtrando 2
+Recebi 2                             « o 2 passou e já foi entregue ao for
+  filtrando 3
+  filtrando 4
+Recebi 4
+  filtrando 5                        « o filtro andou até o próximo par…
+  filtrando 6                        « …e só então o take viu que já tinha 2
+                                     « 7, 8, 9 e 10 nunca foram olhados</pre>
+
+<p>Três coisas para notar:</p>
+<ol>
+  <li>Montar o pipeline não imprimiu nada: as lambdas não tinham rodado.</li>
+  <li>Os números foram <strong>um de cada vez</strong> pela esteira inteira: filtrou o 2, entregou o 2, só depois filtrou o 3.</li>
+  <li>O <code>take(2)</code> fez o trabalho parar cedo. Repare que o filtro ainda olhou o 5 e o 6: ao avançar depois do 4, ele procura o próximo par antes de o <code>take</code> conferir que já entregou 2. É um detalhe de funcionamento; o importante é que 7, 8, 9 e 10 ficaram de fora.</li>
+</ol>
+
+<p>Por causa da preguiça, dá para usar a sequência <strong>sem fim</strong> do <code>iota</code>, desde que algo corte:</p>
+
+<pre class="file" data-file="infinito.cpp">#include &lt;iostream&gt;
+#include &lt;ranges&gt;
+
+int main() {
+    auto quadrados = std::views::iota(1)
+        | std::views::transform([](int n) { return n * n; })
+        | std::views::take(5);
+
+    for (int q : quadrados) std::cout &lt;&lt; q &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra infinito.cpp -o infinito
+$ ./infinito
+1 4 9 16 25</pre>
+
+<div class="warning">
+<strong>A view não é dona dos dados</strong>
+<p>Uma view só "olha" para o vetor original. Se o vetor for destruído ou mudar de tamanho enquanto a view existe, a view passa a olhar para memória inválida. Regra prática: crie a view, use-a logo em seguida (num <code>for</code>) e não a guarde para depois. Se precisar guardar o resultado, transforme-o num vetor, como na próxima seção.</p>
+</div>
+
+<hr>
+
+<h2>5. <code>std::ranges::to</code>: de view para vetor <span class="versao">C++23</span></h2>
+<p>Uma view não é um vetor: não dá para fazer <code>push_back</code> nela, nem guardá-la depois que o original sumir. Para "materializar" o resultado num container de verdade, o C++23 trouxe <code>std::ranges::to</code>, que vai no fim da esteira:</p>
+
+<pre class="file" data-file="para_vetor.cpp">#include &lt;iostream&gt;
+#include &lt;ranges&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; numeros = {1, 2, 3, 4, 5, 6};
+
+    auto pares = numeros
+        | std::views::filter([](int n) { return n % 2 == 0; })
+        | std::ranges::to&lt;std::vector&gt;();
+
+    pares.push_back(100);
+    for (int n : pares) std::cout &lt;&lt; n &lt;&lt; ' ';
+    std::cout &lt;&lt; "(tamanho " &lt;&lt; pares.size() &lt;&lt; ")\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra para_vetor.cpp -o para_vetor
+$ ./para_vetor
+2 4 6 100 (tamanho 4)                « agora é um std::vector&lt;int&gt; de verdade</pre>
+
+<p>Repare em <code>std::ranges::to&lt;std::vector&gt;()</code>: você diz só "vetor", e o compilador descobre que é de <code>int</code>. Confirmado no g++ 15 com <code>-std=c++23</code>. Antes do C++23, a saída era um laço com <code>push_back</code>, ou criar o vetor a partir dos iteradores da view.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: ‘std::ranges’ has not been declared</code></strong>
+<pre class="term" data-cwd="~/cpp">$ g++ ordenar.cpp -o ordenar17
+ordenar.cpp: In function ‘int main()’:
+ordenar.cpp:8:10: error: ‘std::ranges’ has not been declared
+    8 |     std::ranges::sort(notas);
+      |          ^~~~~~
+ordenar.cpp:12:20: error: ‘std::ranges’ has not been declared
+   12 |     auto it = std::ranges::find(notas, 8);
+      |                    ^~~~~~
+ordenar.cpp:17:27: error: ‘std::ranges’ has not been declared
+   17 |     auto aprovados = std::ranges::count_if(notas, [](int n) { return n &gt;= 6; });
+      |                           ^~~~~~</pre>
+<p><strong>O que significa:</strong> "<code>std::ranges</code> não foi declarado". Sem <code>-std=</code>, o g++ 15 compila como C++17, que não tem ranges.</p>
+<p><strong>Como consertar:</strong> compile com <code>-std=c++20</code> ou, como no guia, <code>-std=c++23</code>. Para views, confira também o <code>#include &lt;ranges&gt;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: conversion from ‘std::ranges::filter_view&lt;…&gt;’ to non-scalar type ‘std::vector&lt;int&gt;’ requested</code></strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sem_to.cpp -o sem_to
+sem_to.cpp: In function ‘int main()’:
+sem_to.cpp:6:38: error: conversion from ‘std::ranges::filter_view&lt;std::ranges::ref_view&lt;std::vector&lt;int&gt; &gt;, main()::&lt;lambda(int)&gt; &gt;’ to non-scalar type ‘std::vector&lt;int&gt;’ requested
+    6 |     std::vector&lt;int&gt; pares = numeros | std::views::filter([](int n) { return n % 2 == 0; });
+      |                              ~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~</pre>
+<p><strong>O que significa:</strong> "pediu-se uma conversão de <code>filter_view</code> para <code>std::vector&lt;int&gt;</code>", e ela não existe. A view é uma janela, não um vetor. O tipo dela é esse nome enorme, e é por isso que se usa <code>auto</code>.</p>
+<p><strong>Como consertar:</strong> guarde a view em <code>auto</code>, ou acrescente <code>| std::ranges::to&lt;std::vector&gt;()</code> no fim.</p>
+</div>
+
+<div class="cenario">
+<strong>O programa nunca termina com <code>iota</code></strong>
+<p><strong>O que significa:</strong> <code>std::views::iota(1)</code> sem <code>take</code> (ou sem um <code>break</code> no <code>for</code>) gera números para sempre.</p>
+<p><strong>Como consertar:</strong> use <code>iota(a, b)</code> com fim, ou ponha <code>| std::views::take(n)</code> no pipeline. Se travar no terminal, aperte <kbd>Ctrl</kbd>+<kbd>C</kbd>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Cabeçalho</th><th>O que faz</th></tr>
+<tr><td><code>std::ranges::sort(v)</code></td><td><code>&lt;algorithm&gt;</code></td><td>Ordena o container inteiro</td></tr>
+<tr><td><code>std::ranges::sort(v, {}, &amp;T::campo)</code></td><td><code>&lt;algorithm&gt;</code></td><td>Ordena olhando um campo (projeção)</td></tr>
+<tr><td><code>std::ranges::find</code>, <code>count_if</code>, <code>max_element</code>, <code>reverse</code>…</td><td><code>&lt;algorithm&gt;</code></td><td>Os algoritmos clássicos, recebendo o container</td></tr>
+<tr><td><code>v | std::views::filter(pred)</code></td><td><code>&lt;ranges&gt;</code></td><td>Só os que passam</td></tr>
+<tr><td><code>v | std::views::transform(f)</code></td><td><code>&lt;ranges&gt;</code></td><td><code>f</code> aplicada em cada um</td></tr>
+<tr><td><code>v | std::views::take(n)</code></td><td><code>&lt;ranges&gt;</code></td><td>Os n primeiros</td></tr>
+<tr><td><code>v | std::views::reverse</code></td><td><code>&lt;ranges&gt;</code></td><td>De trás para frente</td></tr>
+<tr><td><code>std::views::iota(a, b)</code> / <code>iota(a)</code></td><td><code>&lt;ranges&gt;</code></td><td>a, a+1, …, b-1 / sem fim</td></tr>
+<tr><td><code>… | std::ranges::to&lt;std::vector&gt;()</code></td><td><code>&lt;ranges&gt;</code></td><td>Vira um vetor de verdade (C++23)</td></tr>
+</table>
+</div>
+<p>Há muitas outras views (<code>drop</code>, <code>take_while</code>, <code>split</code>, <code>join</code>, <code>enumerate</code>, <code>zip</code>…); elas estão em <a href="ref-algoritmos.html">Referência: Algoritmos</a>.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Forma curta</h3>
+<p>Complete para ordenar o vetor <code>v</code> com a forma de ranges:</p>
+<div class="ex-code">std::<input data-answer="ranges::sort" aria-label="algoritmo">(v);</div>
+</div>
+
+<div class="exercise">
+<h3>2. O cano</h3>
+<p>Qual símbolo liga uma view a outra?</p>
+<div class="ex-code">auto r = v <input data-answer="|" aria-label="símbolo"> std::views::take(2);</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. O que mostra <code>for (int n : std::views::iota(3, 7)) std::cout &lt;&lt; n &lt;&lt; ' ';</code>?</p>
+<label><input type="radio" name="q3"> <code>3 4 5 6 7</code></label>
+<label><input type="radio" name="q3"> <code>3 4 5 6</code></label>
+<label><input type="radio" name="q3"> <code>4 5 6</code></label>
+<label><input type="radio" name="q3"> <code>3 7</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Depois de <code>auto r = v | std::views::transform([](int n) { return n * 10; });</code>, o que aconteceu com <code>v</code>?</p>
+<label><input type="radio" name="q4"> Cada elemento foi multiplicado por 10</label>
+<label><input type="radio" name="q4"> <code>v</code> ficou vazio</label>
+<label><input type="radio" name="q4"> <code>v</code> foi copiado para <code>r</code></label>
+<label><input type="radio" name="q4"> Nada: a view só olha para <code>v</code>, e nem calculou nada ainda</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Com <code>v = {1, 2, 3, 4, 5, 6}</code>, o que dá <code>v | std::views::take(3) | std::views::filter([](int n) { return n % 2 == 0; })</code>?</p>
+<label><input type="radio" name="q5"> <code>2</code></label>
+<label><input type="radio" name="q5"> <code>2 4 6</code></label>
+<label><input type="radio" name="q5"> <code>1 2 3</code></label>
+<label><input type="radio" name="q5"> <code>2 4</code></label>
+</div>
+
+<h3>Missão: do clássico para ranges</h3>
+
+<div class="trycpp" data-goal="out:abacaxi banana kiwi pera uva,out:Curtas: 3,src:ranges::sort\(frutas\),src:ranges::count_if\(frutas">
+<p class="try-task"><strong>Missão:</strong> o programa funciona, mas usa a forma antiga. Reescreva as duas chamadas com <code>std::ranges::sort</code> e <code>std::ranges::count_if</code>, passando <code>frutas</code> direto (sem <code>begin</code>/<code>end</code>). A saída tem de continuar a mesma.</p>
+<pre class="script">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; frutas = {"uva", "banana", "pera", "abacaxi", "kiwi"};
+
+    std::sort(frutas.begin(), frutas.end());
+    auto curtas = std::count_if(frutas.begin(), frutas.end(), [](const std::string&amp; f) {
+        return f.size() &lt;= 4;
+    });
+
+    for (const auto&amp; f : frutas) std::cout &lt;&lt; f &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+    std::cout &lt;&lt; "Curtas: " &lt;&lt; curtas &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; frutas = {"uva", "banana", "pera", "abacaxi", "kiwi"};
+
+    std::ranges::sort(frutas);
+    auto curtas = std::ranges::count_if(frutas, [](const std::string&amp; f) {
+        return f.size() &lt;= 4;
+    });
+
+    for (const auto&amp; f : frutas) std::cout &lt;&lt; f &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+    std::cout &lt;&lt; "Curtas: " &lt;&lt; curtas &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<h3>Missão final: múltiplos de 7 ao quadrado</h3>
+
+<div class="trycpp" data-goal="out:49 196 441,src:views::iota,src:views::filter,src:views::transform">
+<p class="try-task"><strong>Missão:</strong> monte um pipeline que comece em <code>std::views::iota(1, 31)</code>, filtre os múltiplos de 7 (<code>n % 7 == 0</code>), eleve cada um ao quadrado e pegue os 3 primeiros. A saída deve ser <code>49 196 441</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;ranges&gt;
+
+int main() {
+    auto resultado = std::views::iota(1, 31);
+        // encaixe aqui o filter, o transform e o take
+
+    for (int n : resultado) std::cout &lt;&lt; n &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;ranges&gt;
+
+int main() {
+    auto resultado = std::views::iota(1, 31)
+        | std::views::filter([](int n) { return n % 7 == 0; })
+        | std::views::transform([](int n) { return n * n; })
+        | std::views::take(3);
+
+    for (int n : resultado) std::cout &lt;&lt; n &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<p>A solução, no laboratório:</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra setes.cpp -o setes
+$ ./setes
+49 196 441 </pre>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>std::ranges::sort(v)</code>, <code>std::ranges::find(v, x)</code> etc. recebem o container inteiro: menos digitação e sem misturar <code>begin</code>/<code>end</code> de vetores diferentes.</li>
+  <li>Projeção: <code>std::ranges::sort(turma, {}, &amp;Aluno::nota)</code> ordena por um campo.</li>
+  <li>Views (<code>&lt;ranges&gt;</code>) são janelas sobre os dados: não copiam e não mudam o original. As principais: <code>filter</code>, <code>transform</code>, <code>take</code>, <code>reverse</code>, <code>iota</code>.</li>
+  <li>O <code>|</code> encadeia views; leia da esquerda para a direita (ou de cima para baixo).</li>
+  <li>Views são preguiçosas: só calculam quando alguém pede, um elemento por vez, e podem parar cedo.</li>
+  <li><code>| std::ranges::to&lt;std::vector&gt;()</code> (C++23) transforma o resultado num vetor de verdade.</li>
+  <li>Ranges exigem <code>-std=c++20</code> ou mais; o guia usa <code>-std=c++23</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
