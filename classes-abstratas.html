@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Classes Abstratas — função virtual pura (= 0), interfaces e Forma → Circulo/Retangulo | Guia C++</title>
+<meta name="description" content="Classes abstratas em C++ para quem está começando: função virtual pura (= 0), por que não dá para criar um objeto de classe abstrata (com o erro real do g++), filhas que esquecem um método, interfaces em C++ e o exemplo Forma com Circulo e Retangulo calculando área.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Classes Abstratas</span></h1>
+
+<p class="intro">Qual é a área de uma "forma"? A pergunta não tem resposta: você só sabe calcular a área de um círculo, de um retângulo, de um triângulo. "Forma" é uma <strong>ideia</strong> que junta todos eles, não uma coisa que você desenha. Em C++, uma classe assim se chama <strong>abstrata</strong>: ela define o que todas as filhas precisam saber fazer, sem fazer ela mesma, e o compilador proíbe criar um objeto dela. Nesta aula você vai escrever a sua primeira, entender a mensagem de erro que aparece quando alguém tenta usá-la do jeito errado e ver como o C++ faz "interfaces".</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma <strong>função virtual pura</strong>: <code>virtual double area() const = 0;</code>.</li>
+  <li>Por que uma classe com função virtual pura é <strong>abstrata</strong> e não pode virar objeto.</li>
+  <li>O erro real <code>cannot declare variable … to be of abstract type</code> e como lê-lo.</li>
+  <li>O que acontece quando uma filha esquece de escrever um dos métodos.</li>
+  <li>Como montar o exemplo <code>Forma</code> → <code>Circulo</code> / <code>Retangulo</code> com <code>area()</code>.</li>
+  <li>O que é uma <strong>interface</strong> em C++ (uma classe só com virtuais puras) e quando usar cada uma.</li>
+</ul>
+</div>
+
+<p>Esta aula continua <a href="polimorfismo.html">Polimorfismo (virtual)</a>: você vai precisar de <code>virtual</code>, <code>override</code> e do destrutor virtual. Os programas foram compilados com o <strong>g++ 15</strong> na máquina da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: um formulário com campos obrigatórios</h2>
+<p>A Ana vai abrir uma conta no banco e recebe um formulário. Alguns campos vêm marcados com asterisco: <strong>obrigatórios</strong>. O formulário não tem as respostas; ele só diz <em>o que</em> precisa ser respondido. Ninguém entrega o formulário em branco, e o banco recusa um formulário com um campo obrigatório vazio.</p>
+
+<p>A classe abstrata é o formulário. As funções virtuais puras são os campos com asterisco. Cada classe filha é um formulário <strong>preenchido</strong>: só quando todos os campos obrigatórios têm resposta, o compilador aceita criar objetos dela.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Formulário</th><th>C++</th></tr>
+<tr><td>O formulário em branco</td><td>Classe abstrata (<code>Forma</code>)</td></tr>
+<tr><td>Campo obrigatório (*)</td><td>Função virtual pura (<code>area() = 0</code>)</td></tr>
+<tr><td>Formulário preenchido</td><td>Classe concreta (<code>Circulo</code>, <code>Retangulo</code>)</td></tr>
+<tr><td>Banco recusa formulário incompleto</td><td>Compilador recusa criar objeto de classe abstrata</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. A função virtual pura: <code>= 0</code></h2>
+<p>Na aula de polimorfismo, o <code>Animal</code> tinha um <code>falar()</code> "padrão" que imprimia <code>...</code>. Para a <code>Forma</code>, não existe um <code>area()</code> padrão que faça sentido (devolver zero seria mentir). Então, em vez de um corpo, escrevemos <code>= 0</code>:</p>
+
+<pre class="file" data-file="forma.h">class Forma {
+public:
+    virtual ~Forma() = default;
+    virtual double area() const = 0;          // virtual pura
+    virtual std::string nome() const = 0;     // virtual pura
+};
+</pre>
+
+<dl class="anatomy">
+  <dt>virtual</dt><dd>Como sempre: as filhas podem (aqui, <strong>devem</strong>) substituir o método, e a chamada segue o objeto de verdade.</dd>
+  <dt>double area() const</dt><dd>A assinatura que todas as filhas vão seguir: sem parâmetros, devolve <code>double</code>, não altera o objeto.</dd>
+  <dt>= 0</dt><dd>"Sem corpo aqui". Esse <code>= 0</code> não tem nada a ver com o número zero: é só a forma (estranha, herdada dos anos 1980) de escrever "virtual <strong>pura</strong>". Uma função virtual pura é uma obrigação: toda filha que quiser virar objeto precisa escrevê-la.</dd>
+  <dt>virtual ~Forma() = default;</dt><dd>O destrutor virtual, pelo mesmo motivo da aula anterior: as formas vão ser apagadas por ponteiros de <code>Forma</code>.</dd>
+</dl>
+
+<p>Uma classe com <strong>pelo menos uma</strong> função virtual pura é uma <strong>classe abstrata</strong>. Uma classe que não tem nenhuma (todas preenchidas) é uma <strong>classe concreta</strong>.</p>
+
+<hr>
+
+<h2>2. Não dá para criar um objeto abstrato</h2>
+<p>O que aconteceria se você criasse uma <code>Forma</code> e chamasse <code>area()</code>? Não há código para rodar. Por isso, o compilador nem deixa chegar lá:</p>
+
+<pre class="file" data-file="abs1.cpp">#include &lt;string&gt;
+
+class Forma {
+public:
+    virtual ~Forma() = default;
+    virtual double area() const = 0;
+    virtual std::string nome() const = 0;
+};
+
+int main() {
+    Forma f;
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra abs1.cpp -o abs1
+abs1.cpp: In function ‘int main()’:
+abs1.cpp:11:11: error: cannot declare variable ‘f’ to be of abstract type ‘Forma’
+   11 |     Forma f;
+      |           ^
+abs1.cpp:3:7: note:   because the following virtual functions are pure within ‘Forma’:
+    3 | class Forma {
+      |       ^~~~~
+abs1.cpp:6:20: note:     ‘virtual double Forma::area() const’
+    6 |     virtual double area() const = 0;
+      |                    ^~~~
+abs1.cpp:7:25: note:     ‘virtual std::string Forma::nome() const’
+    7 |     virtual std::string nome() const = 0;
+      |                         ^~~~</pre>
+
+<dl class="anatomy">
+  <dt>error: cannot declare variable ‘f’ to be of abstract type ‘Forma’</dt><dd>"Não é possível declarar a variável <code>f</code> com o tipo abstrato <code>Forma</code>".</dd>
+  <dt>note: because the following virtual functions are pure within ‘Forma’:</dt><dd>"Porque as seguintes funções virtuais são puras dentro de <code>Forma</code>:". O g++ lista, uma por nota, os campos obrigatórios que ninguém preencheu.</dd>
+  <dt>‘virtual double Forma::area() const’ / ‘virtual std::string Forma::nome() const’</dt><dd>As duas que faltam, com a linha de cada uma.</dd>
+</dl>
+
+<p>O Clang do editor diz a mesma coisa assim: <code>variable type 'Forma' is an abstract class</code>, com notas <code>unimplemented pure virtual method 'area' in 'Forma'</code>. Com <code>new Forma</code>, a mensagem muda um pouco: <code>invalid new-expression of abstract class type ‘Forma’</code> (Clang: <code>allocating an object of abstract class type 'Forma'</code>).</p>
+
+<div class="note">
+<strong>O que <em>pode</em> ser do tipo <code>Forma</code></strong>
+<p>Objetos, não. Mas <strong>referências</strong> e <strong>ponteiros</strong> para <code>Forma</code>, sim: <code>const Forma&amp;</code>, <code>Forma*</code>, <code>std::unique_ptr&lt;Forma&gt;</code>. Eles apontam para um círculo ou retângulo de verdade, e é assim que a classe abstrata é usada: como o tipo "qualquer forma" nas funções e nas listas.</p>
+</div>
+
+<div class="trycpp" data-goal="erro:/abstract/">
+<p class="try-task"><strong>Missão (provoque o erro):</strong> o programa compila e roda. Acrescente no <code>main</code> a linha <code>Forma f;</code> e rode: a compilação deve falhar dizendo que <code>Forma</code> é abstrata. Leia as notas: quais funções o compilador lista? Depois apague o <code>= 0</code> de uma delas (e dê um corpo, como <code>{ return 0; }</code>) e veja a lista diminuir.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Forma {
+public:
+    virtual ~Forma() = default;
+    virtual double area() const = 0;
+    virtual std::string nome() const = 0;
+};
+
+int main() {
+    std::cout &lt;&lt; "Compilou!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Forma {
+public:
+    virtual ~Forma() = default;
+    virtual double area() const = 0;
+    virtual std::string nome() const = 0;
+};
+
+int main() {
+    Forma f;
+    std::cout &lt;&lt; "Compilou!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. As filhas preenchem o formulário: <code>Circulo</code> e <code>Retangulo</code></h2>
+
+<pre class="file" data-file="formas.cpp">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;numbers&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class Forma {
+public:
+    virtual ~Forma() = default;
+    virtual double area() const = 0;          // virtual pura
+    virtual std::string nome() const = 0;     // virtual pura
+    void descrever() const {
+        std::cout &lt;&lt; nome() &lt;&lt; " com área " &lt;&lt; area() &lt;&lt; '\n';
+    }
+};
+
+class Circulo : public Forma {
+public:
+    Circulo(double raio) : raio_{raio} {}
+    double area() const override { return std::numbers::pi * raio_ * raio_; }
+    std::string nome() const override { return "Círculo"; }
+private:
+    double raio_;
+};
+
+class Retangulo : public Forma {
+public:
+    Retangulo(double largura, double altura) : largura_{largura}, altura_{altura} {}
+    double area() const override { return largura_ * altura_; }
+    std::string nome() const override { return "Retângulo"; }
+private:
+    double largura_;
+    double altura_;
+};
+
+int main() {
+    std::vector&lt;std::unique_ptr&lt;Forma&gt;&gt; desenho;
+    desenho.push_back(std::make_unique&lt;Circulo&gt;(1.0));
+    desenho.push_back(std::make_unique&lt;Retangulo&gt;(3.0, 2.0));
+    desenho.push_back(std::make_unique&lt;Circulo&gt;(2.0));
+
+    double total = 0;
+    for (const auto&amp; f : desenho) {
+        f-&gt;descrever();
+        total += f-&gt;area();
+    }
+    std::cout &lt;&lt; "Área total: " &lt;&lt; total &lt;&lt; '\n';
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>void descrever() const</code> na <code>Forma</code></td><td>Uma classe abstrata pode ter métodos <strong>comuns</strong>, com corpo. Este usa <code>nome()</code> e <code>area()</code> sem saber como eles serão feitos: na hora de rodar, cada objeto entrega a sua versão.</td></tr>
+<tr><td><code>std::numbers::pi</code></td><td>O π que vem no cabeçalho <code>&lt;numbers&gt;</code> <span class="versao">C++20</span> (aula <a href="matematica.html">Matemática</a>).</td></tr>
+<tr><td><code>double area() const override</code></td><td>Preenche o campo obrigatório. O <code>override</code> confere se a assinatura bate com a da <code>Forma</code>.</td></tr>
+<tr><td><code>std::vector&lt;std::unique_ptr&lt;Forma&gt;&gt;</code></td><td>Uma lista de "qualquer forma", como o pet shop da aula anterior.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra formas.cpp -o formas
+$ ./formas
+Círculo com área 3.14159          « π × 1 × 1
+Retângulo com área 6              « 3 × 2
+Círculo com área 12.5664          « π × 2 × 2
+Área total: 21.708</pre>
+
+<p>O <code>descrever()</code> foi escrito <strong>uma vez</strong>, na <code>Forma</code>, e funcionou para todas as formas. É um padrão muito comum: a classe abstrata escreve o "roteiro" e deixa os detalhes para as filhas.</p>
+
+<h3>Quando a filha esquece um campo</h3>
+<p>Se uma classe filha não escrever <strong>todas</strong> as virtuais puras, ela herda o "buraco" e continua abstrata. Veja um <code>Quadrado</code> que só escreveu <code>area()</code>:</p>
+
+<pre class="file" data-file="abs2.cpp">class Quadrado : public Forma {
+public:
+    Quadrado(double lado) : lado_{lado} {}
+    double area() const override { return lado_ * lado_; }
+private:
+    double lado_;
+};
+
+int main() {
+    Quadrado q{2.0};
+    return q.area() &gt; 0 ? 0 : 1;
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra abs2.cpp -o abs2
+abs2.cpp: In function ‘int main()’:
+abs2.cpp:19:14: error: cannot declare variable ‘q’ to be of abstract type ‘Quadrado’
+   19 |     Quadrado q{2.0};
+      |              ^
+abs2.cpp:10:7: note:   because the following virtual functions are pure within ‘Quadrado’:
+   10 | class Quadrado : public Forma {
+      |       ^~~~~~~~
+abs2.cpp:7:25: note:     ‘virtual std::string Forma::nome() const’
+    7 |     virtual std::string nome() const = 0;
+      |                         ^~~~</pre>
+
+<p>Repare que o erro aparece na linha que <strong>cria</strong> o <code>Quadrado</code> (19), não na classe. E a nota diz exatamente o que falta: <code>nome()</code>. Esse é o grande serviço da classe abstrata: é impossível esquecer um método obrigatório e só descobrir quando o programa estiver rodando.</p>
+
+<hr>
+
+<h2>4. Interfaces: classes só com virtuais puras</h2>
+<p>Em linguagens como Java e C#, existe a palavra <code>interface</code>. O C++ não tem essa palavra, mas tem a mesma ideia: uma classe que tem <strong>apenas</strong> funções virtuais puras (mais o destrutor virtual), sem atributos. Ela é um contrato puro: "quem herdar de mim sabe fazer isto".</p>
+
+<p>A vantagem aparece quando classes que <strong>não têm nada a ver</strong> umas com as outras precisam de uma habilidade em comum. Na lojinha da Ana, produtos e clientes não são parentes, mas os dois sabem se imprimir:</p>
+
+<pre class="file" data-file="interface.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+// Interface: só funções virtuais puras (e o destrutor virtual)
+class Imprimivel {
+public:
+    virtual ~Imprimivel() = default;
+    virtual void imprimir() const = 0;
+};
+
+class Produto : public Imprimivel {
+public:
+    Produto(std::string nome, double preco) : nome_{nome}, preco_{preco} {}
+    void imprimir() const override {
+        std::cout &lt;&lt; "Produto: " &lt;&lt; nome_ &lt;&lt; " (R$ " &lt;&lt; preco_ &lt;&lt; ")\n";
+    }
+private:
+    std::string nome_;
+    double preco_;
+};
+
+class Cliente : public Imprimivel {
+public:
+    Cliente(std::string nome) : nome_{nome} {}
+    void imprimir() const override {
+        std::cout &lt;&lt; "Cliente: " &lt;&lt; nome_ &lt;&lt; '\n';
+    }
+private:
+    std::string nome_;
+};
+
+void imprimir_tudo(const std::vector&lt;const Imprimivel*&gt;&amp; itens) {
+    for (const Imprimivel* item : itens) {
+        item-&gt;imprimir();
+    }
+}
+
+int main() {
+    Produto caderno{"Caderno", 12.9};
+    Cliente bia{"Bia"};
+    Produto lapis{"Lápis", 1.5};
+
+    imprimir_tudo({&amp;caderno, &amp;bia, &amp;lapis});
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra interface.cpp -o interface
+$ ./interface
+Produto: Caderno (R$ 12.9)
+Cliente: Bia
+Produto: Lápis (R$ 1.5)</pre>
+
+<p>A função <code>imprimir_tudo</code> não sabe o que é um produto nem um cliente: só sabe que todos são <code>Imprimivel</code>. Aqui a lista guarda ponteiros comuns (<code>const Imprimivel*</code>), porque os objetos já vivem no <code>main</code> e a lista só os <strong>empresta</strong>: ninguém precisa apagá-los. O <code>&amp;caderno</code> é o endereço do caderno (aula <a href="ponteiros.html">Ponteiros</a>).</p>
+
+<p>Uma classe pode herdar de uma classe base <strong>e</strong> de várias interfaces ao mesmo tempo: <code>class Livro : public Produto, public Imprimivel, public Comparavel</code>. Esse é o uso mais tranquilo da herança múltipla.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Classe abstrata</th><th>Interface</th></tr>
+<tr><td>Virtuais puras</td><td>Pelo menos uma</td><td>Todas (menos o destrutor)</td></tr>
+<tr><td>Métodos com corpo</td><td>Pode ter (como <code>descrever()</code>)</td><td>Não tem</td></tr>
+<tr><td>Atributos</td><td>Pode ter</td><td>Não tem</td></tr>
+<tr><td>Ideia</td><td>"Uma família de coisas parecidas" (<code>Forma</code>)</td><td>"Uma habilidade" (<code>Imprimivel</code>, <code>Comparavel</code>)</td></tr>
+<tr><td>Quando usar</td><td>As filhas dividem dados e parte do comportamento</td><td>Classes sem parentesco precisam de um contrato comum</td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>Nomes de interface</strong>
+<p>É costume dar a uma interface um nome de <strong>habilidade</strong>, terminando em "-ável"/"-ível": <code>Imprimivel</code>, <code>Desenhavel</code>, <code>Comparavel</code>, <code>Salvavel</code>. Ajuda a ler <code>class Produto : public Imprimivel</code> como "produto é imprimível".</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"cannot declare variable ‘f’ to be of abstract type ‘Forma’"</strong>
+<p><strong>O que significa:</strong> você tentou criar um objeto de uma classe abstrata. Também aparece em lugares menos óbvios: um parâmetro <strong>por valor</strong> (<code>void f(Forma x)</code>) ou um <code>std::vector&lt;Forma&gt;</code>, que precisariam criar objetos <code>Forma</code>.</p>
+<p><strong>Como consertar:</strong> crie um objeto de uma classe filha concreta (<code>Circulo c{1.0};</code>). Para "qualquer forma", use <code>const Forma&amp;</code>, <code>Forma*</code> ou <code>std::unique_ptr&lt;Forma&gt;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A filha também é abstrata: "pure within ‘Quadrado’"</strong>
+<p><strong>O que significa:</strong> a filha não escreveu todas as virtuais puras. As notas listam as que faltam, com o nome da classe onde foram declaradas (<code>Forma::nome()</code>).</p>
+<p><strong>Como consertar:</strong> escreva cada método listado na filha, com a mesma assinatura e <code>override</code>. Se a assinatura estiver diferente (um <code>const</code> a menos), o <code>override</code> vai apontar o erro.</p>
+</div>
+
+<div class="cenario">
+<strong>"invalid new-expression of abstract class type ‘Forma’"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra abs3.cpp -o abs3
+abs3.cpp: In function ‘int main()’:
+abs3.cpp:8:20: error: invalid new-expression of abstract class type ‘Forma’
+    8 |     Forma* p = new Forma;
+      |                    ^~~~~
+abs3.cpp:1:7: note:   because the following virtual functions are pure within ‘Forma’:
+    1 | class Forma {
+      |       ^~~~~
+abs3.cpp:4:20: note:     ‘virtual double Forma::area() const’
+    4 |     virtual double area() const = 0;
+      |                    ^~~~</pre>
+<p><strong>O que significa:</strong> "expressão <code>new</code> inválida para o tipo abstrato <code>Forma</code>". O ponteiro <code>Forma*</code> está certo; o <code>new Forma</code>, não.</p>
+<p><strong>Como consertar:</strong> <code>Forma* p = new Circulo{1.0};</code>, ou, melhor, <code>std::unique_ptr&lt;Forma&gt; p = std::make_unique&lt;Circulo&gt;(1.0);</code>.</p>
+</div>
+
+<hr>
+
+<h2>Missão</h2>
+
+<div class="trycpp" data-goal="out:Triângulo com área 6,src:class\s+Triangulo\s*:\s*public\s+Forma">
+<p class="try-task"><strong>Missão:</strong> crie a classe <code>Triangulo</code>, filha de <code>Forma</code>, com base e altura. A área é <code>base * altura / 2</code> e o nome é <code>Triângulo</code>. Depois tire as barras <code>//</code> da linha que acrescenta um triângulo de base 4 e altura 3 ao desenho. A saída deve ter <code>Triângulo com área 6</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class Forma {
+public:
+    virtual ~Forma() = default;
+    virtual double area() const = 0;
+    virtual std::string nome() const = 0;
+    void descrever() const {
+        std::cout &lt;&lt; nome() &lt;&lt; " com área " &lt;&lt; area() &lt;&lt; '\n';
+    }
+};
+
+class Retangulo : public Forma {
+public:
+    Retangulo(double largura, double altura) : largura_{largura}, altura_{altura} {}
+    double area() const override { return largura_ * altura_; }
+    std::string nome() const override { return "Retângulo"; }
+private:
+    double largura_;
+    double altura_;
+};
+
+// escreva a classe Triangulo aqui
+
+int main() {
+    std::vector&lt;std::unique_ptr&lt;Forma&gt;&gt; desenho;
+    desenho.push_back(std::make_unique&lt;Retangulo&gt;(3.0, 2.0));
+    // desenho.push_back(std::make_unique&lt;Triangulo&gt;(4.0, 3.0));
+
+    for (const auto&amp; f : desenho) {
+        f-&gt;descrever();
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+class Forma {
+public:
+    virtual ~Forma() = default;
+    virtual double area() const = 0;
+    virtual std::string nome() const = 0;
+    void descrever() const {
+        std::cout &lt;&lt; nome() &lt;&lt; " com área " &lt;&lt; area() &lt;&lt; '\n';
+    }
+};
+
+class Retangulo : public Forma {
+public:
+    Retangulo(double largura, double altura) : largura_{largura}, altura_{altura} {}
+    double area() const override { return largura_ * altura_; }
+    std::string nome() const override { return "Retângulo"; }
+private:
+    double largura_;
+    double altura_;
+};
+
+class Triangulo : public Forma {
+public:
+    Triangulo(double base, double altura) : base_{base}, altura_{altura} {}
+    double area() const override { return base_ * altura_ / 2; }
+    std::string nome() const override { return "Triângulo"; }
+private:
+    double base_;
+    double altura_;
+};
+
+int main() {
+    std::vector&lt;std::unique_ptr&lt;Forma&gt;&gt; desenho;
+    desenho.push_back(std::make_unique&lt;Retangulo&gt;(3.0, 2.0));
+    desenho.push_back(std::make_unique&lt;Triangulo&gt;(4.0, 3.0));
+
+    for (const auto&amp; f : desenho) {
+        f-&gt;descrever();
+    }
+}
+</pre>
+</div>
+
+<p>A saída da solução no laboratório:</p>
+<pre class="term" data-cwd="~/cpp">$ ./triangulo
+Retângulo com área 6
+Triângulo com área 6</pre>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>O que faz</th></tr>
+<tr><td><code>virtual double area() const = 0;</code></td><td>Função virtual pura: obrigação para as filhas</td></tr>
+<tr><td>Classe com ≥ 1 virtual pura</td><td>Abstrata: não pode virar objeto</td></tr>
+<tr><td><code>double area() const override { … }</code></td><td>A filha preenche a obrigação</td></tr>
+<tr><td>Filha que não preencheu todas</td><td>Também é abstrata</td></tr>
+<tr><td><code>const Forma&amp;</code>, <code>Forma*</code>, <code>std::unique_ptr&lt;Forma&gt;</code></td><td>Permitidos: apontam para objetos das filhas</td></tr>
+<tr><td><code>Forma f;</code>, <code>new Forma</code>, <code>void g(Forma f)</code>, <code>std::vector&lt;Forma&gt;</code></td><td>Proibidos: criariam objetos abstratos</td></tr>
+<tr><td><code>virtual ~Forma() = default;</code></td><td>Sempre, em classe abstrata e em interface</td></tr>
+<tr><td>Interface</td><td>Classe só com virtuais puras e destrutor virtual</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Virtual pura</h3>
+<p>Complete para <code>perimetro()</code> ser uma função virtual pura da <code>Forma</code>:</p>
+<div class="ex-code">virtual double perimetro() const <input data-answer="= 0;|=0;|= 0|=0" aria-label="final da declaração"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Concreta ou abstrata?</h3>
+<p>A <code>Forma</code> tem <code>area()</code> e <code>nome()</code> virtuais puras. A classe <code>Losango</code> herda de <code>Forma</code> e só escreveu <code>area()</code>. Ela é concreta ou abstrata?</p>
+<div class="ex-code"><input data-answer="abstrata|Abstrata" aria-label="resposta"></div>
+</div>
+
+<div class="exercise">
+<h3>3. O tipo da lista</h3>
+<p>Complete o tipo de um vetor que guarda formas diferentes e apaga cada uma sozinho:</p>
+<div class="ex-code">std::vector&lt;<input data-answer="std::unique_ptr&lt;Forma&gt;|std::unique_ptr&lt;Forma &gt;|std::shared_ptr&lt;Forma&gt;" aria-label="tipo">&gt; desenho;</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Qual destas linhas compila, sendo <code>Forma</code> abstrata e <code>Circulo</code> concreta?</p>
+<label><input type="radio" name="q4"> <code>Forma f;</code></label>
+<label><input type="radio" name="q4"> <code>Forma* p = new Forma;</code></label>
+<label><input type="radio" name="q4"> <code>const Forma&amp; r = circulo;</code></label>
+<label><input type="radio" name="q4"> <code>std::vector&lt;Forma&gt; v;</code> seguido de <code>v.push_back(circulo);</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. O que é uma interface em C++?</p>
+<label><input type="radio" name="q5"> Uma classe que só tem funções virtuais puras (e o destrutor virtual), sem atributos.</label>
+<label><input type="radio" name="q5"> Uma classe declarada com a palavra <code>interface</code>.</label>
+<label><input type="radio" name="q5"> Qualquer classe com construtor.</label>
+<label><input type="radio" name="q5"> Uma classe marcada com <code>final</code>.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">6. Em <code>virtual double area() const = 0;</code>, o que significa o <code>= 0</code>?</p>
+<label><input type="radio" name="q6"> Que a área começa valendo zero.</label>
+<label><input type="radio" name="q6"> Que a função não tem corpo aqui e as filhas são obrigadas a escrevê-la.</label>
+<label><input type="radio" name="q6"> Que a função devolve zero se a filha não a substituir.</label>
+<label><input type="radio" name="q6"> Que a função não pode ser chamada.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>virtual … = 0;</code> é uma <strong>função virtual pura</strong>: não tem corpo na base e é obrigatória nas filhas.</li>
+  <li>Uma classe com ao menos uma virtual pura é <strong>abstrata</strong>: <code>Forma f;</code> dá <code>cannot declare variable ‘f’ to be of abstract type ‘Forma’</code>, e as notas listam o que falta.</li>
+  <li>A filha só vira <strong>concreta</strong> quando escreve todas as virtuais puras; senão, continua abstrata.</li>
+  <li>Use a classe abstrata por referência, ponteiro ou <code>std::unique_ptr</code>; nunca por valor.</li>
+  <li>Classes abstratas podem ter atributos e métodos comuns (como <code>descrever()</code>), que usam as virtuais puras.</li>
+  <li><strong>Interface</strong> = classe só com virtuais puras; serve para dar uma habilidade comum a classes sem parentesco.</li>
+  <li>Sempre <code>virtual ~Base() = default;</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
