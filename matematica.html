@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Matemática — cmath: sqrt, pow, abs, round e pi | Guia C++</title>
+<meta name="description" content="As funções de matemática do C++ para quem nunca programou: sqrt, pow, std::abs, round, floor, ceil, trunc, max e min, std::numbers::pi, hypot e o nan de sqrt(-1), com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Matemática (cmath)</span></h1>
+
+<p class="intro">Os operadores <code>+ - * / %</code> fazem as contas básicas. Mas e a raiz quadrada? E "2 elevado a 10"? E arredondar a média da Ana? Para isso, o C++ traz uma <strong>caixa de ferramentas de matemática</strong> pronta, a biblioteca <code>&lt;cmath&gt;</code>. Nesta aula você vai usar as funções mais comuns dela, uma de cada vez, e ver o que acontece quando a conta não tem resposta, como a raiz de um número negativo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é <code>&lt;cmath&gt;</code> e como chamar uma função de matemática.</li>
+  <li>Raiz e potência: <code>std::sqrt</code>, <code>std::pow</code> (e <code>std::cbrt</code>, a raiz cúbica).</li>
+  <li>Valor absoluto com <code>std::abs</code>, e a armadilha do <code>abs</code> sem <code>std::</code>, que corta o <code>2.75</code> para <code>2</code>.</li>
+  <li>As quatro formas de arredondar: <code>round</code>, <code>floor</code>, <code>ceil</code> e <code>trunc</code>.</li>
+  <li>Maior e menor com <code>std::max</code> e <code>std::min</code> (de <code>&lt;algorithm&gt;</code>).</li>
+  <li>O número π pronto: <code>std::numbers::pi</code> <span class="versao">C++20</span>.</li>
+  <li>A distância entre dois pontos com <code>std::hypot</code>.</li>
+  <li>O que são <code>nan</code> e <code>inf</code>, e por que <code>sqrt(-1)</code> não trava o programa.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), com o comando padrão do guia, <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code> (explicado em <a href="compilar.html">Compilar com g++</a>). Você pode repetir cada um no editor do guia, que compila C++ de verdade no navegador.</p>
+
+<hr>
+
+<h2>A ideia: a calculadora científica</h2>
+<p>Lembra da calculadora da escola? A simples tem só <code>+ − × ÷</code>. A <strong>científica</strong> tem botões a mais: <code>√</code>, <code>x²</code>, <code>|x|</code>, <code>π</code>. Os operadores do C++ (aula <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>) são a calculadora simples. A <code>&lt;cmath&gt;</code> é a fileira de botões científicos.</p>
+
+<p>Cada "botão" é uma <strong>função</strong>: um pedaço de código pronto, com um nome, que recebe valores entre parênteses e <strong>devolve</strong> um resultado. Você vai aprender a criar as suas em <a href="funcoes.html">Funções</a>; por enquanto, basta saber <strong>chamar</strong> as que já existem:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na calculadora</th><th>Em C++</th><th>Resultado</th></tr>
+<tr><td>√25</td><td><code>std::sqrt(25)</code></td><td><code>5</code></td></tr>
+<tr><td>2¹⁰</td><td><code>std::pow(2, 10)</code></td><td><code>1024</code></td></tr>
+<tr><td>|−7|</td><td><code>std::abs(-7)</code></td><td><code>7</code></td></tr>
+<tr><td>π</td><td><code>std::numbers::pi</code></td><td><code>3.14159</code>…</td></tr>
+</table>
+</div>
+
+<p>O nome <code>cmath</code> quer dizer "<em>C math</em>", a matemática que veio da linguagem C. O <code>c</code> no começo marca as bibliotecas herdadas do C (como <code>&lt;cstdlib&gt;</code> e <code>&lt;cstdio&gt;</code>).</p>
+
+<hr>
+
+<h2>1. Raiz e potência: <code>sqrt</code> e <code>pow</code></h2>
+<p>Para usar as funções, inclua <code>&lt;cmath&gt;</code> no topo do arquivo, ao lado do <code>&lt;iostream&gt;</code>:</p>
+
+<pre class="file" data-file="raiz.cpp">#include &lt;iostream&gt;
+#include &lt;cmath&gt;
+
+int main() {
+    std::cout &lt;&lt; std::sqrt(25) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::sqrt(2) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::pow(2, 10) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::pow(1.5, 2) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::pow(27, 1.0 / 3) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::cbrt(27) &lt;&lt; "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;cmath&gt;</dt><dd>Traz as funções de matemática para o seu programa. Sem essa linha, o compilador não conhece <code>std::sqrt</code> (o erro está em "Quando dá errado").</dd>
+  <dt>std::</dt><dd>O "sobrenome" das coisas da biblioteca padrão (<em>standard</em>). <code>std::sqrt</code> = "o <code>sqrt</code> da biblioteca padrão". A aula <a href="namespaces.html">Namespaces</a> explica o porquê.</dd>
+  <dt>sqrt(25)</dt><dd><em>square root</em>, raiz quadrada. O valor entre parênteses é o <strong>argumento</strong>: o número de que você quer a raiz.</dd>
+  <dt>pow(2, 10)</dt><dd><em>power</em>, potência: a <strong>base</strong> (2) elevada ao <strong>expoente</strong> (10). Dois argumentos, separados por vírgula. Em C++ <strong>não existe</strong> operador <code>^</code> de potência: <code>2 ^ 10</code> compila, mas é outra coisa (uma operação de bits) e dá <code>8</code>. O g++ 15 desconfia e avisa: <code>warning: result of ‘2^10’ is 8; did you mean ‘1 &lt;&lt; 10’ (1024)? [-Wxor-used-as-pow]</code>.</dd>
+  <dt>pow(27, 1.0 / 3)</dt><dd>Elevar a 1/3 é tirar a raiz cúbica. Repare no <code>1.0</code>: com <code>1 / 3</code>, a divisão de inteiros daria <code>0</code> (aula <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>).</dd>
+  <dt>cbrt(27)</dt><dd><em>cube root</em>, raiz cúbica, direto.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/mat">$ g++ -std=c++23 -Wall -Wextra raiz.cpp -o raiz
+$ ./raiz
+5
+1.41421                  « √2 tem infinitas casas; o cout mostra 6 algarismos
+1024
+2.25
+3
+3</pre>
+
+<p>Duas coisas para reparar:</p>
+<ul>
+  <li><strong>O resultado é <code>double</code></strong> (número com vírgula, aula <a href="ponto-flutuante.html">float e double</a>), mesmo quando a conta dá "redondo". <code>std::sqrt(25)</code> devolve <code>5.0</code>; o <code>cout</code> só esconde o <code>.0</code>.</li>
+  <li><strong>O <code>cout</code> mostra no máximo 6 algarismos</strong>. Por isso <code>√2</code> virou <code>1.41421</code>. Números grandes viram notação científica: <code>std::pow(2, 30)</code> aparece como <code>1.07374e+09</code> (1,07374 × 10⁹). Para escolher quantas casas mostrar, veja <a href="iomanip.html">Formatar com iomanip</a> e <a href="format-print.html">std::format e std::print</a>.</li>
+</ul>
+
+<div class="tip">
+<strong>E o <code>-lm</code>?</strong>
+<p>Em tutoriais da linguagem C, você vai ver <code>gcc programa.c -lm</code>: o <code>-lm</code> manda "ligar" a biblioteca de matemática (<code>libm</code>). <strong>Em C++ ele não é necessário</strong>: o <code>g++</code> sempre liga a biblioteca do C++ (<code>libstdc++</code>), que já depende da <code>libm</code>. O <code>ldd</code> (que lista as bibliotecas de um programa) mostra que ela entrou sozinha:</p>
+<pre class="term" data-cwd="~/mat">$ ldd ./raiz
+	linux-vdso.so.1 (0x00007ae3a075e000)
+	libstdc++.so.6 =&gt; /usr/lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007ae3a0400000)
+	libm.so.6 =&gt; /usr/lib/x86_64-linux-gnu/libm.so.6 (0x00007ae3a02da000)     « aqui
+	libc.so.6 =&gt; /usr/lib/x86_64-linux-gnu/libc.so.6 (0x00007ae3a0000000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007ae3a0760000)
+	libgcc_s.so.1 =&gt; /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007ae3a0708000)</pre>
+<p>Os números entre parênteses são endereços de memória e mudam a cada execução.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Raiz de 144: 12,out:3 elevado a 4: 81,src:sqrt,src:pow">
+<p class="try-task"><strong>Missão:</strong> complete as duas linhas para mostrar a raiz quadrada de <code>144</code> e <code>3</code> elevado a <code>4</code>. A saída deve ser <code>12</code> e <code>81</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;cmath&gt;
+
+int main() {
+    std::cout &lt;&lt; "Raiz de 144: " &lt;&lt; 0 &lt;&lt; "\n";
+    std::cout &lt;&lt; "3 elevado a 4: " &lt;&lt; 0 &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;cmath&gt;
+
+int main() {
+    std::cout &lt;&lt; "Raiz de 144: " &lt;&lt; std::sqrt(144) &lt;&lt; "\n";
+    std::cout &lt;&lt; "3 elevado a 4: " &lt;&lt; std::pow(3, 4) &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Valor absoluto: <code>std::abs</code></h2>
+<p>O <strong>valor absoluto</strong> é o número "sem o sinal": a distância até o zero. |−7| = 7 e |7| = 7. Serve, por exemplo, para saber de quanto é uma dívida sem se preocupar se o saldo está negativo.</p>
+
+<pre class="file" data-file="abs.cpp">#include &lt;iostream&gt;
+#include &lt;cmath&gt;
+
+int main() {
+    std::cout &lt;&lt; std::abs(-7) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::abs(-2.5) &lt;&lt; "\n";
+    std::cout &lt;&lt; abs(-2.5) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/mat">$ g++ -std=c++23 -Wall -Wextra abs.cpp -o abs
+$ ./abs
+7
+2.5
+2                        « abs sem std:: cortou o .5, e o g++ não avisou nada!</pre>
+
+<p>As duas primeiras linhas estão certas. A terceira mostrou <code>2</code> em vez de <code>2.5</code>, e o compilador ficou calado mesmo com <code>-Wall -Wextra</code>. O que aconteceu?</p>
+
+<ul>
+  <li>O <code>std::abs</code> do C++ tem uma versão para cada tipo de número: uma para <code>int</code>, uma para <code>double</code>, uma para <code>long</code>… O compilador escolhe a certa olhando o argumento. Isso se chama <strong>sobrecarga</strong> (aula <a href="sobrecarga.html">Sobrecarga de Funções</a>).</li>
+  <li>O <code>abs</code> <strong>sem</strong> <code>std::</code> é o antigo da linguagem C, que só conhece <code>int</code>. O <code>-2.5</code> foi convertido para <code>int</code> (virou <code>-2</code>, perdendo o <code>.5</code>) antes do cálculo.</li>
+</ul>
+
+<p>Só a opção <code>-Wconversion</code> (que não faz parte de <code>-Wall -Wextra</code>, aula <a href="avisos.html">Avisos</a>) denuncia a perda:</p>
+
+<pre class="term" data-cwd="~/mat">$ g++ -std=c++23 -Wall -Wextra -Wconversion abs.cpp -o abs
+abs.cpp: In function ‘int main()’:
+abs.cpp:7:22: warning: conversion from ‘double’ to ‘int’ changes value from ‘-2.5e+0’ to ‘-2’ [-Wfloat-conversion]
+    7 |     std::cout &lt;&lt; abs(-2.5) &lt;&lt; "\n";
+      |                      ^~~~</pre>
+
+<p>Tradução: "conversão de <code>double</code> para <code>int</code> muda o valor de −2,5 para −2". No editor do guia, que usa o <strong>Clang</strong>, o aviso aparece mesmo sem <code>-Wconversion</code>, e ainda sugere a correção:</p>
+
+<pre class="term" data-cwd="~/mat">$ clang++ -std=c++23 -Wall -Wextra abs.cpp -o abs
+abs.cpp:7:18: warning: using integer absolute value function 'abs' when argument is of floating point type [-Wabsolute-value]
+    7 |     std::cout &lt;&lt; abs(-2.5) &lt;&lt; "\n";
+      |                  ^
+abs.cpp:7:18: note: use function 'std::abs' instead
+    7 |     std::cout &lt;&lt; abs(-2.5) &lt;&lt; "\n";
+      |                  ^~~
+      |                  std::abs
+abs.cpp:7:22: warning: implicit conversion from 'double' to 'int' changes value from -2.5 to -2 [-Wliteral-conversion]
+    7 |     std::cout &lt;&lt; abs(-2.5) &lt;&lt; "\n";
+      |                  ~~~ ^~~~
+2 warnings generated.</pre>
+
+<div class="warning">
+<strong>Regra prática: sempre <code>std::abs</code></strong>
+<p>Com <code>std::</code>, o resultado é certo para qualquer tipo. Sem ele, o resultado depende de qual cabeçalho você incluiu: no laboratório, com <code>&lt;cmath&gt;</code> ou <code>&lt;cstdlib&gt;</code>, <code>abs(-2.75)</code> deu <code>2</code>; com o antigo <code>&lt;stdlib.h&gt;</code>, deu <code>2.75</code>. Programa que muda de resposta conforme o <code>#include</code> é armadilha. Você também vai ver <code>fabs</code> (o "<code>abs</code> para <code>double</code>" do C) em código antigo; em C++, <code>std::abs</code> já resolve.</p>
+</div>
+
+<hr>
+
+<h2>3. Arredondar: <code>round</code>, <code>floor</code>, <code>ceil</code> e <code>trunc</code></h2>
+<p>Existem quatro jeitos de transformar <code>2.7</code> num número inteiro, e cada um serve para uma situação:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Nome em inglês</th><th>O que faz</th></tr>
+<tr><td><code>std::round</code></td><td><em>round</em>, arredondar</td><td>Vai para o inteiro <strong>mais perto</strong>. No meio exato (<code>.5</code>), vai para longe do zero.</td></tr>
+<tr><td><code>std::floor</code></td><td><em>floor</em>, chão</td><td>Desce para o inteiro de <strong>baixo</strong>.</td></tr>
+<tr><td><code>std::ceil</code></td><td><em>ceiling</em>, teto</td><td>Sobe para o inteiro de <strong>cima</strong>.</td></tr>
+<tr><td><code>std::trunc</code></td><td><em>truncate</em>, cortar</td><td><strong>Joga fora</strong> as casas decimais, sem arredondar.</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="arred.cpp">#include &lt;iostream&gt;
+#include &lt;cmath&gt;
+
+int main() {
+    double v[] = {2.4, 2.5, 2.7, -2.5, -2.7};
+    for (double x : v) {
+        std::cout &lt;&lt; x &lt;&lt; ": round=" &lt;&lt; std::round(x) &lt;&lt; " floor=" &lt;&lt; std::floor(x)
+                  &lt;&lt; " ceil=" &lt;&lt; std::ceil(x) &lt;&lt; " trunc=" &lt;&lt; std::trunc(x) &lt;&lt; "\n";
+    }
+}
+</pre>
+
+<p>Este programa usa duas coisas de aulas futuras só para não repetir a mesma linha cinco vezes: uma lista de números (<code>double v[]</code>, aula <a href="arrays.html">Arrays</a>) e um <code>for</code> que passa por cada um deles, chamando-o de <code>x</code> (aula <a href="for-range.html">for de Intervalo</a>). Foque nas funções:</p>
+
+<pre class="term" data-cwd="~/mat">$ ./arred
+2.4: round=2 floor=2 ceil=3 trunc=2
+2.5: round=3 floor=2 ceil=3 trunc=2
+2.7: round=3 floor=2 ceil=3 trunc=2
+-2.5: round=-3 floor=-3 ceil=-2 trunc=-2    « nos negativos, "baixo" é -3
+-2.7: round=-3 floor=-3 ceil=-2 trunc=-2</pre>
+
+<p>Nos positivos, <code>floor</code> e <code>trunc</code> dão o mesmo resultado. A diferença aparece nos <strong>negativos</strong>: o <code>floor</code> desce (−2,5 → −3), o <code>trunc</code> só corta (−2,5 → −2). Pense num termômetro: abaixo de zero, "descer" é ficar mais frio.</p>
+
+<h3>Quando usar cada um</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Função</th><th>Exemplo</th></tr>
+<tr><td>Mostrar uma média "redonda"</td><td><code>std::round</code></td><td>média 6,75 → 7</td></tr>
+<tr><td>Quantas caixas, ônibus, viagens <strong>são necessárias</strong></td><td><code>std::ceil</code></td><td>23 ovos em caixas de 6 → 4 caixas (sobra uma meio vazia, mas precisa dela)</td></tr>
+<tr><td>Quantos itens <strong>cabem</strong> inteiros</td><td><code>std::floor</code></td><td>com R$ 20, a R$ 3 cada → 6 cadernos</td></tr>
+<tr><td>Só a parte inteira, ignorando o resto</td><td><code>std::trunc</code></td><td>idade a partir de 29,9 anos → 29</td></tr>
+</table>
+</div>
+
+<h3>Arredondar com uma casa decimal</h3>
+<p>As quatro funções sempre arredondam para um <strong>inteiro</strong>. Para ficar com uma casa, o truque é multiplicar por 10, arredondar e dividir por 10:</p>
+
+<pre class="file" data-file="nota.cpp">#include &lt;iostream&gt;
+#include &lt;cmath&gt;
+
+int main() {
+    double media = 6.75;
+    std::cout &lt;&lt; "Média: " &lt;&lt; media &lt;&lt; "\n";
+    std::cout &lt;&lt; "Arredondada: " &lt;&lt; std::round(media) &lt;&lt; "\n";
+    std::cout &lt;&lt; "Com 1 casa: " &lt;&lt; std::round(media * 10) / 10 &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/mat">$ ./nota
+Média: 6.75
+Arredondada: 7
+Com 1 casa: 6.8          « 67.5 → round → 68 → ÷10 → 6.8</pre>
+
+<p>Se a ideia é só <strong>mostrar</strong> o número com uma casa (e não mudar o valor guardado), é mais simples pedir isso na hora de imprimir, com <a href="iomanip.html">iomanip</a> ou <a href="format-print.html">std::format</a>.</p>
+
+<div class="tip">
+<strong>Quero um <code>int</code>, não um <code>double</code></strong>
+<p><code>std::round(2.5)</code> devolve <code>3.0</code>, um <code>double</code>. Se você precisa de um inteiro de verdade (para contar, ou usar como posição numa lista), use <code>std::lround(2.5)</code>, que devolve um <code>long</code> com o valor <code>3</code>. A conversão entre tipos é assunto de <a href="conversao-tipos.html">Conversão de Tipos</a>.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Caixas: 4,src:ceil">
+<p class="try-task"><strong>Missão:</strong> a Ana tem 23 ovos e cada caixa leva 6. O programa diz que ela precisa de 3 caixas, mas aí sobram ovos de fora! Use <code>std::ceil</code> para mostrar <code>Caixas: 4</code>. Cuidado: <code>23 / 6</code> com dois inteiros já dá <code>3</code> antes de o <code>ceil</code> entrar em ação.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;cmath&gt;
+
+int main() {
+    int ovos = 23;
+    int caixas = ovos / 6;
+    std::cout &lt;&lt; "Caixas: " &lt;&lt; caixas &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;cmath&gt;
+
+int main() {
+    int ovos = 23;
+    double caixas = std::ceil(ovos / 6.0);
+    std::cout &lt;&lt; "Caixas: " &lt;&lt; caixas &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>4. Maior e menor: <code>std::max</code> e <code>std::min</code></h2>
+<p>Para escolher o maior ou o menor de dois valores, use <code>std::max</code> e <code>std::min</code>. Eles <strong>não</strong> moram na <code>&lt;cmath&gt;</code>, e sim na <code>&lt;algorithm&gt;</code> (algoritmos), outra biblioteca padrão:</p>
+
+<pre class="file" data-file="maxmin.cpp">#include &lt;iostream&gt;
+#include &lt;algorithm&gt;
+
+int main() {
+    std::cout &lt;&lt; std::max(3, 7) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::min(3, 7) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::max({8, 3, 9, 5}) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/mat">$ ./maxmin
+7
+3
+9                        « com chaves { }, aceita quantos valores você quiser</pre>
+
+<dl class="anatomy">
+  <dt>std::max(3, 7)</dt><dd>Devolve o maior dos dois: <code>7</code>.</dd>
+  <dt>std::min(3, 7)</dt><dd>Devolve o menor: <code>3</code>.</dd>
+  <dt>std::max({8, 3, 9, 5})</dt><dd>Com uma lista entre chaves, compara todos de uma vez. Repare: parênteses <strong>e</strong> chaves.</dd>
+</dl>
+
+<p>Os dois valores precisam ser <strong>do mesmo tipo</strong>. <code>std::max(3, 7.5)</code> (um <code>int</code> e um <code>double</code>) não compila; veja o erro em "Quando dá errado". Um uso comum é "não deixar passar do limite": <code>std::min(nota, 10.0)</code> garante que a nota nunca passe de 10, mesmo com bônus.</p>
+
+<hr>
+
+<h2>5. O número π: <code>std::numbers::pi</code> <span class="versao">C++20</span></h2>
+<p>Desde o C++20, o π vem pronto, com todas as casas que um <code>double</code> consegue guardar, na biblioteca <code>&lt;numbers&gt;</code>:</p>
+
+<pre class="file" data-file="pi.cpp">#include &lt;iostream&gt;
+#include &lt;numbers&gt;
+
+int main() {
+    double raio = 2.0;
+    double area = std::numbers::pi * raio * raio;
+    std::cout &lt;&lt; "Área: " &lt;&lt; area &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/mat">$ g++ -std=c++23 -Wall -Wextra pi.cpp -o pi
+$ ./pi
+Área: 12.5664</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;numbers&gt;</dt><dd>A biblioteca das constantes matemáticas (C++20).</dd>
+  <dt>std::numbers::pi</dt><dd>Leia de trás para frente: "o <code>pi</code>, que está em <code>numbers</code>, que está em <code>std</code>". Não tem parênteses: é um <strong>valor</strong>, não uma função.</dd>
+  <dt>raio * raio</dt><dd>O raio ao quadrado. Também daria <code>std::pow(raio, 2)</code> (com <code>&lt;cmath&gt;</code>).</dd>
+</dl>
+
+<p>Na mesma biblioteca estão <code>std::numbers::e</code> (2.71828…, o número de Euler) e <code>std::numbers::sqrt2</code> (√2 = 1.41421…).</p>
+
+<div class="note">
+<strong>Por que o <code>-std=c++23</code> é obrigatório aqui</strong>
+<p>O g++ 15, se você não disser nada, compila como <strong>C++17</strong>, que ainda não tinha <code>&lt;numbers&gt;</code>. Sem o <code>-std=</code>:</p>
+<pre class="term" data-cwd="~/mat">$ g++ -Wall -Wextra pi.cpp -o pi
+pi.cpp: In function ‘int main()’:
+pi.cpp:6:24: error: ‘std::numbers’ has not been declared
+    6 |     double area = std::numbers::pi * raio * raio;
+      |                        ^~~~~~~</pre>
+<p>"<code>std::numbers</code> não foi declarado". Em código antigo, você vai ver duas alternativas: <code>M_PI</code> (uma constante do sistema, que não faz parte do padrão C++) ou o π digitado à mão, <code>const double PI = 3.14159265358979;</code> (veja <a href="constantes.html">Constantes</a>). Com C++20 ou mais novo, prefira <code>std::numbers::pi</code>.</p>
+</div>
+
+<hr>
+
+<h2>6. Distância entre dois pontos: <code>std::hypot</code></h2>
+<p>A casa da Ana fica 3 quarteirões a leste e 4 ao norte da padaria. Em linha reta, qual a distância? É o teorema de Pitágoras: √(3² + 4²) = 5. A função <code>std::hypot</code> (de <em>hypotenuse</em>, hipotenusa) faz essa conta de uma vez:</p>
+
+<pre class="file" data-file="hypot.cpp">#include &lt;iostream&gt;
+#include &lt;cmath&gt;
+
+int main() {
+    std::cout &lt;&lt; std::hypot(3, 4) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::sqrt(3 * 3 + 4 * 4) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/mat">$ ./hypot
+5
+5</pre>
+
+<p>As duas linhas dão o mesmo resultado. O <code>hypot</code> é mais curto de ler e, com números muito grandes ou muito pequenos, mais preciso (ele evita que o quadrado "estoure" no meio da conta).</p>
+
+<hr>
+
+<h2>7. Conta sem resposta: <code>nan</code> e <code>inf</code></h2>
+<p>Não existe raiz quadrada de número negativo nos números reais. O que o C++ faz com <code>std::sqrt(-1)</code>? Ele <strong>não</strong> trava o programa: devolve um valor especial chamado <strong>NaN</strong> (<em>Not a Number</em>, "não é um número").</p>
+
+<pre class="file" data-file="nan.cpp">#include &lt;iostream&gt;
+#include &lt;cmath&gt;
+
+int main() {
+    double r = std::sqrt(-1);
+    std::cout &lt;&lt; r &lt;&lt; "\n";
+    std::cout &lt;&lt; std::log(0) &lt;&lt; "\n";
+    std::cout &lt;&lt; 1.0 / 0 &lt;&lt; "\n";
+    std::cout &lt;&lt; std::isnan(r) &lt;&lt; "\n";
+    std::cout &lt;&lt; (r == r) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/mat">$ g++ -std=c++23 -Wall -Wextra nan.cpp -o nan
+nan.cpp: In function ‘int main()’:
+nan.cpp:8:22: warning: division by zero [-Wdiv-by-zero]
+    8 |     std::cout &lt;&lt; 1.0 / 0 &lt;&lt; "\n";
+      |                  ~~~~^~~
+$ ./nan
+-nan                     « sqrt(-1): "não é um número" (o sinal de menos não significa nada útil)
+-inf                     « log(0): menos infinito
+inf                      « 1.0 / 0: infinito
+1                        « isnan(r) é verdadeiro (1 = true)
+0                        « um NaN não é igual nem a ele mesmo!</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Valor</th><th>Quer dizer</th><th>De onde vem</th></tr>
+<tr><td><code>nan</code> / <code>-nan</code></td><td>"Não é um número": a conta não tem resposta</td><td><code>std::sqrt(-1)</code>, <code>0.0 / 0</code>, conta com outro <code>nan</code></td></tr>
+<tr><td><code>inf</code> / <code>-inf</code></td><td>Infinito (positivo ou negativo)</td><td><code>1.0 / 0</code>, <code>std::log(0)</code>, número grande demais</td></tr>
+</table>
+</div>
+
+<p>O perigo é que o <code>nan</code> <strong>contamina</strong> tudo: qualquer conta com ele dá <code>nan</code>, e o programa segue em frente mostrando lixo. Para descobrir se um resultado é <code>nan</code>, use <code>std::isnan(x)</code> (não <code>x == x</code>, que é um truque confuso). Na aula <a href="if-else.html">if e else</a> você vai aprender a <strong>conferir antes</strong>: "se o número for negativo, avise o usuário em vez de calcular a raiz".</p>
+
+<div class="note">
+<strong><code>1.0 / 0</code> dá <code>inf</code>, mas <code>1 / 0</code> não</strong>
+<p>A divisão por zero só dá <code>inf</code> com números com vírgula (<code>double</code>). Com dois inteiros, <code>1 / 0</code> é <strong>comportamento indefinido</strong>: no laboratório, o programa morreu sem mostrar nada, com código de saída <code>136</code> (aula <a href="comportamento-indefinido.html">Comportamento Indefinido</a>). Nos dois casos, o <code>g++</code> avisa com <code>-Wdiv-by-zero</code> quando o zero está escrito no código.</p>
+</div>
+
+<hr>
+
+<h2>Formas diferentes de fazer a mesma conta</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Conta</th><th>Formas</th><th>Qual usar</th></tr>
+<tr><td>x²</td><td><code>x * x</code> · <code>std::pow(x, 2)</code></td><td><code>x * x</code> é simples e exato com inteiros; <code>pow</code> sempre devolve <code>double</code>. Para expoentes maiores ou com vírgula, <code>pow</code>.</td></tr>
+<tr><td>Raiz cúbica</td><td><code>std::cbrt(x)</code> · <code>std::pow(x, 1.0 / 3)</code></td><td><code>cbrt</code>: mais claro, e funciona com negativos (<code>pow(-8, 1.0/3)</code> dá <code>nan</code>).</td></tr>
+<tr><td>π</td><td><code>std::numbers::pi</code> · <code>M_PI</code> · <code>3.14159…</code> à mão</td><td><code>std::numbers::pi</code> (C++20). Os outros só em código antigo.</td></tr>
+<tr><td>Hipotenusa</td><td><code>std::hypot(a, b)</code> · <code>std::sqrt(a*a + b*b)</code></td><td><code>hypot</code>: mais curto e mais preciso.</td></tr>
+<tr><td>Valor absoluto</td><td><code>std::abs(x)</code> · <code>abs(x)</code> · <code>fabs(x)</code></td><td>Sempre <code>std::abs</code>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: ‘sqrt’ is not a member of ‘std’; did you mean ‘sort’?</code></strong>
+<pre class="file" data-file="semcmath.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; std::sqrt(16) &lt;&lt; "\n";
+}
+</pre>
+<pre class="term" data-cwd="~/mat">$ g++ -std=c++23 -Wall -Wextra semcmath.cpp -o semcmath
+semcmath.cpp: In function ‘int main()’:
+semcmath.cpp:4:23: error: ‘sqrt’ is not a member of ‘std’; did you mean ‘sort’?
+    4 |     std::cout &lt;&lt; std::sqrt(16) &lt;&lt; "\n";
+      |                       ^~~~
+      |                       sort</pre>
+<p><strong>O que significa:</strong> "<code>sqrt</code> não é um membro de <code>std</code>". O compilador não conhece a função porque faltou o <code>#include &lt;cmath&gt;</code>. A sugestão "você quis dizer <code>sort</code>?" é só um palpite por nomes parecidos: ignore.</p>
+<p><strong>Como consertar:</strong> acrescente <code>#include &lt;cmath&gt;</code> no topo. Regra geral: para cada coisa que você usa da biblioteca, inclua o cabeçalho dela, mesmo que às vezes funcione sem (outro cabeçalho pode trazê-la "de carona", mas isso muda de compilador para compilador).</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: no matching function for call to ‘max(int, double)’</code></strong>
+<pre class="file" data-file="maxmin.cpp">    std::cout &lt;&lt; std::max(3, 7.5) &lt;&lt; "\n";
+</pre>
+<p>A mensagem completa tem mais de 30 linhas. As que importam são a primeira e esta:</p>
+<pre class="term" data-cwd="~/mat">$ g++ -std=c++23 -Wall -Wextra maxmin.cpp -o maxmin
+maxmin.cpp: In function ‘int main()’:
+maxmin.cpp:8:26: error: no matching function for call to ‘max(int, double)’
+    8 |     std::cout &lt;&lt; std::max(3, 7.5) &lt;&lt; "\n";
+      |                  ~~~~~~~~^~~~~~~~
+maxmin.cpp:8:26: note: there are 4 candidates
+<em>…</em>
+maxmin.cpp:8:26: note:   deduced conflicting types for parameter ‘const _Tp’ (‘int’ and ‘double’)</pre>
+<p><strong>O que significa:</strong> "nenhuma função combina com a chamada <code>max(int, double)</code>". O <code>std::max</code> exige que os dois valores tenham o <strong>mesmo tipo</strong>, e recebeu um <code>int</code> (<code>3</code>) e um <code>double</code> (<code>7.5</code>): "tipos conflitantes (<code>int</code> e <code>double</code>)". As notas <code>candidate 1</code>, <code>candidate 2</code>… listam as versões de <code>max</code> que existem e por que nenhuma serviu.</p>
+<p><strong>Como consertar:</strong> deixe os dois do mesmo tipo: <code>std::max(3.0, 7.5)</code>. Ou diga o tipo explicitamente: <code>std::max&lt;double&gt;(3, 7.5)</code>. A aula <a href="erros-compilacao.html">Lendo Erros do Compilador</a> ensina a achar a linha importante nesses erros longos.</p>
+</div>
+
+<div class="cenario">
+<strong>O programa mostra <code>nan</code> ou <code>-nan</code></strong>
+<p><strong>O que significa:</strong> alguma conta não tinha resposta: raiz de negativo, <code>0.0 / 0</code>, logaritmo de negativo. Dali em diante, tudo que usou esse valor também virou <code>nan</code>.</p>
+<p><strong>Como consertar:</strong> procure a primeira conta que gerou o <code>nan</code> (mostre os valores intermediários com <code>cout</code>) e confira os dados antes de calcular, com um <a href="if-else.html">if</a>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>abs</code> devolve um número sem as casas decimais</strong>
+<p><strong>O que significa:</strong> você usou <code>abs</code> sem <code>std::</code>, que é a versão do C só para inteiros.</p>
+<p><strong>Como consertar:</strong> escreva <code>std::abs</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>std::ceil(23 / 6)</code> dá 3, não 4</strong>
+<p><strong>O que significa:</strong> a divisão <code>23 / 6</code> é feita <strong>antes</strong>, entre dois inteiros, e já dá <code>3</code>. O <code>ceil</code> recebe <code>3</code> e não tem o que arredondar.</p>
+<p><strong>Como consertar:</strong> faça a divisão com <code>double</code>: <code>std::ceil(23 / 6.0)</code> ou <code>std::ceil(static_cast&lt;double&gt;(ovos) / 6)</code> (veja <a href="conversao-tipos.html">Conversão de Tipos</a>).</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Cabeçalho</th><th>O que faz</th><th>Exemplo → resultado</th></tr>
+<tr><td><code>std::sqrt(x)</code></td><td><code>&lt;cmath&gt;</code></td><td>Raiz quadrada</td><td><code>sqrt(25)</code> → <code>5</code></td></tr>
+<tr><td><code>std::cbrt(x)</code></td><td><code>&lt;cmath&gt;</code></td><td>Raiz cúbica</td><td><code>cbrt(27)</code> → <code>3</code></td></tr>
+<tr><td><code>std::pow(b, e)</code></td><td><code>&lt;cmath&gt;</code></td><td>b elevado a e</td><td><code>pow(2, 10)</code> → <code>1024</code></td></tr>
+<tr><td><code>std::abs(x)</code></td><td><code>&lt;cmath&gt;</code></td><td>Valor absoluto (qualquer tipo)</td><td><code>abs(-2.5)</code> → <code>2.5</code></td></tr>
+<tr><td><code>std::round(x)</code></td><td><code>&lt;cmath&gt;</code></td><td>Inteiro mais perto</td><td><code>round(2.5)</code> → <code>3</code></td></tr>
+<tr><td><code>std::floor(x)</code></td><td><code>&lt;cmath&gt;</code></td><td>Arredonda para baixo</td><td><code>floor(-2.5)</code> → <code>-3</code></td></tr>
+<tr><td><code>std::ceil(x)</code></td><td><code>&lt;cmath&gt;</code></td><td>Arredonda para cima</td><td><code>ceil(2.1)</code> → <code>3</code></td></tr>
+<tr><td><code>std::trunc(x)</code></td><td><code>&lt;cmath&gt;</code></td><td>Corta as casas decimais</td><td><code>trunc(-2.7)</code> → <code>-2</code></td></tr>
+<tr><td><code>std::lround(x)</code></td><td><code>&lt;cmath&gt;</code></td><td>Como <code>round</code>, mas devolve <code>long</code></td><td><code>lround(2.5)</code> → <code>3</code></td></tr>
+<tr><td><code>std::hypot(a, b)</code></td><td><code>&lt;cmath&gt;</code></td><td>√(a² + b²)</td><td><code>hypot(3, 4)</code> → <code>5</code></td></tr>
+<tr><td><code>std::isnan(x)</code></td><td><code>&lt;cmath&gt;</code></td><td><code>true</code> se x é NaN</td><td><code>isnan(sqrt(-1))</code> → <code>1</code></td></tr>
+<tr><td><code>std::max(a, b)</code>, <code>std::min(a, b)</code></td><td><code>&lt;algorithm&gt;</code></td><td>Maior / menor (mesmo tipo)</td><td><code>max(3, 7)</code> → <code>7</code></td></tr>
+<tr><td><code>std::max({a, b, c})</code></td><td><code>&lt;algorithm&gt;</code></td><td>Maior de uma lista</td><td><code>max({8, 3, 9})</code> → <code>9</code></td></tr>
+<tr><td><code>std::numbers::pi</code></td><td><code>&lt;numbers&gt;</code> (C++20)</td><td>π</td><td><code>3.14159</code>…</td></tr>
+</table>
+</div>
+<p>A <code>&lt;cmath&gt;</code> tem muito mais: <code>std::sin</code>, <code>std::cos</code>, <code>std::tan</code> (trigonometria, com ângulos em <strong>radianos</strong>), <code>std::log</code> (logaritmo natural), <code>std::log10</code>, <code>std::exp</code>. Elas funcionam do mesmo jeito: inclua <code>&lt;cmath&gt;</code> e chame com <code>std::</code>.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A raiz</h3>
+<p>Complete para mostrar a raiz quadrada de 81:</p>
+<div class="ex-code">std::cout &lt;&lt; std::<input data-answer="sqrt" aria-label="função">(81);</div>
+</div>
+
+<div class="exercise">
+<h3>2. O cabeçalho</h3>
+<p>Qual cabeçalho você precisa incluir para usar <code>std::max</code>?</p>
+<div class="ex-code">#include &lt;<input data-answer="algorithm" aria-label="cabeçalho">&gt;</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Quanto vale <code>std::floor(-3.2)</code>?</p>
+<label><input type="radio" name="q3"> <code>-3</code></label>
+<label><input type="radio" name="q3"> <code>3</code></label>
+<label><input type="radio" name="q3"> <code>-4</code></label>
+<label><input type="radio" name="q3"> <code>-3.2</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Um ônibus leva 40 pessoas. Para levar 130 alunos, qual função calcula quantos ônibus são necessários?</p>
+<label><input type="radio" name="q4"> <code>std::floor(130 / 40.0)</code></label>
+<label><input type="radio" name="q4"> <code>std::ceil(130 / 40.0)</code></label>
+<label><input type="radio" name="q4"> <code>std::round(130 / 40.0)</code></label>
+<label><input type="radio" name="q4"> <code>std::ceil(130 / 40)</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. O que <code>std::cout &lt;&lt; std::sqrt(-4);</code> mostra?</p>
+<label><input type="radio" name="q5"> <code>-2</code></label>
+<label><input type="radio" name="q5"> <code>2</code></label>
+<label><input type="radio" name="q5"> Um erro de compilação</label>
+<label><input type="radio" name="q5"> <code>-nan</code> (ou <code>nan</code>)</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Por que preferir <code>std::abs(x)</code> a <code>abs(x)</code>?</p>
+<label><input type="radio" name="q6"> Porque <code>abs</code> sem <code>std::</code> pode ser a versão só para inteiros e cortar as casas decimais</label>
+<label><input type="radio" name="q6"> Porque <code>abs</code> sem <code>std::</code> não compila</label>
+<label><input type="radio" name="q6"> Porque <code>std::abs</code> é mais rápido</label>
+<label><input type="radio" name="q6"> Não há diferença</label>
+</div>
+
+<h3>Missão final: o canteiro redondo</h3>
+
+<div class="trycpp" data-goal="out:Área: 78.5398,out:Sacos: 8,src:numbers::pi,src:ceil">
+<p class="try-task"><strong>Missão:</strong> a Ana vai adubar um canteiro redondo de raio 5 metros. Calcule a área (π × raio²) usando <code>std::numbers::pi</code> e mostre <code>Área: 78.5398</code>. Cada saco de adubo cobre 10 m²: mostre quantos sacos ela precisa comprar (<code>Sacos: 8</code>), arredondando para cima.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;cmath&gt;
+#include &lt;numbers&gt;
+
+int main() {
+    double raio = 5.0;
+    // calcule a área aqui
+
+    // e quantos sacos de 10 m² ela precisa
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;cmath&gt;
+#include &lt;numbers&gt;
+
+int main() {
+    double raio = 5.0;
+    double area = std::numbers::pi * std::pow(raio, 2);
+    double sacos = std::ceil(area / 10);
+    std::cout &lt;&lt; "Área: " &lt;&lt; area &lt;&lt; "\n";
+    std::cout &lt;&lt; "Sacos: " &lt;&lt; sacos &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>#include &lt;cmath&gt;</code> traz as funções de matemática. Chame-as com <code>std::</code>: <code>std::sqrt(25)</code>.</li>
+  <li><code>std::sqrt</code> (raiz), <code>std::pow(b, e)</code> (potência; C++ não tem <code>^</code> de potência), <code>std::cbrt</code> (raiz cúbica). O resultado é <code>double</code>.</li>
+  <li>Use sempre <code>std::abs</code>: o <code>abs</code> sem <code>std::</code> pode ser a versão do C, só para <code>int</code>, e transformar <code>2.5</code> em <code>2</code> sem aviso do g++.</li>
+  <li><code>round</code> (mais perto), <code>floor</code> (para baixo), <code>ceil</code> (para cima), <code>trunc</code> (corta). Cuidado com a divisão de inteiros antes do arredondamento.</li>
+  <li><code>std::max</code> e <code>std::min</code> vêm de <code>&lt;algorithm&gt;</code> e exigem dois valores do mesmo tipo.</li>
+  <li><code>std::numbers::pi</code> (<code>&lt;numbers&gt;</code>, C++20) precisa de <code>-std=c++20</code> ou mais novo.</li>
+  <li><code>std::sqrt(-1)</code> não trava: devolve <code>nan</code>. Divisão de <code>double</code> por zero dá <code>inf</code>. Teste com <code>std::isnan</code>.</li>
+  <li>Em C++, não precisa de <code>-lm</code>: o <code>g++</code> já liga a biblioteca de matemática.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
