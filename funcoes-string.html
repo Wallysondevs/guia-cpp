@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Funções de String — find, substr, replace, erase e mais | Guia C++</title>
+<meta name="description" content="As funções de std::string mais usadas, para quem nunca programou: find e a armadilha do npos, rfind, substr, replace, insert, erase, comparar com == e compare, starts_with, ends_with e contains, maiúsculas com toupper e inverter com std::reverse, com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Funções de String</span></h1>
+
+<p class="intro">Um <code>std::string</code> não é só uma caixa de texto: ele vem com uma caixa de ferramentas. Com elas você <strong>procura</strong> uma palavra numa frase, <strong>recorta</strong> o dia de uma data, <strong>troca</strong> "gato" por "cachorro", <strong>apaga</strong> o "R$" de um preço e pergunta se o arquivo <strong>termina</strong> em ".pdf". Nesta aula você vai conhecer as ferramentas mais usadas, uma de cada vez, sempre com a saída real. A lista completa fica na referência <a href="ref-string.html">std::string</a>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Procurar com <code>find</code> e <code>rfind</code>, e a armadilha do <code>std::string::npos</code>.</li>
+  <li>Recortar um pedaço com <code>substr</code>.</li>
+  <li>Trocar, inserir e apagar pedaços com <code>replace</code>, <code>insert</code> e <code>erase</code>.</li>
+  <li>Comparar textos com <code>==</code>, <code>&lt;</code> e <code>compare</code>.</li>
+  <li>Perguntar "começa com?", "termina com?" e "contém?" com <code>starts_with</code>, <code>ends_with</code> <span class="versao">C++20</span> e <code>contains</code> <span class="versao">C++23</span>.</li>
+  <li>Passar a string inteira para maiúsculas e inverter a ordem dos caracteres.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com o comando padrão <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Lembre que as posições começam em 0 (aula <a href="acessar-caracteres.html">Acessar Caracteres</a>).</p>
+
+<hr>
+
+<h2>A ideia: uma régua embaixo do texto</h2>
+<p>Quase todas as ferramentas desta aula trabalham com <strong>posições</strong>. Imagine uma régua colada embaixo da frase, marcando o índice de cada caractere:</p>
+
+<pre class="file" data-file="a régua">O gato comeu o peixe do gato
+0123456789012345678901234567
+          1         2</pre>
+
+<p>Com a régua, as perguntas ficam simples. "Onde está <code>gato</code>?" Na posição 2. "Recorte 5 caracteres a partir da 15": <code>peixe</code>. Toda vez que você se perder, desenhe a régua.</p>
+
+<hr>
+
+<h2>1. Procurar: <code>find</code> e <code>rfind</code></h2>
+<p><code>find</code> ("achar") procura um texto (ou um caractere) e devolve a <strong>posição</strong> onde ele começa. <code>rfind</code> faz o mesmo de trás para a frente (o <code>r</code> é de <em>reverse</em>, "ao contrário"): acha a <strong>última</strong> ocorrência.</p>
+
+<pre class="file" data-file="find.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string frase = "O gato comeu o peixe do gato";
+    std::cout &lt;&lt; frase.find("gato") &lt;&lt; '\n';
+    std::cout &lt;&lt; frase.find("peixe") &lt;&lt; '\n';
+    std::cout &lt;&lt; frase.find('O') &lt;&lt; '\n';
+    std::cout &lt;&lt; frase.find("gato", 3) &lt;&lt; '\n';
+    std::cout &lt;&lt; frase.rfind("gato") &lt;&lt; '\n';
+    std::cout &lt;&lt; frase.find("cachorro") &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra find.cpp -o find
+$ ./find
+2
+15
+0
+24
+24
+18446744073709551615     « "cachorro" não existe na frase</pre>
+
+<dl class="anatomy">
+  <dt>frase.find("gato")</dt><dd>Procura do começo para o fim e devolve a posição da <strong>primeira</strong> ocorrência: 2 (olhe a régua).</dd>
+  <dt>frase.find('O')</dt><dd>Também procura um único <code>char</code>. O <code>O</code> maiúsculo é o primeiro caractere: posição 0. Atenção: <code>find</code> diferencia maiúsculas de minúsculas.</dd>
+  <dt>frase.find("gato", 3)</dt><dd>O segundo número diz <strong>de onde começar</strong> a procurar. A partir da posição 3, o primeiro <code>gato</code> já ficou para trás, e ele acha o segundo, na 24.</dd>
+  <dt>frase.rfind("gato")</dt><dd>A última ocorrência: 24.</dd>
+  <dt>frase.find("cachorro")</dt><dd>Não achou. E aí ele devolve esse número gigante: <code>18446744073709551615</code>. É o <code>npos</code>, o assunto da próxima seção.</dd>
+</dl>
+
+<h3>A armadilha do <code>std::string::npos</code></h3>
+<p>Quando <code>find</code> não acha nada, ele precisa devolver <strong>algum</strong> número. Não pode ser 0, que é uma posição válida. Então ele devolve um valor especial, <code>std::string::npos</code> ("<em>no position</em>", nenhuma posição): o <strong>maior número possível</strong> do tipo <code>std::size_t</code>, que na máquina da Ana (64 bits) é 18446744073709551615. Nenhuma string tem uma posição tão grande, então ele significa "não está aqui".</p>
+
+<p>A forma certa de perguntar "achou?" é comparar com <code>npos</code>:</p>
+
+<pre class="file" data-file="npos.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string email = "ana@exemplo.com";
+    std::size_t pos = email.find('@');
+    if (pos != std::string::npos) {
+        std::cout &lt;&lt; "arroba na posição " &lt;&lt; pos &lt;&lt; '\n';
+    } else {
+        std::cout &lt;&lt; "e-mail sem arroba\n";
+    }
+    if (email.find('#') == std::string::npos) {
+        std::cout &lt;&lt; "sem #\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra npos.cpp -o npos
+$ ./npos
+arroba na posição 3
+sem #</pre>
+
+<dl class="anatomy">
+  <dt>std::size_t pos = email.find('@');</dt><dd>Guarda a posição num <code>std::size_t</code>, o tipo que o <code>find</code> devolve (inteiro sem sinal, veja <a href="inteiros.html">Inteiros</a>).</dd>
+  <dt>pos != std::string::npos</dt><dd>"A posição é diferente de nenhuma posição?" = "achou?". O <code>!=</code> é "diferente" (veja <a href="operadores-comparacao.html">Comparação</a>).</dd>
+  <dt>email.find('#') == std::string::npos</dt><dd>"Não achou?"</dd>
+</dl>
+
+<p>Agora o erro clássico. Parece lógico usar o resultado do <code>find</code> direto no <code>if</code>, como "achou ou não":</p>
+
+<pre class="file" data-file="armadilha.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string frase = "gato preto";
+    if (frase.find("gato")) {
+        std::cout &lt;&lt; "achei gato\n";
+    } else {
+        std::cout &lt;&lt; "não achei gato\n";
+    }
+    if (frase.find("cachorro")) {
+        std::cout &lt;&lt; "achei cachorro\n";
+    }
+    int pos = frase.find("cachorro");
+    std::cout &lt;&lt; "pos em int: " &lt;&lt; pos &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra armadilha.cpp -o armadilha
+$ ./armadilha
+não achei gato         « errado: gato está lá!
+achei cachorro         « errado: cachorro não está!
+pos em int: -1</pre>
+
+<p>Tudo ao contrário, e o compilador não avisou nada. O <code>if</code> trata <strong>0 como falso</strong> e qualquer outro número como verdadeiro (veja <a href="bool.html">Booleanos</a>). <code>gato</code> foi achado na posição <strong>0</strong>, então o <code>if</code> entendeu "falso". <code>cachorro</code> não foi achado, o resultado foi <code>npos</code>, um número enorme, e o <code>if</code> entendeu "verdadeiro".</p>
+
+<p>A última linha mostra outro detalhe: guardado num <code>int</code>, o <code>npos</code> "dá a volta" e vira <code>-1</code>. Você vai ver código antigo testando <code>pos == -1</code>. Funciona por acaso; o certo é <code>std::size_t</code> e <code>npos</code>.</p>
+
+<div class="warning">
+<strong>Regra de ouro do <code>find</code></strong>
+<p>Nunca use o resultado do <code>find</code> sozinho num <code>if</code>. Compare sempre com <code>std::string::npos</code>. Se só quer saber "tem ou não tem", use <code>contains</code> (seção 7), que já devolve <code>true</code>/<code>false</code>.</p>
+</div>
+
+<hr>
+
+<h2>2. Recortar: <code>substr</code></h2>
+<p><code>substr</code> ("<em>substring</em>", um pedaço da string) devolve uma <strong>nova</strong> string com um trecho da original. Você diz <strong>onde começa</strong> e <strong>quantos caracteres</strong> quer. A original não muda.</p>
+
+<pre class="file" data-file="substr.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string data = "16/10/2026";
+    std::string dia = data.substr(0, 2);
+    std::string mes = data.substr(3, 2);
+    std::string ano = data.substr(6);
+    std::cout &lt;&lt; dia &lt;&lt; " | " &lt;&lt; mes &lt;&lt; " | " &lt;&lt; ano &lt;&lt; '\n';
+
+    std::string email = "ana@exemplo.com";
+    std::size_t arroba = email.find('@');
+    std::cout &lt;&lt; "usuário: " &lt;&lt; email.substr(0, arroba) &lt;&lt; '\n';
+    std::cout &lt;&lt; "domínio: " &lt;&lt; email.substr(arroba + 1) &lt;&lt; '\n';
+    std::cout &lt;&lt; data.substr(6, 100) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra substr.cpp -o substr
+$ ./substr
+16 | 10 | 2026
+usuário: ana
+domínio: exemplo.com
+2026</pre>
+
+<dl class="anatomy">
+  <dt>data.substr(0, 2)</dt><dd>A partir da posição 0, pegue 2 caracteres: <code>16</code>. O segundo número é a <strong>quantidade</strong>, não a posição final (uma confusão muito comum).</dd>
+  <dt>data.substr(3, 2)</dt><dd>A partir da 3 (pulando o <code>16/</code>), 2 caracteres: <code>10</code>.</dd>
+  <dt>data.substr(6)</dt><dd>Sem a quantidade: <strong>daí até o fim</strong>. <code>2026</code>.</dd>
+  <dt>email.substr(0, arroba)</dt><dd>A combinação mais útil: <code>find</code> acha a posição, <code>substr</code> recorta. Do começo até antes da arroba: a posição da arroba (3) é exatamente a quantidade de caracteres antes dela.</dd>
+  <dt>email.substr(arroba + 1)</dt><dd>Do caractere seguinte à arroba até o fim.</dd>
+  <dt>data.substr(6, 100)</dt><dd>Pedir mais caracteres do que existem não é erro: ele pega até o fim.</dd>
+</dl>
+
+<p>Já uma posição de <strong>começo</strong> além do fim é erro, e o <code>substr</code> lança a mesma exceção do <code>.at()</code>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ cat substrerro.cpp
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string data = "16/10/2026";
+    std::cout &lt;&lt; data.substr(20) &lt;&lt; '\n';
+}
+$ g++ -std=c++23 -Wall -Wextra substrerro.cpp -o substrerro
+$ ./substrerro
+terminate called after throwing an instance of 'std::out_of_range'
+  what():  basic_string::substr: __pos (which is 20) &gt; this-&gt;size() (which is 10)
+Abortado                   (imagem do núcleo gravada) ./substrerro</pre>
+
+<p>Isso acontece muito com <code>find</code> + <code>substr</code> quando o <code>find</code> não acha nada: <code>s.substr(s.find('@') + 1)</code> com um texto sem arroba. Por isso, confira o <code>npos</code> antes de recortar.</p>
+
+<div class="trycpp" data-goal="out:usuário: bruno,out:domínio: lojinha.com.br,src:find\s*\(,src:substr\s*\(">
+<p class="try-task"><strong>Missão:</strong> separe o e-mail em usuário e domínio usando <code>find</code> e <code>substr</code> (sem escrever <code>bruno</code> nem <code>lojinha</code> no código), para mostrar:</p>
+<pre class="out">usuário: bruno
+domínio: lojinha.com.br</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string email = "bruno@lojinha.com.br";
+    // ache a arroba e recorte os dois pedaços
+
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string email = "bruno@lojinha.com.br";
+    std::size_t arroba = email.find('@');
+    std::cout &lt;&lt; "usuário: " &lt;&lt; email.substr(0, arroba) &lt;&lt; '\n';
+    std::cout &lt;&lt; "domínio: " &lt;&lt; email.substr(arroba + 1) &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Trocar um pedaço: <code>replace</code></h2>
+<p><code>replace</code> ("substituir") apaga um trecho e coloca outro texto no lugar, <strong>na própria string</strong>. O texto novo pode ter qualquer tamanho.</p>
+
+<pre class="file" data-file="replace.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string frase = "Eu gosto de gato";
+    std::size_t pos = frase.find("gato");
+    frase.replace(pos, 4, "cachorro");
+    std::cout &lt;&lt; frase &lt;&lt; '\n';
+
+    std::string data = "16/10/2026";
+    data.replace(2, 1, "-");
+    data.replace(5, 1, "-");
+    std::cout &lt;&lt; data &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra replace.cpp -o replace
+$ ./replace
+Eu gosto de cachorro
+16-10-2026</pre>
+
+<dl class="anatomy">
+  <dt>frase.replace(pos, 4, "cachorro")</dt><dd>Três informações: <strong>onde</strong> começa o trecho (a posição de <code>gato</code>), <strong>quantos</strong> caracteres apagar (4, o tamanho de <code>gato</code>) e <strong>o que</strong> colocar no lugar. A frase cresce sozinha para caber <code>cachorro</code>.</dd>
+  <dt>data.replace(2, 1, "-")</dt><dd>Troca 1 caractere na posição 2 (a primeira <code>/</code>) por <code>-</code>.</dd>
+</dl>
+
+<p><code>replace</code> troca <strong>um</strong> trecho. Para trocar <strong>todas</strong> as ocorrências, repita "procure, troque, procure de novo a partir dali" até o <code>find</code> devolver <code>npos</code>. O <code>while</code> ("enquanto") faz essa repetição (aula <a href="while.html">while</a>); por enquanto, use como receita:</p>
+
+<pre class="file" data-file="replacetodos.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string texto = "pão, leite, pão de queijo, pão doce";
+    std::string velho = "pão";
+    std::string novo = "bolo";
+    std::size_t pos = texto.find(velho);
+    while (pos != std::string::npos) {
+        texto.replace(pos, velho.size(), novo);
+        pos = texto.find(velho, pos + novo.size());
+    }
+    std::cout &lt;&lt; texto &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra replacetodos.cpp -o replacetodos
+$ ./replacetodos
+bolo, leite, bolo de queijo, bolo doce</pre>
+
+<p>O <code>pos + novo.size()</code> faz a próxima busca começar <strong>depois</strong> do texto que acabou de entrar. Sem ele, trocar <code>"a"</code> por <code>"aa"</code> acharia o <code>a</code> recém-colocado para sempre, e o programa nunca terminaria.</p>
+
+<hr>
+
+<h2>4. Inserir: <code>insert</code></h2>
+<p><code>insert</code> ("inserir") coloca um texto <strong>antes</strong> da posição indicada, empurrando o resto para a direita.</p>
+
+<pre class="file" data-file="insert.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana Souza";
+    nome.insert(4, "Maria ");
+    std::cout &lt;&lt; nome &lt;&lt; '\n';
+    nome.insert(0, "Sra. ");
+    std::cout &lt;&lt; nome &lt;&lt; '\n';
+    std::string cep = "50030230";
+    cep.insert(5, "-");
+    std::cout &lt;&lt; cep &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra insert.cpp -o insert
+$ ./insert
+Ana Maria Souza
+Sra. Ana Maria Souza
+50030-230</pre>
+
+<dl class="anatomy">
+  <dt>nome.insert(4, "Maria ")</dt><dd>Na posição 4 (onde está o <code>S</code> de <code>Souza</code>), insere <code>Maria </code>. O <code>Souza</code> vai para a direita.</dd>
+  <dt>nome.insert(0, "Sra. ")</dt><dd>Posição 0 = no começo. É o jeito de "acrescentar na frente" sem montar uma string nova (o <code>+=</code> da aula <a href="concatenacao.html">Juntar Strings</a> só acrescenta no fim).</dd>
+  <dt>cep.insert(5, "-")</dt><dd>Formata o CEP: o hífen entra antes do sexto dígito.</dd>
+</dl>
+
+<hr>
+
+<h2>5. Apagar: <code>erase</code>, <code>pop_back</code> e <code>clear</code></h2>
+<p><code>erase</code> ("apagar") remove caracteres a partir de uma posição.</p>
+
+<pre class="file" data-file="erase.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana Maria Souza";
+    nome.erase(4, 6);
+    std::cout &lt;&lt; "[" &lt;&lt; nome &lt;&lt; "]\n";
+
+    std::string preco = "R$ 25,90";
+    preco.erase(0, 3);
+    std::cout &lt;&lt; "[" &lt;&lt; preco &lt;&lt; "]\n";
+
+    std::string frase = "Bom dia!!!";
+    frase.erase(7);
+    std::cout &lt;&lt; "[" &lt;&lt; frase &lt;&lt; "]\n";
+
+    std::string s = "abc";
+    s.pop_back();
+    std::cout &lt;&lt; "[" &lt;&lt; s &lt;&lt; "]\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra erase.cpp -o erase
+$ ./erase
+[Ana Souza]
+[25,90]
+[Bom dia]
+[ab]</pre>
+
+<dl class="anatomy">
+  <dt>nome.erase(4, 6)</dt><dd>A partir da posição 4, apaga 6 caracteres: <code>Maria </code> (5 letras e o espaço).</dd>
+  <dt>preco.erase(0, 3)</dt><dd>Apaga os 3 primeiros: <code>R$ </code>.</dd>
+  <dt>frase.erase(7)</dt><dd>Sem a quantidade: apaga da posição 7 <strong>até o fim</strong>. Os três <code>!</code> somem.</dd>
+  <dt>s.pop_back()</dt><dd>Apaga o <strong>último</strong> caractere ("tirar do fundo"). Numa string vazia é comportamento indefinido.</dd>
+</dl>
+
+<p>Para apagar <strong>tudo</strong>, use <code>s.clear()</code> (aula <a href="strings.html">Strings</a>).</p>
+
+<hr>
+
+<h2>6. Comparar: <code>==</code>, <code>&lt;</code> e <code>compare</code></h2>
+<p>Strings se comparam com os mesmos operadores dos números (aula <a href="operadores-comparacao.html">Operadores de Comparação</a>). <code>==</code> pergunta "são iguais?"; <code>&lt;</code> pergunta "vem antes, na ordem do dicionário?".</p>
+
+<pre class="file" data-file="compare.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string a = "banana";
+    std::string b = "maçã";
+    std::string c = "Banana";
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; (a == "banana") &lt;&lt; '\n';
+    std::cout &lt;&lt; (a == c) &lt;&lt; '\n';
+    std::cout &lt;&lt; (a &lt; b) &lt;&lt; '\n';
+    std::cout &lt;&lt; (c &lt; a) &lt;&lt; '\n';
+    std::cout &lt;&lt; a.compare(b) &lt;&lt; '\n';
+    std::cout &lt;&lt; b.compare(a) &lt;&lt; '\n';
+    std::cout &lt;&lt; a.compare("banana") &lt;&lt; '\n';
+    std::cout &lt;&lt; ("10" &lt; std::string("9")) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra compare.cpp -o compare
+$ ./compare
+true                 « a == "banana"
+false                « "banana" e "Banana" são diferentes
+true                 « "banana" vem antes de "maçã"
+true                 « "Banana" vem antes de "banana"!
+-11
+11
+0
+true                 « "10" vem antes de "9"!</pre>
+
+<dl class="anatomy">
+  <dt>a == "banana"</dt><dd>Compara caractere por caractere. Funciona com um <code>std::string</code> de um lado e um literal do outro.</dd>
+  <dt>a == c</dt><dd><code>false</code>: maiúsculas e minúsculas são caracteres diferentes.</dd>
+  <dt>a &lt; b</dt><dd>Ordem "de dicionário": compara o primeiro caractere; se for igual, o segundo; e assim por diante. <code>b</code> vem antes de <code>m</code>.</dd>
+  <dt>c &lt; a</dt><dd><code>"Banana" &lt; "banana"</code>: a ordem é a da tabela de caracteres (ASCII, veja <a href="char.html">Caracteres</a>), em que <strong>todas as maiúsculas vêm antes de todas as minúsculas</strong>. Para o computador, <code>"Zebra" &lt; "abacate"</code>.</dd>
+  <dt>a.compare(b)</dt><dd>Responde as três perguntas de uma vez: <strong>negativo</strong> se <code>a</code> vem antes, <strong>zero</strong> se são iguais, <strong>positivo</strong> se vem depois. O número exato (<code>-11</code> é a distância entre <code>b</code> e <code>m</code> na tabela) muda de uma biblioteca para outra; <strong>só o sinal importa</strong>.</dd>
+  <dt>"10" &lt; std::string("9")</dt><dd><code>true</code>, porque o caractere <code>'1'</code> vem antes de <code>'9'</code>. Textos com números são comparados como texto, não como números. Para comparar valores, converta antes (aula <a href="string-numero.html">Texto ↔ Número</a>).</dd>
+</dl>
+
+<div class="tip">
+<strong><code>==</code> ou <code>compare</code>?</strong>
+<p>No dia a dia, use <code>==</code>, <code>!=</code>, <code>&lt;</code> e <code>&gt;</code>: ficam mais legíveis. O <code>compare</code> aparece em código antigo e em situações em que você quer as três respostas numa conta só (como numa ordenação, em <a href="algoritmos.html">Algoritmos</a>).</p>
+</div>
+
+<hr>
+
+<h2>7. Começa com, termina com, contém</h2>
+<p>Três perguntas que você faz o tempo todo, com respostas <code>true</code>/<code>false</code>, sem posições nem <code>npos</code>:</p>
+
+<pre class="file" data-file="starts.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string arquivo = "relatorio-2026.pdf";
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; arquivo.starts_with("relatorio") &lt;&lt; '\n';
+    std::cout &lt;&lt; arquivo.ends_with(".pdf") &lt;&lt; '\n';
+    std::cout &lt;&lt; arquivo.ends_with(".txt") &lt;&lt; '\n';
+    std::cout &lt;&lt; arquivo.starts_with('r') &lt;&lt; '\n';
+    std::cout &lt;&lt; arquivo.contains("2026") &lt;&lt; '\n';
+    std::cout &lt;&lt; arquivo.contains('#') &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra starts.cpp -o starts
+$ ./starts
+true
+true
+false
+true
+true
+false</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Pergunta</th><th>Desde</th><th>Antes dela, como se fazia</th></tr>
+<tr><td><code>s.starts_with(x)</code></td><td>"Começa com <code>x</code>?"</td><td><span class="versao">C++20</span></td><td><code>s.rfind(x, 0) == 0</code> ou <code>s.substr(0, …) == x</code></td></tr>
+<tr><td><code>s.ends_with(x)</code></td><td>"Termina com <code>x</code>?"</td><td><span class="versao">C++20</span></td><td>Comparar <code>s.substr(s.size() - x.size())</code> (cuidado com tamanhos)</td></tr>
+<tr><td><code>s.contains(x)</code></td><td>"Tem <code>x</code> em algum lugar?"</td><td><span class="versao">C++23</span></td><td><code>s.find(x) != std::string::npos</code></td></tr>
+</table>
+</div>
+
+<p>Como elas são recentes, compilar com um padrão antigo dá erro. O g++ 15 usa C++17 se você não pedir outro (por isso o guia sempre usa <code>-std=c++23</code>):</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++17 -Wall -Wextra starts.cpp -o starts
+starts.cpp: In function ‘int main()’:
+starts.cpp:7:26: error: ‘std::string’ {aka ‘class std::__cxx11::basic_string&lt;char&gt;’} has no member named ‘starts_with’
+    7 |     std::cout &lt;&lt; arquivo.starts_with("relatorio") &lt;&lt; '\n';
+      |                          ^~~~~~~~~~~
+starts.cpp:8:26: error: ‘std::string’ {aka ‘class std::__cxx11::basic_string&lt;char&gt;’} has no member named ‘ends_with’
+    8 |     std::cout &lt;&lt; arquivo.ends_with(".pdf") &lt;&lt; '\n';
+      |                          ^~~~~~~~~
+starts.cpp:9:26: error: ‘std::string’ {aka ‘class std::__cxx11::basic_string&lt;char&gt;’} has no member named ‘ends_with’
+    9 |     std::cout &lt;&lt; arquivo.ends_with(".txt") &lt;&lt; '\n';
+      |                          ^~~~~~~~~
+starts.cpp:10:26: error: ‘std::string’ {aka ‘class std::__cxx11::basic_string&lt;char&gt;’} has no member named ‘starts_with’
+   10 |     std::cout &lt;&lt; arquivo.starts_with('r') &lt;&lt; '\n';
+      |                          ^~~~~~~~~~~
+starts.cpp:11:26: error: ‘std::string’ {aka ‘class std::__cxx11::basic_string&lt;char&gt;’} has no member named ‘contains’
+   11 |     std::cout &lt;&lt; arquivo.contains("2026") &lt;&lt; '\n';
+      |                          ^~~~~~~~
+starts.cpp:12:26: error: ‘std::string’ {aka ‘class std::__cxx11::basic_string&lt;char&gt;’} has no member named ‘contains’
+   12 |     std::cout &lt;&lt; arquivo.contains('#') &lt;&lt; '\n';
+      |                          ^~~~~~~~
+$ g++ -std=c++20 -Wall -Wextra starts.cpp -o starts
+starts.cpp: In function ‘int main()’:
+starts.cpp:11:26: error: ‘std::string’ {aka ‘class std::__cxx11::basic_string&lt;char&gt;’} has no member named ‘contains’
+   11 |     std::cout &lt;&lt; arquivo.contains("2026") &lt;&lt; '\n';
+      |                          ^~~~~~~~
+starts.cpp:12:26: error: ‘std::string’ {aka ‘class std::__cxx11::basic_string&lt;char&gt;’} has no member named ‘contains’
+   12 |     std::cout &lt;&lt; arquivo.contains('#') &lt;&lt; '\n';
+      |                          ^~~~~~~~</pre>
+
+<p>"<code>std::string</code> não tem membro chamado <code>starts_with</code>". A função existe, mas não naquela versão da linguagem: com <code>-std=c++20</code>, só o <code>contains</code> (do C++23) continua faltando. Quando uma função "não existe" e você tem certeza do nome, desconfie do <code>-std</code> (veja <a href="versoes.html">Versões do C++</a>).</p>
+
+<hr>
+
+<h2>8. Maiúsculas e minúsculas: <code>toupper</code> e <code>tolower</code></h2>
+<p>O <code>std::string</code> não tem uma função "tudo em maiúsculas". Você faz isso caractere por caractere, com <code>std::toupper</code> ("para maiúscula") e <code>std::tolower</code> ("para minúscula"), do cabeçalho <code>&lt;cctype&gt;</code>, dentro de um laço <code>for (char&amp; c : s)</code> (aula <a href="acessar-caracteres.html">Acessar Caracteres</a>):</p>
+
+<pre class="file" data-file="maiusculas.cpp">#include &lt;cctype&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "ana souza";
+    for (char&amp; c : nome) {
+        c = std::toupper(static_cast&lt;unsigned char&gt;(c));
+    }
+    std::cout &lt;&lt; nome &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra maiusculas.cpp -o maiusculas
+$ ./maiusculas
+ANA SOUZA</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;cctype&gt;</dt><dd>Traz as funções de "tipo de caractere" (<em>character type</em>): <code>toupper</code>, <code>tolower</code>, <code>isdigit</code>, <code>isalpha</code>…</dd>
+  <dt>for (char&amp; c : nome)</dt><dd>Passa por cada caractere, com <code>&amp;</code> para poder <strong>mudá-lo</strong>.</dd>
+  <dt>static_cast&lt;unsigned char&gt;(c)</dt><dd>Converte o caractere para "sem sinal" antes de entregar ao <code>toupper</code> (veja <a href="conversao-tipos.html">Conversão de Tipos</a>). Parece burocracia, mas é obrigatório: os bytes dos acentos são <strong>negativos</strong> num <code>char</code>, e <code>toupper</code> com número negativo é comportamento indefinido. Com o <code>unsigned char</code>, eles viram números positivos válidos.</dd>
+  <dt>c = std::toupper(…)</dt><dd>Guarda a versão maiúscula de volta no caractere. Espaços, números e pontuação voltam iguais.</dd>
+</dl>
+
+<p>Uma forma mais curta, que você vai encontrar muito, usa <code>std::transform</code> (de <code>&lt;algorithm&gt;</code>) com uma <strong>lambda</strong>, uma "função de uma linha só" (aula <a href="lambdas.html">Lambdas</a>). Por enquanto, use como receita:</p>
+
+<pre class="file" data-file="transform.cpp">#include &lt;algorithm&gt;
+#include &lt;cctype&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string sigla = "Ufpe";
+    std::transform(sigla.begin(), sigla.end(), sigla.begin(),
+                   [](unsigned char c) { return std::toupper(c); });
+    std::cout &lt;&lt; sigla &lt;&lt; '\n';
+    std::transform(sigla.begin(), sigla.end(), sigla.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    std::cout &lt;&lt; sigla &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra transform.cpp -o transform
+$ ./transform
+UFPE
+ufpe</pre>
+
+<p>Leia como: "transforme de <code>sigla.begin()</code> (o começo) até <code>sigla.end()</code> (o fim), guardando a partir de <code>sigla.begin()</code>, aplicando <code>toupper</code> em cada caractere". O <code>begin</code>/<code>end</code> são <strong>iteradores</strong>, marcadores de começo e fim que você vai estudar em <a href="iteradores.html">Iteradores</a>.</p>
+
+<div class="warning">
+<strong><code>toupper</code> não entende acentos</strong>
+<p><code>"maçã"</code> vira <code>"MAçã"</code>: o <code>ç</code> e o <code>ã</code> ficam como estavam, porque cada um ocupa dois bytes e o <code>toupper</code> trabalha byte a byte. A aula <a href="acentos-utf8.html">Acentos e UTF-8</a> mostra isso e as saídas possíveis.</p>
+</div>
+
+<hr>
+
+<h2>9. Inverter: <code>std::reverse</code></h2>
+<p>Para inverter a ordem dos caracteres, use <code>std::reverse</code> ("inverter"), do cabeçalho <code>&lt;algorithm&gt;</code>. Ela muda a própria string.</p>
+
+<pre class="file" data-file="reverse.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string palavra = "roma";
+    std::reverse(palavra.begin(), palavra.end());
+    std::cout &lt;&lt; palavra &lt;&lt; '\n';
+
+    std::string p = "arara";
+    std::string invertida = p;
+    std::reverse(invertida.begin(), invertida.end());
+    std::cout &lt;&lt; std::boolalpha &lt;&lt; (p == invertida) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra reverse.cpp -o reverse
+$ ./reverse
+amor
+true               « "arara" lida de trás para a frente é igual: um palíndromo</pre>
+
+<dl class="anatomy">
+  <dt>std::reverse(palavra.begin(), palavra.end())</dt><dd>Inverte tudo do começo ao fim. Não devolve nada: a mudança fica em <code>palavra</code>.</dd>
+  <dt>std::string invertida = p;</dt><dd>Para guardar a original, faça uma <strong>cópia</strong> e inverta a cópia.</dd>
+</dl>
+
+<p>Com acentos, o <code>std::reverse</code> inverte os <strong>bytes</strong> e quebra as letras de dois bytes. Veja o resultado em <a href="acentos-utf8.html">Acentos e UTF-8</a>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>O <code>if</code> com <code>find</code> funciona ao contrário</strong>
+<p><strong>O que significa:</strong> você escreveu <code>if (s.find(x))</code>. Achou na posição 0 vira "falso"; não achou (<code>npos</code>) vira "verdadeiro". O compilador não avisa.</p>
+<p><strong>Como consertar:</strong> <code>if (s.find(x) != std::string::npos)</code>, ou <code>if (s.contains(x))</code> no C++23.</p>
+</div>
+
+<div class="cenario">
+<strong>Aparece <code>18446744073709551615</code> (ou <code>-1</code>)</strong>
+<p><strong>O que significa:</strong> você mostrou o resultado de um <code>find</code> que não achou nada: é o <code>std::string::npos</code>. Guardado num <code>int</code>, ele aparece como <code>-1</code>.</p>
+<p><strong>Como consertar:</strong> confira com <code>!= std::string::npos</code> antes de usar a posição. Guarde posições em <code>std::size_t</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>what():  basic_string::substr: __pos (which is 20) &gt; this-&gt;size() (which is 10)</code></strong>
+<p><strong>O que significa:</strong> o <code>substr</code> (ou o <code>erase</code>, o <code>insert</code>, o <code>replace</code>) recebeu uma posição de começo maior que o tamanho. É um <code>std::out_of_range</code>. Muitas vezes a posição veio de um <code>find</code> que devolveu <code>npos</code>.</p>
+<p><strong>Como consertar:</strong> confira o resultado do <code>find</code> antes de usá-lo. Lembre que o segundo número do <code>substr</code> é a <strong>quantidade</strong>, não a posição final.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: ‘std::string’ … has no member named ‘starts_with’</code> (ou <code>ends_with</code>, <code>contains</code>)</strong>
+<p><strong>O que significa:</strong> a função é mais nova que o padrão com que você compilou. Sem <code>-std</code>, o g++ 15 usa C++17.</p>
+<p><strong>Como consertar:</strong> compile com <code>-std=c++23</code>. Se o nome estiver digitado errado (<code>startswith</code>, <code>startsWith</code>), a mensagem é a mesma: confira também a escrita.</p>
+</div>
+
+<div class="cenario">
+<strong>Aparece <code>65</code> em vez de <code>A</code></strong>
+<pre class="file" data-file="toupper1.cpp">#include &lt;cctype&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "ana";
+    for (char&amp; c : nome) {
+        c = std::toupper(c);
+    }
+    std::cout &lt;&lt; nome &lt;&lt; '\n';
+    std::cout &lt;&lt; std::toupper('a') &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra toupper1.cpp -o toupper1
+$ ./toupper1
+ANA
+65</pre>
+<p><strong>O que significa:</strong> <code>std::toupper</code> devolve um <code>int</code> (o código do caractere), não um <code>char</code>. Guardado num <code>char</code> (primeira linha), vira letra de novo. Mostrado direto com <code>std::cout</code>, aparece o número: 65 é o código do <code>A</code>.</p>
+<p><strong>Como consertar:</strong> guarde num <code>char</code> antes de mostrar, ou converta: <code>static_cast&lt;char&gt;(std::toupper('a'))</code>. E, com texto que pode ter acento, não esqueça o <code>static_cast&lt;unsigned char&gt;</code> na entrada.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo (com <code>s = "gato preto"</code>)</th></tr>
+<tr><td><code>s.find(x)</code></td><td>Posição da primeira ocorrência, ou <code>npos</code></td><td><code>s.find("preto")</code> → 5</td></tr>
+<tr><td><code>s.find(x, ini)</code></td><td>O mesmo, começando em <code>ini</code></td><td><code>s.find('o', 4)</code> → 9</td></tr>
+<tr><td><code>s.rfind(x)</code></td><td>Posição da última ocorrência</td><td><code>s.rfind('o')</code> → 9</td></tr>
+<tr><td><code>std::string::npos</code></td><td>"Não achou"</td><td><code>s.find("x") == std::string::npos</code></td></tr>
+<tr><td><code>s.substr(ini, n)</code></td><td>Cópia de <code>n</code> caracteres a partir de <code>ini</code></td><td><code>s.substr(0, 4)</code> → <code>"gato"</code></td></tr>
+<tr><td><code>s.substr(ini)</code></td><td>Cópia de <code>ini</code> até o fim</td><td><code>s.substr(5)</code> → <code>"preto"</code></td></tr>
+<tr><td><code>s.replace(ini, n, x)</code></td><td>Troca <code>n</code> caracteres a partir de <code>ini</code> por <code>x</code></td><td><code>s.replace(0, 4, "cão")</code> → <code>"cão preto"</code></td></tr>
+<tr><td><code>s.insert(ini, x)</code></td><td>Insere <code>x</code> antes da posição <code>ini</code></td><td><code>s.insert(0, "o ")</code> → <code>"o gato preto"</code></td></tr>
+<tr><td><code>s.erase(ini, n)</code> / <code>s.erase(ini)</code></td><td>Apaga <code>n</code> caracteres / até o fim</td><td><code>s.erase(4)</code> → <code>"gato"</code></td></tr>
+<tr><td><code>s.pop_back()</code> / <code>s.clear()</code></td><td>Apaga o último / tudo</td><td></td></tr>
+<tr><td><code>==  !=  &lt;  &gt;</code></td><td>Comparam (ordem da tabela de caracteres)</td><td><code>"Zebra" &lt; "abacate"</code> → <code>true</code></td></tr>
+<tr><td><code>s.compare(x)</code></td><td>Negativo, zero ou positivo</td><td><code>s.compare("gato preto")</code> → 0</td></tr>
+<tr><td><code>s.starts_with(x)</code> / <code>s.ends_with(x)</code></td><td>Começa / termina com <code>x</code> <span class="versao">C++20</span></td><td><code>s.ends_with("to")</code> → <code>true</code></td></tr>
+<tr><td><code>s.contains(x)</code></td><td>Contém <code>x</code> <span class="versao">C++23</span></td><td><code>s.contains("ato")</code> → <code>true</code></td></tr>
+<tr><td><code>std::toupper(c)</code> / <code>std::tolower(c)</code></td><td>Um caractere para maiúscula / minúscula (<code>&lt;cctype&gt;</code>)</td><td>Use num laço, com <code>unsigned char</code></td></tr>
+<tr><td><code>std::reverse(s.begin(), s.end())</code></td><td>Inverte a string (<code>&lt;algorithm&gt;</code>)</td><td><code>"gato preto"</code> → <code>"oterp otag"</code></td></tr>
+</table>
+</div>
+<p>Todas as outras funções (<code>find_first_of</code>, <code>resize</code>, <code>swap</code>, <code>c_str</code>…) estão na referência <a href="ref-string.html">std::string</a>.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Achou?</h3>
+<p>Complete a condição que pergunta se <code>"@"</code> existe em <code>email</code>:</p>
+<div class="ex-code">if (email.find('@') != std::string::<input data-answer="npos" aria-label="valor especial">)</div>
+</div>
+
+<div class="exercise">
+<h3>2. Recortar</h3>
+<p>Com <code>data = "16/10/2026"</code>, complete para pegar o ano (os 4 últimos caracteres, a partir da posição 6):</p>
+<div class="ex-code">std::string ano = data.<input data-answer="substr" aria-label="função">(6);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Termina com</h3>
+<p>Complete para perguntar se <code>arquivo</code> termina em <code>.csv</code> (C++20):</p>
+<div class="ex-code">arquivo.<input data-answer="ends_with" aria-label="função">(".csv")</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Com <code>std::string s = "abacaxi";</code>, quanto vale <code>s.substr(2, 3)</code>?</p>
+<label><input type="radio" name="q4"> <code>"ba"</code></label>
+<label><input type="radio" name="q4"> <code>"aca"</code></label>
+<label><input type="radio" name="q4"> <code>"ac"</code></label>
+<label><input type="radio" name="q4"> <code>"acax"</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Com <code>std::string s = "uva";</code>, o que <code>if (s.find("u")) { … }</code> faz?</p>
+<label><input type="radio" name="q5"> Entra no <code>if</code>, porque achou</label>
+<label><input type="radio" name="q5"> Erro de compilação</label>
+<label><input type="radio" name="q5"> Lança <code>std::out_of_range</code></label>
+<label><input type="radio" name="q5"> <strong>Não</strong> entra no <code>if</code>, porque achou na posição 0, que vale "falso"</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Qual destas comparações dá <code>true</code>?</p>
+<label><input type="radio" name="q6"> <code>std::string("Zebra") &lt; "abacate"</code></label>
+<label><input type="radio" name="q6"> <code>std::string("9") &lt; "10"</code></label>
+<label><input type="radio" name="q6"> <code>std::string("Ana") == "ana"</code></label>
+<label><input type="radio" name="q6"> <code>std::string("b").compare("a") &lt; 0</code></label>
+</div>
+
+<h3>Missão final: arrumar o nome do arquivo</h3>
+
+<div class="trycpp" data-goal="out:relatorio_final.txt,out:É texto? true,src:ends_with\s*\(,src:tolower">
+<p class="try-task"><strong>Missão:</strong> o nome do arquivo veio bagunçado. Usando as ferramentas da aula: (1) ache o espaço com <code>find</code> e troque-o por <code>_</code> com <code>replace</code>; (2) passe tudo para minúsculas com <code>std::tolower</code> num laço; (3) responda com <code>ends_with</code> se é um arquivo <code>.txt</code>. A saída deve ser:</p>
+<pre class="out">relatorio_final.txt
+É texto? true</pre>
+<pre class="script">#include &lt;cctype&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string arquivo = "Relatorio Final.TXT";
+    // 1) troque o espaço por _
+
+    // 2) tudo em minúsculas
+
+    std::cout &lt;&lt; arquivo &lt;&lt; '\n';
+    // 3) mostre "É texto? " e a resposta do ends_with
+}
+</pre>
+<pre class="solucao">#include &lt;cctype&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string arquivo = "Relatorio Final.TXT";
+    std::size_t espaco = arquivo.find(' ');
+    arquivo.replace(espaco, 1, "_");
+    for (char&amp; c : arquivo) {
+        c = std::tolower(static_cast&lt;unsigned char&gt;(c));
+    }
+    std::cout &lt;&lt; arquivo &lt;&lt; '\n';
+    std::cout &lt;&lt; std::boolalpha &lt;&lt; "É texto? " &lt;&lt; arquivo.ends_with(".txt") &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>find</code>/<code>rfind</code> devolvem a posição, ou <code>std::string::npos</code> quando não acham. <strong>Sempre</strong> compare com <code>npos</code>; nunca use o resultado sozinho num <code>if</code>.</li>
+  <li><code>substr(ini, n)</code> recorta (o segundo número é a quantidade). Começo além do fim lança <code>std::out_of_range</code>.</li>
+  <li><code>replace(ini, n, x)</code>, <code>insert(ini, x)</code> e <code>erase(ini, n)</code> mudam a própria string.</li>
+  <li><code>==</code> e <code>&lt;</code> comparam pela tabela de caracteres: maiúsculas antes de minúsculas, <code>"10" &lt; "9"</code>. <code>compare</code> devolve negativo, zero ou positivo.</li>
+  <li><code>starts_with</code>/<code>ends_with</code> <span class="versao">C++20</span> e <code>contains</code> <span class="versao">C++23</span> respondem <code>true</code>/<code>false</code>; exigem <code>-std=c++20</code>/<code>c++23</code>.</li>
+  <li>Maiúsculas: laço com <code>std::toupper(static_cast&lt;unsigned char&gt;(c))</code>. Inverter: <code>std::reverse(s.begin(), s.end())</code>. Nenhum dos dois lida bem com acentos.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
