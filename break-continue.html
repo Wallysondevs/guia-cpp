@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ break e continue — sair do laço e pular uma volta | Guia C++</title>
+<meta name="description" content="break e continue em C++ para quem nunca programou: sair de um laço ao achar o que procura, while (true) com break, pular itens com continue, o break dentro de switch, como sair de laços aninhados (variável de controle ou função) e os erros reais do g++ 15, com a lista de compras da Ana.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">break e continue</span></h1>
+
+<p class="intro">Um laço normalmente vai até o fim: dá todas as voltas, e cada volta roda o corpo inteiro. Às vezes você quer <strong>interromper</strong> esse ritmo. Achou o que procurava? Não precisa olhar o resto: <code>break</code> ("quebrar") <strong>sai do laço</strong> na hora. Este item não interessa? <code>continue</code> ("continuar") <strong>pula o resto desta volta</strong> e passa para a próxima.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como usar <code>break</code> para parar uma busca assim que achar o item.</li>
+  <li>Como escrever um laço "infinito de propósito" com <code>while (true)</code> e sair dele com <code>break</code>.</li>
+  <li>Como usar <code>continue</code> para pular itens.</li>
+  <li>A armadilha do <code>break</code> dentro de um <code>switch</code> (ele não sai do laço).</li>
+  <li>Como sair de dois laços, um dentro do outro, de uma vez.</li>
+  <li>Os erros reais: <code>break</code> fora de laço e <code>continue</code> que trava o <code>while</code>.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Vários exemplos usam a lista de compras da Ana, um <code>std::vector&lt;std::string&gt;</code> percorrido com o <a href="for-range.html">for de intervalo</a>.</p>
+
+<hr>
+
+<h2>A ideia: procurar as chaves e pular as gavetas vazias</h2>
+<p>Você perdeu as chaves e vai abrir as gavetas da cozinha, uma por uma.</p>
+<ul>
+  <li>Achou as chaves na terceira gaveta? Você <strong>para de procurar</strong>. Ninguém abre as outras sete "só para terminar". Isso é o <code>break</code>: sai do laço inteiro.</li>
+  <li>Abriu uma gaveta e viu que ela está vazia? Não precisa revirar nada: <strong>fecha e passa para a próxima</strong>. Isso é o <code>continue</code>: abandona só esta volta.</li>
+</ul>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>break</code></th><th><code>continue</code></th></tr>
+<tr><td>O que interrompe</td><td>O <strong>laço inteiro</strong></td><td>Só a <strong>volta atual</strong></td></tr>
+<tr><td>Para onde vai</td><td>Para a primeira linha depois do laço</td><td>Para a próxima volta (no <code>for</code>, passa pelo passo antes)</td></tr>
+<tr><td>Na gaveta</td><td>"Achei! Parei de procurar."</td><td>"Vazia, próxima."</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. <code>break</code>: parar quando achar</h2>
+<p>A Ana quer saber se <code>café</code> está na lista de compras. O programa mostra cada item que olha, para você ver onde a busca para:</p>
+
+<pre class="file" data-file="procurar.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; lista = {"arroz", "feijão", "café", "leite", "pão"};
+    std::string procurado = "café";
+    for (const auto&amp; item : lista) {
+        std::cout &lt;&lt; "Olhando: " &lt;&lt; item &lt;&lt; '\n';
+        if (item == procurado) {
+            std::cout &lt;&lt; "Achei " &lt;&lt; procurado &lt;&lt; "!\n";
+            break;
+        }
+    }
+    std::cout &lt;&lt; "Fim da busca.\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>if (item == procurado)</dt><dd>A pergunta de cada volta: este item é o que eu procuro? (Comparar textos com <code>==</code> funciona com <code>std::string</code>, veja <a href="strings.html">Strings</a>.)</dd>
+  <dt>break;</dt><dd>Sai do laço <strong>imediatamente</strong>. O que restava do corpo e as voltas que faltavam são abandonados. O programa continua na linha depois da <code>}</code> do <code>for</code>.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra procurar.cpp -o procurar
+$ ./procurar
+Olhando: arroz
+Olhando: feijão
+Olhando: café
+Achei café!
+Fim da busca.</pre>
+
+<p><code>leite</code> e <code>pão</code> nem foram olhados. Numa lista de 5 itens a economia é pequena; numa de 1 milhão, achar logo no começo e parar faz muita diferença.</p>
+
+<h3>O orçamento acabou</h3>
+<p>O <code>break</code> também serve para parar quando um limite é atingido. A Ana tem R$ 50 e vai comprando os itens na ordem da lista, até o próximo não caber mais no orçamento:</p>
+
+<pre class="file" data-file="orcamento.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;double&gt; precos = {12.5, 8.0, 27.0, 15.0, 4.5};
+    double orcamento = 50.0;
+    double gasto = 0.0;
+    int comprados = 0;
+    for (double p : precos) {
+        if (gasto + p &gt; orcamento) {
+            std::cout &lt;&lt; "O próximo item (R$ " &lt;&lt; p &lt;&lt; ") estoura o orçamento.\n";
+            break;
+        }
+        gasto += p;
+        comprados++;
+    }
+    std::cout &lt;&lt; "Itens comprados: " &lt;&lt; comprados &lt;&lt; ", gasto: R$ " &lt;&lt; gasto &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra orcamento.cpp -o orcamento
+$ ./orcamento
+O próximo item (R$ 15) estoura o orçamento.
+Itens comprados: 3, gasto: R$ 47.5</pre>
+
+<p>Repare na ordem dentro do corpo: primeiro o teste com <code>break</code>, depois a compra. Quando o <code>break</code> acontece, as linhas <code>gasto += p;</code> e <code>comprados++;</code> daquela volta <strong>não rodam</strong>: o item de R$ 15 não foi comprado.</p>
+
+<div class="trycpp" data-goal="out:Primeiro múltiplo de 7: 21,src:break">
+<p class="try-task"><strong>Missão:</strong> percorra a lista e mostre o <strong>primeiro</strong> número que é múltiplo de 7 (<code>n % 7 == 0</code>, veja <a href="operadores-aritmeticos.html">o resto da divisão</a>), no formato <code>Primeiro múltiplo de 7: 21</code>. Use <code>break</code> para não mostrar o 35, que também é múltiplo.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; numeros = {4, 10, 21, 35, 9};
+    for (int n : numeros) {
+        // teste aqui se n é múltiplo de 7
+
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; numeros = {4, 10, 21, 35, 9};
+    for (int n : numeros) {
+        if (n % 7 == 0) {
+            std::cout &lt;&lt; "Primeiro múltiplo de 7: " &lt;&lt; n &lt;&lt; '\n';
+            break;
+        }
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. <code>while (true)</code> + <code>break</code>: o laço com saída no meio</h2>
+<p>Na aula <a href="while.html">while</a>, a soma até o usuário digitar 0 precisava ler o número <strong>antes</strong> do laço e de novo no fim do corpo. No <a href="do-while.html">do-while</a>, o 0 acabava entrando na soma. Uma terceira forma, muito usada, é um laço que <strong>nunca para sozinho</strong> (<code>while (true)</code>: "enquanto verdadeiro", ou seja, sempre) com uma saída no meio:</p>
+
+<pre class="file" data-file="soma.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int soma = 0;
+    while (true) {
+        int numero = 0;
+        std::cout &lt;&lt; "Digite um número (0 para parar): ";
+        std::cin &gt;&gt; numero;
+        if (numero == 0) {
+            break;
+        }
+        soma += numero;
+    }
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra soma.cpp -o soma
+$ ./soma
+Digite um número (0 para parar): 10
+Digite um número (0 para parar): 25
+Digite um número (0 para parar): 7
+Digite um número (0 para parar): 0
+Soma: 42</pre>
+
+<p>O corpo lê o número <strong>uma vez só</strong>, a saída fica exatamente onde a decisão é tomada, e o 0 não entra na soma. A variável <code>numero</code> pode até nascer dentro do corpo, porque nenhuma condição de <code>while</code> precisa dela. O preço: quem lê o código precisa procurar o <code>break</code> para saber quando o laço termina. Por isso, use <code>while (true)</code> com <strong>uma</strong> saída clara, perto do começo do corpo.</p>
+
+<div class="trycpp" data-stdin="10 25 7 0">
+<p class="try-task"><strong>Experimente:</strong> a entrada já vem pronta (<code>10 25 7 0</code>). Acrescente um contador <code>quantos</code> (crie-o fora do laço e some 1 depois do <code>soma += numero;</code>) e mostre também a média no fim. Depois troque a entrada por outros números, sempre terminando com <code>0</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int soma = 0;
+    while (true) {
+        int numero = 0;
+        std::cout &lt;&lt; "Digite um número (0 para parar): ";
+        std::cin &gt;&gt; numero;
+        if (numero == 0) {
+            break;
+        }
+        soma += numero;
+    }
+    std::cout &lt;&lt; "\nSoma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. <code>continue</code>: pular para a próxima volta</h2>
+<p>Na lista da Ana, o que ela já comprou está marcado com <code>#</code> na frente. Para mostrar só o que falta, o programa <strong>pula</strong> os itens marcados:</p>
+
+<pre class="file" data-file="riscados.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; lista = {"arroz", "#leite", "feijão", "#pão", "café"};
+    std::cout &lt;&lt; "Ainda falta comprar:\n";
+    for (const auto&amp; item : lista) {
+        if (item[0] == '#') {
+            continue;
+        }
+        std::cout &lt;&lt; "- " &lt;&lt; item &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>item[0]</dt><dd>O primeiro caractere do texto (posição 0, veja <a href="acessar-caracteres.html">Acessar Caracteres</a>).</dd>
+  <dt>== '#'</dt><dd>É um <code>#</code>? Então o item já foi comprado.</dd>
+  <dt>continue;</dt><dd>Abandona o <strong>resto desta volta</strong> (o <code>std::cout</code> de baixo não roda) e vai direto para o próximo item.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra riscados.cpp -o riscados
+$ ./riscados
+Ainda falta comprar:
+- arroz
+- feijão
+- café</pre>
+
+<p>O mesmo programa poderia ser escrito sem <code>continue</code>, com o <code>std::cout</code> dentro de um <code>if (item[0] != '#')</code>. Quando o corpo é curto, as duas formas são igualmente boas. O <code>continue</code> ganha quando o corpo é longo: os casos "descartáveis" saem logo no começo, e o resto do corpo não precisa ficar dentro de mais um par de chaves.</p>
+
+<h3>No <code>for</code> clássico: o passo ainda acontece</h3>
+<p>Num <code>for (início; condição; passo)</code>, o <code>continue</code> pula o resto do corpo, mas o <strong>passo roda</strong> normalmente antes da próxima volta. Aqui ele pula os pares e mostra só os ímpares:</p>
+
+<pre class="file" data-file="impares.cpp">#include &lt;iostream&gt;
+
+int main() {
+    for (int i = 1; i &lt;= 10; i++) {
+        if (i % 2 == 0) {
+            continue;
+        }
+        std::cout &lt;&lt; i &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra impares.cpp -o impares
+$ ./impares
+1 3 5 7 9 </pre>
+
+<p>Num <code>while</code>, porém, o passo é uma linha comum do corpo, e o <code>continue</code> pode pulá-lo. Isso trava o programa: veja o primeiro cenário de <a href="#erros">Quando dá errado</a>.</p>
+
+<hr>
+
+<h2 id="switch">4. A armadilha: <code>break</code> dentro de <code>switch</code></h2>
+<p>O <code>break</code> tem dois empregos: sair de um laço e terminar um <code>case</code> do <a href="switch.html">switch</a>. Quando um <code>switch</code> está <strong>dentro</strong> de um laço, o <code>break</code> sai só do que estiver <strong>mais perto</strong>: o <code>switch</code>. Este menu tenta usar o <code>break</code> do <code>case 0</code> para sair do <code>while (true)</code>:</p>
+
+<pre class="file" data-file="menu.cpp">#include &lt;iostream&gt;
+
+int main() {
+    while (true) {
+        int opcao = 0;
+        std::cout &lt;&lt; "1 - Olá   0 - Sair\nOpção: ";
+        std::cin &gt;&gt; opcao;
+        switch (opcao) {
+            case 1:
+                std::cout &lt;&lt; "Olá!\n";
+                break;
+            case 0:
+                std::cout &lt;&lt; "Saindo...\n";
+                break;
+        }
+    }
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra menu.cpp -o menu
+$ ./menu
+1 - Olá   0 - Sair
+Opção: 1
+Olá!
+1 - Olá   0 - Sair
+Opção: 0
+Saindo...
+1 - Olá   0 - Sair
+Opção: 0
+Saindo...
+1 - Olá   0 - Sair
+Opção: ^C                « só o Ctrl+C resolveu
+$ echo $?
+130</pre>
+
+<p>O programa diz "Saindo..." e não sai. O <code>break</code> do <code>case 0</code> terminou o <code>switch</code>, o corpo do <code>while</code> acabou, e o <code>while (true)</code> começou outra volta. O "Até logo!" nunca aparece. O compilador não avisa: o código é válido.</p>
+
+<p>Há três consertos comuns:</p>
+<ol>
+  <li><strong>Uma variável de controle</strong> (<em>flag</em>, "bandeirinha"), que o <code>case 0</code> liga e a condição do laço olha:
+<pre class="file" data-file="menu2.cpp">#include &lt;iostream&gt;
+
+int main() {
+    bool sair = false;
+    while (!sair) {
+        int opcao = 0;
+        std::cout &lt;&lt; "1 - Olá   0 - Sair\nOpção: ";
+        std::cin &gt;&gt; opcao;
+        switch (opcao) {
+            case 1:
+                std::cout &lt;&lt; "Olá!\n";
+                break;
+            case 0:
+                sair = true;
+                break;
+        }
+    }
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra menu2.cpp -o menu2
+$ ./menu2
+1 - Olá   0 - Sair
+Opção: 1
+Olá!
+1 - Olá   0 - Sair
+Opção: 0
+Até logo!</pre>
+  </li>
+  <li><strong>Um <code>do-while</code> com a condição <code>opcao != 0</code></strong>, como o menu da aula <a href="do-while.html">do-while</a>.</li>
+  <li><strong>Trocar o <code>switch</code> por <code>if</code>/<code>else if</code></strong>: aí o <code>break</code> dentro do <code>if</code> sai do laço, porque <code>if</code> não "captura" o <code>break</code>.</li>
+</ol>
+
+<hr>
+
+<h2 id="aninhados">5. Sair de dois laços de uma vez</h2>
+<p>Quando há um laço dentro de outro (veja <a href="lacos-aninhados.html">Laços Aninhados</a>), o mesmo princípio vale: o <code>break</code> sai só do laço <strong>mais de dentro</strong>. A Ana quer arrumar 24 ovos numa bandeja retangular de até 9 × 9. Qual é o primeiro formato (linhas × colunas) que serve?</p>
+
+<pre class="file" data-file="bandeja.cpp">#include &lt;iostream&gt;
+
+int main() {
+    for (int linhas = 1; linhas &lt;= 9; linhas++) {
+        for (int colunas = 1; colunas &lt;= 9; colunas++) {
+            if (linhas * colunas == 24) {
+                std::cout &lt;&lt; "Bandeja " &lt;&lt; linhas &lt;&lt; " x " &lt;&lt; colunas &lt;&lt; '\n';
+                break;
+            }
+        }
+    }
+    std::cout &lt;&lt; "Fim\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra bandeja.cpp -o bandeja
+$ ./bandeja
+Bandeja 3 x 8
+Bandeja 4 x 6
+Bandeja 6 x 4
+Bandeja 8 x 3
+Fim</pre>
+
+<p>A ideia era parar no primeiro, mas o <code>break</code> só encerrou o laço das <code>colunas</code>. O laço das <code>linhas</code> seguiu para a linha 4, depois 5… e achou outros formatos. Para sair dos dois, há duas formas recomendadas.</p>
+
+<h3>Forma 1: uma variável de controle</h3>
+<pre class="file" data-file="bandeja_flag.cpp">#include &lt;iostream&gt;
+
+int main() {
+    bool achou = false;
+    for (int linhas = 1; linhas &lt;= 9 &amp;&amp; !achou; linhas++) {
+        for (int colunas = 1; colunas &lt;= 9; colunas++) {
+            if (linhas * colunas == 24) {
+                std::cout &lt;&lt; "Bandeja " &lt;&lt; linhas &lt;&lt; " x " &lt;&lt; colunas &lt;&lt; '\n';
+                achou = true;
+                break;
+            }
+        }
+    }
+    std::cout &lt;&lt; "Fim\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra bandeja_flag.cpp -o bandeja_flag
+$ ./bandeja_flag
+Bandeja 3 x 8
+Fim</pre>
+
+<p>O <code>break</code> sai do laço de dentro; a condição do laço de fora, <code>linhas &lt;= 9 &amp;&amp; !achou</code> ("e ainda não achou", veja <a href="operadores-logicos.html">Operadores Lógicos</a>), fica falsa e encerra o de fora também.</p>
+
+<h3>Forma 2: uma função com <code>return</code></h3>
+<p>O <code>return</code> sai da <strong>função inteira</strong>, não importa quantos laços existam lá dentro. Se a busca ficar numa função separada, ele resolve tudo de uma vez. Funções têm aula própria (<a href="funcoes.html">Funções</a>); por enquanto, leia <code>void procurar_bandeja() { … }</code> como "um bloco de código com nome, que o <code>main</code> chama":</p>
+
+<pre class="file" data-file="bandeja_funcao.cpp">#include &lt;iostream&gt;
+
+void procurar_bandeja() {
+    for (int linhas = 1; linhas &lt;= 9; linhas++) {
+        for (int colunas = 1; colunas &lt;= 9; colunas++) {
+            if (linhas * colunas == 24) {
+                std::cout &lt;&lt; "Bandeja " &lt;&lt; linhas &lt;&lt; " x " &lt;&lt; colunas &lt;&lt; '\n';
+                return;
+            }
+        }
+    }
+    std::cout &lt;&lt; "Nenhuma bandeja serve.\n";
+}
+
+int main() {
+    procurar_bandeja();
+    std::cout &lt;&lt; "Fim\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra bandeja_funcao.cpp -o bandeja_funcao
+$ ./bandeja_funcao
+Bandeja 3 x 8
+Fim</pre>
+
+<p>Quando a busca é a parte principal do trabalho, a função é a forma mais limpa: o nome <code>procurar_bandeja</code> já explica o que os laços fazem.</p>
+
+<div class="note">
+<strong>E o <code>goto</code>?</strong>
+<p>O C++ herdou do C o comando <code>goto</code>, que pula para um rótulo em qualquer ponto da função, e às vezes ele aparece em código antigo justamente para sair de laços aninhados. Este guia não o ensina: ele torna o caminho do programa difícil de seguir, e as duas formas acima resolvem o mesmo problema com clareza.</p>
+</div>
+
+<hr>
+
+<h2>Qual usar?</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Ferramenta</th></tr>
+<tr><td>Achei o que procurava; o resto não interessa</td><td><code>break</code></td></tr>
+<tr><td>Repetir até uma condição que só se sabe no meio do corpo</td><td><code>while (true)</code> + <code>break</code></td></tr>
+<tr><td>Este item não interessa, mas os próximos sim</td><td><code>continue</code> (ou um <code>if</code> em volta do resto)</td></tr>
+<tr><td>Sair do laço de dentro de um <code>switch</code></td><td>Variável de controle, <code>do-while</code> ou <code>if</code>/<code>else if</code></td></tr>
+<tr><td>Sair de dois laços aninhados</td><td>Variável de controle, ou função com <code>return</code></td></tr>
+</table>
+</div>
+
+<p>Não exagere: um laço com três <code>break</code> e dois <code>continue</code> espalhados é difícil de entender. Se a condição de parada cabe naturalmente no <code>while</code> ou no <code>for</code>, deixe-a lá.</p>
+
+<hr>
+
+<h2 id="erros">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>O programa trava (o <code>continue</code> pulou o passo do <code>while</code>)</strong>
+<pre class="file" data-file="continuewhile.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int i = 0;
+    std::cout &lt;&lt; "Ímpares:" &lt;&lt; std::endl;
+    while (i &lt; 10) {
+        if (i % 2 == 0) {
+            continue;
+        }
+        std::cout &lt;&lt; i &lt;&lt; ' ';
+        i++;
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra continuewhile.cpp -o continuewhile
+$ timeout 3 ./continuewhile
+Ímpares:
+$ echo $?
+124</pre>
+<p><strong>O que aconteceu:</strong> <code>i</code> começa em 0, que é par: o <code>continue</code> volta para a condição <strong>sem passar pelo <code>i++</code></strong>. <code>i</code> continua 0 para sempre, e o programa nunca mostra nada. O <code>timeout</code> o encerrou depois de 3 segundos (código <code>124</code>, veja <a href="while.html#infinito">o laço infinito</a>).</p>
+<p><strong>Como consertar:</strong> faça o passo <strong>antes</strong> do <code>continue</code> (ou no começo do corpo), ou use um <code>for</code>, cujo passo sempre roda.</p>
+</div>
+
+<div class="cenario">
+<strong>"break statement not within loop or switch"</strong>
+<pre class="file" data-file="fora.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int x = 5;
+    if (x &gt; 3) {
+        break;
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra fora.cpp -o fora
+fora.cpp: In function ‘int main()’:
+fora.cpp:6:9: error: break statement not within loop or switch
+    6 |         break;
+      |         ^~~~~</pre>
+<p><strong>O que significa:</strong> "instrução <code>break</code> fora de um laço ou <code>switch</code>". O <code>break</code> não sai de um <code>if</code>; ele só existe dentro de <code>while</code>, <code>do-while</code>, <code>for</code> ou <code>switch</code>. O <code>continue</code> é ainda mais restrito: só dentro de laços. No editor do guia, o Clang diz <code>error: 'break' statement not in loop or switch statement</code>.</p>
+<p><strong>Como consertar:</strong> se a ideia era "não fazer o resto", use <code>if</code>/<code>else</code>. Se era "terminar o programa", use <code>return 0;</code> dentro do <code>main</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O menu diz "Saindo..." e não sai</strong>
+<p><strong>O que aconteceu:</strong> o <code>break</code> estava dentro de um <code>switch</code> e saiu só dele (<a href="#switch">seção 4</a>).</p>
+<p><strong>Como consertar:</strong> variável de controle (<code>bool sair</code>), <code>do-while (opcao != 0)</code> ou <code>if</code>/<code>else if</code> no lugar do <code>switch</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A busca achou mais de um resultado</strong>
+<p><strong>O que aconteceu:</strong> com laços aninhados, o <code>break</code> saiu só do laço de dentro, e o de fora continuou procurando (<a href="#aninhados">seção 5</a>).</p>
+<p><strong>Como consertar:</strong> uma variável <code>bool achou</code> na condição do laço de fora, ou a busca numa função com <code>return</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que faz</th></tr>
+<tr><td><code>break;</code></td><td>Sai do laço (ou <code>switch</code>) mais próximo; segue na linha depois dele.</td></tr>
+<tr><td><code>continue;</code></td><td>Pula o resto desta volta; no <code>for</code>, roda o passo e testa a condição.</td></tr>
+<tr><td><code>while (true) { …; if (fim) break; … }</code></td><td>Laço com a saída no meio.</td></tr>
+<tr><td><code>for (;;) { … }</code></td><td>O mesmo laço "sem fim", escrito com <code>for</code>.</td></tr>
+<tr><td><code>bool achou = false; for (…; … &amp;&amp; !achou; …)</code></td><td>Variável de controle para sair de laços aninhados.</td></tr>
+<tr><td><code>return;</code></td><td>Sai da função inteira, com todos os laços dela.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Parar a busca</h3>
+<p>Complete para sair do laço quando achar o número 42:</p>
+<div class="ex-code">for (int n : numeros) { if (n == 42) { <input data-answer="break;|break" aria-label="comando"> } }</div>
+</div>
+
+<div class="exercise">
+<h3>2. Pular os negativos</h3>
+<p>Complete para somar só os números positivos:</p>
+<div class="ex-code">for (int n : numeros) { if (n &lt; 0) { <input data-answer="continue;|continue" aria-label="comando"> } soma += n; }</div>
+</div>
+
+<div class="exercise">
+<h3>3. O que aparece?</h3>
+<p>O que este laço mostra? <code>for (int i = 1; i &lt;= 5; i++) { if (i == 3) break; std::cout &lt;&lt; i; }</code></p>
+<div class="ex-code"><input data-answer="12" aria-label="saída"></div>
+</div>
+
+<div class="exercise">
+<h3>4. E agora?</h3>
+<p>E este? <code>for (int i = 1; i &lt;= 5; i++) { if (i == 3) continue; std::cout &lt;&lt; i; }</code></p>
+<div class="ex-code"><input data-answer="1245" aria-label="saída"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Um <code>break</code> dentro de um <code>case</code> de um <code>switch</code>, que está dentro de um <code>while</code>, sai de quê?</p>
+<label><input type="radio" name="q5"> Do <code>while</code> e do <code>switch</code></label>
+<label><input type="radio" name="q5"> Do programa inteiro</label>
+<label><input type="radio" name="q5"> Só do <code>switch</code></label>
+<label><input type="radio" name="q5"> Só do <code>while</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">6. Qual é a forma recomendada para sair de dois laços aninhados ao mesmo tempo?</p>
+<label><input type="radio" name="q6"> Dois <code>break</code> seguidos (<code>break; break;</code>)</label>
+<label><input type="radio" name="q6"> Uma variável de controle na condição do laço de fora, ou uma função com <code>return</code></label>
+<label><input type="radio" name="q6"> Um <code>continue</code> no laço de dentro</label>
+<label><input type="radio" name="q6"> Não é possível em C++</label>
+</div>
+
+<h3>Missão final: somar só os preços válidos</h3>
+<div class="trycpp" data-goal="out:Soma: 47.5,src:continue">
+<p class="try-task"><strong>Missão:</strong> a planilha da lojinha tem preços inválidos (zero ou negativos) misturados aos bons. Use <code>continue</code> para <strong>pular</strong> os preços menores ou iguais a zero e some o resto. O resultado deve ser <code>Soma: 47.5</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;double&gt; precos = {12.5, -1.0, 8.0, 0.0, 27.0};
+    double soma = 0.0;
+    for (double p : precos) {
+        soma += p;
+    }
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;double&gt; precos = {12.5, -1.0, 8.0, 0.0, 27.0};
+    double soma = 0.0;
+    for (double p : precos) {
+        if (p &lt;= 0) {
+            continue;
+        }
+        soma += p;
+    }
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>break</code> sai do laço na hora; o programa continua depois dele. Ideal para buscas: achou, parou.</li>
+  <li><code>while (true)</code> + <code>break</code> põe a saída exatamente onde a decisão é tomada.</li>
+  <li><code>continue</code> pula o resto da volta atual e vai para a próxima. No <code>for</code>, o passo ainda roda; no <code>while</code>, cuidado para não pular o passo.</li>
+  <li>Dentro de um <code>switch</code>, o <code>break</code> sai só do <code>switch</code>, não do laço.</li>
+  <li>Com laços aninhados, o <code>break</code> sai só do de dentro. Para sair dos dois: variável de controle ou função com <code>return</code>. O <code>goto</code> existe, mas evite.</li>
+  <li><code>break</code> fora de laço ou <code>switch</code> não compila: <code>break statement not within loop or switch</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
