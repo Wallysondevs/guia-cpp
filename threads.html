@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Threads — fazer várias coisas ao mesmo tempo | Guia C++</title>
+<meta name="description" content="Threads em C++ para quem está começando: o que é concorrência, std::thread e join, o terminate ao esquecer o join, passar argumentos e std::ref, condição de corrida com saídas reais inconsistentes, std::mutex e std::lock_guard, std::jthread (C++20) e std::async, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Threads</span></h1>
+
+<p class="intro">Até aqui, todo programa fez uma coisa de cada vez: uma linha, depois a próxima. Mas o computador da Ana tem vários núcleos de processador, e muitos programas fazem várias coisas <strong>ao mesmo tempo</strong>: um jogo desenha a tela enquanto toca a música; um navegador baixa várias imagens de uma vez. Cada uma dessas "linhas de trabalho" é uma <strong>thread</strong>. Nesta aula você vai criar threads, ver os erros clássicos acontecerem de verdade (inclusive um que muda de resultado a cada execução) e aprender a primeira ferramenta para evitá-los, o <code>std::mutex</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é concorrência e o que é uma thread.</li>
+  <li>Criar uma thread com <code>std::thread</code> e esperar por ela com <code>join()</code>.</li>
+  <li>O que acontece quando você esquece o <code>join()</code> (<code>terminate</code>, o erro real).</li>
+  <li>Passar argumentos para a thread, e por que referências precisam de <code>std::ref</code>.</li>
+  <li>O que é uma <strong>condição de corrida</strong>, com um contador que dá um resultado diferente a cada execução.</li>
+  <li>Proteger dados com <code>std::mutex</code> e <code>std::lock_guard</code>.</li>
+  <li><code>std::jthread</code> <span class="versao">C++20</span>, que espera sozinho, e o <code>std::async</code>, só de passagem.</li>
+</ul>
+</div>
+
+<div class="warning">
+<strong>Threads não rodam no editor do guia</strong>
+<p>O editor "Experimente" roda o seu programa dentro do navegador, num ambiente (WebAssembly) que não oferece threads. Por isso, os programas com <code>std::thread</code> desta aula aparecem só no terminal do laboratório, com as saídas reais. As caixas de "Experimente" ensinam as partes que funcionam sem threads: a lógica de uma condição de corrida, simulada passo a passo, e a divisão de um trabalho em partes. Para rodar as threads de verdade, use o g++ no seu computador (aula <a href="instalar-linux.html">Instalar no Linux</a>).</p>
+</div>
+
+<p>Os programas foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com o comando padrão <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Todos usam no máximo duas threads além da principal e terminam em menos de um segundo. Você vai precisar de <a href="funcoes.html">Funções</a>, <a href="passagem-referencia.html">Por Valor × Por Referência</a> e <a href="lambdas.html">Lambdas</a>.</p>
+
+<hr>
+
+<h2>A ideia: duas pessoas na mesma cozinha</h2>
+<p>Hoje é dia de almoço especial na casa da Ana. Se ela fizer tudo sozinha, primeiro cozinha, depois lava a louça. Se o Bruno ajudar, os dois trabalham <strong>ao mesmo tempo</strong>: ela cozinha enquanto ele lava. Isso é <strong>concorrência</strong>: vários trabalhos andando juntos.</p>
+<p>Mas trabalhar junto traz problemas novos:</p>
+<ul>
+  <li>A Ana precisa <strong>esperar</strong> o Bruno terminar antes de servir o almoço (isso vai ser o <code>join</code>).</li>
+  <li>Se os dois forem marcar no mesmo caderninho quantos pratos já ficaram prontos, um pode apagar a marca do outro (isso vai ser a <strong>condição de corrida</strong>).</li>
+  <li>A solução para o caderninho: uma regra de "um de cada vez", como uma chave que só um pode segurar (isso vai ser o <code>mutex</code>).</li>
+</ul>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Palavra</th><th>Quer dizer</th></tr>
+<tr><td><strong>Thread</strong> ("fio", "linha")</td><td>Uma linha de execução: uma sequência de instruções rodando. Todo programa começa com uma, a do <code>main</code>.</td></tr>
+<tr><td><strong>Concorrência</strong></td><td>Vários trabalhos em andamento ao mesmo tempo.</td></tr>
+<tr><td><strong>Paralelismo</strong></td><td>Vários trabalhos rodando literalmente no mesmo instante, em núcleos diferentes do processador.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. A primeira thread: <code>std::thread</code> e <code>join</code></h2>
+
+<pre class="file" data-file="primeira.cpp">#include &lt;iostream&gt;
+#include &lt;thread&gt;
+
+void lavar_louca() {
+    std::cout &lt;&lt; "Bruno: lavando a louça\n";
+}
+
+int main() {
+    std::thread ajudante(lavar_louca);
+    std::cout &lt;&lt; "Ana: fazendo o almoço\n";
+    ajudante.join();
+    std::cout &lt;&lt; "Ana: tudo pronto!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra primeira.cpp -o primeira
+$ ./primeira
+Ana: fazendo o almoço
+Bruno: lavando a louça
+Ana: tudo pronto!</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;thread&gt;</dt><dd>O cabeçalho das threads.</dd>
+  <dt>std::thread ajudante(lavar_louca);</dt><dd>Cria uma thread chamada <code>ajudante</code>, que começa <strong>imediatamente</strong> a executar a função <code>lavar_louca</code>. Repare: o nome da função vai sem parênteses. Você não está chamando a função; está entregando-a para a thread chamar.</dd>
+  <dt>std::cout &lt;&lt; "Ana: …"</dt><dd>Enquanto isso, o <code>main</code> continua na thread principal.</dd>
+  <dt>ajudante.join();</dt><dd><em>Join</em> = "juntar-se". O <code>main</code> <strong>para e espera</strong> até a thread <code>ajudante</code> terminar. Depois do <code>join</code>, é garantido que a louça foi lavada.</dd>
+</dl>
+
+<p>Quem escreveu primeiro, a Ana ou o Bruno? <strong>Não dá para saber de antemão.</strong> Aqui a Ana venceu, porque criar uma thread leva um tempinho; em outro computador, ou num momento em que o sistema estiver ocupado, a ordem pode se inverter. Em programas com threads, a ordem entre threads diferentes não é garantida, a menos que você mesmo a garanta (com <code>join</code>, por exemplo). O "tudo pronto!", esse sim, sempre sai por último: ele vem depois do <code>join</code>.</p>
+
+<div class="tip">
+<strong>Preciso de <code>-pthread</code>?</strong>
+<p>Em tutoriais antigos, o comando para compilar threads no Linux tem <code>-pthread</code> no fim. Conferimos: com o g++ 15 do Ubuntu 26.04, o comando padrão do guia funciona sem ela, porque a biblioteca de threads passou a fazer parte da biblioteca C principal (glibc 2.34, de 2021). Em sistemas mais antigos, sem <code>-pthread</code> o programa pode falhar ao compilar ou ao rodar. Acrescentá-la não faz mal: se for usar um Linux antigo, escreva <code>g++ -std=c++23 -Wall -Wextra -pthread …</code>.</p>
+</div>
+
+<h3>Esquecer o <code>join</code>: <code>terminate</code></h3>
+<p>Toda <code>std::thread</code> criada precisa de um <code>join()</code> antes de ser destruída (ou de um <code>detach()</code>, que a "solta" para sempre e quase nunca é uma boa ideia). Se o <code>main</code> chegar ao fim com a thread ainda "presa" ao objeto, o C++ derruba o programa inteiro:</p>
+
+<pre class="file" data-file="sem_join.cpp">#include &lt;iostream&gt;
+#include &lt;thread&gt;
+
+void lavar_louca() {
+    std::cout &lt;&lt; "Bruno: lavando a louça\n";
+}
+
+int main() {
+    std::thread ajudante(lavar_louca);
+    std::cout &lt;&lt; "Ana: fazendo o almoço\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sem_join.cpp -o sem_join      « compila sem aviso nenhum
+$ ./sem_join
+Ana: fazendo o almoço
+terminate called without an active exception
+Abortado                   (imagem do núcleo gravada) ./sem_join
+$ echo $?
+134</pre>
+
+<dl class="anatomy">
+  <dt>terminate called without an active exception</dt><dd>"<code>terminate</code> foi chamado sem nenhuma exceção ativa." <code>std::terminate</code> é a função que encerra o programa à força. Normalmente ela aparece por causa de uma exceção não capturada (aula <a href="excecoes.html">Exceções</a>); aqui, não houve exceção: foi o objeto <code>ajudante</code> sendo destruído no fim do <code>main</code> sem ter feito <code>join</code>.</dd>
+  <dt>Abortado</dt><dd>O programa morreu com o sinal de abortar (código de saída 134 = 128 + 6).</dd>
+</dl>
+
+<p>E o Bruno nem chegou a lavar a louça: o programa morreu antes. A regra: <strong>para cada <code>std::thread</code>, um <code>join()</code></strong>. Ou use a <code>std::jthread</code> da seção 5, que faz o <code>join</code> sozinha.</p>
+
+<hr>
+
+<h2>2. Passar argumentos</h2>
+<p>Depois do nome da função, coloque os argumentos que ela recebe, separados por vírgula:</p>
+
+<pre class="file" data-file="argumentos.cpp">#include &lt;chrono&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;thread&gt;
+
+void baixar(std::string arquivo, int partes) {
+    for (int i = 1; i &lt;= partes; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::cout &lt;&lt; arquivo + ": parte " + std::to_string(i) + " de " + std::to_string(partes) + "\n";
+    }
+}
+
+int main() {
+    std::thread t1(baixar, "fotos.zip", 3);
+    std::thread t2(baixar, "musica.mp3", 2);
+
+    t1.join();
+    t2.join();
+    std::cout &lt;&lt; "Downloads concluídos\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra argumentos.cpp -o argumentos
+$ ./argumentos
+fotos.zip: parte 1 de 3
+musica.mp3: parte 1 de 2             « os dois "downloads" andam juntos
+fotos.zip: parte 2 de 3
+musica.mp3: parte 2 de 2
+fotos.zip: parte 3 de 3
+Downloads concluídos</pre>
+
+<p>Os dois "downloads" (fingidos, com o <code>sleep_for</code> da aula <a href="chrono.html">Tempo e Datas</a>) andaram lado a lado: o programa todo levou cerca de 0,3 s, e não 0,5 s, como levaria fazendo um depois do outro. A ordem entre as linhas de <code>fotos.zip</code> e <code>musica.mp3</code> pode variar de uma execução para outra. Repare também que cada linha é montada inteira com <code>+</code> antes de ir para o <code>cout</code>: com vários <code>&lt;&lt;</code> separados, os pedaços das duas threads poderiam se misturar no meio da linha.</p>
+
+<h3>Referências precisam de <code>std::ref</code></h3>
+<p>A <code>std::thread</code> <strong>copia</strong> todos os argumentos, por segurança: a thread pode viver mais que as variáveis de quem a criou. Se a função recebe uma referência (para devolver um resultado, por exemplo), você precisa dizer explicitamente "passe por referência" com <code>std::ref</code>, de <code>&lt;functional&gt;</code>:</p>
+
+<pre class="file" data-file="referencia.cpp">#include &lt;functional&gt;
+#include &lt;iostream&gt;
+#include &lt;thread&gt;
+
+void contar_ate(int limite, int&amp; resultado) {
+    int soma = 0;
+    for (int i = 1; i &lt;= limite; ++i) {
+        soma += i;
+    }
+    resultado = soma;
+}
+
+int main() {
+    int total = 0;
+    std::thread t(contar_ate, 100, std::ref(total));
+    t.join();
+    std::cout &lt;&lt; "Soma de 1 a 100: " &lt;&lt; total &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra referencia.cpp -o referencia
+$ ./referencia
+Soma de 1 a 100: 5050</pre>
+
+<p>Sem o <code>std::ref</code> (escrevendo só <code>total</code>), o g++ recusa:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sem_ref.cpp -o sem_ref
+In file included from /usr/include/c++/15/stop_token:40,
+                 from /usr/include/c++/15/thread:44,
+                 from sem_ref.cpp:3:
+/usr/include/c++/15/bits/std_thread.h: In instantiation of ‘std::thread::thread(_Callable&amp;&amp;, _Args&amp;&amp; ...) [with _Callable = void (&amp;)(int, int&amp;); _Args = {int, int&amp;}; &lt;template-parameter-1-3&gt; = void]’:
+sem_ref.cpp:15:41:   required from here
+   15 |     std::thread t(contar_ate, 100, total);
+      |                                         ^
+/usr/include/c++/15/bits/std_thread.h:168:72: error: static assertion failed: std::thread arguments must be invocable after conversion to rvalues
+  168 |                                       typename decay&lt;_Args&gt;::type...&gt;::value,
+      |                                                                        ^~~~~
+                                     « … e mais 19 linhas</pre>
+
+<p>A frase importante é <em>std::thread arguments must be invocable after conversion to rvalues</em>: "os argumentos da <code>std::thread</code> precisam funcionar depois de convertidos em valores temporários". Traduzindo: a thread copiou o <code>total</code> para uma cópia temporária, e uma referência <code>int&amp;</code> não pode se ligar a uma cópia temporária. Isso é proposital: se deixasse, a função alteraria a cópia, e o seu <code>total</code> continuaria 0 sem você entender por quê. A linha <code>sem_ref.cpp:15:41: required from here</code> aponta a sua linha.</p>
+
+<div class="warning">
+<strong>Quem passa referência promete manter a variável viva</strong>
+<p>Com <code>std::ref(total)</code>, a thread mexe na variável <code>total</code> do <code>main</code>. Ela precisa existir até a thread terminar, ou seja, até o <code>join</code>. É por isso que o <code>join</code> vem antes de usar o <code>total</code>.</p>
+</div>
+
+<p>Em vez de uma função separada, também dá para passar uma <a href="lambdas.html">lambda</a>: <code>std::thread t([&amp;total] { total = 42; });</code>. A captura <code>[&amp;total]</code> faz o papel do <code>std::ref</code>.</p>
+
+<hr>
+
+<h2>3. Condição de corrida: o contador que perde contas</h2>
+<p>Duas threads vão contar visitas num contador compartilhado, 100 mil cada uma. O resultado deveria ser 200 mil:</p>
+
+<pre class="file" data-file="corrida.cpp">#include &lt;iostream&gt;
+#include &lt;thread&gt;
+
+int contador = 0;
+
+void visitar() {
+    for (int i = 0; i &lt; 100000; ++i) {
+        ++contador;
+    }
+}
+
+int main() {
+    std::thread a(visitar);
+    std::thread b(visitar);
+    a.join();
+    b.join();
+    std::cout &lt;&lt; "Esperado: 200000, obtido: " &lt;&lt; contador &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra corrida.cpp -o corrida
+$ ./corrida
+Esperado: 200000, obtido: 102492
+$ ./corrida
+Esperado: 200000, obtido: 111838
+$ ./corrida
+Esperado: 200000, obtido: 105624     « três execuções, três resultados, todos errados</pre>
+
+<p>Quase metade das visitas sumiu, e cada execução perdeu uma quantidade diferente. No seu computador, os números serão outros (podem até, por sorte, sair certos de vez em quando, o que torna esse erro ainda mais traiçoeiro). Esse defeito se chama <strong>condição de corrida</strong> (<em>race condition</em>): o resultado depende de quem "corre" mais rápido.</p>
+
+<h3>Por que as contas se perdem</h3>
+<p><code>++contador</code> parece uma coisa só, mas para o processador são <strong>três passos</strong>: ler o valor da memória, somar 1, escrever de volta. Se as duas threads intercalarem esses passos, uma escrita apaga a outra:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Passo</th><th>Thread A</th><th>Thread B</th><th><code>contador</code> na memória</th></tr>
+<tr><td>1</td><td>lê: 0</td><td></td><td>0</td></tr>
+<tr><td>2</td><td></td><td>lê: 0</td><td>0</td></tr>
+<tr><td>3</td><td>soma: 0 + 1 = 1</td><td></td><td>0</td></tr>
+<tr><td>4</td><td></td><td>soma: 0 + 1 = 1</td><td>0</td></tr>
+<tr><td>5</td><td>escreve 1</td><td></td><td>1</td></tr>
+<tr><td>6</td><td></td><td>escreve 1</td><td><strong>1</strong> (deveria ser 2)</td></tr>
+</table>
+</div>
+
+<p>Duas visitas, uma só contada. Repetido milhares de vezes, sobra o resultado que você viu. Para o C++, duas threads mexendo na mesma variável ao mesmo tempo, com pelo menos uma escrevendo, é um <strong>data race</strong> ("corrida de dados") e é <a href="comportamento-indefinido.html">comportamento indefinido</a>: perder contas é só um dos efeitos possíveis. O compilador não avisa nada. Para pegar esse erro ao rodar, existe o ThreadSanitizer, <code>-fsanitize=thread</code> (aula <a href="sanitizers.html">Sanitizers</a>).</p>
+
+<p>Você pode reproduzir a tabela sem threads, executando os passos na ordem errada de propósito. Isso funciona no editor:</p>
+
+<div class="trycpp" data-goal="out:Contador: 2">
+<p class="try-task"><strong>Missão:</strong> o programa simula, sem threads, a tabela acima: Ana e Bruno leem o contador antes de o outro escrever, e uma soma se perde (sai <code>Contador: 1</code>). Reordene as linhas, sem mudar nenhuma, para que o Bruno só leia <strong>depois</strong> de a Ana escrever. A saída deve ser <code>Contador: 2</code>. É exatamente isso que o <code>mutex</code> da próxima seção garante.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int contador = 0;
+
+    // Ana e Bruno querem somar 1 ao contador "ao mesmo tempo".
+    int copia_ana = contador;        // 1. Ana lê o contador
+    int copia_bruno = contador;      // 2. Bruno lê o contador
+    copia_ana = copia_ana + 1;       // 3. Ana soma 1 na cópia dela
+    copia_bruno = copia_bruno + 1;   // 4. Bruno soma 1 na cópia dele
+    contador = copia_ana;            // 5. Ana escreve o resultado
+    contador = copia_bruno;          // 6. Bruno escreve o resultado
+
+    std::cout &lt;&lt; "Contador: " &lt;&lt; contador &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int contador = 0;
+
+    // Ana e Bruno querem somar 1 ao contador "ao mesmo tempo".
+    int copia_ana = contador;        // 1. Ana lê o contador
+    copia_ana = copia_ana + 1;       // 3. Ana soma 1 na cópia dela
+    contador = copia_ana;            // 5. Ana escreve o resultado
+    int copia_bruno = contador;      // 2. Bruno lê o contador
+    copia_bruno = copia_bruno + 1;   // 4. Bruno soma 1 na cópia dele
+    contador = copia_bruno;          // 6. Bruno escreve o resultado
+
+    std::cout &lt;&lt; "Contador: " &lt;&lt; contador &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>4. <code>std::mutex</code> e <code>std::lock_guard</code>: um de cada vez</h2>
+<p>Um <strong>mutex</strong> (de <em>mutual exclusion</em>, "exclusão mútua") é como a chave do banheiro de um posto de gasolina: só quem está com a chave entra; os outros esperam na porta. Quem tranca o mutex antes de mexer no contador tem certeza de que ninguém mais está mexendo nele ao mesmo tempo.</p>
+
+<pre class="file" data-file="mutex.cpp">#include &lt;iostream&gt;
+#include &lt;mutex&gt;
+#include &lt;thread&gt;
+
+int contador = 0;
+std::mutex trava;
+
+void visitar() {
+    for (int i = 0; i &lt; 100000; ++i) {
+        std::lock_guard&lt;std::mutex&gt; guarda(trava);
+        ++contador;
+    }
+}
+
+int main() {
+    std::thread a(visitar);
+    std::thread b(visitar);
+    a.join();
+    b.join();
+    std::cout &lt;&lt; "Esperado: 200000, obtido: " &lt;&lt; contador &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra mutex.cpp -o mutex
+$ ./mutex
+Esperado: 200000, obtido: 200000
+$ ./mutex
+Esperado: 200000, obtido: 200000     « certo, toda vez</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;mutex&gt;</dt><dd>O cabeçalho do mutex e do <code>lock_guard</code>.</dd>
+  <dt>std::mutex trava;</dt><dd>O mutex, compartilhado pelas threads (como o contador). Ele começa destrancado.</dd>
+  <dt>std::lock_guard&lt;std::mutex&gt; guarda(trava);</dt><dd>Tranca o mutex. Se outra thread estiver com ele, esta <strong>espera</strong> aqui até ele ser liberado. <em>Lock guard</em> = "guarda da tranca".</dd>
+  <dt>++contador;</dt><dd>Agora os três passos (ler, somar, escrever) acontecem sem ninguém no meio.</dd>
+  <dt>} (fim da volta do for)</dt><dd>O <code>guarda</code> sai de escopo e <strong>destranca sozinho</strong> o mutex. É a técnica RAII (aula <a href="destrutores-raii.html">Destrutores e RAII</a>).</dd>
+</dl>
+
+<p>Por que não chamar <code>trava.lock()</code> e <code>trava.unlock()</code> na mão? Funciona, mas se você esquecer o <code>unlock</code> (ou se uma exceção acontecer no meio), o mutex fica trancado para sempre e as outras threads esperam eternamente: o programa trava (um <strong>deadlock</strong>). O <code>lock_guard</code> não esquece.</p>
+
+<div class="note">
+<strong>Proteger custa</strong>
+<p>Com o mutex, as duas threads passam boa parte do tempo esperando uma pela outra. No laboratório, medindo com <code>time</code>, a versão com mutex levou cerca de 0,026 s, contra 0,003 s da versão sem proteção (que dá o resultado errado): quase dez vezes mais. O mutex garante o resultado certo; a velocidade vem de dividir o trabalho para que as threads mexam o mínimo possível em dados compartilhados, como na missão final. Para um simples contador, também existe o <code>std::atomic&lt;int&gt;</code>, de <code>&lt;atomic&gt;</code>, que faz o <code>++</code> inteiro de uma vez só, sem mutex.</p>
+</div>
+
+<hr>
+
+<h2>5. <code>std::jthread</code>: a thread que espera sozinha <span class="versao">C++20</span></h2>
+<p>O C++20 trouxe a <code>std::jthread</code> ("joining thread", "thread que se junta"). Ela é igual à <code>std::thread</code>, com uma diferença: quando o objeto é destruído, ela <strong>faz o <code>join</code> sozinha</strong>. Lembra do programa que morria por falta de <code>join</code>? Trocando só o tipo:</p>
+
+<pre class="file" data-file="jthread.cpp">#include &lt;iostream&gt;
+#include &lt;thread&gt;
+
+void lavar_louca() {
+    std::cout &lt;&lt; "Bruno: lavando a louça\n";
+}
+
+int main() {
+    std::jthread ajudante(lavar_louca);
+    std::cout &lt;&lt; "Ana: fazendo o almoço\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra jthread.cpp -o jthread
+$ ./jthread
+Ana: fazendo o almoço
+Bruno: lavando a louça               « no fim do main, a jthread esperou o Bruno</pre>
+
+<p>Em código novo, prefira <code>std::jthread</code>: é o mesmo princípio do <code>lock_guard</code>, o objeto cuida da limpeza sozinho. Ela também sabe receber um pedido de "pare" (<code>request_stop</code>), útil para threads que ficam rodando num laço; isso fica para quando você precisar. Com <code>-std=c++17</code>, o g++ avisa: <code>error: ‘jthread’ is not a member of ‘std’</code> e <code>note: ‘std::jthread’ is only available from C++20 onwards</code>.</p>
+
+<h3><code>std::async</code>: só para conhecer</h3>
+<p>Muitas vezes o que você quer é "calcule isto em paralelo e me dê o resultado depois". O <code>std::async</code>, de <code>&lt;future&gt;</code>, faz isso sem você criar a thread na mão: ele devolve um <code>std::future</code> ("futuro"), uma promessa de resultado, e o <code>.get()</code> espera e entrega o valor:</p>
+
+<pre class="file" data-file="assincrono.cpp">#include &lt;future&gt;
+#include &lt;iostream&gt;
+
+long long somar(int de, int ate) {
+    long long s = 0;
+    for (int i = de; i &lt;= ate; ++i) s += i;
+    return s;
+}
+
+int main() {
+    std::future&lt;long long&gt; metade1 = std::async(std::launch::async, somar, 1, 500);
+    long long metade2 = somar(501, 1000);
+    std::cout &lt;&lt; "Total: " &lt;&lt; metade1.get() + metade2 &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra assincrono.cpp -o assincrono
+$ ./assincrono
+Total: 500500</pre>
+
+<p>Enquanto uma thread soma de 1 a 500, o <code>main</code> soma de 501 a 1000. O <code>std::launch::async</code> pede uma thread nova de verdade. Os detalhes de <code>future</code> e <code>async</code> vão além deste guia; guarde que existem.</p>
+
+<hr>
+
+<h2>Dividir o trabalho</h2>
+<p>O uso mais comum de threads é este: um trabalho grande, dividido em partes independentes, cada parte numa thread, e no fim os resultados se juntam. Cada thread escreve na <strong>sua própria</strong> variável, então não há corrida e não é preciso mutex:</p>
+
+<pre class="file" data-file="dividir.cpp">#include &lt;iostream&gt;
+#include &lt;thread&gt;
+
+void somar_intervalo(int inicio, int fim, long long&amp; resultado) {
+    long long soma = 0;
+    for (int i = inicio; i &lt;= fim; ++i) {
+        soma += i;
+    }
+    resultado = soma;
+}
+
+int main() {
+    long long parte1 = 0;
+    long long parte2 = 0;
+
+    std::thread t1(somar_intervalo, 1, 50, std::ref(parte1));
+    std::thread t2(somar_intervalo, 51, 100, std::ref(parte2));
+    t1.join();
+    t2.join();
+
+    std::cout &lt;&lt; "Parte 1: " &lt;&lt; parte1 &lt;&lt; '\n';
+    std::cout &lt;&lt; "Parte 2: " &lt;&lt; parte2 &lt;&lt; '\n';
+    std::cout &lt;&lt; "Total: " &lt;&lt; parte1 + parte2 &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra dividir.cpp -o dividir
+$ ./dividir
+Parte 1: 1275
+Parte 2: 3775
+Total: 5050</pre>
+
+<p>Para somar 100 números, threads não valem a pena: criar uma thread custa mais que essa conta. Elas compensam com trabalhos que levam segundos (processar milhares de fotos, por exemplo). E mais threads não é sempre melhor: além do número de núcleos do processador, elas só disputam o mesmo lugar. A missão final pratica a divisão das partes; no editor, sem threads, as duas chamadas rodam uma depois da outra, mas a lógica de "cada parte com sua variável" é a mesma.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>terminate called without an active exception</code></strong>
+<p><strong>O que significa:</strong> um objeto <code>std::thread</code> foi destruído (no fim do bloco em que foi criado) sem <code>join()</code> nem <code>detach()</code>.</p>
+<p><strong>Como consertar:</strong> chame <code>t.join()</code> antes do fim do bloco, ou use <code>std::jthread</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>static assertion failed: std::thread arguments must be invocable after conversion to rvalues</code></strong>
+<p><strong>O que significa:</strong> a função da thread recebe uma referência (<code>int&amp;</code>), e você passou a variável direto. A thread copia os argumentos, e a cópia não serve para a referência.</p>
+<p><strong>Como consertar:</strong> passe <code>std::ref(variavel)</code> (com <code>#include &lt;functional&gt;</code>), ou use uma lambda que capture por referência.</p>
+</div>
+
+<div class="cenario">
+<strong>O resultado muda a cada execução</strong>
+<p><strong>O que significa:</strong> condição de corrida: duas threads mexem na mesma variável sem proteção. É comportamento indefinido, e o compilador não avisa.</p>
+<p><strong>Como consertar:</strong> proteja o acesso com <code>std::mutex</code> + <code>std::lock_guard</code>, use <code>std::atomic</code> para contadores simples, ou, melhor ainda, dê a cada thread sua própria variável e junte no fim. Para encontrar a corrida: <code>-fsanitize=thread</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O programa trava e não termina</strong>
+<p><strong>O que significa:</strong> provavelmente um <em>deadlock</em>: uma thread espera um mutex que nunca é liberado (um <code>lock()</code> sem <code>unlock()</code>), ou duas threads esperam uma pela outra.</p>
+<p><strong>Como consertar:</strong> aperte <kbd>Ctrl</kbd>+<kbd>C</kbd> para parar. Use sempre <code>std::lock_guard</code> em vez de <code>lock</code>/<code>unlock</code> na mão, e mantenha o trecho trancado o menor possível.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>std::thread t(funcao, arg1, arg2);</code></td><td>Cria uma thread que roda <code>funcao(arg1, arg2)</code> (<code>&lt;thread&gt;</code>)</td></tr>
+<tr><td><code>t.join();</code></td><td>Espera a thread terminar</td></tr>
+<tr><td><code>t.detach();</code></td><td>Solta a thread (evite)</td></tr>
+<tr><td><code>std::ref(x)</code></td><td>Passa <code>x</code> por referência para a thread (<code>&lt;functional&gt;</code>)</td></tr>
+<tr><td><code>std::jthread t(funcao);</code></td><td>Thread que faz <code>join</code> sozinha no fim (C++20)</td></tr>
+<tr><td><code>std::mutex m;</code></td><td>Uma tranca (<code>&lt;mutex&gt;</code>)</td></tr>
+<tr><td><code>std::lock_guard&lt;std::mutex&gt; g(m);</code></td><td>Tranca até o fim do bloco</td></tr>
+<tr><td><code>std::atomic&lt;int&gt; c = 0;</code></td><td>Contador seguro sem mutex (<code>&lt;atomic&gt;</code>)</td></tr>
+<tr><td><code>std::async(std::launch::async, f, args…)</code></td><td>Roda <code>f</code> em paralelo; resultado com <code>.get()</code> (<code>&lt;future&gt;</code>)</td></tr>
+<tr><td><code>std::this_thread::sleep_for(100ms);</code></td><td>Pausa a thread atual</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Esperar</h3>
+<p>Complete para esperar a thread <code>t</code> terminar:</p>
+<div class="ex-code">t.<input data-answer="join()" aria-label="método">;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Por referência</h3>
+<p>Complete para a thread receber <code>total</code> por referência:</p>
+<div class="ex-code">std::thread t(somar, std::<input data-answer="ref" aria-label="função">(total));</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. O que acontece se o <code>main</code> terminar com uma <code>std::thread</code> sem <code>join()</code>?</p>
+<label><input type="radio" name="q3"> Nada; a thread continua sozinha</label>
+<label><input type="radio" name="q3"> Erro de compilação</label>
+<label><input type="radio" name="q3"> O programa é encerrado com <code>terminate called without an active exception</code></label>
+<label><input type="radio" name="q3"> O C++ faz o <code>join</code> automaticamente</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Duas threads fazem <code>++contador</code> 1000 vezes cada, sem mutex. O que se pode afirmar sobre o resultado?</p>
+<label><input type="radio" name="q4"> Sempre 2000</label>
+<label><input type="radio" name="q4"> Pode sair menos de 2000, e mudar a cada execução</label>
+<label><input type="radio" name="q4"> Sempre 1000</label>
+<label><input type="radio" name="q4"> O compilador avisa e não deixa compilar</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Qual a vantagem do <code>std::lock_guard</code> sobre chamar <code>lock()</code> e <code>unlock()</code> na mão?</p>
+<label><input type="radio" name="q5"> É mais rápido</label>
+<label><input type="radio" name="q5"> Deixa duas threads entrarem juntas</label>
+<label><input type="radio" name="q5"> Dispensa o <code>join</code></label>
+<label><input type="radio" name="q5"> Destranca sozinho no fim do bloco, mesmo se você esquecer ou se houver uma exceção</label>
+</div>
+
+<h3>Missão final: dividir a soma em duas partes</h3>
+
+<div class="trycpp" data-goal="out:Parte 2: 3775,out:Total: 5050,src:somar_intervalo\(\s*51">
+<p class="try-task"><strong>Missão:</strong> a soma de 1 a 100 foi dividida em duas partes, como se cada uma fosse para uma thread. Só a primeira parte está sendo calculada. Chame <code>somar_intervalo</code> para a segunda parte (de 51 a 100, guardando em <code>parte2</code>). A saída deve terminar com <code>Parte 2: 3775</code> e <code>Total: 5050</code>. (No laboratório, com <code>std::thread</code>, a versão com threads deu o mesmo resultado; veja a seção "Dividir o trabalho".)</p>
+<pre class="script">#include &lt;iostream&gt;
+
+void somar_intervalo(int inicio, int fim, long long&amp; resultado) {
+    long long soma = 0;
+    for (int i = inicio; i &lt;= fim; ++i) {
+        soma += i;
+    }
+    resultado = soma;
+}
+
+int main() {
+    long long parte1 = 0;
+    long long parte2 = 0;
+
+    somar_intervalo(1, 50, parte1);
+    // calcule a parte 2 aqui
+
+    std::cout &lt;&lt; "Parte 1: " &lt;&lt; parte1 &lt;&lt; '\n';
+    std::cout &lt;&lt; "Parte 2: " &lt;&lt; parte2 &lt;&lt; '\n';
+    std::cout &lt;&lt; "Total: " &lt;&lt; parte1 + parte2 &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+void somar_intervalo(int inicio, int fim, long long&amp; resultado) {
+    long long soma = 0;
+    for (int i = inicio; i &lt;= fim; ++i) {
+        soma += i;
+    }
+    resultado = soma;
+}
+
+int main() {
+    long long parte1 = 0;
+    long long parte2 = 0;
+
+    somar_intervalo(1, 50, parte1);
+    somar_intervalo(51, 100, parte2);
+
+    std::cout &lt;&lt; "Parte 1: " &lt;&lt; parte1 &lt;&lt; '\n';
+    std::cout &lt;&lt; "Parte 2: " &lt;&lt; parte2 &lt;&lt; '\n';
+    std::cout &lt;&lt; "Total: " &lt;&lt; parte1 + parte2 &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma thread é uma linha de execução. <code>std::thread t(funcao, args…);</code> cria e já começa a rodar.</li>
+  <li>Toda <code>std::thread</code> precisa de <code>join()</code>; sem ele, o programa morre com <code>terminate called without an active exception</code>. <code>std::jthread</code> (C++20) faz o <code>join</code> sozinha.</li>
+  <li>A ordem entre threads não é garantida. Só o <code>join</code> (e as travas) põem ordem.</li>
+  <li>Argumentos são copiados; para referência, <code>std::ref(x)</code>.</li>
+  <li>Duas threads mexendo na mesma variável sem proteção = condição de corrida: resultados errados e diferentes a cada execução, sem aviso do compilador.</li>
+  <li><code>std::mutex</code> + <code>std::lock_guard</code>: um de cada vez, destrancando sozinho no fim do bloco.</li>
+  <li>O melhor é dividir o trabalho para que cada thread tenha seus próprios dados, e juntar no fim.</li>
+  <li>No g++ 15 do Ubuntu 26.04, <code>-pthread</code> não é necessário; em sistemas antigos, acrescente.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
