@@ -82,11 +82,13 @@ int main() {
 | --- | --- |
 | `out:TEXTO` / `outre:REGEX` | a saída do programa (stdout e stderr, como no terminal) contém / casa |
 | `compila` | compilou sem erros |
-| `erro:TEXTO` | a compilação **falhou** e a mensagem contém o texto (missões "provoque o erro"). Use um trecho que exista no Clang **e** no g++, como `'x' was not declared` × `use of undeclared identifier 'x'`. Se as mensagens diferirem, use uma regex com as duas formas: `erro:/undeclared identifier\|was not declared/` |
+| `erro:TEXTO` | a compilação **falhou** e a mensagem contém o texto (missões "provoque o erro"). Use um trecho que exista no Clang **e** no g++, como `'x' was not declared` × `use of undeclared identifier 'x'`. Se as mensagens diferirem, use uma regex com as duas formas (veja a nota abaixo da tabela) |
 | `aviso:TEXTO` | a compilação deu um aviso contendo o texto, por exemplo `aviso:unused variable` |
 | `semaviso` | compilou sem nenhum aviso |
 | `exit:N` | o programa terminou com o código N |
 | `src:REGEX` | o código do leitor casa com a regex (para exigir um recurso, como `src:for\s*\(`) |
+
+**Regex nas metas** (`outre:`, `src:`, `erro:/…/`): é a regex normal do JavaScript — `|` é alternativa e `\|` é uma barra vertical literal. Exemplo: `erro:/undeclared identifier|was not declared/` (escrito aqui fora da tabela porque, dentro de tabela Markdown, a barra aparece escapada). Lembre que `,` separa metas: dentro de uma meta, vírgula literal é `\,`.
 
 ### Outros blocos
 `dl.anatomy`, `div.note/.tip/.warning/.cenario`, `ol.passo`, `div.table-wrap > table.ref`, `.exercise`, `.mc`, `figure`.
