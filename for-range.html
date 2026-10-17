@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ for de Intervalo — percorrer listas e strings (range-for) | Guia C++</title>
+<meta name="description" content="O for de intervalo (range-for) em C++ para quem nunca programou: for (int n : numeros), percorrer uma std::string letra por letra, usar auto, modificar os itens com auto&amp; (e ver que sem &amp; nada muda), const auto&amp; para não copiar, com saídas e erros reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">for de Intervalo</span> <span class="versao">C++11</span></h1>
+
+<p class="intro">Muitas vezes, repetir significa <strong>passar por todos os itens de uma lista</strong>: todas as notas da turma, todos os produtos do carrinho, todas as letras de um nome. Com o <a href="for.html">for</a> clássico você precisaria de um contador, do tamanho da lista e de acesso por posição. O C++11 trouxe um atalho para isso, o <strong>for de intervalo</strong> (em inglês, <em>range-based for</em>, ou só <em>range-for</em>): "para cada item desta lista, faça…".</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como escrever <code>for (int n : numeros)</code> e ler em voz alta "para cada <code>n</code> em <code>numeros</code>".</li>
+  <li>Como somar, achar o maior e mostrar os itens de uma lista.</li>
+  <li>Como percorrer uma <code>std::string</code> letra por letra (e o cuidado com acentos).</li>
+  <li>Como deixar o compilador escolher o tipo com <code>auto</code>.</li>
+  <li>Por que <code>for (auto p : precos) p = p * 2;</code> <strong>não muda</strong> nada, e como <code>auto&amp;</code> resolve.</li>
+  <li>Por que <code>const auto&amp;</code> é a forma recomendada para só ler.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: "para cada pessoa da fila, entregue um panfleto"</h2>
+<p>Você está entregando panfletos numa fila. Ninguém lhe diz "entregue para a pessoa número 1, depois para a número 2…". A instrução é simplesmente: <em>"para cada pessoa da fila, entregue um panfleto"</em>. Você começa pela primeira, vai até a última e para. Não precisa contar quantas são nem saber a posição de cada uma.</p>
+<p>O for de intervalo é isso: você diz <strong>qual é a lista</strong> e <strong>que nome dar a cada item</strong>; o C++ cuida do resto (começar do primeiro, ir até o último, parar).</p>
+
+<h3>Uma lista para trabalhar: <code>std::vector</code></h3>
+<p>Para percorrer uma lista, primeiro precisamos de uma. Nesta aula, vamos usar o <code>std::vector</code>, a lista padrão do C++ (<em>vector</em> = vetor, uma lista que pode crescer). Ele tem aula própria, <a href="vector.html">std::vector</a>; por enquanto, basta saber criar um:</p>
+
+<dl class="anatomy">
+  <dt>#include &lt;vector&gt;</dt><dd>Traz o <code>std::vector</code> para o programa, como o <code>&lt;iostream&gt;</code> traz o <code>std::cout</code>.</dd>
+  <dt>std::vector&lt;int&gt;</dt><dd>O tipo: "uma lista de <code>int</code>". Entre <code>&lt; &gt;</code> vai o tipo de cada item: <code>std::vector&lt;double&gt;</code> é uma lista de números com vírgula; <code>std::vector&lt;std::string&gt;</code>, uma lista de textos.</dd>
+  <dt>numeros</dt><dd>O nome da variável (a lista inteira).</dd>
+  <dt>= {4, 8, 15, 16, 23, 42};</dt><dd>Os itens iniciais, entre chaves, separados por vírgula.</dd>
+</dl>
+
+<hr>
+
+<h2>1. O primeiro for de intervalo</h2>
+
+<pre class="file" data-file="primeiro.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; numeros = {4, 8, 15, 16, 23, 42};
+    for (int n : numeros) {
+        std::cout &lt;&lt; n &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>for</dt><dd>A mesma palavra-chave do <code>for</code> clássico. O que muda é o que vai dentro dos parênteses.</dd>
+  <dt>int n</dt><dd>A variável que, <strong>em cada volta</strong>, recebe um item da lista. Na 1ª volta vale 4; na 2ª, 8; e assim por diante. O tipo (<code>int</code>) deve combinar com o tipo dos itens.</dd>
+  <dt>:</dt><dd>Os <strong>dois-pontos</strong> separam a variável da lista. Leia como "em": "para cada <code>n</code> <em>em</em> <code>numeros</code>".</dd>
+  <dt>numeros</dt><dd>A lista que será percorrida, do primeiro ao último item.</dd>
+  <dt>{ … }</dt><dd>O corpo, que roda uma vez para cada item.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra primeiro.cpp -o primeiro
+$ ./primeiro
+4
+8
+15
+16
+23
+42</pre>
+
+<p>Seis itens, seis voltas. Repare no que <strong>não</strong> está no código: não há contador, não há condição de parada, não há passo, não há o número 6 em lugar nenhum. Se você acrescentar um sétimo número na lista, o laço dá sete voltas sem mudar nada no <code>for</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>for</code> clássico</th><th>for de intervalo</th></tr>
+<tr><td>O que você escreve</td><td>Início, condição e passo</td><td>Só a variável e a lista</td></tr>
+<tr><td>Sabe a posição do item?</td><td>Sim (<code>i</code>)</td><td>Não</td></tr>
+<tr><td>Pode errar o tamanho ("um a mais")?</td><td>Sim</td><td><strong>Não</strong></td></tr>
+<tr><td>Bom para</td><td>Contar, pular de 2 em 2, andar para trás, precisar da posição</td><td>Passar por todos os itens, do primeiro ao último</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>2. Fazendo contas com os itens</h2>
+<p>As técnicas da aula <a href="while.html">while</a> (o <strong>acumulador</strong> que nasce fora e cresce dentro) funcionam do mesmo jeito. A Ana quer a soma, a média e a maior das notas:</p>
+
+<pre class="file" data-file="notas.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;double&gt; notas = {7.5, 9.0, 6.0, 8.5};
+    double soma = 0.0;
+    double maior = 0.0;
+    for (double nota : notas) {
+        soma += nota;
+        if (nota &gt; maior) {
+            maior = nota;
+        }
+    }
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+    std::cout &lt;&lt; "Média: " &lt;&lt; soma / 4 &lt;&lt; '\n';
+    std::cout &lt;&lt; "Maior nota: " &lt;&lt; maior &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra notas.cpp -o notas
+$ ./notas
+Soma: 31
+Média: 7.75
+Maior nota: 9</pre>
+
+<ul>
+  <li>Os itens são <code>double</code>, então a variável do laço também é: <code>double nota</code>.</li>
+  <li><code>maior</code> começa em 0 e, a cada nota maior que ela, é substituída. No fim, guarda a maior de todas. (Se as notas pudessem ser negativas, seria melhor começar com a primeira nota; a aula <a href="vector.html">std::vector</a> mostra como.)</li>
+  <li>O <code>4</code> de <code>soma / 4</code> está "chumbado" no código. Com <code>notas.size()</code>, que dá o tamanho da lista, a média continuaria certa mesmo que a lista mudasse (veja <a href="vector.html">std::vector</a>).</li>
+</ul>
+
+<div class="trycpp" data-goal="out:Total: 47.5,src:for\s*\([^;)]*:">
+<p class="try-task"><strong>Missão:</strong> some os preços do carrinho com um for de intervalo e mostre <code>Total: 47.5</code>. A variável <code>total</code> já foi criada; falta o laço.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;double&gt; precos = {12.5, 8.0, 27.0};
+    double total = 0.0;
+    // percorra precos aqui
+
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;double&gt; precos = {12.5, 8.0, 27.0};
+    double total = 0.0;
+    for (double p : precos) {
+        total += p;
+    }
+    std::cout &lt;&lt; "Total: " &lt;&lt; total &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Percorrer uma <code>std::string</code></h2>
+<p>Um texto (<a href="strings.html">std::string</a>) também é uma lista: uma lista de caracteres (<code>char</code>). Então o for de intervalo funciona com ele, entregando <strong>uma letra por volta</strong>:</p>
+
+<pre class="file" data-file="letras.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string nome = "Ana Maria";
+    for (char c : nome) {
+        std::cout &lt;&lt; '[' &lt;&lt; c &lt;&lt; ']';
+    }
+    std::cout &lt;&lt; '\n';
+
+    int quantos_a = 0;
+    for (char c : nome) {
+        if (c == 'a' || c == 'A') {
+            quantos_a++;
+        }
+    }
+    std::cout &lt;&lt; "Letras 'a': " &lt;&lt; quantos_a &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra letras.cpp -o letras
+$ ./letras
+[A][n][a][ ][M][a][r][i][a]
+Letras 'a': 4</pre>
+
+<p>Os colchetes mostram cada volta: 9 caracteres, contando o espaço. O segundo laço usa um <code>if</code> para contar só as letras <code>a</code>, maiúsculas ou minúsculas.</p>
+
+<div class="warning">
+<strong>Letras com acento ocupam mais de um <code>char</code></strong>
+<p>Num texto em UTF-8 (o padrão do Linux), letras como <code>ã</code> e <code>é</code> ocupam <strong>2 bytes</strong>, e cada <code>char</code> é um byte. Veja o que acontece com <code>"pão"</code>:</p>
+<pre class="file" data-file="acento.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string palavra = "pão";
+    std::cout &lt;&lt; "Tamanho: " &lt;&lt; palavra.size() &lt;&lt; '\n';
+    for (char c : palavra) {
+        std::cout &lt;&lt; '[' &lt;&lt; c &lt;&lt; ']';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra acento.cpp -o acento
+$ ./acento
+Tamanho: 4
+[p][�][�][o]</pre>
+<p>"pão" tem 3 letras, mas 4 <code>char</code>s: o <code>ã</code> virou dois pedaços, e cada pedaço sozinho não é um caractere válido; o terminal mostra <code>�</code> no lugar. Para textos sem acento, letra por letra funciona bem. Para lidar com acentos, veja <a href="acentos-utf8.html">Acentos e UTF-8</a>.</p>
+</div>
+
+<hr>
+
+<h2>4. Deixe o compilador escolher o tipo: <code>auto</code></h2>
+<p>Em vez de escrever o tipo do item, você pode usar <a href="auto.html">auto</a>: o compilador olha a lista e descobre sozinho. Com <code>std::vector&lt;double&gt;</code>, <code>auto</code> vira <code>double</code>; com <code>std::string</code>, vira <code>char</code>:</p>
+
+<pre class="file" data-file="auto.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;double&gt; precos = {12.5, 8.0, 27.0};
+    for (auto p : precos) {
+        std::cout &lt;&lt; "R$ " &lt;&lt; p &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra auto.cpp -o auto
+$ ./auto
+R$ 12.5
+R$ 8
+R$ 27</pre>
+
+<p>Com <code>auto</code>, o tipo da variável sempre combina com o da lista. Isso evita um erro silencioso: escrever <code>int</code> para uma lista de <code>double</code> (veja <a href="#erros">Quando dá errado</a>). Por isso, no for de intervalo, <code>auto</code> é a escolha mais comum no C++ moderno.</p>
+
+<hr>
+
+<h2 id="modificar">5. Modificar os itens: <code>auto&amp;</code></h2>
+<p>A Ana quer <strong>dobrar</strong> todos os preços da lista. A primeira tentativa parece óbvia, mas não funciona. Rode e confira:</p>
+
+<pre class="file" data-file="copia.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; precos = {10, 20, 50};
+
+    for (auto p : precos) {
+        p = p * 2;
+    }
+    std::cout &lt;&lt; "Sem &amp;: ";
+    for (auto p : precos) {
+        std::cout &lt;&lt; p &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+
+    for (auto&amp; p : precos) {
+        p = p * 2;
+    }
+    std::cout &lt;&lt; "Com &amp;: ";
+    for (auto p : precos) {
+        std::cout &lt;&lt; p &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra copia.cpp -o copia
+$ ./copia
+Sem &amp;: 10 20 50
+Com &amp;: 20 40 100 </pre>
+
+<p>O primeiro laço rodou, fez as contas e… a lista continuou <code>10 20 50</code>. O compilador nem avisou. Por quê?</p>
+
+<ul>
+  <li><strong>Sem <code>&amp;</code></strong> (<code>auto p</code>): em cada volta, <code>p</code> é uma <strong>cópia</strong> do item. Você dobrou a cópia, e a cópia foi jogada fora no fim da volta. É como tirar uma fotocópia de um documento e escrever na fotocópia: o original não muda.</li>
+  <li><strong>Com <code>&amp;</code></strong> (<code>auto&amp; p</code>): <code>p</code> é uma <strong>referência</strong>, um outro nome para o <strong>próprio item</strong> da lista. Mexer em <code>p</code> é mexer no item. É escrever direto no documento original.</li>
+</ul>
+
+<dl class="anatomy">
+  <dt>auto</dt><dd>O tipo do item, descoberto pelo compilador (aqui, <code>int</code>).</dd>
+  <dt>&amp;</dt><dd>"Referência": não copie, me dê acesso ao item verdadeiro. Referências têm aula própria: <a href="referencias.html">Referências</a>.</dd>
+  <dt>p</dt><dd>O nome do item na volta atual.</dd>
+  <dt>: precos</dt><dd>A lista cujos itens serão alterados.</dd>
+</dl>
+
+<p>A regra prática: <strong>quer mudar os itens da lista? Use <code>auto&amp;</code>.</strong> O mesmo vale para uma <code>std::string</code>: <code>for (auto&amp; c : nome) c = '*';</code> troca todas as letras por asteriscos.</p>
+
+<hr>
+
+<h2>6. Só ler, sem copiar: <code>const auto&amp;</code></h2>
+<p>Copiar um <code>int</code> não custa nada. Mas copiar um <strong>texto</strong> custa: o computador precisa reservar memória e copiar letra por letra. Num laço que só <strong>mostra</strong> os itens de uma lista de textos, cada volta faria uma cópia inútil. A forma recomendada junta as duas ideias:</p>
+
+<pre class="file" data-file="compras.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; lista = {"arroz", "feijão", "café", "leite"};
+    for (const auto&amp; item : lista) {
+        std::cout &lt;&lt; "- " &lt;&lt; item &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra compras.cpp -o compras
+$ ./compras
+- arroz
+- feijão
+- café
+- leite</pre>
+
+<ul>
+  <li><code>&amp;</code>: não copia; <code>item</code> é o próprio texto da lista.</li>
+  <li><code>const</code>: promete que <code>item</code> <strong>não será alterado</strong> (veja <a href="constantes.html">Constantes</a>). Se você tentar, o compilador recusa, e isso protege a lista de mudanças acidentais.</li>
+</ul>
+
+<pre class="file" data-file="constref.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; precos = {10, 20, 50};
+    for (const auto&amp; p : precos) {
+        p = p * 2;
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra constref.cpp -o constref
+constref.cpp: In function ‘int main()’:
+constref.cpp:7:11: error: assignment of read-only reference ‘p’
+    7 |         p = p * 2;
+      |         ~~^~~~~~~</pre>
+
+<p>"Atribuição a uma referência somente leitura <code>p</code>". O <code>const</code> fez seu trabalho. No editor do guia, o Clang diz <code>error: cannot assign to variable 'p' with const-qualified type 'int const &amp;'</code>.</p>
+
+<h3>Qual usar?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que é <code>x</code></th><th>Pode mudar a lista?</th><th>Quando usar</th></tr>
+<tr><td><code>for (auto x : lista)</code></td><td>Uma cópia do item</td><td>Não (muda só a cópia)</td><td>Itens pequenos (<code>int</code>, <code>double</code>, <code>char</code>) que você só lê</td></tr>
+<tr><td><code>for (auto&amp; x : lista)</code></td><td>O próprio item</td><td><strong>Sim</strong></td><td>Quando quer <strong>alterar</strong> os itens</td></tr>
+<tr><td><code>for (const auto&amp; x : lista)</code></td><td>O próprio item, só leitura</td><td>Não (o compilador impede)</td><td>Só ler itens "grandes" (textos, structs). <strong>Na dúvida, use este.</strong></td></tr>
+<tr><td><code>for (int x : lista)</code></td><td>Uma cópia convertida para <code>int</code></td><td>Não</td><td>Quando você quer escolher o tipo; cuidado para ele combinar</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Formas diferentes de escrever</h2>
+
+<h3>Uma lista escrita direto no laço</h3>
+<p>Para poucos valores fixos, a lista pode ir entre chaves, direto no <code>for</code>:</p>
+
+<pre class="file" data-file="chaves.cpp">#include &lt;iostream&gt;
+
+int main() {
+    for (int n : {10, 20, 30}) {
+        std::cout &lt;&lt; n &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra chaves.cpp -o chaves
+$ ./chaves
+10 20 30 </pre>
+
+<h3>Quando você precisa da posição</h3>
+<p>O for de intervalo não diz <strong>em que posição</strong> está o item. Se você precisa numerar, crie um contador antes do laço e some 1 a cada volta:</p>
+
+<pre class="file" data-file="posicao.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; lista = {"arroz", "feijão", "café"};
+    int pos = 1;
+    for (const auto&amp; item : lista) {
+        std::cout &lt;&lt; pos &lt;&lt; ". " &lt;&lt; item &lt;&lt; '\n';
+        pos++;
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra posicao.cpp -o posicao
+$ ./posicao
+1. arroz
+2. feijão
+3. café</pre>
+
+<p>Desde o <span class="versao">C++20</span>, o contador pode ser criado dentro do próprio <code>for</code>, antes de um <code>;</code>: <code>for (int pos = 1; const auto&amp; item : lista)</code>. Assim ele só existe dentro do laço, como o <code>i</code> do <code>for</code> clássico. Com <code>-std=c++17</code>, o g++ avisa: <code>warning: range-based ‘for’ loops with initializer only available with ‘-std=c++20’ or ‘-std=gnu++20’</code>. Se precisar da posição para outras coisas (comparar com o item anterior, pular itens), o <a href="for.html">for clássico</a> com índice pode ser mais simples.</p>
+
+<hr>
+
+<h2 id="erros">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>A lista não mudou (faltou o <code>&amp;</code>)</strong>
+<pre class="term" data-cwd="~/cpp">$ ./copia
+Sem &amp;: 10 20 50
+Com &amp;: 20 40 100 </pre>
+<p><strong>O que aconteceu:</strong> sem <code>&amp;</code>, a variável do laço é uma cópia; alterar a cópia não altera a lista. O compilador não avisa, porque mudar uma cópia é permitido.</p>
+<p><strong>Como consertar:</strong> <code>for (auto&amp; p : precos)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>As notas perderam a parte decimal (tipo errado na variável)</strong>
+<pre class="file" data-file="trunca.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;double&gt; notas = {7.5, 9.0, 6.5};
+    for (int nota : notas) {
+        std::cout &lt;&lt; nota &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra trunca.cpp -o trunca
+$ ./trunca
+7
+9
+6</pre>
+<p><strong>O que aconteceu:</strong> os itens são <code>double</code>, mas a variável é <code>int</code>. Em cada volta, o item foi <strong>convertido</strong> para inteiro, e a parte depois do ponto foi cortada (7.5 virou 7). Nem o <code>-Wall -Wextra</code> avisa (só a opção <code>-Wconversion</code>, veja <a href="conversao-tipos.html">Conversão de Tipos</a>).</p>
+<p><strong>Como consertar:</strong> use o tipo certo (<code>double nota</code>) ou, melhor, <code>auto</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"assignment of read-only reference"</strong>
+<p><strong>O que aconteceu:</strong> você tentou alterar o item num laço com <code>const auto&amp;</code>, que é só de leitura.</p>
+<p><strong>Como consertar:</strong> se a ideia é mesmo alterar a lista, troque por <code>auto&amp;</code>. Se não era, o erro acabou de salvar sua lista: revise a linha.</p>
+</div>
+
+<div class="cenario">
+<strong>Escreveu <code>in</code> (de outras linguagens) no lugar de <code>:</code></strong>
+<pre class="file" data-file="in.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; numeros = {1, 2, 3};
+    for (int n in numeros) {
+        std::cout &lt;&lt; n &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra in.cpp -o in
+in.cpp: In function ‘int main()’:
+in.cpp:6:15: error: expected ‘;’ before ‘in’
+    6 |     for (int n in numeros) {
+      |               ^~~
+      |               ;
+in.cpp:6:16: error: ‘in’ was not declared in this scope; did you mean ‘n’?
+    6 |     for (int n in numeros) {
+      |                ^~
+      |                n
+in.cpp:6:18: error: expected ‘;’ before ‘numeros’
+    6 |     for (int n in numeros) {
+      |                  ^~~~~~~~
+      |                  ;
+in.cpp:6:19: warning: for increment expression has no effect [-Wunused-value]
+    6 |     for (int n in numeros) {
+      |                   ^~~~~~~</pre>
+<p><strong>O que significa:</strong> Python e JavaScript usam <code>for … in …</code>; o C++ usa dois-pontos. Sem os <code>:</code>, o compilador achou que era um <code>for</code> clássico e passou a procurar os <code>;</code>. Ele ainda tentou entender <code>in</code> como uma variável ("did you mean ‘n’?").</p>
+<p><strong>Como consertar:</strong> <code>for (int n : numeros)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Acentos aparecem como <code>�</code></strong>
+<p><strong>O que aconteceu:</strong> o laço percorreu a <code>std::string</code> byte a byte, e uma letra acentuada ocupa dois bytes em UTF-8. Cada metade, sozinha, não é um caractere válido.</p>
+<p><strong>Como consertar:</strong> se só vai mostrar o texto, mostre-o inteiro (<code>std::cout &lt;&lt; palavra</code>). Para trabalhar letra por letra com acentos, veja <a href="acentos-utf8.html">Acentos e UTF-8</a>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que faz</th></tr>
+<tr><td><code>for (int n : numeros) { … }</code></td><td>Uma volta por item; <code>n</code> é uma cópia de cada um.</td></tr>
+<tr><td><code>for (char c : texto)</code></td><td>Uma volta por <code>char</code> (byte) de uma <code>std::string</code>.</td></tr>
+<tr><td><code>for (auto x : lista)</code></td><td>O compilador escolhe o tipo; <code>x</code> é cópia.</td></tr>
+<tr><td><code>for (auto&amp; x : lista)</code></td><td><code>x</code> é o próprio item: alterar <code>x</code> altera a lista.</td></tr>
+<tr><td><code>for (const auto&amp; x : lista)</code></td><td>O próprio item, só leitura, sem cópia. O padrão para ler.</td></tr>
+<tr><td><code>for (int n : {1, 2, 3})</code></td><td>Lista escrita direto no laço.</td></tr>
+<tr><td><code>for (int i = 0; const auto&amp; x : lista)</code></td><td><span class="versao">C++20</span> Com uma variável de apoio criada no próprio <code>for</code>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O separador</h3>
+<p>Complete com o símbolo que separa a variável da lista:</p>
+<div class="ex-code">for (int n <input data-answer=":" aria-label="separador" size="3"> numeros)</div>
+</div>
+
+<div class="exercise">
+<h3>2. Para alterar</h3>
+<p>Complete para que o laço <strong>zere</strong> todos os itens da lista <code>v</code>:</p>
+<div class="ex-code">for (<input data-answer="auto&amp;|auto &amp;|int&amp;|int &amp;" aria-label="tipo"> x : v) { x = 0; }</div>
+</div>
+
+<div class="exercise">
+<h3>3. Só ler textos</h3>
+<p>Complete com a forma recomendada para só <strong>mostrar</strong> uma lista de <code>std::string</code>:</p>
+<div class="ex-code">for (<input data-answer="const auto&amp;|const auto &amp;|auto const&amp;|const std::string&amp;|const std::string &amp;" aria-label="tipo"> nome : nomes)</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Depois de <code>std::vector&lt;int&gt; v = {1, 2, 3}; for (auto x : v) { x = 9; }</code>, quanto vale <code>v</code>?</p>
+<label><input type="radio" name="q4"> <code>{9, 9, 9}</code></label>
+<label><input type="radio" name="q4"> <code>{1, 2, 3}</code></label>
+<label><input type="radio" name="q4"> Não compila</label>
+<label><input type="radio" name="q4"> <code>{1, 2, 9}</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Quantas voltas dá <code>for (char c : std::string("Oi, tudo"))</code>?</p>
+<label><input type="radio" name="q5"> 6</label>
+<label><input type="radio" name="q5"> 7</label>
+<label><input type="radio" name="q5"> 8</label>
+<label><input type="radio" name="q5"> 2</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Você precisa mostrar <code>1. arroz</code>, <code>2. feijão</code>… Qual é a limitação do for de intervalo aqui?</p>
+<label><input type="radio" name="q6"> Ele não informa a posição; é preciso um contador à parte.</label>
+<label><input type="radio" name="q6"> Ele não funciona com textos.</label>
+<label><input type="radio" name="q6"> Ele percorre a lista de trás para a frente.</label>
+<label><input type="radio" name="q6"> Ele só aceita listas de até 10 itens.</label>
+</div>
+
+<h3>Missão final: aumento de 10%</h3>
+<div class="trycpp" data-goal="out:11 22 55,src:auto\s*&amp;">
+<p class="try-task"><strong>Missão:</strong> a lojinha da Ana vai aumentar todos os preços em 10%. Escreva um for de intervalo com <code>auto&amp;</code> que multiplica cada preço por <code>1.10</code>. O segundo laço, que já está pronto, deve mostrar <code>11 22 55</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;double&gt; precos = {10.0, 20.0, 50.0};
+    // aumente os preços aqui
+
+    for (const auto&amp; p : precos) {
+        std::cout &lt;&lt; p &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;double&gt; precos = {10.0, 20.0, 50.0};
+    for (auto&amp; p : precos) {
+        p = p * 1.10;
+    }
+    for (const auto&amp; p : precos) {
+        std::cout &lt;&lt; p &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>for (tipo x : lista) { … }</code> passa por todos os itens, do primeiro ao último, sem contador e sem risco de "um a mais".</li>
+  <li>Funciona com <code>std::vector</code>, com <code>std::string</code> (um <code>char</code> por volta), com arrays e com listas entre chaves.</li>
+  <li><code>auto</code> deixa o tipo sempre certo; um tipo errado (<code>int</code> para <code>double</code>) converte em silêncio.</li>
+  <li>Sem <code>&amp;</code>, <code>x</code> é uma <strong>cópia</strong>: alterá-la não muda a lista. Para alterar, use <code>auto&amp;</code>.</li>
+  <li>Para só ler, especialmente textos, use <code>const auto&amp;</code>: sem cópia e protegido contra mudanças.</li>
+  <li>Precisa da posição? Contador à parte (ou o <a href="for.html">for clássico</a>).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
