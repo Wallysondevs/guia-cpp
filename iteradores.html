@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Iteradores — begin, end, *it, ++it e invalidação | Guia C++</title>
+<meta name="description" content="Iteradores em C++ para quem nunca programou: o dedo que aponta um item, begin() e end() (o fim é depois do último), *it e ++it, percorrer com auto, const_iterator e cbegin, e a invalidação ao apagar de um vector dentro do laço, com o erro real detectado pelo AddressSanitizer e o conserto com erase.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Iteradores</span></h1>
+
+<p class="intro">Na aula <a href="stl.html">O que é a STL</a>, você viu que os algoritmos recebem <code>notas.begin()</code> e <code>notas.end()</code>. Essas duas coisas são <strong>iteradores</strong>: pequenos objetos que apontam um item de um container e sabem andar para o próximo. Nesta aula você vai usá-los com as próprias mãos: pegar o item apontado, avançar, percorrer o container inteiro, e entender o erro mais traiçoeiro deles, o iterador que fica "apontando para o nada" depois de você apagar um item.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um iterador: um "dedo" apontando um item.</li>
+  <li><code>begin()</code> e <code>end()</code>, e por que o <code>end()</code> fica <strong>depois</strong> do último item.</li>
+  <li><code>*it</code> (o item apontado) e <code>++it</code> (andar para o próximo).</li>
+  <li>Como percorrer um container com iterador, com <code>auto it</code> e com o tipo escrito por extenso.</li>
+  <li><code>const_iterator</code>, <code>cbegin()</code> e <code>cend()</code>: o dedo que só lê.</li>
+  <li>Invalidação: o que acontece ao apagar de um <code>vector</code> durante o laço (com o erro real do AddressSanitizer) e o conserto com o retorno do <code>erase</code>.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana, na pasta <code>~/cpp/it</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. É bom conhecer <a href="vector.html">std::vector</a> e ter uma ideia de <a href="ponteiros.html">ponteiros</a> (o iterador se parece muito com eles).</p>
+
+<hr>
+
+<h2>A ideia: o dedo na lista de chamada</h2>
+<p>A professora faz a chamada com o dedo na lista: o dedo começa no primeiro nome, ela lê o nome em que o dedo está, desce o dedo para o próximo, lê, desce… Quando o dedo passa do último nome e chega na margem de baixo da folha, a chamada acabou.</p>
+
+<p>Um iterador é esse dedo:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na chamada</th><th>No C++</th><th>Exemplo</th></tr>
+<tr><td>Pôr o dedo no primeiro nome</td><td><code>begin()</code>: iterador para o primeiro item</td><td><code>auto it = notas.begin();</code></td></tr>
+<tr><td>Ler o nome onde o dedo está</td><td><code>*it</code>: o item apontado</td><td><code>std::cout &lt;&lt; *it;</code></td></tr>
+<tr><td>Descer o dedo</td><td><code>++it</code>: avança para o próximo item</td><td><code>++it;</code></td></tr>
+<tr><td>A margem embaixo do último nome</td><td><code>end()</code>: a posição <strong>depois</strong> do último item</td><td><code>it != notas.end()</code></td></tr>
+</table>
+</div>
+
+<p>A margem não é um nome: não dá para "ler" a margem. Do mesmo jeito, <code>end()</code> não aponta item nenhum; ele só marca onde a lista acabou. Guarde isso, porque é a fonte de vários erros.</p>
+
+<figure>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Posição</th><td>0</td><td>1</td><td>2</td><td>3</td><td>(depois do último)</td></tr>
+<tr><th><code>notas</code></th><td><code>7</code></td><td><code>9</code></td><td><code>4</code></td><td><code>10</code></td><td>— nada —</td></tr>
+<tr><th>Iterador</th><td><code>begin()</code> ↑</td><td></td><td></td><td></td><td><code>end()</code> ↑</td></tr>
+</table>
+</div>
+<figcaption>Num vetor de 4 itens, <code>begin()</code> aponta o item 0 e <code>end()</code> aponta a "casa" 4, que não existe. A faixa vai do <code>begin()</code> (incluído) até o <code>end()</code> (excluído). Em matemática se escreve <code>[begin, end)</code>.</figcaption>
+</figure>
+
+<hr>
+
+<h2>1. <code>begin()</code>, <code>*it</code> e <code>++it</code>, um passo de cada vez</h2>
+
+<pre class="file" data-file="dedo.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 9, 4, 10};
+
+    auto it = notas.begin();
+    std::cout &lt;&lt; *it &lt;&lt; '\n';
+
+    ++it;
+    std::cout &lt;&lt; *it &lt;&lt; '\n';
+
+    ++it;
+    ++it;
+    std::cout &lt;&lt; *it &lt;&lt; '\n';
+
+    ++it;
+    if (it == notas.end()) {
+        std::cout &lt;&lt; "chegou no fim\n";
+    }
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>auto it = notas.begin();</dt><dd>Cria o iterador <code>it</code> (nome tradicional, de <em>iterator</em>) apontando o primeiro item. O <code>auto</code> deixa o compilador escrever o tipo, que é comprido (seção 3).</dd>
+  <dt>*it</dt><dd>"O item para onde <code>it</code> aponta". O <code>*</code> é o mesmo dos <a href="ponteiros.html">ponteiros</a>: lê-se "o conteúdo de".</dd>
+  <dt>++it;</dt><dd>Avança o dedo um item. Prefira <code>++it</code> a <code>it++</code> com iteradores: fazem o mesmo aqui, e o <code>++it</code> nunca precisa guardar uma cópia (aula <a href="incremento.html">++ e --</a>).</dd>
+  <dt>it == notas.end()</dt><dd>Compara dois iteradores: "o dedo chegou na margem?". Iteradores do mesmo container podem ser comparados com <code>==</code> e <code>!=</code>.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/it">$ g++ -std=c++23 -Wall -Wextra dedo.cpp -o dedo
+$ ./dedo
+7
+9
+10                       « dois ++ pularam o 4 e pararam no 10
+chegou no fim</pre>
+
+<hr>
+
+<h2>2. O <code>end()</code> fica depois do último</h2>
+<p>E se você tentar ler o <code>end()</code>, como se fosse um item?</p>
+
+<pre class="file" data-file="fim.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 9, 4, 10};
+    auto it = notas.end();
+    std::cout &lt;&lt; *it &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/it">$ g++ -std=c++23 -Wall -Wextra fim.cpp -o fim
+$ ./fim
+0                        « um número qualquer: ninguém sabe de onde veio</pre>
+
+<p>Compilou sem aviso e mostrou <code>0</code>. Não se engane: esse <code>0</code> é lixo, o que estava na memória logo depois do vetor. É <a href="comportamento-indefinido.html">comportamento indefinido</a>: em outro computador, ou amanhã, pode sair outro número ou o programa pode cair.</p>
+
+<p>Para pegar esse tipo de erro, a biblioteca do g++ tem um <strong>modo de depuração</strong>: compile com <code>-D_GLIBCXX_DEBUG</code> e os iteradores passam a se vigiar:</p>
+
+<pre class="term" data-cwd="~/cpp/it">$ g++ -std=c++23 -Wall -Wextra -D_GLIBCXX_DEBUG fim.cpp -o fim
+$ ./fim
+$ ./fim
+/usr/include/c++/15/debug/safe_iterator.h:352:
+In function:
+    constexpr gnu_debug::_Safe_iterator&lt;_Iterator, _Sequence, 
+    _Category&gt;::reference gnu_debug::_Safe_iterator&lt;_Iterator, _Sequence, 
+    _Category&gt;::operator*() const [with _Iterator = gnu_cxx::
+    normal_iterator&lt;int*, std::vector&lt;int, std::allocator&lt;int&gt; &gt; &gt;; 
+    _Sequence = std::debug::vector&lt;int&gt;; _Category = 
+    std::forward_iterator_tag; reference = int&amp;]
+
+Error: attempt to dereference a past-the-end iterator.
+
+Objects involved in the operation:
+    iterator "this" @ 0x7ffeecb465a0 {
+      type = gnu_cxx::normal_iterator&lt;int*, std::vector&lt;int, std::allocator&lt;int&gt; &gt; &gt; (mutable iterator);
+      state = past-the-end;
+      references sequence with type 'std::debug::vector&lt;int, std::allocator&lt;int&gt; &gt;' @ 0x7ffeecb465d0
+    }
+Abortado                   (imagem do núcleo gravada) ./fim</pre>
+
+<p>A linha que importa é <code>Error: attempt to dereference a past-the-end iterator</code>: "tentativa de desreferenciar (ler com <code>*</code>) um iterador que passou do fim". O resto mostra qual iterador (<code>state = past-the-end</code>, "estado: depois do fim"). O programa foi parado na hora (<code>Abortado</code>), em vez de seguir com lixo. Use <code>-D_GLIBCXX_DEBUG</code> enquanto estiver testando; ele deixa o programa mais lento, então não use na versão final.</p>
+
+<div class="tip">
+<strong>E o último item?</strong>
+<p>O último item é o anterior ao <code>end()</code>: <code>*(notas.end() - 1)</code>, ou, bem mais legível, <code>notas.back()</code>. E <strong>nunca</strong> leia <code>*notas.begin()</code> num vetor vazio: nele, <code>begin() == end()</code>, e o "primeiro item" não existe.</p>
+</div>
+
+<hr>
+
+<h2>3. Percorrer o container inteiro</h2>
+<p>Juntando as peças, o laço clássico com iterador:</p>
+
+<pre class="file" data-file="percorrer.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 9, 4, 10};
+
+    for (auto it = notas.begin(); it != notas.end(); ++it) {
+        std::cout &lt;&lt; *it &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+
+    for (auto it = notas.begin(); it != notas.end(); ++it) {
+        *it = *it + 1;
+    }
+
+    for (std::vector&lt;int&gt;::iterator it = notas.begin(); it != notas.end(); ++it) {
+        std::cout &lt;&lt; *it &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parte do <code>for</code></th><th>O que faz</th></tr>
+<tr><td><code>auto it = notas.begin()</code></td><td>Começa com o dedo no primeiro item.</td></tr>
+<tr><td><code>it != notas.end()</code></td><td>Continua enquanto o dedo não chegou na margem. Use <code>!=</code>, não <code>&lt;</code>: nem todo iterador sabe fazer <code>&lt;</code> (os da <code>std::list</code> não sabem).</td></tr>
+<tr><td><code>++it</code></td><td>Depois de cada volta, desce o dedo.</td></tr>
+<tr><td><code>*it = *it + 1;</code></td><td>Pelo iterador também se <strong>escreve</strong>: cada nota ganha um ponto, no próprio vetor.</td></tr>
+<tr><td><code>std::vector&lt;int&gt;::iterator</code></td><td>O tipo verdadeiro do <code>it</code>, escrito por extenso: "o iterador de um <code>std::vector&lt;int&gt;</code>". É o que o <code>auto</code> economiza.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp/it">$ g++ -std=c++23 -Wall -Wextra percorrer.cpp -o percorrer
+$ ./percorrer
+7 9 4 10
+8 10 5 11</pre>
+
+<h3>E o <code>for</code> de intervalo?</h3>
+<p>O <code>for (int n : notas)</code> da aula <a href="for-range.html">range-for</a> é <strong>esse mesmo laço</strong>, escrito pelo compilador: por baixo, ele chama <code>begin()</code>, <code>end()</code>, <code>!=</code>, <code>++</code> e <code>*</code>. Então quando usar cada um?</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Quando usar</th></tr>
+<tr><td><code>for</code> de intervalo</td><td><code>for (int n : notas)</code></td><td><strong>O padrão</strong> para passar por todos os itens. Mais curto, sem chance de errar o fim.</td></tr>
+<tr><td><code>for</code> de intervalo com referência</td><td><code>for (int&amp; n : notas) n += 1;</code></td><td>Para mudar os itens.</td></tr>
+<tr><td>Laço com iterador</td><td><code>for (auto it = …; it != …; ++it)</code></td><td>Quando você precisa do <strong>iterador</strong> em si: para apagar (seção 5), para saber a posição, para começar no meio, para andar de trás para frente.</td></tr>
+<tr><td>Laço com índice</td><td><code>for (std::size_t i = 0; i &lt; notas.size(); ++i)</code></td><td>Só em <code>vector</code>, <code>array</code> e <code>deque</code>, quando o número da posição importa.</td></tr>
+</table>
+</div>
+
+<div class="trycpp" data-goal="out:16 20 10 22,src:\.begin\(\)">
+<p class="try-task"><strong>Missão:</strong> use um laço com <strong>iterador</strong> (com <code>notas.begin()</code>) para <strong>dobrar</strong> cada nota, no próprio vetor. O segundo laço, que já está pronto, deve mostrar <code>16 20 10 22</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{8, 10, 5, 11};
+
+    // dobre as notas aqui, com um laço de iterador
+
+    for (int n : notas) {
+        std::cout &lt;&lt; n &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{8, 10, 5, 11};
+
+    for (auto it = notas.begin(); it != notas.end(); ++it) {
+        *it = *it * 2;
+    }
+
+    for (int n : notas) {
+        std::cout &lt;&lt; n &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<h3>Iteradores devolvidos pelos algoritmos</h3>
+<p>Muitos algoritmos <strong>devolvem</strong> um iterador. O <code>std::find</code> devolve o dedo apontando o item achado, ou o <code>end()</code> se não achou. E existe o dedo que anda ao contrário: <code>rbegin()</code> (o último item) e <code>rend()</code> (antes do primeiro).</p>
+
+<pre class="file" data-file="achar.cpp">#include &lt;algorithm&gt;
+#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 9, 4, 10};
+
+    auto pos = std::find(notas.begin(), notas.end(), 4);
+    if (pos != notas.end()) {
+        std::cout &lt;&lt; "achei o " &lt;&lt; *pos &lt;&lt; " na posição "
+                  &lt;&lt; pos - notas.begin() &lt;&lt; '\n';
+    }
+
+    auto nada = std::find(notas.begin(), notas.end(), 5);
+    if (nada == notas.end()) {
+        std::cout &lt;&lt; "5 não está na lista\n";
+    }
+
+    for (auto it = notas.rbegin(); it != notas.rend(); ++it) {
+        std::cout &lt;&lt; *it &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/it">$ g++ -std=c++23 -Wall -Wextra achar.cpp -o achar
+$ ./achar
+achei o 4 na posição 2
+5 não está na lista
+10 4 9 7</pre>
+
+<p><code>pos - notas.begin()</code> é "quantos passos do começo até o dedo": a posição. Essa conta (e <code>it + 3</code>, para pular três) só existe nos iteradores de <code>vector</code>, <code>array</code>, <code>deque</code> e <code>string</code>, que podem pular direto para qualquer lugar. Nos outros containers, use <code>std::next(it, 3)</code> e <code>std::distance(a, b)</code>, do cabeçalho <code>&lt;iterator&gt;</code>. Sempre confira <code>!= end()</code> antes de usar <code>*pos</code>: se o <code>find</code> não achou, <code>pos</code> é o <code>end()</code>, e você já viu o que acontece ao ler o <code>end()</code>.</p>
+
+<hr>
+
+<h2>4. O dedo que só lê: <code>const_iterator</code>, <code>cbegin()</code> e <code>cend()</code></h2>
+<p>Quando você só quer ler, use <code>cbegin()</code> e <code>cend()</code> (o <code>c</code> é de <em>const</em>). Eles devolvem um <code>const_iterator</code>, um iterador que <strong>não deixa mudar</strong> o item. Se você tentar, o compilador recusa:</p>
+
+<pre class="file" data-file="constante.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 9, 4, 10};
+
+    for (auto it = notas.cbegin(); it != notas.cend(); ++it) {
+        *it = 0;
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/it">$ g++ -std=c++23 -Wall -Wextra constante.cpp -o constante
+constante.cpp: In function ‘int main()’:
+constante.cpp:8:13: error: assignment of read-only location ‘it.__gnu_cxx::__normal_iterator&lt;const int*, std::vector&lt;int&gt; &gt;::operator*()’
+    8 |         *it = 0;
+      |         ~~~~^~~</pre>
+
+<p>"Atribuição a um local somente leitura". No meio do nome comprido, repare em <code>const int*</code>: por dentro, esse iterador é um ponteiro para <code>int</code> <strong>constante</strong> (aula <a href="const-ponteiros.html">const com Ponteiros</a>). No editor do guia, o Clang diz <code>cannot assign to return value because function 'operator*' returns a const value</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você tem</th><th><code>begin()</code> devolve</th><th>Pode mudar o item?</th></tr>
+<tr><td><code>std::vector&lt;int&gt; v</code></td><td><code>std::vector&lt;int&gt;::iterator</code></td><td>Sim</td></tr>
+<tr><td><code>std::vector&lt;int&gt; v</code>, usando <code>v.cbegin()</code></td><td><code>std::vector&lt;int&gt;::const_iterator</code></td><td>Não</td></tr>
+<tr><td><code>const std::vector&lt;int&gt;&amp; v</code> (parâmetro só de leitura)</td><td><code>const_iterator</code>, mesmo com <code>begin()</code></td><td>Não</td></tr>
+</table>
+</div>
+
+<p>Regra prática: se o laço só lê, use <code>cbegin()</code>/<code>cend()</code>. Assim, se alguém escrever <code>*it = …</code> por engano, o compilador avisa.</p>
+
+<hr>
+
+<h2>5. Invalidação: o dedo que aponta para o nada</h2>
+<p>A Ana quer apagar as notas abaixo de 5. O <code>vector</code> tem o método <code>erase(it)</code>, que apaga o item apontado por um iterador. Ela escreveu o laço que parece óbvio:</p>
+
+<pre class="file" data-file="apagar-errado.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 3, 4, 10, 2};
+
+    for (auto it = notas.begin(); it != notas.end(); ++it) {
+        if (*it &lt; 5) {
+            notas.erase(it);
+        }
+    }
+
+    for (int n : notas) {
+        std::cout &lt;&lt; n &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp/it">$ g++ -std=c++23 -Wall -Wextra apagar-errado.cpp -o apagar-errado
+$ ./apagar-errado
+Falha de segmentação     (imagem do núcleo gravada) ./apagar-errado
+$ echo $?
+139                      « 128 + 11: morto pelo sinal 11 (SIGSEGV)</pre>
+
+<p>Compilou sem aviso e caiu com <strong>falha de segmentação</strong>: o programa tentou ler memória que não é dele. Para descobrir onde, compile com o <strong>AddressSanitizer</strong> (<code>-fsanitize=address</code>, aula <a href="sanitizers.html">Sanitizers</a>) e <code>-g</code> (para ele saber os números das linhas). A saída é longa; aqui vão as 21 primeiras linhas:</p>
+
+<pre class="term" data-cwd="~/cpp/it">$ g++ -std=c++23 -Wall -Wextra -g -fsanitize=address apagar-errado.cpp -o apagar-errado
+$ ./apagar-errado 2&gt;&amp;1 | head -n 21
+=================================================================
+==542060==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x6c987c5e0054 at pc 0x5bec0afaa637 bp 0x7ffdf7b04d40 sp 0x7ffdf7b04d30
+READ of size 4 at 0x6c987c5e0054 thread T0
+    #0 0x5bec0afaa636 in main /home/ana/cpp/it/apagar-errado.cpp:8
+    #1 0x70687d22a600 in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+    #2 0x70687d22a717 in __libc_start_main_impl ../csu/libc-start.c:360
+    #3 0x5bec0afaa384 in _start (/home/ana/cpp/it/apagar-errado+0x2384) (BuildId: 9495fc923138f7f87bd5f930cbd7fc9534a260d1)
+
+0x6c987c5e0054 is located 0 bytes after 20-byte region [0x6c987c5e0040,0x6c987c5e0054)
+allocated by thread T0 here:
+    #0 0x70687db2c73f in operator new(unsigned long) ../../../../src/libsanitizer/asan/asan_new_delete.cpp:109
+    #1 0x5bec0afabd6d in std::__new_allocator&lt;int&gt;::allocate(unsigned long, void const*) /usr/include/c++/15/bits/new_allocator.h:151
+    #2 0x5bec0afab7b4 in std::allocator&lt;int&gt;::allocate(unsigned long) /usr/include/c++/15/bits/allocator.h:203
+    #3 0x5bec0afab7b4 in std::allocator_traits&lt;std::allocator&lt;int&gt; &gt;::allocate(std::allocator&lt;int&gt;&amp;, unsigned long) /usr/include/c++/15/bits/alloc_traits.h:614
+    #4 0x5bec0afab7b4 in std::_Vector_base&lt;int, std::allocator&lt;int&gt; &gt;::_M_allocate(unsigned long) /usr/include/c++/15/bits/stl_vector.h:387
+    #5 0x5bec0afab0af in void std::vector&lt;int, std::allocator&lt;int&gt; &gt;::_M_range_initialize_n&lt;int const*, int const*&gt;(int const*, int const*, unsigned long) /usr/include/c++/15/bits/stl_vector.h:1985
+    #6 0x5bec0afaad4e in std::vector&lt;int, std::allocator&lt;int&gt; &gt;::vector(std::initializer_list&lt;int&gt;, std::allocator&lt;int&gt; const&amp;) /usr/include/c++/15/bits/stl_vector.h:712
+    #7 0x5bec0afaa56f in main /home/ana/cpp/it/apagar-errado.cpp:5
+    #8 0x70687d22a600 in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+    #9 0x70687d22a717 in __libc_start_main_impl ../csu/libc-start.c:360
+    #10 0x5bec0afaa384 in _start (/home/ana/cpp/it/apagar-errado+0x2384) (BuildId: 9495fc923138f7f87bd5f930cbd7fc9534a260d1)</pre>
+
+<dl class="anatomy">
+  <dt>heap-buffer-overflow</dt><dd>"Estouro de área do heap": o programa leu além do fim de um bloco de memória (o bloco onde o vetor guarda as notas).</dd>
+  <dt>READ of size 4</dt><dd>Foi uma <strong>leitura</strong> de 4 bytes: um <code>int</code>.</dd>
+  <dt>#0 … in main /home/ana/cpp/it/apagar-errado.cpp:8</dt><dd>Onde: <strong>linha 8</strong>, o <code>if (*it &lt; 5)</code>. O <code>*it</code> leu fora do vetor.</dd>
+  <dt>located 0 bytes after 20-byte region</dt><dd>A leitura foi "0 bytes depois de uma região de 20 bytes": exatamente na primeira casa <strong>depois</strong> das 5 notas (5 × 4 bytes = 20). O dedo passou do fim.</dd>
+  <dt>allocated by thread T0 here: … apagar-errado.cpp:5</dt><dd>Quem criou esse bloco: a linha 5, a criação do vetor <code>notas</code>.</dd>
+</dl>
+
+<h3>O que aconteceu, volta a volta</h3>
+<p>Quando o <code>erase</code> apaga um item, ele <strong>empurra</strong> os seguintes uma casa para a esquerda, para não deixar buraco. O iterador <code>it</code>, que apontava o item apagado, passa a ser <strong>inválido</strong>: oficialmente, ele não aponta mais nada que se possa usar. Na prática, ele fica parado na mesma casa, que agora tem o <strong>próximo</strong> item. Aí o <code>++it</code> do <code>for</code> pula esse item:</p>
+
+<ol class="passo">
+  <li><code>{7, 3, 4, 10, 2}</code>, dedo no <code>7</code>: fica. <code>++it</code> → dedo no <code>3</code>.</li>
+  <li><code>3 &lt; 5</code>: <code>erase</code>. Vira <code>{7, 4, 10, 2}</code>; o dedo, parado na casa 1, agora vê o <code>4</code>. O <code>++it</code> pula para o <code>10</code>: <strong>o 4 nunca foi testado</strong>.</li>
+  <li><code>10</code>: fica. <code>++it</code> → dedo no <code>2</code>.</li>
+  <li><code>2 &lt; 5</code>: <code>erase</code>. Vira <code>{7, 4, 10}</code>; o dedo, na casa 3, agora está exatamente no <code>end()</code>. O <code>++it</code> o leva para <strong>depois</strong> do <code>end()</code>.</li>
+  <li>O teste <code>it != notas.end()</code> continua verdadeiro (o dedo passou da margem sem parar nela), e o <code>*it</code> lê fora do vetor: a falha de segmentação.</li>
+</ol>
+
+<h3>O conserto: o <code>erase</code> devolve o próximo</h3>
+<p>O <code>erase</code> devolve um iterador <strong>novo e válido</strong>, apontando o item que veio depois do apagado. Use esse retorno, e só avance o dedo quando <strong>não</strong> apagar:</p>
+
+<pre class="file" data-file="apagar-certo.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; notas{7, 3, 4, 10, 2};
+
+    for (auto it = notas.begin(); it != notas.end(); ) {
+        if (*it &lt; 5) {
+            it = notas.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    for (int n : notas) {
+        std::cout &lt;&lt; n &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>for (auto it = …; it != notas.end(); )</dt><dd>Repare: a terceira parte do <code>for</code> está <strong>vazia</strong>. O dedo não avança sozinho; quem decide é o corpo.</dd>
+  <dt>it = notas.erase(it);</dt><dd>Apaga e já põe o dedo no próximo item (ou no <code>end()</code>, se apagou o último). Nada é pulado.</dd>
+  <dt>else { ++it; }</dt><dd>Só avança quando o item fica.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/it">$ g++ -std=c++23 -Wall -Wextra apagar-certo.cpp -o apagar-certo
+$ ./apagar-certo
+7 10</pre>
+
+<div class="tip">
+<strong>O jeito mais curto <span class="versao">C++20</span></strong>
+<p>Para "apagar todos os itens que…", o C++20 tem uma função pronta: <code>std::erase_if(notas, [](int n) { return n &lt; 5; });</code>. Ela faz o laço certo por você. O <code>[](int n) { … }</code> é uma <a href="lambdas.html">lambda</a>. Para apagar um valor exato: <code>std::erase(notas, 3);</code>. O laço com <code>it = erase(it)</code> continua útil quando, além de apagar, você precisa fazer outra coisa com cada item.</p>
+</div>
+
+<h3>O que mais invalida iteradores</h3>
+<p>Não é só o <code>erase</code>. Quando um <code>vector</code> cresce além do espaço reservado (por exemplo, num <code>push_back</code>), ele se <strong>muda</strong> para um bloco de memória maior e devolve o antigo. Todo iterador que apontava para o bloco antigo fica apontando para memória devolvida. Um laço que faz <code>push_back</code> no mesmo vetor que percorre leva o AddressSanitizer a acusar outro erro, <code>heap-use-after-free</code> ("uso do heap depois de liberado"):</p>
+
+<pre class="term" data-cwd="~/cpp/it">$ g++ -std=c++23 -Wall -Wextra -g -fsanitize=address crescer.cpp -o crescer     « um laço com notas.push_back(10) dentro
+$ ./crescer 2&gt;&amp;1 | head -n 6
+=================================================================
+==542399==ERROR: AddressSanitizer: heap-use-after-free on address 0x79f9861e0014 at pc 0x600097e496db bp 0x7ffd3402a130 sp 0x7ffd3402a120
+READ of size 4 at 0x79f9861e0014 thread T0
+    #0 0x600097e496da in main /home/ana/cpp/it/crescer.cpp:11
+    #1 0x7dd986e2a600 in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+    #2 0x7dd986e2a717 in __libc_start_main_impl ../csu/libc-start.c:360</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operação num <code>std::vector</code></th><th>Quais iteradores ficam inválidos</th></tr>
+<tr><td><code>erase(it)</code></td><td>O apagado e todos os que vêm depois dele</td></tr>
+<tr><td><code>push_back</code>, <code>insert</code>, <code>emplace_back</code></td><td><strong>Todos</strong>, se o vetor precisou crescer; senão, os que vêm depois do ponto de inserção</td></tr>
+<tr><td><code>clear()</code></td><td>Todos</td></tr>
+<tr><td>Ler, mudar um item (<code>*it = 5</code>)</td><td>Nenhum</td></tr>
+</table>
+</div>
+
+<p>Regra de bolso: <strong>se o laço muda o tamanho do container, desconfie dos iteradores</strong>. Os outros containers têm regras próprias (na <code>std::list</code>, por exemplo, apagar um item só invalida o iterador dele); cada aula de container conta as suas.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Falha de segmentação / <code>heap-buffer-overflow</code> num laço que apaga</strong>
+<p><strong>O que significa:</strong> você usou um iterador depois de apagar o item dele (o <code>++it</code> do <code>for</code> depois de um <code>erase(it)</code>).</p>
+<p><strong>Como consertar:</strong> <code>it = v.erase(it);</code> e avance só no <code>else</code>. Ou use <code>std::erase_if</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Um número estranho ao ler <code>*v.end()</code>, ou <code>attempt to dereference a past-the-end iterator</code></strong>
+<p><strong>O que significa:</strong> você leu o <code>end()</code>, que não é um item. Acontece também quando o <code>std::find</code> não acha e você usa o resultado sem conferir.</p>
+<p><strong>Como consertar:</strong> confira <code>if (pos != v.end())</code> antes de <code>*pos</code>. Para o último item, use <code>v.back()</code>. Em testes, compile com <code>-D_GLIBCXX_DEBUG</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: assignment of read-only location</code></strong>
+<p><strong>O que significa:</strong> você tentou mudar um item por um <code>const_iterator</code> (de <code>cbegin()</code> ou de um container <code>const</code>).</p>
+<p><strong>Como consertar:</strong> se a mudança é intencional, use <code>begin()</code> num container que não seja <code>const</code>. Se não é, o compilador acabou de achar um erro para você.</p>
+</div>
+
+<div class="cenario">
+<strong>Comparar iteradores de containers diferentes</strong>
+<p><strong>O que significa:</strong> <code>for (auto it = a.begin(); it != b.end(); ++it)</code>, com <code>a</code> e <code>b</code> diferentes: o dedo nunca encontra a margem de outra folha. Compila e dá comportamento indefinido.</p>
+<p><strong>Como consertar:</strong> o <code>begin()</code> e o <code>end()</code> têm que ser do mesmo container.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>c.begin()</code> / <code>c.end()</code></td><td>Iterador do primeiro item / da posição depois do último</td></tr>
+<tr><td><code>c.cbegin()</code> / <code>c.cend()</code></td><td>O mesmo, só de leitura (<code>const_iterator</code>)</td></tr>
+<tr><td><code>c.rbegin()</code> / <code>c.rend()</code></td><td>Iteradores de trás para frente</td></tr>
+<tr><td><code>*it</code></td><td>O item apontado</td></tr>
+<tr><td><code>++it</code> / <code>--it</code></td><td>Avança / volta um item</td></tr>
+<tr><td><code>it == outro</code>, <code>it != outro</code></td><td>Compara posições</td></tr>
+<tr><td><code>it + n</code>, <code>it - c.begin()</code></td><td>Pula <code>n</code> / calcula a posição (só <code>vector</code>, <code>array</code>, <code>deque</code>, <code>string</code>)</td></tr>
+<tr><td><code>std::next(it, n)</code>, <code>std::distance(a, b)</code></td><td>O mesmo, para qualquer container (<code>&lt;iterator&gt;</code>)</td></tr>
+<tr><td><code>it = c.erase(it);</code></td><td>Apaga e devolve o iterador do próximo item</td></tr>
+<tr><td><code>std::vector&lt;int&gt;::iterator</code></td><td>O tipo de iterador de um <code>vector&lt;int&gt;</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O item apontado</h3>
+<p>Complete para mostrar o item para onde <code>it</code> aponta:</p>
+<div class="ex-code">std::cout &lt;&lt; <input data-answer="*it" aria-label="item">;</div>
+</div>
+
+<div class="exercise">
+<h3>2. O laço que apaga</h3>
+<p>Complete a linha que apaga e já pega o próximo:</p>
+<div class="ex-code">it = notas.<input data-answer="erase(it)" aria-label="apagar">;</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Num vetor <code>{5, 8, 2}</code>, para onde aponta <code>end()</code>?</p>
+<label><input type="radio" name="q3"> Para o <code>2</code></label>
+<label><input type="radio" name="q3"> Para o <code>5</code></label>
+<label><input type="radio" name="q3"> Para a posição depois do <code>2</code>, que não é um item</label>
+<label><input type="radio" name="q3"> Para o tamanho do vetor, <code>3</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Por que <code>for (…; ++it) { if (…) v.erase(it); }</code> está errado?</p>
+<label><input type="radio" name="q4"> Porque <code>erase</code> não existe em <code>vector</code></label>
+<label><input type="radio" name="q4"> Porque depois do <code>erase</code> o <code>it</code> fica inválido, e o <code>++it</code> pula itens e pode passar do fim</label>
+<label><input type="radio" name="q4"> Porque <code>erase</code> apaga o vetor inteiro</label>
+<label><input type="radio" name="q4"> Porque o compilador não aceita <code>erase</code> dentro de laços</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Qual destas formas dá um iterador que <strong>não</strong> deixa mudar o item?</p>
+<label><input type="radio" name="q5"> <code>v.begin()</code> num <code>std::vector&lt;int&gt; v</code></label>
+<label><input type="radio" name="q5"> <code>v.end()</code></label>
+<label><input type="radio" name="q5"> <code>v.rbegin()</code></label>
+<label><input type="radio" name="q5"> <code>v.cbegin()</code></label>
+</div>
+
+<h3>Missão final: tirar o café da lista</h3>
+
+<div class="trycpp" data-goal="out:arroz leite pão,src:erase">
+<p class="try-task"><strong>Missão:</strong> a Ana desistiu do café. Apague <strong>todos</strong> os <code>"café"</code> da lista de compras, com o laço de iterador que usa o retorno do <code>erase</code> (ou com <code>std::erase</code>). Repare que há dois cafés seguidos: o laço errado pularia o segundo. A saída deve ser <code>arroz leite pão</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; compras{"café", "arroz", "café", "café", "leite", "pão"};
+
+    for (auto it = compras.begin(); it != compras.end(); ++it) {
+        // troque este laço por um que apague os "café" sem pular nenhum
+    }
+
+    for (const auto&amp; item : compras) {
+        std::cout &lt;&lt; item &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;std::string&gt; compras{"café", "arroz", "café", "café", "leite", "pão"};
+
+    for (auto it = compras.begin(); it != compras.end(); ) {
+        if (*it == "café") {
+            it = compras.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    for (const auto&amp; item : compras) {
+        std::cout &lt;&lt; item &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um <strong>iterador</strong> é um dedo que aponta um item de um container. <code>*it</code> lê (ou muda) o item; <code>++it</code> avança.</li>
+  <li><code>begin()</code> aponta o primeiro item; <code>end()</code> aponta a posição <strong>depois</strong> do último, que não é item. Nunca leia <code>*end()</code>.</li>
+  <li>O laço: <code>for (auto it = c.begin(); it != c.end(); ++it)</code>. O <code>for</code> de intervalo faz isso por você e é o padrão.</li>
+  <li><code>cbegin()</code>/<code>cend()</code> dão um <code>const_iterator</code>, que só lê.</li>
+  <li>Apagar ou inserir num <code>vector</code> <strong>invalida</strong> iteradores. Ao apagar num laço: <code>it = c.erase(it);</code> e <code>++it</code> só no <code>else</code>. Ou <code>std::erase_if</code> <span class="versao">C++20</span>.</li>
+  <li><code>-D_GLIBCXX_DEBUG</code> e <code>-fsanitize=address</code> transformam esses erros silenciosos em mensagens claras.</li>
+  <li>Próximo passo: containers que não são o <code>vector</code>, em <a href="list-deque.html">list e deque</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
