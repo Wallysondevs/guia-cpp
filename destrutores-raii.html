@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Destrutores e RAII — ~Classe(), tempo de vida e recursos que se liberam sozinhos | Guia C++</title>
+<meta name="description" content="Destrutores em C++ para quem está começando: o ~Classe(), quando ele roda (fim do escopo, delete), a ordem real de construção e destruição, e a técnica RAII que faz arquivos, memória e travas se liberarem sozinhos, sem coletor de lixo. Saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Destrutores e RAII</span></h1>
+
+<p class="intro">Na aula de <a href="construtores.html">Construtores</a> você viu a função que roda quando um objeto <strong>nasce</strong>. Esta aula é sobre a função que roda quando ele <strong>morre</strong>: o <strong>destrutor</strong>. Parece um detalhe, mas é uma das ideias mais importantes do C++. É com ela que um arquivo se fecha sozinho, que a memória volta para o sistema sem você pedir e que o C++ consegue viver sem "coletor de lixo". O nome dessa técnica é <strong>RAII</strong>, e no fim da aula você vai entender por que todo programador C++ fala dela.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um destrutor e como escrever um: <code>~Classe()</code>.</li>
+  <li>Quando o destrutor roda: no fim do bloco, no fim da função, no <code>delete</code>.</li>
+  <li>A ordem real em que os objetos nascem e morrem (o último a nascer é o primeiro a morrer).</li>
+  <li>O que é RAII: prender um recurso (arquivo, memória, trava) ao tempo de vida de um objeto.</li>
+  <li>Como <code>std::ifstream</code>, <code>std::vector</code>, <code>std::unique_ptr</code> e <code>std::lock_guard</code> usam RAII por você.</li>
+  <li>Por que o C++ não precisa de coletor de lixo.</li>
+</ul>
+</div>
+
+<p>Todos os programas foram compilados com o <strong>g++ 15</strong> na máquina da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code> (veja <a href="compilar.html">Compilar com g++</a>).</p>
+
+<hr>
+
+<h2>A ideia: quem pega, devolve</h2>
+<p>Pense numa biblioteca. Você pega um livro emprestado e, quando termina, <strong>devolve</strong>. Se todo mundo esquecesse de devolver, a biblioteca ficaria vazia em uma semana. Agora imagine uma biblioteca mágica: o livro volta sozinho para a estante no instante em que você sai do prédio. Ninguém precisa lembrar de nada.</p>
+
+<p>Programas também pegam coisas emprestadas do sistema: <strong>memória</strong>, <strong>arquivos abertos</strong>, <strong>conexões</strong>, <strong>travas</strong>. Isso tudo se chama <strong>recurso</strong>, e todo recurso precisa ser devolvido. O destrutor é a "biblioteca mágica" do C++: uma função que roda automaticamente quando o objeto deixa de existir, e é o lugar perfeito para devolver o que ele pegou.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Momento da vida do objeto</th><th>Função que roda</th><th>Serve para</th></tr>
+<tr><td>Nasce</td><td><strong>construtor</strong>: <code>Classe()</code></td><td>Preparar o objeto, pegar recursos.</td></tr>
+<tr><td>Morre</td><td><strong>destrutor</strong>: <code>~Classe()</code></td><td>Devolver os recursos, fazer a limpeza final.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. O primeiro destrutor</h2>
+<p>O destrutor tem o mesmo nome da classe, com um <strong>til</strong> (<code>~</code>) na frente. Para enxergar quando ele roda, vamos colocar um <code>std::cout</code> dentro do construtor e outro dentro do destrutor:</p>
+
+<pre class="file" data-file="nasce.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Aviso {
+public:
+    Aviso(std::string nome) : nome_{nome} {
+        std::cout &lt;&lt; "Construtor: " &lt;&lt; nome_ &lt;&lt; " nasceu\n";
+    }
+    ~Aviso() {
+        std::cout &lt;&lt; "Destrutor: " &lt;&lt; nome_ &lt;&lt; " morreu\n";
+    }
+private:
+    std::string nome_;
+};
+
+int main() {
+    std::cout &lt;&lt; "Início do main\n";
+    Aviso a{"A"};
+    std::cout &lt;&lt; "Fim do main\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>Aviso(std::string nome) : nome_{nome}</dt><dd>O construtor, com a lista de inicialização que guarda o nome no atributo <code>nome_</code> (visto em <a href="construtores.html">Construtores</a>).</dd>
+  <dt>~</dt><dd>O <strong>til</strong> marca o destrutor. Em matemática e em C++, <code>~</code> lembra "o contrário": o contrário do construtor.</dd>
+  <dt>~Aviso()</dt><dd>O destrutor: mesmo nome da classe, <strong>sem parâmetros</strong> e <strong>sem tipo de retorno</strong> (nem <code>void</code>). Cada classe tem <strong>um só</strong> destrutor.</dd>
+  <dt>{ … }</dt><dd>O corpo: o que fazer na hora da morte. Aqui só imprime; num programa de verdade, devolve recursos.</dd>
+  <dt>Aviso a{"A"};</dt><dd>Cria o objeto: o construtor roda nesta linha.</dd>
+  <dt>a chave } do main</dt><dd>Fim do escopo de <code>a</code>: o destrutor roda aqui. Você <strong>não chama</strong> o destrutor; o C++ chama por você.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra nasce.cpp -o nasce
+$ ./nasce
+Início do main
+Construtor: A nasceu
+Fim do main
+Destrutor: A morreu      « depois do "Fim do main": na chave que fecha o main</pre>
+
+<p>Repare que nenhuma linha do <code>main</code> chama <code>~Aviso()</code>. Mesmo assim, a mensagem apareceu, e apareceu <strong>depois</strong> de <code>Fim do main</code>. O destrutor rodou exatamente quando a variável <code>a</code> deixou de existir: na chave <code>}</code> que fecha o <code>main</code>.</p>
+
+<div class="note">
+<strong>E se eu não escrever destrutor?</strong>
+<p>O compilador cria um sozinho, vazio por fora. Ele não imprime nada, mas faz uma coisa importante: chama o destrutor de cada atributo. É por isso que o <code>std::string nome_</code> devolve a memória do texto mesmo sem você escrever nada. A maioria das classes não precisa de destrutor próprio, como você vai ver no fim da aula.</p>
+</div>
+
+<hr>
+
+<h2>2. Quando o destrutor roda</h2>
+<p>Uma variável comum (criada sem <code>new</code>) vive do ponto em que foi declarada até o <strong>fim do bloco</strong> em que ela está, ou seja, até a próxima <code>}</code> que fecha o seu bloco. Esse trecho é o <strong>escopo</strong> dela (aula <a href="escopo.html">Escopo</a>), e o tempo entre nascer e morrer é o seu <strong>tempo de vida</strong>. Vamos ver vários casos de uma vez. Para a saída ficar curta, o <code>Aviso</code> agora imprime <code>+</code> quando nasce e <code>-</code> quando morre:</p>
+
+<pre class="file" data-file="ordem.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Aviso {
+public:
+    Aviso(std::string nome) : nome_{nome} {
+        std::cout &lt;&lt; "  + " &lt;&lt; nome_ &lt;&lt; '\n';
+    }
+    ~Aviso() {
+        std::cout &lt;&lt; "  - " &lt;&lt; nome_ &lt;&lt; '\n';
+    }
+private:
+    std::string nome_;
+};
+
+void tarefa() {
+    std::cout &lt;&lt; "Entrando em tarefa()\n";
+    Aviso t{"T (da função)"};
+    std::cout &lt;&lt; "Saindo de tarefa()\n";
+}
+
+int main() {
+    Aviso a{"A"};
+    Aviso b{"B"};
+    {
+        std::cout &lt;&lt; "Abrindo o bloco\n";
+        Aviso c{"C (do bloco)"};
+        std::cout &lt;&lt; "Fechando o bloco\n";
+    }
+    tarefa();
+    for (int i = 1; i &lt;= 2; ++i) {
+        Aviso v{"volta " + std::to_string(i)};
+    }
+    std::cout &lt;&lt; "Fim do main\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ordem.cpp -o ordem
+$ ./ordem
+  + A
+  + B
+Abrindo o bloco
+  + C (do bloco)
+Fechando o bloco
+  - C (do bloco)         « a chave } do bloco: C morre aqui
+Entrando em tarefa()
+  + T (da função)
+Saindo de tarefa()
+  - T (da função)        « fim da função: T morre aqui
+  + volta 1
+  - volta 1              « cada volta do for cria e destrói um objeto novo
+  + volta 2
+  - volta 2
+Fim do main
+  - B                    « B nasceu depois de A, então morre antes
+  - A</pre>
+
+<p>Leia a saída de cima para baixo e compare com o código. Quatro regras aparecem:</p>
+<ol class="passo">
+  <li><strong>Fim de bloco.</strong> Um par de chaves solto <code>{ … }</code> cria um escopo. <code>C</code> morreu na chave que fecha esse bloco, bem antes do fim do <code>main</code>.</li>
+  <li><strong>Fim de função.</strong> <code>T</code> é variável local de <code>tarefa()</code>; morreu quando a função terminou.</li>
+  <li><strong>Cada volta de laço.</strong> O corpo do <code>for</code> é um bloco. A cada volta, <code>v</code> nasce e morre de novo.</li>
+  <li><strong>Ordem inversa.</strong> <code>A</code> nasceu antes de <code>B</code>, e <code>B</code> morreu antes de <code>A</code>. É como uma pilha de pratos: o último que você colocou é o primeiro que você tira.</li>
+</ol>
+
+<p>A ordem inversa tem um motivo: um objeto criado depois pode depender de um criado antes (por exemplo, usar um arquivo que outro objeto abriu). Destruindo de trás para frente, ninguém fica usando algo que já morreu.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode como está. Depois crie um <code>Aviso d{"D"};</code> logo antes de <code>Fim do main</code> e descubra em que ponto ele morre. Tente também mover <code>Aviso b{"B"};</code> para dentro do bloco.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Aviso {
+public:
+    Aviso(std::string nome) : nome_{nome} {
+        std::cout &lt;&lt; "  + " &lt;&lt; nome_ &lt;&lt; '\n';
+    }
+    ~Aviso() {
+        std::cout &lt;&lt; "  - " &lt;&lt; nome_ &lt;&lt; '\n';
+    }
+private:
+    std::string nome_;
+};
+
+int main() {
+    Aviso a{"A"};
+    Aviso b{"B"};
+    {
+        std::cout &lt;&lt; "Abrindo o bloco\n";
+        Aviso c{"C"};
+        std::cout &lt;&lt; "Fechando o bloco\n";
+    }
+    std::cout &lt;&lt; "Fim do main\n";
+}
+</pre>
+</div>
+
+<h3>Os atributos morrem depois do dono</h3>
+<p>Quando um objeto tem outros objetos como atributos, a ordem é: primeiro roda o corpo do destrutor do dono, depois os atributos morrem, <strong>na ordem inversa em que foram declarados</strong>. Assim, dentro do destrutor, você ainda pode usar todos os atributos:</p>
+
+<pre class="file" data-file="membros.cpp">class Mochila {
+public:
+    Mochila() : caderno_{"caderno"}, estojo_{"estojo"} {
+        std::cout &lt;&lt; "Mochila pronta\n";
+    }
+    ~Mochila() {
+        std::cout &lt;&lt; "Esvaziando a mochila\n";
+    }
+private:
+    Aviso caderno_;
+    Aviso estojo_;
+};
+
+int main() {
+    Mochila m;
+    std::cout &lt;&lt; "Fim do main\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ ./membros
+  + caderno              « os atributos nascem primeiro, na ordem da declaração
+  + estojo
+Mochila pronta           « depois roda o corpo do construtor
+Fim do main
+Esvaziando a mochila     « na morte, primeiro o corpo do destrutor...
+  - estojo               « ...depois os atributos, de trás para frente
+  - caderno</pre>
+
+<h3>Objetos criados com <code>new</code>: só morrem no <code>delete</code></h3>
+<p>Um objeto criado com <code>new</code> (aula <a href="new-delete.html">Memória Dinâmica</a>) não pertence a nenhum bloco. Ele vive até alguém escrever <code>delete</code>. Se ninguém escrever, ele <strong>nunca</strong> morre, e o destrutor nunca roda. Já o <code>std::unique_ptr</code> (aula <a href="smart-pointers.html">Ponteiros Inteligentes</a>) faz o <code>delete</code> sozinho:</p>
+
+<pre class="file" data-file="heap.cpp">int main() {
+    Aviso* p = new Aviso{"P (com new)"};
+    std::cout &lt;&lt; "Antes do delete\n";
+    delete p;
+    std::cout &lt;&lt; "Depois do delete\n";
+
+    Aviso* esquecido = new Aviso{"E (ninguém deu delete)"};
+    (void)esquecido;
+
+    auto u = std::make_unique&lt;Aviso&gt;("U (unique_ptr)");
+    std::cout &lt;&lt; "Fim do main\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra heap.cpp -o heap
+$ ./heap
+  + P (com new)
+Antes do delete
+  - P (com new)          « o delete chamou o destrutor
+Depois do delete
+  + E (ninguém deu delete)
+  + U (unique_ptr)
+Fim do main
+  - U (unique_ptr)       « o unique_ptr morreu no fim do main e levou o objeto junto</pre>
+
+<p>O <code>E</code> nasceu e <strong>nunca morreu</strong>: não existe a linha <code>- E</code>. A memória dele ficou presa até o programa terminar. Isso se chama <strong>vazamento de memória</strong> (<em>memory leak</em>). O <code>(void)esquecido;</code> só serve para o compilador não avisar que a variável não foi usada.</p>
+
+<div class="tip">
+<strong>Dá para pegar o vazamento</strong>
+<p>Compilando com <code>-fsanitize=address</code> (aula <a href="sanitizers.html">Sanitizers</a>), o programa avisa no final <code>ERROR: LeakSanitizer: detected memory leaks</code> ("detectados vazamentos de memória") e aponta a linha do <code>new</code> esquecido. Mas o melhor é nem precisar: com RAII, que vem a seguir, não existe <code>delete</code> para esquecer.</p>
+</div>
+
+<hr>
+
+<h2>3. RAII: o recurso preso ao tempo de vida do objeto</h2>
+<p>RAII é a sigla de <em>Resource Acquisition Is Initialization</em>, "adquirir o recurso é inicializar". O nome é estranho (até o criador do C++, Bjarne Stroustrup, admite), mas a regra é simples:</p>
+
+<div class="note">
+<strong>A regra do RAII</strong>
+<ul>
+  <li>O <strong>construtor</strong> pega o recurso (abre o arquivo, reserva a memória, fecha a trava).</li>
+  <li>O <strong>destrutor</strong> devolve o recurso (fecha o arquivo, libera a memória, abre a trava).</li>
+  <li>Você usa o objeto como uma variável comum. Quando ele sai do escopo, o recurso volta sozinho.</li>
+</ul>
+</div>
+
+<h3>O problema: o jeito manual</h3>
+<p>O C++ herdou da linguagem C um jeito antigo de abrir arquivos: <code>std::fopen</code> ("file open", abrir arquivo) devolve um ponteiro do tipo <code>std::FILE*</code>, e <code>std::fclose</code> ("file close") fecha. Quem abre precisa lembrar de fechar. Veja uma função que salva a lista de compras e, na segunda chamada, encontra um problema no meio do caminho (uma <a href="excecoes.html">exceção</a>, o jeito do C++ de interromper tudo e avisar que deu errado):</p>
+
+<pre class="file" data-file="manual.cpp">#include &lt;cstdio&gt;
+#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+
+void salvar_lista(bool falhar) {
+    std::FILE* arq = std::fopen("compras.txt", "w");
+    std::cout &lt;&lt; "[abriu compras.txt]\n";
+    std::fputs("arroz\n", arq);
+    if (falhar) throw std::runtime_error{"acabou o espaço"};
+    std::fputs("feijão\n", arq);
+    std::fclose(arq);
+    std::cout &lt;&lt; "[fechou]\n";
+}
+
+int main() {
+    salvar_lista(false);
+    try {
+        salvar_lista(true);
+    } catch (const std::exception&amp; e) {
+        std::cout &lt;&lt; "Erro: " &lt;&lt; e.what() &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra manual.cpp -o manual
+$ ./manual
+[abriu compras.txt]
+[fechou]
+[abriu compras.txt]      « segunda chamada: abriu...
+Erro: acabou o espaço    « ...e nunca fechou: o throw pulou o fclose</pre>
+
+<p>Na segunda vez, o <code>throw</code> saiu da função no meio, e a linha do <code>fclose</code> nunca rodou. O arquivo ficou aberto. O mesmo acontece com um <code>return</code> antecipado que alguém acrescenta meses depois. Num programa que roda por dias (um servidor), cada arquivo esquecido é um recurso a menos, até o sistema recusar abrir o próximo.</p>
+
+<h3>A solução: uma classe <code>Arquivo</code> que fecha sozinha</h3>
+<p>Coloque o <code>fopen</code> no construtor e o <code>fclose</code> no destrutor:</p>
+
+<pre class="file" data-file="arquivo.cpp">#include &lt;cstdio&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+class Arquivo {
+public:
+    Arquivo(const std::string&amp; nome) {
+        ptr_ = std::fopen(nome.c_str(), "w");
+        std::cout &lt;&lt; "[abriu " &lt;&lt; nome &lt;&lt; "]\n";
+    }
+    ~Arquivo() {
+        if (ptr_) std::fclose(ptr_);
+        std::cout &lt;&lt; "[fechou]\n";
+    }
+    void escrever(const std::string&amp; texto) {
+        if (ptr_) std::fputs(texto.c_str(), ptr_);
+    }
+
+    Arquivo(const Arquivo&amp;) = delete;             // proíbe cópias
+    Arquivo&amp; operator=(const Arquivo&amp;) = delete;  // (aula Cópia e Movimento)
+private:
+    std::FILE* ptr_;
+};
+
+int main() {
+    {
+        Arquivo lista{"compras.txt"};
+        lista.escrever("arroz\n");
+        lista.escrever("feijão\n");
+        std::cout &lt;&lt; "Escrevi duas linhas\n";
+    }
+    std::cout &lt;&lt; "Já fora do bloco\n";
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>std::FILE* ptr_;</code></td><td>O recurso que a classe "toma conta": o arquivo aberto.</td></tr>
+<tr><td><code>ptr_ = std::fopen(nome.c_str(), "w");</code></td><td>No construtor: abre o arquivo para escrita (<code>"w"</code> = <em>write</em>). O <code>c_str()</code> entrega o texto no formato antigo que o <code>fopen</code> entende. Se não conseguir abrir, <code>ptr_</code> fica nulo.</td></tr>
+<tr><td><code>if (ptr_) std::fclose(ptr_);</code></td><td>No destrutor: fecha, se estiver aberto. Ninguém precisa lembrar disso.</td></tr>
+<tr><td><code>escrever(…)</code></td><td>Um método comum para usar o recurso. <code>fputs</code> = "file put string", grava um texto.</td></tr>
+<tr><td><code>Arquivo(const Arquivo&amp;) = delete;</code></td><td>Proíbe copiar um <code>Arquivo</code>. Sem isso, duas cópias tentariam fechar o mesmo arquivo. O porquê completo está na próxima aula, <a href="copia-movimento.html">Cópia e Movimento</a>.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra arquivo.cpp -o arquivo
+$ ./arquivo
+[abriu compras.txt]
+Escrevi duas linhas
+[fechou]                 « fechou sozinho, na chave } do bloco
+Já fora do bloco
+$ cat compras.txt
+arroz
+feijão</pre>
+
+<h3>Mesmo com erro no meio, o destrutor roda</h3>
+<p>Agora o teste de fogo: a mesma função <code>salvar_lista</code> do jeito manual, mas usando a classe <code>Arquivo</code> (com uma pequena mudança: o construtor lança uma exceção se o <code>fopen</code> falhar):</p>
+
+<pre class="file" data-file="excecao.cpp">void salvar_lista(bool falhar) {
+    Arquivo arq{"compras.txt"};
+    arq.escrever("arroz\n");
+    if (falhar) throw std::runtime_error{"acabou o espaço"};
+    arq.escrever("feijão\n");
+}                       // sem fclose: o destrutor de arq cuida disso
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra excecao.cpp -o excecao
+$ ./excecao
+[abriu compras.txt]
+[fechou]
+[abriu compras.txt]
+[fechou]                 « o throw saiu da função, e o destrutor rodou no caminho
+Erro: acabou o espaço</pre>
+
+<p>Quando uma exceção sai de uma função, o C++ destrói todas as variáveis locais pelo caminho, de trás para frente, antes de chegar ao <code>catch</code>. Isso se chama <strong>desempilhar</strong> (<em>stack unwinding</em>). Com RAII, não importa <strong>como</strong> a função termina (no fim, num <code>return</code> no meio ou numa exceção): o recurso sempre volta.</p>
+
+<hr>
+
+<h2>4. RAII que você já usa sem saber</h2>
+<p>A biblioteca padrão do C++ é feita de classes RAII. Você quase nunca precisa escrever uma classe como a <code>Arquivo</code>: ela já existe, pronta e mais completa.</p>
+
+<pre class="file" data-file="biblio.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;mutex&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+std::mutex trava;
+int contador = 0;
+
+void somar() {
+    std::lock_guard&lt;std::mutex&gt; guarda{trava};  // trava aqui...
+    ++contador;
+}                                               // ...e destrava aqui
+
+int main() {
+    {
+        std::ofstream saida{"compras.txt"};
+        saida &lt;&lt; "arroz\nfeijão\n";
+    }   // o ofstream fechou o arquivo aqui
+
+    std::ifstream entrada{"compras.txt"};
+    std::string linha;
+    while (std::getline(entrada, linha)) {
+        std::cout &lt;&lt; "Li: " &lt;&lt; linha &lt;&lt; '\n';
+    }
+
+    std::vector&lt;int&gt; notas{7, 8, 10};
+    auto nome = std::make_unique&lt;std::string&gt;("Ana");
+    somar();
+    std::cout &lt;&lt; "contador = " &lt;&lt; contador &lt;&lt; '\n';
+}   // entrada, notas e nome liberam o que pegaram aqui
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra biblio.cpp -o biblio
+$ ./biblio
+Li: arroz
+Li: feijão
+contador = 1</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Classe</th><th>Recurso</th><th>Construtor pega</th><th>Destrutor devolve</th></tr>
+<tr><td><code>std::ifstream</code> / <code>std::ofstream</code></td><td>Arquivo aberto</td><td>Abre o arquivo</td><td>Fecha o arquivo (e grava o que faltava)</td></tr>
+<tr><td><code>std::string</code>, <code>std::vector</code></td><td>Memória para os itens</td><td>Reserva memória</td><td>Libera a memória</td></tr>
+<tr><td><code>std::unique_ptr</code>, <code>std::shared_ptr</code></td><td>Um objeto criado com <code>new</code></td><td>Recebe o objeto</td><td>Faz o <code>delete</code></td></tr>
+<tr><td><code>std::lock_guard</code></td><td>Uma trava (<code>std::mutex</code>)</td><td>Fecha a trava</td><td>Abre a trava</td></tr>
+</table>
+</div>
+
+<p>O <code>std::lock_guard</code> ("guarda da trava") aparece em programas com várias <a href="threads.html">threads</a>, tarefas que rodam ao mesmo tempo. Uma <code>std::mutex</code> é uma trava que deixa só uma tarefa por vez mexer no <code>contador</code>. Esquecer de abrir a trava congela o programa para sempre, e o <code>lock_guard</code> torna esse esquecimento impossível. Você vai usá-lo de verdade na aula de threads; aqui, guarde a ideia: <strong>trava presa à vida de um objeto</strong>.</p>
+
+<div class="note">
+<strong>Por que o <code>ofstream</code> está dentro de um bloco?</strong>
+<p>Para ele morrer (e fechar o arquivo, gravando tudo) <strong>antes</strong> de o <code>ifstream</code> abrir o mesmo arquivo para ler. Esse truque das chaves soltas é a forma mais simples de dizer "o recurso só é necessário até aqui". Arquivos têm aula própria: <a href="arquivos.html">Ler e Escrever Arquivos</a>.</p>
+</div>
+
+<hr>
+
+<h2>5. Por que o C++ não precisa de coletor de lixo</h2>
+<p>Linguagens como Java, Python e JavaScript têm um <strong>coletor de lixo</strong> (<em>garbage collector</em>): um ajudante que, de tempos em tempos, procura objetos que ninguém mais usa e libera a memória deles. É cômodo, mas tem dois custos:</p>
+<ul>
+  <li><strong>Você não sabe quando acontece.</strong> O objeto pode ficar na memória por segundos ou minutos depois de não servir mais.</li>
+  <li><strong>Só cuida de memória.</strong> Arquivos, conexões e travas continuam precisando ser fechados à mão (por isso Java tem <code>try-with-resources</code> e Python tem <code>with</code>).</li>
+</ul>
+
+<p>No C++, com RAII, a liberação é <strong>determinística</strong>: acontece num ponto exato do código, a chave <code>}</code>, e vale para <strong>qualquer</strong> recurso, não só memória. Não existe um processo extra rodando por trás, o que é um dos motivos para o C++ ser usado em jogos, navegadores e sistemas em que cada milissegundo conta.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Coletor de lixo (Java, Python…)</th><th>RAII (C++)</th></tr>
+<tr><td>Quando libera</td><td>Algum momento depois, quando o coletor decidir</td><td>Na hora: no fim do escopo</td></tr>
+<tr><td>O que libera</td><td>Só memória</td><td>Memória, arquivos, travas, conexões…</td></tr>
+<tr><td>Custo extra</td><td>Um processo de coleta rodando</td><td>Nenhum além do próprio destrutor</td></tr>
+<tr><td>O que você precisa fazer</td><td>Nada para memória; fechar o resto à mão</td><td>Usar classes RAII (as da biblioteca padrão já são)</td></tr>
+</table>
+</div>
+
+<p>O preço do RAII é uma disciplina: em C++ moderno, <strong>você quase nunca escreve <code>delete</code></strong>. Use <code>std::string</code>, <code>std::vector</code>, <code>std::unique_ptr</code> e os fluxos de arquivo, e deixe os destrutores deles trabalharem. Quando uma classe só tem atributos assim, ela nem precisa de destrutor próprio. Isso tem nome, <strong>regra do zero</strong>, e aparece na próxima aula.</p>
+
+<hr>
+
+<h2>6. Regras do destrutor</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Regra</th><th>Por quê</th></tr>
+<tr><td>Nome: <code>~</code> + nome da classe</td><td>É assim que o compilador o reconhece.</td></tr>
+<tr><td>Sem parâmetros e sem tipo de retorno</td><td>Ninguém chama o destrutor com argumentos nem usa o resultado: ele roda sozinho.</td></tr>
+<tr><td>Um só por classe</td><td>Sem parâmetros, não há como ter versões diferentes (sem <a href="sobrecarga.html">sobrecarga</a>).</td></tr>
+<tr><td>Não chame <code>obj.~Classe()</code> à mão</td><td>Ele rodaria de novo no fim do escopo: destruir duas vezes é <a href="comportamento-indefinido.html">comportamento indefinido</a>.</td></tr>
+<tr><td>Não deixe exceção sair do destrutor</td><td>Desde o C++11 o destrutor é <code>noexcept</code> (promete não lançar exceções). Se lançar, o programa é abortado (veja abaixo).</td></tr>
+<tr><td>Em classe base de herança, faça-o <code>virtual</code></td><td>Explicado em <a href="polimorfismo.html">Polimorfismo</a>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"destructors may not have parameters"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra e1.cpp -o e1
+e1.cpp:5:5: error: destructors may not have parameters
+    5 |     ~Aviso(int codigo) {
+      |     ^
+e1.cpp: In destructor ‘Aviso::~Aviso()’:
+e1.cpp:6:35: error: ‘codigo’ was not declared in this scope
+    6 |         std::cout &lt;&lt; "morreu " &lt;&lt; codigo &lt;&lt; '\n';
+      |                                   ^~~~~~</pre>
+<p><strong>O que significa:</strong> "destrutores não podem ter parâmetros". O compilador ignorou o <code>int codigo</code>, e por isso o segundo erro diz que <code>codigo</code> não existe. O Clang do editor diz <code>destructor cannot have any parameters</code>.</p>
+<p><strong>Como consertar:</strong> tire o parâmetro. Se o destrutor precisa de uma informação, guarde-a num atributo quando o objeto for construído.</p>
+</div>
+
+<div class="cenario">
+<strong>"return type specification for destructor invalid"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra e2.cpp -o e2
+e2.cpp:5:5: error: return type specification for destructor invalid
+    5 |     void ~Aviso() {
+      |     ^~~~</pre>
+<p><strong>O que significa:</strong> "especificar tipo de retorno para destrutor é inválido". Destrutor não tem tipo de retorno, nem <code>void</code>. (Clang: <code>destructor cannot have a return type</code>.)</p>
+<p><strong>Como consertar:</strong> apague o <code>void</code>: <code>~Aviso() { … }</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Exceção dentro do destrutor: "‘throw’ will always call ‘terminate’"</strong>
+<pre class="file" data-file="e3.cpp">class Conexao {
+public:
+    ~Conexao() {
+        std::cout &lt;&lt; "Fechando a conexão\n";
+        throw std::runtime_error{"falhou ao fechar"};
+    }
+};
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra e3.cpp -o e3
+e3.cpp: In destructor ‘Conexao::~Conexao()’:
+e3.cpp:8:9: warning: ‘throw’ will always call ‘terminate’ [-Wterminate]
+    8 |         throw std::runtime_error{"falhou ao fechar"};
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+e3.cpp:8:9: note: in C++11 destructors default to ‘noexcept’
+$ ./e3
+Fechando a conexão
+terminate called after throwing an instance of 'std::runtime_error'
+  what():  falhou ao fechar
+Abortado                   (imagem do núcleo gravada) ./e3
+$ echo $?
+134</pre>
+<p><strong>O que significa:</strong> o aviso diz "o <code>throw</code> sempre vai chamar <code>terminate</code>", e a nota explica: desde o C++11 destrutores são <code>noexcept</code>. O <code>main</code> tinha um <code>try</code>/<code>catch</code> em volta, mas não adiantou: <code>terminate</code> aborta o programa na hora (código <code>134</code>).</p>
+<p><strong>Como consertar:</strong> o destrutor deve terminar sempre em silêncio. Se fechar pode falhar, ofereça um método comum (<code>fechar()</code>) que o usuário chama quando quer saber do erro, e no destrutor apenas tente fechar, sem lançar nada.</p>
+</div>
+
+<div class="cenario">
+<strong>Usar um objeto que já morreu: "reference to local variable ‘texto’ returned"</strong>
+<pre class="file" data-file="e4.cpp">const std::string&amp; saudacao() {
+    std::string texto = "Olá, Ana!";
+    return texto;
+}
+
+int main() {
+    std::cout &lt;&lt; saudacao() &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra e4.cpp -o e4
+e4.cpp: In function ‘const std::string&amp; saudacao()’:
+e4.cpp:6:12: warning: reference to local variable ‘texto’ returned [-Wreturn-local-addr]
+    6 |     return texto;
+      |            ^~~~~
+e4.cpp:5:17: note: declared here
+    5 |     std::string texto = "Olá, Ana!";
+      |                 ^~~~~
+$ ./e4
+Falha de segmentação     (imagem do núcleo gravada) ./e4
+$ echo $?
+139</pre>
+<p><strong>O que significa:</strong> "devolvida uma referência a uma variável local". <code>texto</code> morre (o destrutor da string libera o texto) na chave que fecha <code>saudacao()</code>. O <code>main</code> recebe uma referência para um objeto que não existe mais, e o programa quebra. É o lado ruim do tempo de vida bem definido: depois da <code>}</code>, o objeto acabou de verdade.</p>
+<p><strong>Como consertar:</strong> devolva <strong>por valor</strong>: <code>std::string saudacao()</code>. Isso é barato no C++ moderno (veja <a href="move.html">Semântica de Movimento</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>O destrutor nunca rodou (nenhuma mensagem)</strong>
+<p><strong>O que aconteceu:</strong> o objeto foi criado com <code>new</code> e ninguém deu <code>delete</code>, como o <code>E</code> do exemplo da seção 2. Não há erro de compilação nem mensagem: só o silêncio, e um vazamento de memória.</p>
+<p><strong>Como consertar:</strong> troque <code>Classe* p = new Classe{…};</code> por <code>auto p = std::make_unique&lt;Classe&gt;(…);</code>, ou simplesmente por uma variável comum: <code>Classe obj{…};</code>.</p>
+</div>
+
+<hr>
+
+<h2>Missão</h2>
+
+<div class="trycpp" data-goal="out:Luz acesa,out:Luz apagada,outre:apagada[\s\S]*Saí da sala,src:~Luz\s*\(">
+<p class="try-task"><strong>Missão:</strong> a classe <code>Luz</code> acende quando nasce. (1) Escreva o destrutor, que mostra <code>Luz apagada</code>. (2) No <code>main</code>, coloque a luz dentro de um bloco <code>{ … }</code> de modo que <code>Luz apagada</code> apareça <strong>antes</strong> de <code>Saí da sala</code>. Rode e confira a ordem.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+class Luz {
+public:
+    Luz() {
+        std::cout &lt;&lt; "Luz acesa\n";
+    }
+    // escreva o destrutor aqui
+};
+
+int main() {
+    std::cout &lt;&lt; "Entrei na sala\n";
+    Luz luz;
+    std::cout &lt;&lt; "Lendo um livro...\n";
+    std::cout &lt;&lt; "Saí da sala\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+class Luz {
+public:
+    Luz() {
+        std::cout &lt;&lt; "Luz acesa\n";
+    }
+    ~Luz() {
+        std::cout &lt;&lt; "Luz apagada\n";
+    }
+};
+
+int main() {
+    std::cout &lt;&lt; "Entrei na sala\n";
+    {
+        Luz luz;
+        std::cout &lt;&lt; "Lendo um livro...\n";
+    }
+    std::cout &lt;&lt; "Saí da sala\n";
+}
+</pre>
+</div>
+
+<p>A saída da solução no laboratório:</p>
+<pre class="term" data-cwd="~/cpp">$ ./luz
+Entrei na sala
+Luz acesa
+Lendo um livro...
+Luz apagada
+Saí da sala</pre>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Quando o destrutor roda</th></tr>
+<tr><td>Variável local</td><td>Na <code>}</code> que fecha o bloco em que foi declarada</td></tr>
+<tr><td>Vários objetos no mesmo bloco</td><td>Na ordem inversa da criação</td></tr>
+<tr><td>Variável dentro de um laço</td><td>No fim de cada volta</td></tr>
+<tr><td>Atributo de outro objeto</td><td>Depois do corpo do destrutor do dono, na ordem inversa da declaração</td></tr>
+<tr><td>Objeto criado com <code>new</code></td><td>Só no <code>delete</code> (nunca, se esquecerem)</td></tr>
+<tr><td>Objeto dentro de <code>std::unique_ptr</code></td><td>Quando o <code>unique_ptr</code> morre</td></tr>
+<tr><td>Itens de um <code>std::vector</code></td><td>Quando o vetor morre, ou quando o item é removido (<code>pop_back</code>, <code>clear</code>…)</td></tr>
+<tr><td>Uma exceção sai da função</td><td>Todas as variáveis locais morrem no caminho até o <code>catch</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O nome do destrutor</h3>
+<p>Complete a declaração do destrutor da classe <code>Conta</code>:</p>
+<div class="ex-code"><input data-answer="~Conta()|~Conta( )" aria-label="destrutor"> { std::cout &lt;&lt; "Conta encerrada\n"; }</div>
+</div>
+
+<div class="exercise">
+<h3>2. Quem morre primeiro?</h3>
+<p>No <code>main</code> estão, nesta ordem, <code>Aviso x{"X"}; Aviso y{"Y"}; Aviso z{"Z"};</code>. Qual nome aparece na <strong>primeira</strong> linha <code>-</code> quando o <code>main</code> termina?</p>
+<div class="ex-code"><input data-answer="Z|z" aria-label="nome"></div>
+</div>
+
+<div class="exercise">
+<h3>3. A sigla</h3>
+<p>Qual é a sigla da técnica de prender um recurso ao tempo de vida de um objeto?</p>
+<div class="ex-code"><input data-answer="RAII|raii" aria-label="sigla"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Uma função cria um <code>std::ofstream</code>, escreve uma linha e lança uma exceção antes de terminar. O que acontece com o arquivo?</p>
+<label><input type="radio" name="q4"> Fica aberto até o programa terminar.</label>
+<label><input type="radio" name="q4"> Fica aberto para sempre, mesmo depois do programa.</label>
+<label><input type="radio" name="q4"> É fechado pelo destrutor do <code>ofstream</code> antes de a exceção chegar ao <code>catch</code>.</label>
+<label><input type="radio" name="q4"> O compilador recusa o programa.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Qual destes objetos <strong>não</strong> tem o destrutor chamado automaticamente?</p>
+<label><input type="radio" name="q5"> <code>Aviso a{"A"};</code> dentro de uma função.</label>
+<label><input type="radio" name="q5"> <code>Aviso* p = new Aviso{"P"};</code> sem <code>delete</code>.</label>
+<label><input type="radio" name="q5"> <code>auto u = std::make_unique&lt;Aviso&gt;("U");</code></label>
+<label><input type="radio" name="q5"> Um <code>Aviso</code> guardado dentro de um <code>std::vector</code>.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Qual a principal diferença entre RAII e um coletor de lixo?</p>
+<label><input type="radio" name="q6"> RAII só funciona com memória.</label>
+<label><input type="radio" name="q6"> RAII precisa de um processo extra rodando por trás.</label>
+<label><input type="radio" name="q6"> O coletor de lixo libera tudo no fim de cada bloco.</label>
+<label><input type="radio" name="q6"> Com RAII, o recurso é liberado num ponto exato (o fim do escopo), e isso vale para arquivos, travas e memória.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>O destrutor <code>~Classe()</code> roda sozinho quando o objeto morre. Não tem parâmetros nem tipo de retorno, e cada classe tem um só.</li>
+  <li>Variáveis comuns morrem na <code>}</code> do seu bloco, na ordem inversa em que nasceram. Atributos morrem depois do corpo do destrutor do dono.</li>
+  <li>Objetos de <code>new</code> só morrem no <code>delete</code>; esquecer dá vazamento. Prefira <code>std::unique_ptr</code> ou variáveis comuns.</li>
+  <li>RAII: o construtor pega o recurso e o destrutor devolve. Funciona até quando uma exceção ou um <code>return</code> sai da função no meio.</li>
+  <li><code>std::ifstream</code>/<code>ofstream</code>, <code>std::string</code>, <code>std::vector</code>, <code>std::unique_ptr</code> e <code>std::lock_guard</code> já são RAII.</li>
+  <li>Por isso o C++ não precisa de coletor de lixo: a liberação é imediata e vale para qualquer recurso.</li>
+  <li>Nunca deixe uma exceção sair de um destrutor e nunca devolva referência para uma variável local.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
