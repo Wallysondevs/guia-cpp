@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ CMake — CMakeLists.txt, cmake -B build e Ninja | Guia C++</title>
+<meta name="description" content="CMake para quem nunca programou: um CMakeLists.txt mínimo (cmake_minimum_required, project, CMAKE_CXX_STANDARD 23, add_executable), cmake -B build e cmake --build build, projeto com vários arquivos, por que usar CMake (multiplataforma e IDEs), Ninja com -G Ninja e os erros reais do CMake 4.2.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">CMake</span></h1>
+
+<p class="intro">O <a href="make.html">Make</a> resolve o problema de recompilar só o que mudou, mas você ainda escreve cada regra à mão, lembra de cada <code>.h</code>, e o <code>Makefile</code> só funciona onde há <code>make</code> e <code>g++</code>. O Bruno, amigo da Ana, usa Windows com o Visual Studio; a Ana usa Linux com o VS Code. Como os dois compilam o mesmo projeto? A resposta da maioria dos projetos C++ do mundo é o <strong>CMake</strong>: você descreve o projeto num arquivo simples, o <code>CMakeLists.txt</code>, e o CMake <strong>gera</strong> os arquivos de compilação certos para cada sistema.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que o CMake faz e por que ele é o padrão em projetos C++.</li>
+  <li>Um <code>CMakeLists.txt</code> mínimo, linha por linha.</li>
+  <li>Os dois passos: <code>cmake -B build</code> (configurar) e <code>cmake --build build</code> (compilar).</li>
+  <li>Como montar o projeto da lojinha, com vários arquivos.</li>
+  <li>Como usar o Ninja (<code>-G Ninja</code>) e outro compilador.</li>
+  <li>Os erros mais comuns do CMake e como lê-los.</li>
+</ul>
+</div>
+
+<p>Todos os comandos desta aula foram executados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), com o <strong>CMake 4.2</strong>, o <strong>g++ 15.2</strong> e o <strong>Ninja</strong> do Ubuntu. No Ubuntu, o CMake e o Ninja se instalam com <code>sudo apt install cmake ninja-build</code>. Para conferir:</p>
+
+<pre class="term">$ cmake --version
+cmake version 4.2.3
+
+CMake suite maintained and supported by Kitware (kitware.com/cmake).</pre>
+
+<hr>
+
+<h2>A ideia: a planta da casa</h2>
+<p>Um arquiteto não diz ao pedreiro "assente 2.340 tijolos na posição tal". Ele desenha a <strong>planta</strong>: dois quartos, uma cozinha, um banheiro. Cada equipe de obra lê a planta e constrói do seu jeito, com as ferramentas que tem.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na obra</th><th>No C++</th></tr>
+<tr><td>A planta: "dois quartos e uma cozinha"</td><td>o <code>CMakeLists.txt</code>: "um programa <code>loja</code>, feito de <code>main.cpp</code> e <code>calculos.cpp</code>, em C++23"</td></tr>
+<tr><td>O mestre de obras, que transforma a planta em tarefas</td><td>o <strong>CMake</strong>, que gera um <code>Makefile</code>, um projeto do Visual Studio, um arquivo do Ninja…</td></tr>
+<tr><td>Os pedreiros</td><td>o Make ou o Ninja, que chamam o compilador</td></tr>
+</table>
+</div>
+
+<p>Por isso o CMake é chamado de <strong>gerador de sistema de build</strong> (<em>build</em> = "construção", o processo de compilar e ligar). Ele não compila nada sozinho: ele escreve as instruções para quem compila.</p>
+
+<hr>
+
+<h2>1. O <code>CMakeLists.txt</code> mínimo</h2>
+<p>A Ana começou com um programa de um arquivo só, numa pasta <code>~/cpp/cm1</code>:</p>
+
+<pre class="file" data-file="ola.cpp">#include &lt;print&gt;
+
+int main() {
+    std::println("Olá do CMake!");
+}
+</pre>
+
+<p>Ao lado dele, ela criou um arquivo de texto com o nome exato <code>CMakeLists.txt</code> (com <code>C</code>, <code>M</code> e <code>L</code> maiúsculos):</p>
+
+<pre class="file" data-file="CMakeLists.txt">cmake_minimum_required(VERSION 3.25)
+project(Ola LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+add_executable(ola ola.cpp)
+</pre>
+
+<dl class="anatomy">
+  <dt>cmake_minimum_required(VERSION 3.25)</dt><dd>"Versão mínima exigida do CMake". Todo <code>CMakeLists.txt</code> começa com ela. Além de recusar um CMake velho demais, ela diz ao CMake <strong>de que época</strong> é o seu arquivo, para ele se comportar como você espera. Use uma versão recente que você tenha (o Ubuntu 26.04 traz a 4.2; a 3.25 é de 2022 e já cobre tudo desta aula).</dd>
+  <dt>project(Ola LANGUAGES CXX)</dt><dd>O nome do projeto (<code>Ola</code>) e a linguagem. <code>CXX</code> é o nome que o CMake (e o Make) usa para C++. Sem o <code>LANGUAGES CXX</code>, o CMake também procuraria um compilador de C.</dd>
+  <dt>set(CMAKE_CXX_STANDARD 23)</dt><dd><code>set</code> ("defina") dá valor a uma variável. Esta pede o C++23, como o <code>-std=c++23</code> do comando padrão do guia.</dd>
+  <dt>set(CMAKE_CXX_STANDARD_REQUIRED ON)</dt><dd>"O padrão é obrigatório": se o compilador não souber C++23, pare com erro, em vez de cair silenciosamente para um padrão mais antigo.</dd>
+  <dt>add_executable(ola ola.cpp)</dt><dd>"Acrescente um executável": o programa vai se chamar <code>ola</code> e é feito do arquivo <code>ola.cpp</code>. Esse nome (<code>ola</code>) é o <strong>alvo</strong> (<em>target</em>), como no Make.</dd>
+</dl>
+
+<p>Os comandos do CMake são escritos como <code>nome(argumentos)</code>, com os argumentos separados por espaço, sem vírgula e sem <code>;</code>. Não diferenciam maiúsculas de minúsculas (<code>ADD_EXECUTABLE</code> também funciona; o costume atual é minúsculas), mas os nomes de variáveis, como <code>CMAKE_CXX_STANDARD</code>, sim.</p>
+
+<hr>
+
+<h2>2. Configurar e compilar</h2>
+<p>O CMake trabalha em dois passos. Primeiro, <strong>configurar</strong>: ler o <code>CMakeLists.txt</code>, procurar o compilador e gerar os arquivos de build numa pasta separada:</p>
+
+<pre class="term">$ cd ~/cpp/cm1
+$ cmake -B build
+-- The CXX compiler identification is GNU 15.2.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done (0.4s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/ana/cpp/cm1/build</pre>
+
+<dl class="anatomy">
+  <dt>-B build</dt><dd>A pasta onde os arquivos gerados vão ficar (<em>B</em> de <em>build</em>). Ela é criada se não existir. O <code>CMakeLists.txt</code> é procurado na pasta atual.</dd>
+  <dt>The CXX compiler identification is GNU 15.2.0</dt><dd>O CMake achou um compilador de C++: o GCC (o g++) 15.2. O <code>/usr/bin/c++</code> é o nome genérico que, no Ubuntu, aponta para o g++.</dd>
+  <dt>Detecting… - done</dt><dd>Testes que o CMake faz para descobrir do que o compilador é capaz. Só rodam na primeira configuração.</dd>
+  <dt>Build files have been written to</dt><dd>"Os arquivos de build foram gravados em…". Pronto para compilar.</dd>
+</dl>
+
+<p>Depois, <strong>compilar</strong>:</p>
+
+<pre class="term">$ cmake --build build
+[ 50%] Building CXX object CMakeFiles/ola.dir/ola.cpp.o
+[100%] Linking CXX executable ola
+[100%] Built target ola
+$ ./build/ola
+Olá do CMake!</pre>
+
+<p><code>cmake --build build</code> quer dizer "construa o que está configurado na pasta <code>build</code>". As linhas dizem o que está acontecendo: compilando (<em>Building</em>) o <code>ola.cpp</code> num <code>.o</code>, ligando (<em>Linking</em>) o executável, alvo pronto (<em>Built target</em>). O programa fica <strong>dentro</strong> da pasta <code>build</code>, por isso <code>./build/ola</code>. Rodando de novo, sem mudar nada:</p>
+
+<pre class="term">$ cmake --build build
+[100%] Built target ola</pre>
+
+<p>Nada foi recompilado: por baixo, quem trabalhou foi o Make. Veja o que o CMake gerou na pasta <code>build</code>:</p>
+
+<pre class="term">$ ls build
+CMakeCache.txt
+CMakeFiles
+cmake_install.cmake
+Makefile             « um Makefile, escrito pelo CMake
+ola</pre>
+
+<div class="tip">
+<strong>Por que uma pasta <code>build</code> separada?</strong>
+<p>Tudo o que é gerado (o <code>Makefile</code>, os <code>.o</code>, o programa, o <code>CMakeCache.txt</code> com as escolhas da configuração) fica lá dentro, longe do seu código. Para recomeçar do zero, basta apagar a pasta: <code>rm -rf build</code>. E dá para ter várias ao mesmo tempo (uma com o g++, outra com o Clang), como você vai ver na seção 5. Se o projeto usa git, ponha <code>build/</code> no <code>.gitignore</code>.</p>
+</div>
+
+<h3>Quando reconfigurar?</h3>
+<p>Quase nunca à mão. Se você editar o <code>CMakeLists.txt</code>, o <code>cmake --build</code> percebe e reconfigura sozinho. A Ana tinha um programa que mostra o valor de <code>__cplusplus</code> (veja <a href="preprocessador.html">O Pré-processador</a>), compilado com <code>set(CMAKE_CXX_STANDARD 20)</code>, e trocou o 20 por 23:</p>
+
+<pre class="term">$ ./build/qual
+Compilador: GCC (g++) 15
+__cplusplus = 202002
+$ sed -i 's/STANDARD 20/STANDARD 23/' CMakeLists.txt
+$ cmake --build build &amp;&amp; ./build/qual
+-- Configuring done (0.0s)                 « reconfigurou sozinho
+-- Generating done (0.0s)
+-- Build files have been written to: /home/ana/cpp/qual/build
+[ 50%] Building CXX object CMakeFiles/qual.dir/qual.cpp.o
+[100%] Linking CXX executable qual
+[100%] Built target qual
+Compilador: GCC (g++) 15
+__cplusplus = 202302</pre>
+
+<p>(O <code>sed -i</code> trocou o texto dentro do arquivo; você pode fazer o mesmo num editor.)</p>
+
+<div class="trycpp" data-flags="-std=c++20 -Wall -Wextra">
+<p class="try-task"><strong>Experimente:</strong> este é o programa <code>qual.cpp</code> da Ana. Esta caixa compila com <code>-std=c++20</code>, como um projeto com <code>set(CMAKE_CXX_STANDARD 20)</code>. Rode e compare com a saída do g++ acima: aqui o compilador é o Clang, mas o padrão é o mesmo. Depois troque o <code>202002L</code> do <code>#if</code> por <code>202302L</code> e veja a outra mensagem aparecer.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+#if defined(__clang__)
+    std::cout &lt;&lt; "Compilador: Clang " &lt;&lt; __clang_major__ &lt;&lt; '\n';
+#elif defined(__GNUC__)
+    std::cout &lt;&lt; "Compilador: GCC (g++) " &lt;&lt; __GNUC__ &lt;&lt; '\n';
+#endif
+    std::cout &lt;&lt; "__cplusplus = " &lt;&lt; __cplusplus &lt;&lt; '\n';
+#if __cplusplus &gt;= 202002L
+    std::cout &lt;&lt; "Pelo menos C++20: pode usar std::format e ranges.\n";
+#else
+    std::cout &lt;&lt; "Padrão antigo demais para este recurso.\n";
+#endif
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. A lojinha com vários arquivos</h2>
+<p>Agora o projeto de verdade: <code>main.cpp</code>, <code>calculos.cpp</code> e <code>calculos.h</code>, os de <a href="headers.html">Arquivos .h e .cpp</a>, na pasta <code>~/cpp/loja-cmake</code>:</p>
+
+<pre class="file" data-file="CMakeLists.txt">cmake_minimum_required(VERSION 3.25)
+project(Lojinha LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+add_executable(loja main.cpp calculos.cpp)
+target_compile_options(loja PRIVATE -Wall -Wextra)
+</pre>
+
+<dl class="anatomy">
+  <dt>add_executable(loja main.cpp calculos.cpp)</dt><dd>Os <code>.cpp</code> do programa, separados por espaço. O <code>.h</code> não precisa entrar: o CMake descobre sozinho quais cabeçalhos cada <code>.cpp</code> inclui (o trabalho que você fazia à mão nas dependências do <code>Makefile</code>).</dd>
+  <dt>set(CMAKE_CXX_EXTENSIONS OFF)</dt><dd>Sem esta linha, o CMake pede ao g++ o <code>-std=gnu++23</code>: C++23 <strong>mais</strong> extensões próprias do GCC. Com ela, pede o <code>-std=c++23</code> puro, igual ao do guia, e um código que usa extensões sem querer não passa despercebido.</dd>
+  <dt>target_compile_options(loja PRIVATE -Wall -Wextra)</dt><dd>Opções a mais para o alvo <code>loja</code>: os avisos de sempre (veja <a href="avisos.html">Avisos</a>). <code>PRIVATE</code> quer dizer "só para compilar este alvo". Os comandos <code>target_…</code> sempre recebem primeiro o nome do alvo.</dd>
+</dl>
+
+<pre class="term">$ cd ~/cpp/loja-cmake
+$ cmake -B build
+-- The CXX compiler identification is GNU 15.2.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done (0.6s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/ana/cpp/loja-cmake/build
+$ cmake --build build
+[ 33%] Building CXX object CMakeFiles/loja.dir/main.cpp.o
+[ 66%] Building CXX object CMakeFiles/loja.dir/calculos.cpp.o
+[100%] Linking CXX executable loja
+[100%] Built target loja
+$ ./build/loja
+Total: R$ 10
+Com 10% de desconto: R$ 9</pre>
+
+<p>Faça o teste do <code>touch</code> da aula de Make. Mudando o cabeçalho, os dois <code>.cpp</code> são recompilados, mesmo sem o <code>.h</code> aparecer no <code>CMakeLists.txt</code>:</p>
+
+<pre class="term">$ touch calculos.h
+$ cmake --build build
+[ 33%] Building CXX object CMakeFiles/loja.dir/calculos.cpp.o
+[ 66%] Building CXX object CMakeFiles/loja.dir/main.cpp.o
+[100%] Linking CXX executable loja
+[100%] Built target loja</pre>
+
+<h3>Ver os comandos de verdade: <code>--verbose</code></h3>
+<p>Para ver o comando que o CMake mandou rodar, use <code>--verbose</code> ("falante"). A saída é comprida, cheia de detalhes internos do Make; aqui vão só as linhas que interessam:</p>
+
+<pre class="term">$ touch calculos.cpp
+$ cmake --build build --verbose
+«… linhas internas do make omitidas …»
+[ 33%] Building CXX object CMakeFiles/loja.dir/calculos.cpp.o
+/usr/bin/c++   -std=c++23 -Wall -Wextra -MD -MT CMakeFiles/loja.dir/calculos.cpp.o -MF CMakeFiles/loja.dir/calculos.cpp.o.d -o CMakeFiles/loja.dir/calculos.cpp.o -c /home/ana/cpp/loja-cmake/calculos.cpp
+[ 66%] Linking CXX executable loja
+/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/loja.dir/link.d CMakeFiles/loja.dir/main.cpp.o CMakeFiles/loja.dir/calculos.cpp.o -o loja
+«…»
+[100%] Built target loja</pre>
+
+<p>Repare: é o mesmo <code>-std=c++23 -Wall -Wextra -c</code> que você digitava, e depois a ligação dos <code>.o</code>, como em <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>. As opções <code>-MD -MT … -MF …</code> pedem ao g++ que anote quais <code>.h</code> cada <code>.cpp</code> incluiu: é assim que o CMake sabe o que recompilar quando um cabeçalho muda. No projeto de um arquivo só, sem o <code>CMAKE_CXX_EXTENSIONS OFF</code>, a mesma linha tinha <code>-std=gnu++23</code>.</p>
+
+<h3>Uma biblioteca dentro do projeto</h3>
+<p>Em projetos maiores, as partes viram <strong>bibliotecas</strong> internas, que um ou mais programas usam:</p>
+
+<pre class="file" data-file="CMakeLists.txt">cmake_minimum_required(VERSION 3.25)
+project(Lojinha LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+add_library(calculos calculos.cpp)
+
+add_executable(loja main.cpp)
+target_link_libraries(loja PRIVATE calculos)
+</pre>
+
+<pre class="term">$ cmake -B build &gt; /dev/null &amp;&amp; cmake --build build &amp;&amp; ./build/loja
+[ 25%] Building CXX object CMakeFiles/calculos.dir/calculos.cpp.o
+[ 50%] Linking CXX static library libcalculos.a
+[ 50%] Built target calculos
+[ 75%] Building CXX object CMakeFiles/loja.dir/main.cpp.o
+[100%] Linking CXX executable loja
+[100%] Built target loja
+Total: R$ 10
+Com 10% de desconto: R$ 9</pre>
+
+<p><code>add_library</code> cria a biblioteca <code>calculos</code> (o arquivo <code>libcalculos.a</code>, um pacote de <code>.o</code>), e <code>target_link_libraries</code> diz que o <code>loja</code> precisa dela na ligação. (O <code>&gt; /dev/null</code> só esconde as mensagens da configuração.) É o mesmo comando que você vai usar para ligar bibliotecas de terceiros em <a href="bibliotecas.html">Usar Bibliotecas Externas</a>.</p>
+
+<hr>
+
+<h2>4. Por que CMake?</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>g++ na mão</th><th>Makefile</th><th>CMake</th></tr>
+<tr><td>Recompila só o que mudou</td><td>não</td><td>sim</td><td>sim</td></tr>
+<tr><td>Descobre sozinho as dependências dos <code>.h</code></td><td>não</td><td>não (você lista)</td><td>sim</td></tr>
+<tr><td>Funciona no Windows com Visual Studio</td><td>não</td><td>não</td><td>sim</td></tr>
+<tr><td>Abre direto em IDEs</td><td>não</td><td>pouco</td><td>sim: VS Code (extensão CMake Tools), CLion, Visual Studio, Qt Creator</td></tr>
+<tr><td>Bibliotecas de terceiros</td><td>você passa <code>-I</code>, <code>-l</code></td><td>você passa <code>-I</code>, <code>-l</code></td><td><code>find_package</code> + <code>target_link_libraries</code></td></tr>
+<tr><td>Bom para</td><td>um ou dois arquivos</td><td>projetos pequenos, só Linux</td><td>qualquer projeto que vai crescer ou ser compartilhado</td></tr>
+</table>
+</div>
+
+<p>O mesmo <code>CMakeLists.txt</code> da Ana, no Windows do Bruno, gera um projeto do Visual Studio em vez de um <code>Makefile</code>; no Mac, gera para o Xcode ou para o Make. Quase todas as bibliotecas C++ conhecidas trazem um <code>CMakeLists.txt</code>, e as IDEs entendem esse arquivo: no VS Code com a extensão CMake Tools, abrir a pasta já oferece configurar e compilar (veja <a href="editores.html">Editores e IDEs</a>).</p>
+
+<hr>
+
+<h2>5. Ninja e outros geradores</h2>
+<p>O CMake pode gerar arquivos para vários "pedreiros". Esses formatos se chamam <strong>geradores</strong>, e se escolhem com <code>-G</code>. No Linux, o padrão é o Make (<em>Unix Makefiles</em>). Uma alternativa popular é o <strong>Ninja</strong>, um programa de build feito para ser rápido e silencioso:</p>
+
+<pre class="term">$ cmake -B build-ninja -G Ninja
+-- The CXX compiler identification is GNU 15.2.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done (0.3s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/ana/cpp/loja-cmake/build-ninja
+$ cmake --build build-ninja
+[1/3] Building CXX object CMakeFiles/loja.dir/calculos.cpp.o
+[2/3] Building CXX object CMakeFiles/loja.dir/main.cpp.o
+[3/3] Linking CXX executable loja
+$ ./build-ninja/loja
+Total: R$ 10
+Com 10% de desconto: R$ 9</pre>
+
+<p>O comando de compilar é o mesmo, <code>cmake --build</code>: ele chama o Make ou o Ninja, conforme a pasta. O Ninja mostra o progresso como <code>[2/3]</code> ("tarefa 2 de 3") e, por padrão, usa todos os núcleos do processador ao mesmo tempo, o que faz diferença em projetos grandes. Sem nada para fazer, ele diz:</p>
+
+<pre class="term">$ cmake --build build-ninja
+ninja: no work to do.
+$ touch calculos.cpp
+$ cmake --build build-ninja
+[1/2] Building CXX object CMakeFiles/loja.dir/calculos.cpp.o
+[2/2] Linking CXX executable loja</pre>
+
+<h3>Outro compilador: <code>CMAKE_CXX_COMPILER</code></h3>
+<p>Na configuração, <code>-D</code> dá valor a uma variável do CMake (como o <code>-D</code> do g++ define uma macro). Para usar o Clang numa terceira pasta:</p>
+
+<pre class="term">$ cmake -B build-clang -G Ninja -DCMAKE_CXX_COMPILER=clang++
+-- The CXX compiler identification is Clang 21.1.8
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/clang++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done (0.5s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/ana/cpp/loja-cmake/build-clang
+$ cmake --build build-clang
+[1/3] Building CXX object CMakeFiles/loja.dir/calculos.cpp.o
+[2/3] Building CXX object CMakeFiles/loja.dir/main.cpp.o
+[3/3] Linking CXX executable loja</pre>
+
+<p>O compilador fica gravado no <code>CMakeCache.txt</code> daquela pasta. Para trocar, crie outra pasta (ou apague a antiga). Outra variável comum é <code>-DCMAKE_BUILD_TYPE=Release</code> (com otimizações) ou <code>Debug</code> (com informações para o <a href="depuracao-gdb.html">GDB</a>).</p>
+
+<hr>
+
+<h2>6. Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"Compatibility with CMake &lt; 3.5 has been removed from CMake."</strong>
+<p>A Ana copiou um <code>CMakeLists.txt</code> de um tutorial antigo, que começava com <code>cmake_minimum_required(VERSION 3.0)</code>:</p>
+<pre class="term">$ cmake -B build
+CMake Error at CMakeLists.txt:1 (cmake_minimum_required):
+  Compatibility with CMake &lt; 3.5 has been removed from CMake.
+
+  Update the VERSION argument &lt;min&gt; value.  Or, use the &lt;min&gt;...&lt;max&gt; syntax
+  to tell CMake that the project requires at least &lt;min&gt; but has been updated
+  to work with policies introduced by &lt;max&gt; or earlier.
+
+  Or, add -DCMAKE_POLICY_VERSION_MINIMUM=3.5 to try configuring anyway.
+
+
+-- Configuring incomplete, errors occurred!
+$ echo $?
+1</pre>
+<p><strong>O que significa:</strong> <code>CMake Error at CMakeLists.txt:1 (cmake_minimum_required)</code> diz onde: linha 1, no comando <code>cmake_minimum_required</code>. O CMake 4 deixou de imitar as versões anteriores à 3.5 (de 2016). "Atualize o valor de VERSION."</p>
+<p><strong>Como resolver:</strong> troque para uma versão recente, como <code>cmake_minimum_required(VERSION 3.25)</code>. Se o projeto não é seu e você só quer compilá-lo, a própria mensagem sugere <code>cmake -B build -DCMAKE_POLICY_VERSION_MINIMUM=3.5</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Cannot find source file"</strong>
+<p>Um erro de digitação no <code>add_executable</code> (<code>calculo.cpp</code> sem o <code>s</code>):</p>
+<pre class="term">$ cmake -B build
+-- The CXX compiler identification is GNU 15.2.0
+«… detecções …»
+-- Configuring done (0.3s)
+CMake Error at CMakeLists.txt:4 (add_executable):
+  Cannot find source file:
+
+    calculo.cpp
+
+
+CMake Error at CMakeLists.txt:4 (add_executable):
+  No SOURCES given to target: loja
+
+
+CMake Generate step failed.  Build files cannot be regenerated correctly.</pre>
+<p><strong>O que significa:</strong> "Não encontrei o arquivo-fonte <code>calculo.cpp</code>", na linha 4. O segundo erro é consequência do primeiro: sem conseguir ler a lista, o alvo <code>loja</code> ficou "sem fontes" (<em>No SOURCES</em>).</p>
+<p><strong>Como resolver:</strong> confira o nome com <code>ls</code> e corrija o <code>CMakeLists.txt</code>. Sempre leia o <strong>primeiro</strong> erro primeiro.</p>
+</div>
+
+<div class="cenario">
+<strong>Esqueceu um <code>.cpp</code> no <code>add_executable</code></strong>
+<p>Com <code>add_executable(loja main.cpp)</code>, a configuração passa (o CMake não sabe que faltou algo), mas a ligação falha:</p>
+<pre class="term">$ cmake --build build
+[ 50%] Building CXX object CMakeFiles/loja.dir/main.cpp.o
+[100%] Linking CXX executable loja
+/usr/bin/x86_64-linux-gnu-ld.bfd: CMakeFiles/loja.dir/main.cpp.o: na função "main":
+main.cpp:(.text+0x1f): referência não definida para "calcularTotal(double, int)"
+/usr/bin/x86_64-linux-gnu-ld.bfd: main.cpp:(.text+0x98): referência não definida para "aplicarDesconto(double, double)"
+collect2: error: ld returned 1 exit status
+gmake[2]: *** [CMakeFiles/loja.dir/build.make:101: loja] Error 1
+gmake[1]: *** [CMakeFiles/Makefile2:87: CMakeFiles/loja.dir/all] Error 2
+gmake: *** [Makefile:91: all] Error 2</pre>
+<p><strong>O que significa:</strong> é o <code>undefined reference</code> ("referência não definida") de <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>: o <code>calculos.cpp</code> não entrou na ligação. As três linhas <code>gmake</code> no fim são o Make (o <code>gmake</code> é o GNU Make) avisando, em camadas, que a tarefa falhou. A causa está acima delas.</p>
+<p><strong>Como resolver:</strong> acrescente o arquivo: <code>add_executable(loja main.cpp calculos.cpp)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"does not appear to contain CMakeLists.txt"</strong>
+<pre class="term">$ cmake -B build
+CMake Error: The source directory "/home/ana/cpp/vazio" does not appear to contain CMakeLists.txt.
+Specify --help for usage, or press the help button on the CMake GUI.</pre>
+<p><strong>O que significa:</strong> "a pasta de código não parece conter um CMakeLists.txt". Você está na pasta errada, ou o arquivo tem outro nome (<code>cmakelists.txt</code>, <code>CMakeList.txt</code>).</p>
+<p><strong>Como resolver:</strong> <code>cd</code> para a pasta do projeto e confira o nome exato. Para indicar a pasta do código sem entrar nela, use <code>-S</code>: <code>cmake -S ~/cpp/loja-cmake -B build</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No <code>CMakeLists.txt</code></th><th>O que faz</th></tr>
+<tr><td><code>cmake_minimum_required(VERSION 3.25)</code></td><td>versão mínima; sempre a primeira linha</td></tr>
+<tr><td><code>project(Nome LANGUAGES CXX)</code></td><td>nome do projeto e linguagem</td></tr>
+<tr><td><code>set(CMAKE_CXX_STANDARD 23)</code></td><td>padrão do C++</td></tr>
+<tr><td><code>set(CMAKE_CXX_STANDARD_REQUIRED ON)</code></td><td>o padrão é obrigatório</td></tr>
+<tr><td><code>set(CMAKE_CXX_EXTENSIONS OFF)</code></td><td><code>-std=c++23</code> em vez de <code>-std=gnu++23</code></td></tr>
+<tr><td><code>add_executable(prog a.cpp b.cpp)</code></td><td>um programa e seus <code>.cpp</code></td></tr>
+<tr><td><code>add_library(nome x.cpp)</code></td><td>uma biblioteca</td></tr>
+<tr><td><code>target_link_libraries(prog PRIVATE nome)</code></td><td>o programa usa a biblioteca</td></tr>
+<tr><td><code>target_compile_options(prog PRIVATE -Wall -Wextra)</code></td><td>opções de compilação do alvo</td></tr>
+</table>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No terminal</th><th>O que faz</th></tr>
+<tr><td><code>cmake -B build</code></td><td>configura, gerando os arquivos em <code>build</code></td></tr>
+<tr><td><code>cmake -S pasta -B build</code></td><td>o mesmo, com o código em outra pasta</td></tr>
+<tr><td><code>cmake -B build -G Ninja</code></td><td>usa o Ninja em vez do Make</td></tr>
+<tr><td><code>cmake -B build -DVAR=valor</code></td><td>dá valor a uma variável (<code>CMAKE_CXX_COMPILER</code>, <code>CMAKE_BUILD_TYPE</code>)</td></tr>
+<tr><td><code>cmake --build build</code></td><td>compila</td></tr>
+<tr><td><code>cmake --build build --verbose</code></td><td>compila mostrando os comandos</td></tr>
+<tr><td><code>cmake --build build --target clean</code></td><td>apaga o que foi compilado (como <code>make clean</code>)</td></tr>
+<tr><td><code>rm -rf build</code></td><td>recomeça do zero</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O programa e seus arquivos</h3>
+<p>Complete para criar o programa <code>estoque</code> com os arquivos <code>main.cpp</code> e <code>estoque.cpp</code>:</p>
+<div class="ex-code"><input data-answer="add_executable" aria-label="comando">(estoque main.cpp estoque.cpp)</div>
+</div>
+
+<div class="exercise">
+<h3>2. Os dois passos</h3>
+<p>Complete o comando que <strong>compila</strong> um projeto já configurado na pasta <code>build</code>:</p>
+<div class="ex-code">cmake <input data-answer="--build build|--build ./build" aria-label="opções"></div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="2">
+<p class="mc-q">3. O que o <code>cmake -B build</code> faz?</p>
+<label><input type="radio" name="q3"> Compila o programa.</label>
+<label><input type="radio" name="q3"> Lê o <code>CMakeLists.txt</code>, acha o compilador e gera os arquivos de build (um <code>Makefile</code>, por exemplo) na pasta <code>build</code>.</label>
+<label><input type="radio" name="q3"> Apaga a pasta <code>build</code>.</label>
+<label><input type="radio" name="q3"> Roda o programa.</label>
+</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="4">
+<p class="mc-q">4. A Ana acrescentou <code>frete.cpp</code> ao projeto, mas esqueceu de pô-lo no <code>add_executable</code>. O que acontece no <code>cmake --build</code>?</p>
+<label><input type="radio" name="q4"> O CMake acha o arquivo sozinho e compila.</label>
+<label><input type="radio" name="q4"> <code>Cannot find source file</code>.</label>
+<label><input type="radio" name="q4"> <code>missing separator</code>.</label>
+<label><input type="radio" name="q4"> Erro de ligação: referência não definida para as funções do <code>frete.cpp</code>.</label>
+</div>
+</div>
+
+<div class="exercise">
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Para que serve <code>-G Ninja</code>?</p>
+<label><input type="radio" name="q5"> Para compilar com o Clang.</label>
+<label><input type="radio" name="q5"> Para ligar as otimizações.</label>
+<label><input type="radio" name="q5"> Para o CMake gerar arquivos do Ninja em vez de um <code>Makefile</code>.</label>
+<label><input type="radio" name="q5"> Para rodar o programa mais rápido.</label>
+</div>
+</div>
+
+<h3>Missão final: conserte o <code>CMakeLists.txt</code> da lojinha</h3>
+
+<div class="trycpp" data-goal="out:Built target loja">
+<p class="try-task"><strong>Missão:</strong> o editor não roda o CMake, então a Ana escreveu um pequeno <strong>verificador</strong> em C++ (aba <code>verificador.cpp</code>) que lê a aba <code>CMakeLists.txt</code> e confere o que o CMake conferiria. A pasta do projeto tem <code>main.cpp</code>, <code>calculos.cpp</code>, <code>calculos.h</code>, <code>frete.cpp</code> e <code>frete.h</code>, e o <code>main.cpp</code> usa o frete. Rode, leia as reclamações e conserte <strong>só a aba <code>CMakeLists.txt</code></strong>: o programa usa <code>std::println</code> (precisa de C++23), há um nome de arquivo errado e falta um arquivo. Quando estiver tudo certo, aparece <code>[100%] Built target loja</code>.</p>
+<pre class="script" data-file="verificador.cpp">#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+// Os arquivos que existem na pasta do projeto da Ana
+const std::vector&lt;std::string&gt; pasta = {"main.cpp", "calculos.cpp", "calculos.h", "frete.cpp", "frete.h"};
+
+bool estaNaPasta(const std::string&amp; nome) {
+    for (const std::string&amp; a : pasta) {
+        if (a == nome) {
+            return true;
+        }
+    }
+    return false;
+}
+
+int main() {
+    std::ifstream arquivo("CMakeLists.txt");
+    std::stringstream conteudo;
+    conteudo &lt;&lt; arquivo.rdbuf();
+    std::string texto = conteudo.str();
+    int erros = 0;
+
+    if (texto.find("cmake_minimum_required(") == std::string::npos) {
+        std::cout &lt;&lt; "CMake Error: falta cmake_minimum_required(VERSION ...)\n";
+        ++erros;
+    }
+    if (texto.find("project(") == std::string::npos) {
+        std::cout &lt;&lt; "CMake Error: falta project(...)\n";
+        ++erros;
+    }
+
+    int padrao = 0;
+    std::size_t p = texto.find("CMAKE_CXX_STANDARD ");
+    if (p != std::string::npos) {
+        std::istringstream(texto.substr(p + 19)) &gt;&gt; padrao;
+    }
+    if (padrao &lt; 23) {
+        std::cout &lt;&lt; "error: 'println' is not a member of 'std' (o projeto pede C++"
+                  &lt;&lt; padrao &lt;&lt; "; std::println precisa de set(CMAKE_CXX_STANDARD 23))\n";
+        ++erros;
+    }
+
+    std::size_t inicio = texto.find("add_executable(");
+    if (inicio == std::string::npos) {
+        std::cout &lt;&lt; "CMake Error: nenhum add_executable(...)\n";
+        return 1;
+    }
+    inicio += 15;
+    std::size_t fim = texto.find(')', inicio);
+    std::istringstream lista(texto.substr(inicio, fim - inicio));
+    std::string alvo, fonte;
+    lista &gt;&gt; alvo;
+    bool temMain = false, temCalculos = false, temFrete = false;
+    while (lista &gt;&gt; fonte) {
+        if (!estaNaPasta(fonte)) {
+            std::cout &lt;&lt; "CMake Error at CMakeLists.txt (add_executable):\n"
+                      &lt;&lt; "  Cannot find source file:\n\n    " &lt;&lt; fonte &lt;&lt; "\n\n";
+            ++erros;
+        }
+        temMain = temMain || fonte == "main.cpp";
+        temCalculos = temCalculos || fonte == "calculos.cpp";
+        temFrete = temFrete || fonte == "frete.cpp";
+    }
+    if (erros &gt; 0) {
+        return 1;
+    }
+    if (!temMain) {
+        std::cout &lt;&lt; "ld: undefined reference to `main'\n";
+        return 1;
+    }
+    if (!temCalculos || !temFrete) {
+        if (!temCalculos) std::cout &lt;&lt; "ld: undefined reference to `calcularTotal(double, int)'\n";
+        if (!temFrete) std::cout &lt;&lt; "ld: undefined reference to `calcularFrete(double)'\n";
+        return 1;
+    }
+    std::cout &lt;&lt; "-- Configuring done\n[100%] Built target " &lt;&lt; alvo &lt;&lt; '\n';
+}
+</pre>
+<pre class="script" data-file="CMakeLists.txt">cmake_minimum_required(VERSION 3.25)
+project(Lojinha LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+add_executable(loja main.cpp calculo.cpp)
+</pre>
+<pre class="solucao" data-file="CMakeLists.txt">cmake_minimum_required(VERSION 3.25)
+project(Lojinha LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+add_executable(loja main.cpp calculos.cpp frete.cpp)
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>O CMake é um <strong>gerador</strong>: lê o <code>CMakeLists.txt</code> e escreve os arquivos de build (Make, Ninja, Visual Studio…). Por isso o mesmo projeto compila no Linux, no Windows e no Mac, e abre nas IDEs.</li>
+  <li>Mínimo: <code>cmake_minimum_required(VERSION 3.25)</code>, <code>project(Nome LANGUAGES CXX)</code>, <code>set(CMAKE_CXX_STANDARD 23)</code> e <code>add_executable(prog arquivos.cpp)</code>. Acrescente <code>CMAKE_CXX_EXTENSIONS OFF</code> e <code>target_compile_options(prog PRIVATE -Wall -Wextra)</code>.</li>
+  <li>Dois passos: <code>cmake -B build</code> (configurar, uma vez) e <code>cmake --build build</code> (compilar, sempre). O programa fica em <code>build/</code>.</li>
+  <li>O CMake descobre sozinho os <code>.h</code>; liste só os <code>.cpp</code>. Esqueceu um: <code>undefined reference</code>. Nome errado: <code>Cannot find source file</code>.</li>
+  <li><code>-G Ninja</code> troca o Make pelo Ninja; <code>-DCMAKE_CXX_COMPILER=clang++</code> troca o compilador. Uma pasta de build para cada combinação.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
