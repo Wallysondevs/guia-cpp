@@ -260,7 +260,7 @@ Soma: 42</pre>
 
 <div class="note">
 <strong>No editor do guia, a entrada já vem pronta</strong>
-<p>Nas caixas com entrada pronta, o editor entrega os números ao <code>std::cin</code> de uma vez, como se alguém tivesse digitado muito rápido. Por isso os números digitados não aparecem na saída, e as perguntas ficam grudadas: <code>Digite um número (0 para parar): Digite um número…</code>. No terminal de verdade, como acima, cada número aparece depois da pergunta porque é você quem o digita.</p>
+<p>Nas caixas com entrada pronta, o editor entrega a linha inteira (<code>10 25 7 0</code>) ao <code>std::cin</code> de uma vez, como se alguém tivesse digitado tudo antes da primeira pergunta. A linha aparece depois da primeira pergunta, e as perguntas seguintes saem grudadas umas nas outras, porque o <code>std::cin</code> já tem os próximos números e não precisa esperar. No terminal de verdade, como acima, cada número aparece depois da sua pergunta porque é você quem o digita.</p>
 </div>
 
 <div class="trycpp" data-stdin="10 25 7 0" data-goal="out:Você digitou 3 números.,out:Soma: 42">

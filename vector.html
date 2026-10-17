@@ -250,9 +250,11 @@ $ echo $?
 
 <p>A mensagem diz: na conferência de intervalo do vetor (<code>_M_range_check</code>), o índice pedido (5) é maior ou igual ao tamanho (3). Como no <code>std::array</code>, a exceção pode ser tratada com <code>try</code>/<code>catch</code> (veja <a href="std-array.html#at">std::array</a> e <a href="excecoes.html">Exceções</a>).</p>
 
+<p>No editor do guia, que usa o Clang com a biblioteca <em>libc++</em>, a mesma exceção aparece como <code>libc++abi: terminating due to uncaught exception of type std::out_of_range: vector</code>.</p>
+
 <div class="warning">
 <strong><code>[i]</code> não cria elementos</strong>
-<p>Num vetor vazio, <code>notas[0] = 7;</code> <strong>não</strong> acrescenta nada: a posição 0 não existe, e escrever nela é comportamento indefinido. O g++ 15 sem otimização pega o erro e aborta (veja <a href="#erros">Quando dá errado</a>); com <code>-O2</code>, ninguém confere. Para acrescentar, sempre <code>push_back</code>.</p>
+<p>Num vetor vazio, <code>notas[0] = 7;</code> <strong>não</strong> acrescenta nada: a posição 0 não existe, e escrever nela é comportamento indefinido. O g++ 15 sem otimização pega o erro e aborta (veja <a href="#erros">Quando dá errado</a>); com <code>-O2</code>, ninguém confere, e no editor do guia também não: lá, o programa parece funcionar, o que é o pior tipo de erro. Para acrescentar, sempre <code>push_back</code>.</p>
 </div>
 
 <h3>As pontas e tirar do fim</h3>

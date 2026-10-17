@@ -126,6 +126,11 @@ $ echo $?
 
 <p>O <code>Fim</code> nunca apareceu. Parece ruim, mas compare com o array estilo C da aula anterior, que mostrou um <code>0</code> inventado e seguiu em frente como se nada tivesse acontecido. Um programa que <strong>para e diz onde errou</strong> é muito melhor que um que continua com dados errados.</p>
 
+<div class="note">
+<strong>No editor do guia, a mensagem é outra</strong>
+<p>O editor usa o Clang com outra biblioteca padrão (a <em>libc++</em>; o g++ usa a <em>libstdc++</em>). A exceção é a mesma, mas o texto muda: <code>libc++abi: terminating due to uncaught exception of type std::out_of_range: array::at</code> ("encerrando por causa de uma exceção não tratada do tipo <code>std::out_of_range</code>"), sem os números do índice e do tamanho.</p>
+</div>
+
 <h3>Tratando a exceção</h3>
 <p>Uma exceção pode ser "pega" com <code>try</code> e <code>catch</code>, e aí o programa decide o que fazer em vez de morrer. Isso tem aula própria (<a href="excecoes.html">Exceções</a>); veja só a ideia:</p>
 
@@ -170,7 +175,7 @@ Abortado                   (imagem do núcleo gravada) ./colchete
 $ echo $?
 134</pre>
 
-<p>"Asserção <code>__n &lt; this-&gt;size()</code> falhou": o índice não é menor que o tamanho. Mas basta compilar com otimização (<code>-O2</code>, o que se faz na versão final de um programa) para a verificação sumir e o comportamento indefinido voltar:</p>
+<p>"Asserção <code>__n &lt; this-&gt;size()</code> falhou": o índice não é menor que o tamanho. No editor do guia (Clang com libc++), essa verificação não está ligada: o mesmo programa mostra um número qualquer e segue até o <code>Fim</code>. E no próprio g++, basta compilar com otimização (<code>-O2</code>, o que se faz na versão final de um programa) para a verificação sumir e o comportamento indefinido voltar:</p>
 
 <pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -O2 colchete.cpp -o colchete
 colchete.cpp: In function ‘int main()’:
