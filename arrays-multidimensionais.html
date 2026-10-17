@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Arrays Multidimensionais — tabelas com linhas e colunas | Guia C++</title>
+<meta name="description" content="Arrays multidimensionais (matrizes) em C++ para quem nunca programou: int m[3][4], índices [linha][coluna], percorrer com dois for, std::size nas duas dimensões, um tabuleiro de jogo da velha e as notas de cada aluno em cada prova, com saídas e erros reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Arrays Multidimensionais</span></h1>
+
+<p class="intro">Um <a href="arrays.html">array</a> é uma fileira de valores. Mas muita coisa do mundo real é uma <strong>tabela</strong>: as notas de cada aluno em cada prova, as casas de um tabuleiro, os assentos de um cinema (fileira e número), uma planilha. Para isso, o C++ permite arrays com <strong>duas dimensões</strong> (linhas e colunas), chamados de <strong>matrizes</strong>, ou até mais.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como criar uma matriz: <code>int m[3][4]</code> (3 linhas, 4 colunas).</li>
+  <li>Como ler e trocar um elemento com <code>m[linha][coluna]</code>.</li>
+  <li>Como percorrer a matriz inteira com dois <code>for</code>, um dentro do outro.</li>
+  <li>Como descobrir o número de linhas e de colunas com <code>std::size</code>.</li>
+  <li>Como montar um tabuleiro de jogo da velha e verificar se alguém venceu.</li>
+  <li>Como calcular a média de cada aluno (por linha) e de cada prova (por coluna).</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>. Esta aula usa muito o que você viu em <a href="arrays.html">Arrays</a> e em <a href="lacos-aninhados.html">Laços Aninhados</a>.</p>
+
+<hr>
+
+<h2>A ideia: os assentos do cinema</h2>
+<p>No ingresso do cinema está escrito "Fileira C, assento 7". São <strong>dois</strong> números para achar um lugar: primeiro a fileira, depois a posição dentro dela. Uma matriz funciona igual:</p>
+<ul>
+  <li>o primeiro índice escolhe a <strong>linha</strong> (a fileira);</li>
+  <li>o segundo escolhe a <strong>coluna</strong> (o assento dentro da fileira).</li>
+</ul>
+<p>Na verdade, uma matriz em C++ é um <strong>array de arrays</strong>: <code>int m[3][4]</code> é "um array de 3 elementos, e cada elemento é um array de 4 <code>int</code>". Cada linha é um array comum. Essa ideia explica tudo o que vem a seguir.</p>
+
+<hr>
+
+<h2>1. Criar uma matriz</h2>
+
+<pre class="file" data-file="matriz.cpp">#include &lt;iomanip&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    int m[3][4] = {
+        {1, 2, 3, 4},
+        {5, 6, 7, 8},
+        {9, 10, 11, 12}
+    };
+    std::cout &lt;&lt; "Linha 1, coluna 2: " &lt;&lt; m[1][2] &lt;&lt; '\n';
+
+    for (int linha = 0; linha &lt; 3; linha++) {
+        for (int coluna = 0; coluna &lt; 4; coluna++) {
+            std::cout &lt;&lt; std::setw(4) &lt;&lt; m[linha][coluna];
+        }
+        std::cout &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>int</dt><dd>O tipo de cada elemento, como num array comum.</dd>
+  <dt>m</dt><dd>O nome da matriz.</dd>
+  <dt>[3]</dt><dd>Quantas <strong>linhas</strong>.</dd>
+  <dt>[4]</dt><dd>Quantas <strong>colunas</strong> em cada linha. Total: 3 × 4 = 12 elementos.</dd>
+  <dt>{ {…}, {…}, {…} }</dt><dd>Os valores iniciais: um par de chaves por linha, dentro de um par de chaves externo. Escrever uma linha da matriz por linha do código deixa tudo legível.</dd>
+  <dt>m[1][2]</dt><dd>Linha 1, coluna 2. Como sempre em C++, os dois índices começam do 0: é a <strong>segunda</strong> linha, <strong>terceira</strong> coluna, o <code>7</code>.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra matriz.cpp -o matriz
+$ ./matriz
+Linha 1, coluna 2: 7
+   1   2   3   4
+   5   6   7   8
+   9  10  11  12</pre>
+
+<h3>O mapa dos índices</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>coluna 0</th><th>coluna 1</th><th>coluna 2</th><th>coluna 3</th></tr>
+<tr><th>linha 0</th><td><code>m[0][0]</code> = 1</td><td><code>m[0][1]</code> = 2</td><td><code>m[0][2]</code> = 3</td><td><code>m[0][3]</code> = 4</td></tr>
+<tr><th>linha 1</th><td><code>m[1][0]</code> = 5</td><td><code>m[1][1]</code> = 6</td><td><code>m[1][2]</code> = <strong>7</strong></td><td><code>m[1][3]</code> = 8</td></tr>
+<tr><th>linha 2</th><td><code>m[2][0]</code> = 9</td><td><code>m[2][1]</code> = 10</td><td><code>m[2][2]</code> = 11</td><td><code>m[2][3]</code> = 12</td></tr>
+</table>
+</div>
+
+<p>A regra para nunca confundir: <strong>sempre <code>[linha][coluna]</code></strong>, nessa ordem, como "fileira, assento". O último elemento de uma matriz <code>[3][4]</code> é <code>m[2][3]</code>.</p>
+
+<h3>Outras formas de criar</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Resultado</th></tr>
+<tr><td><code>int m[3][4] = {};</code></td><td>Tudo 0. A forma recomendada de começar "em branco".</td></tr>
+<tr><td><code>int m[2][3] = {{1, 2}, {4}};</code></td><td>O que falta em cada linha vira 0: <code>1 2 0</code> / <code>4 0 0</code>.</td></tr>
+<tr><td><code>int m[][3] = {{1, 2, 3}, {4, 5, 6}};</code></td><td>O número de <strong>linhas</strong> pode ser omitido (o compilador conta: 2). O de colunas, não.</td></tr>
+<tr><td><code>int m[3][4];</code></td><td>Sem valores: lixo, como no array comum. Evite.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>2. Percorrer com dois <code>for</code></h2>
+<p>O programa acima já mostrou o padrão, que é o mesmo da tabuada de <a href="lacos-aninhados.html">Laços Aninhados</a>:</p>
+<ul>
+  <li>o laço <strong>de fora</strong> anda pelas <strong>linhas</strong> (<code>linha</code> de 0 a 2);</li>
+  <li>o laço <strong>de dentro</strong> anda pelas <strong>colunas</strong> daquela linha (<code>coluna</code> de 0 a 3);</li>
+  <li><code>m[linha][coluna]</code> é o elemento da vez;</li>
+  <li>o <code>'\n'</code> entre o fim do laço de dentro e o fim do de fora termina cada linha.</li>
+</ul>
+<p>O <code>std::setw(4)</code> (de <a href="iomanip.html">iomanip</a>) dá 4 espaços para cada número, para as colunas ficarem alinhadas.</p>
+
+<h3>Quantas linhas e quantas colunas: <code>std::size</code></h3>
+<p>Como a matriz é um array de arrays, <code>std::size(m)</code> dá o número de <strong>linhas</strong> (quantos arrays há dentro), e <code>std::size(m[0])</code> dá o de <strong>colunas</strong> (o tamanho da primeira linha):</p>
+
+<pre class="file" data-file="tamanho.cpp">#include &lt;iostream&gt;
+#include &lt;iterator&gt;
+
+int main() {
+    int m[3][4] = {};
+    std::cout &lt;&lt; "Linhas: " &lt;&lt; std::size(m) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Colunas: " &lt;&lt; std::size(m[0]) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tamanho.cpp -o tamanho
+$ ./tamanho
+Linhas: 3
+Colunas: 4</pre>
+
+<p>Na prática, o mais claro é guardar os dois tamanhos em constantes (<code>constexpr int LINHAS = 3;</code>), como você vai ver no exemplo das notas.</p>
+
+<h3>Sem índices: for de intervalo</h3>
+<p>Se você não precisa saber em que linha e coluna está, dá para usar o <a href="for-range.html">for de intervalo</a> duas vezes. O de fora entrega uma <strong>linha inteira</strong> (um array) por volta; o de dentro percorre essa linha:</p>
+
+<pre class="file" data-file="rangefor.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int m[2][3] = {{1, 2, 3}, {4, 5, 6}};
+    for (const auto&amp; linha : m) {
+        for (int x : linha) {
+            std::cout &lt;&lt; x &lt;&lt; ' ';
+        }
+        std::cout &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra rangefor.cpp -o rangefor
+$ ./rangefor
+1 2 3
+4 5 6 </pre>
+
+<p>O <code>&amp;</code> em <code>const auto&amp; linha</code> é <strong>obrigatório</strong> aqui, não só uma economia. Sem ele, a linha "decai" para um ponteiro, perde o tamanho (como na aula <a href="arrays.html">Arrays</a>), e o laço de dentro não compila. O erro está em <a href="#erros">Quando dá errado</a>.</p>
+
+<div class="trycpp" data-goal="out:Soma: 78,src:for[\s\S]*for">
+<p class="try-task"><strong>Missão:</strong> com dois laços, some <strong>todos</strong> os elementos da matriz e mostre <code>Soma: 78</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int m[3][4] = {
+        {1, 2, 3, 4},
+        {5, 6, 7, 8},
+        {9, 10, 11, 12}
+    };
+    int soma = 0;
+    // some os elementos aqui
+
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int m[3][4] = {
+        {1, 2, 3, 4},
+        {5, 6, 7, 8},
+        {9, 10, 11, 12}
+    };
+    int soma = 0;
+    for (int linha = 0; linha &lt; 3; linha++) {
+        for (int coluna = 0; coluna &lt; 4; coluna++) {
+            soma += m[linha][coluna];
+        }
+    }
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Um tabuleiro de jogo da velha</h2>
+<p>O jogo da velha é uma matriz 3 × 3 de <code>char</code>: cada casa guarda <code>'X'</code>, <code>'O'</code> ou um espaço <code>' '</code> (casa vazia). Jogar é atribuir a uma casa; mostrar o tabuleiro é percorrer as linhas:</p>
+
+<pre class="file" data-file="velha.cpp">#include &lt;iostream&gt;
+
+int main() {
+    char tabuleiro[3][3] = {
+        {' ', ' ', ' '},
+        {' ', ' ', ' '},
+        {' ', ' ', ' '}
+    };
+
+    tabuleiro[1][1] = 'X';
+    tabuleiro[0][0] = 'O';
+    tabuleiro[1][0] = 'X';
+    tabuleiro[2][2] = 'O';
+    tabuleiro[1][2] = 'X';
+
+    for (int linha = 0; linha &lt; 3; linha++) {
+        std::cout &lt;&lt; ' ' &lt;&lt; tabuleiro[linha][0] &lt;&lt; " | "
+                  &lt;&lt; tabuleiro[linha][1] &lt;&lt; " | "
+                  &lt;&lt; tabuleiro[linha][2] &lt;&lt; '\n';
+        if (linha &lt; 2) {
+            std::cout &lt;&lt; "---+---+---\n";
+        }
+    }
+
+    for (int linha = 0; linha &lt; 3; linha++) {
+        if (tabuleiro[linha][0] != ' ' &amp;&amp;
+            tabuleiro[linha][0] == tabuleiro[linha][1] &amp;&amp;
+            tabuleiro[linha][1] == tabuleiro[linha][2]) {
+            std::cout &lt;&lt; tabuleiro[linha][0] &lt;&lt; " venceu na linha " &lt;&lt; linha + 1 &lt;&lt; "!\n";
+        }
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra velha.cpp -o velha
+$ ./velha
+ O |   |
+---+---+---
+ X | X | X
+---+---+---
+   |   | O
+X venceu na linha 2!</pre>
+
+<ul>
+  <li><strong>As jogadas:</strong> <code>tabuleiro[1][1] = 'X';</code> é "X no centro" (linha do meio, coluna do meio). <code>tabuleiro[0][0]</code> é o canto de cima à esquerda; <code>tabuleiro[2][2]</code>, o de baixo à direita.</li>
+  <li><strong>O desenho:</strong> aqui o laço de dentro foi "desenrolado": como cada linha tem só 3 casas, elas foram escritas uma a uma, com <code>" | "</code> entre elas. O <code>if (linha &lt; 2)</code> desenha a linha divisória só entre as linhas, não depois da última.</li>
+  <li><strong>A vitória:</strong> uma linha vence se a primeira casa não está vazia e as três casas são iguais. O <code>&amp;&amp;</code> ("e", veja <a href="operadores-logicos.html">Operadores Lógicos</a>) junta as três condições. Uma linha de código pode continuar na seguinte, como no <code>if</code> acima.</li>
+</ul>
+
+<p>Para um jogo completo, faltaria ler as jogadas com <code>std::cin</code> num laço, conferir as colunas e as diagonais e alternar os jogadores. A conferência das colunas é a missão final desta aula.</p>
+
+<hr>
+
+<h2>4. Notas por aluno × prova</h2>
+<p>A planilha da Ana: 3 alunos (as linhas) e 4 provas (as colunas). Ela quer duas coisas: a média de <strong>cada aluno</strong> e a média da turma em <strong>cada prova</strong>. Os nomes ficam num array comum, na mesma ordem das linhas:</p>
+
+<pre class="file" data-file="notas.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    constexpr int ALUNOS = 3;
+    constexpr int PROVAS = 4;
+    std::string nomes[ALUNOS] = {"Bia", "Caio", "Davi"};
+    double notas[ALUNOS][PROVAS] = {
+        {7.0, 8.5, 6.0, 9.0},
+        {5.0, 6.5, 7.5, 6.0},
+        {9.5, 9.0, 10.0, 8.5}
+    };
+
+    for (int a = 0; a &lt; ALUNOS; a++) {
+        double soma = 0.0;
+        for (int p = 0; p &lt; PROVAS; p++) {
+            soma += notas[a][p];
+        }
+        std::cout &lt;&lt; nomes[a] &lt;&lt; ": média " &lt;&lt; soma / PROVAS &lt;&lt; '\n';
+    }
+
+    for (int p = 0; p &lt; PROVAS; p++) {
+        double soma = 0.0;
+        for (int a = 0; a &lt; ALUNOS; a++) {
+            soma += notas[a][p];
+        }
+        std::cout &lt;&lt; "Prova " &lt;&lt; p + 1 &lt;&lt; ": média da turma " &lt;&lt; soma / ALUNOS &lt;&lt; '\n';
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra notas.cpp -o notas
+$ ./notas
+Bia: média 7.625
+Caio: média 6.25
+Davi: média 9.25
+Prova 1: média da turma 7.16667
+Prova 2: média da turma 8
+Prova 3: média da turma 7.83333
+Prova 4: média da turma 7.83333</pre>
+
+<p>Compare os dois blocos de laços. Os dois usam <code>notas[a][p]</code> (sempre linha, coluna), mas <strong>trocam qual laço fica por fora</strong>:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Quero a média de…</th><th>Laço de fora</th><th>Laço de dentro</th><th>A soma zera…</th></tr>
+<tr><td>Cada aluno (cada linha)</td><td>alunos (<code>a</code>)</td><td>provas (<code>p</code>)</td><td>a cada aluno</td></tr>
+<tr><td>Cada prova (cada coluna)</td><td>provas (<code>p</code>)</td><td>alunos (<code>a</code>)</td><td>a cada prova</td></tr>
+</table>
+</div>
+<p>O acumulador <code>soma</code> nasce <strong>dentro do laço de fora</strong>: assim ele recomeça do 0 para cada aluno (ou prova). Se nascesse antes dos dois laços, a média do Caio incluiria as notas da Bia.</p>
+
+<hr>
+
+<h2>Formas diferentes e qual usar</h2>
+<ul>
+  <li><strong>Mais dimensões:</strong> <code>int cubo[2][3][4]</code> funciona do mesmo jeito (um array de matrizes), com três índices e três laços. É raro passar de duas.</li>
+  <li><strong>Com <code>std::array</code>:</strong> <code>std::array&lt;std::array&lt;int, 4&gt;, 3&gt; m;</code> é a versão moderna de <code>int m[3][4]</code>, com <code>.size()</code> e <code>.at()</code> (veja <a href="std-array.html">std::array</a>).</li>
+  <li><strong>Tamanho só conhecido ao rodar:</strong> um <code>std::vector&lt;std::vector&lt;int&gt;&gt;</code> (um vetor de vetores, veja <a href="vector.html">std::vector</a>) cresce como você quiser e permite linhas de tamanhos diferentes.</li>
+  <li><strong>Em funções:</strong> uma matriz estilo C perde o número de linhas ao ir para uma função (como o array comum), e o de colunas precisa ser fixo no parâmetro. Mais um motivo para preferir <code>std::array</code> ou <code>std::vector</code> quando o programa crescer.</li>
+</ul>
+
+<hr>
+
+<h2 id="erros">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Lixo na saída: linha e coluna trocadas</strong>
+<pre class="file" data-file="trocado.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int m[2][3] = {{1, 2, 3}, {4, 5, 6}};
+    for (int linha = 0; linha &lt; 3; linha++) {
+        for (int coluna = 0; coluna &lt; 2; coluna++) {
+            std::cout &lt;&lt; m[linha][coluna] &lt;&lt; ' ';
+        }
+        std::cout &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra trocado.cpp -o trocado
+$ ./trocado
+1 2
+4 5
+-1361125376 -1985207981 </pre>
+<p><strong>O que aconteceu:</strong> a matriz tem 2 linhas e 3 colunas, mas os laços usaram 3 linhas e 2 colunas. O <code>3</code> sumiu, o <code>6</code> também, e a "linha 2", que não existe, mostrou lixo da memória: é o acesso <a href="arrays.html#fora">fora do intervalo</a>, comportamento indefinido, sem aviso nenhum.</p>
+<p><strong>Como consertar:</strong> use constantes com nomes claros (<code>LINHAS</code>, <code>COLUNAS</code>) nos laços e na declaração, e teste com <code>-g -fsanitize=address</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"‘begin’ was not declared in this scope" (faltou o <code>&amp;</code> no for de intervalo)</strong>
+<pre class="file" data-file="semref.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int m[2][3] = {{1, 2, 3}, {4, 5, 6}};
+    for (auto linha : m) {
+        for (int x : linha) {
+            std::cout &lt;&lt; x &lt;&lt; ' ';
+        }
+        std::cout &lt;&lt; '\n';
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semref.cpp -o semref
+semref.cpp: In function ‘int main()’:
+semref.cpp:6:22: error: ‘begin’ was not declared in this scope
+    6 |         for (int x : linha) {
+      |                      ^~~~~
+semref.cpp:6:22: note: suggested alternatives:     « (umas 20 linhas de sugestões cortadas)
+semref.cpp:6:22: error: ‘end’ was not declared in this scope</pre>
+<p><strong>O que significa:</strong> o for de intervalo precisa saber onde a lista começa (<code>begin</code>) e termina (<code>end</code>). Com <code>auto linha</code> (sem <code>&amp;</code>), cada linha é copiada como <strong>ponteiro</strong>, que não sabe onde termina. As sugestões do compilador (<code>std::begin</code>…) não ajudam aqui.</p>
+<p><strong>Como consertar:</strong> <code>for (const auto&amp; linha : m)</code> (ou <code>auto&amp;</code>, se for alterar).</p>
+</div>
+
+<div class="cenario">
+<strong><code>m[1, 2]</code> no lugar de <code>m[1][2]</code></strong>
+<pre class="file" data-file="virgula.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int m[2][3] = {{1, 2, 3}, {4, 5, 6}};
+    std::cout &lt;&lt; m[1, 2] &lt;&lt; '\n';
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra virgula.cpp -o virgula
+virgula.cpp: In function ‘int main()’:
+virgula.cpp:5:19: warning: top-level comma expression in array subscript changed meaning in C++23 [-Wcomma-subscript]
+    5 |     std::cout &lt;&lt; m[1, 2] &lt;&lt; '\n';
+      |                   ^
+$ ./virgula
+0x7ffe09c5be98</pre>
+<p><strong>O que significa:</strong> quem vem de Python, Pascal ou de planilhas escreve <code>m[1, 2]</code>. Para arrays do C++, isso não é "linha 1, coluna 2". O g++ ainda aceita, com o aviso "a expressão com vírgula no índice mudou de significado no C++23", e lê como <code>m[2]</code>: a linha 2, que nem existe, mostrada como endereço. O Clang do editor recusa: <code>error: type 'int[2][3]' does not provide a subscript operator</code>.</p>
+<p><strong>Como consertar:</strong> um par de colchetes por dimensão: <code>m[1][2]</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"too many initializers for ‘int [2][3]’"</strong>
+<pre class="file" data-file="demais.cpp">int main() {
+    int m[2][3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
+    return m[0][0];
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra demais.cpp -o demais
+demais.cpp: In function ‘int main()’:
+demais.cpp:2:51: error: too many initializers for ‘int [2][3]’
+    2 |     int m[2][3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
+      |                                                   ^</pre>
+<p><strong>O que significa:</strong> a matriz tem 2 linhas, mas recebeu 3 grupos de valores. No Clang: <code>error: excess elements in array initializer</code>.</p>
+<p><strong>Como consertar:</strong> confira as dimensões: <code>[linhas][colunas]</code>, e cada <code>{…}</code> interno é uma linha.</p>
+</div>
+
+<div class="cenario">
+<strong>"must have bounds for all dimensions except the first"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semcol.cpp -o semcol
+semcol.cpp: In function ‘int main()’:
+semcol.cpp:2:9: error: declaration of ‘m’ as multidimensional array must have bounds for all dimensions except the first
+    2 |     int m[][] = {{1, 2}, {3, 4}};
+      |         ^
+semcol.cpp:3:12: error: ‘m’ was not declared in this scope
+    3 |     return m[0][0];
+      |            ^</pre>
+<p><strong>O que significa:</strong> "a declaração de uma matriz precisa dos tamanhos de todas as dimensões, menos a primeira". O compilador conta as linhas sozinho, mas precisa saber o tamanho de cada linha. O segundo erro é consequência do primeiro (como <code>m</code> não foi criada, ela "não existe").</p>
+<p><strong>Como consertar:</strong> <code>int m[][2] = {{1, 2}, {3, 4}};</code> ou, mais claro, <code>int m[2][2]</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que faz</th></tr>
+<tr><td><code>int m[L][C] = {{…}, {…}};</code></td><td>Matriz de <code>L</code> linhas e <code>C</code> colunas.</td></tr>
+<tr><td><code>int m[L][C] = {};</code></td><td>Tudo 0.</td></tr>
+<tr><td><code>m[i][j]</code></td><td>Linha <code>i</code> (0 a L−1), coluna <code>j</code> (0 a C−1). Sem conferência.</td></tr>
+<tr><td><code>std::size(m)</code> / <code>std::size(m[0])</code></td><td>Número de linhas / de colunas.</td></tr>
+<tr><td><code>for (int i…) { for (int j…) { m[i][j] } '\n'; }</code></td><td>Percorrer linha por linha.</td></tr>
+<tr><td><code>for (const auto&amp; linha : m) for (int x : linha)</code></td><td>Percorrer sem índices (o <code>&amp;</code> é obrigatório).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Quantos elementos?</h3>
+<p>Quantos <code>int</code> cabem em <code>int m[4][5]</code>?</p>
+<div class="ex-code"><input data-answer="20|vinte" aria-label="quantidade"></div>
+</div>
+
+<div class="exercise">
+<h3>2. O canto de baixo</h3>
+<p>Numa matriz <code>int m[4][5]</code>, complete os índices do elemento do canto de baixo à direita:</p>
+<div class="ex-code">m[<input data-answer="3" aria-label="linha" size="2">][<input data-answer="4" aria-label="coluna" size="2">]</div>
+</div>
+
+<div class="exercise">
+<h3>3. O número de colunas</h3>
+<p>Complete para obter o número de <strong>colunas</strong> de <code>m</code>:</p>
+<div class="ex-code">std::size(<input data-answer="m[0]|m[1]|m[2]" aria-label="expressão" size="6">)</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Em <code>int m[3][4] = {{1, 2, 3, 4}, {5, 6, 7, 8}, {9, 10, 11, 12}};</code>, quanto vale <code>m[2][1]</code>?</p>
+<label><input type="radio" name="q4"> 6</label>
+<label><input type="radio" name="q4"> 10</label>
+<label><input type="radio" name="q4"> 7</label>
+<label><input type="radio" name="q4"> 9</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Para calcular a média de <strong>cada prova</strong> (cada coluna) de <code>notas[ALUNOS][PROVAS]</code>, o laço de fora deve percorrer…</p>
+<label><input type="radio" name="q5"> os alunos.</label>
+<label><input type="radio" name="q5"> as linhas.</label>
+<label><input type="radio" name="q5"> as provas.</label>
+<label><input type="radio" name="q5"> tanto faz, o resultado é o mesmo.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Qual destas declarações é válida?</p>
+<label><input type="radio" name="q6"> <code>int m[][3] = {{1, 2, 3}, {4, 5, 6}};</code></label>
+<label><input type="radio" name="q6"> <code>int m[2][] = {{1, 2, 3}, {4, 5, 6}};</code></label>
+<label><input type="radio" name="q6"> <code>int m[][] = {{1, 2, 3}, {4, 5, 6}};</code></label>
+<label><input type="radio" name="q6"> <code>int m[2, 3] = {{1, 2, 3}, {4, 5, 6}};</code></label>
+</div>
+
+<h3>Missão final: vitória na coluna</h3>
+<div class="trycpp" data-goal="out:X venceu na coluna 3!,src:for\s*\(">
+<p class="try-task"><strong>Missão:</strong> neste tabuleiro, o <code>X</code> completou a terceira coluna. Escreva um <code>for</code> que passa pelas 3 <strong>colunas</strong> e, para cada uma, confere se a casa de cima não está vazia e se as três casas da coluna (linhas 0, 1 e 2) são iguais. Se forem, mostre <code>X venceu na coluna 3!</code> (use <code>coluna + 1</code>). Dica: é o teste das linhas com os índices trocados.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    char tabuleiro[3][3] = {
+        {'O', ' ', 'X'},
+        {' ', 'O', 'X'},
+        {' ', ' ', 'X'}
+    };
+    // confira as colunas aqui
+
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    char tabuleiro[3][3] = {
+        {'O', ' ', 'X'},
+        {' ', 'O', 'X'},
+        {' ', ' ', 'X'}
+    };
+    for (int coluna = 0; coluna &lt; 3; coluna++) {
+        if (tabuleiro[0][coluna] != ' ' &amp;&amp;
+            tabuleiro[0][coluna] == tabuleiro[1][coluna] &amp;&amp;
+            tabuleiro[1][coluna] == tabuleiro[2][coluna]) {
+            std::cout &lt;&lt; tabuleiro[0][coluna] &lt;&lt; " venceu na coluna " &lt;&lt; coluna + 1 &lt;&lt; "!\n";
+        }
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma matriz é um array de arrays: <code>int m[3][4]</code> tem 3 linhas de 4 colunas.</li>
+  <li>Acesse com <code>m[linha][coluna]</code>, sempre nessa ordem, os dois a partir do 0.</li>
+  <li>Inicialize com uma chave por linha: <code>{{1, 2}, {3, 4}}</code>, ou tudo zerado com <code>{}</code>.</li>
+  <li>Percorra com dois <code>for</code>: o de fora nas linhas, o de dentro nas colunas. Trocar qual fica por fora muda o que você calcula (por aluno × por prova).</li>
+  <li><code>std::size(m)</code> dá as linhas; <code>std::size(m[0])</code>, as colunas. No for de intervalo, use <code>const auto&amp; linha</code>.</li>
+  <li>Índices trocados ou fora do tamanho não são conferidos: dão lixo, em silêncio.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
