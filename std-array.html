@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ std::array — o array que sabe o próprio tamanho | Guia C++</title>
+<meta name="description" content="std::array em C++ para quem nunca programou: std::array&lt;int, 5&gt;, .size(), front e back, .at() com a exceção std::out_of_range (mensagem real), .fill, copiar com = (o array estilo C não deixa: erro real), comparar com ==, passar para funções sem perder o tamanho, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">std::array</span> <span class="versao">C++11</span></h1>
+
+<p class="intro">Na aula <a href="arrays.html">Arrays</a>, o array estilo C mostrou seus problemas: não sabe o próprio tamanho fora de onde foi criado, não confere os índices, não pode ser copiado com <code>=</code> nem comparado com <code>==</code>, e vira ponteiro quando vai para uma função. O <code>std::array</code>, da biblioteca padrão, é o <strong>mesmo array de tamanho fixo</strong>, igualmente rápido, mas que se comporta como uma variável "normal" e traz ferramentas prontas.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como criar um <code>std::array&lt;int, 5&gt;</code> e o que significa cada parte.</li>
+  <li>Como usar <code>.size()</code>, <code>.front()</code> e <code>.back()</code>.</li>
+  <li>A diferença entre <code>[i]</code> e <code>.at(i)</code>, e a mensagem real de <code>std::out_of_range</code>.</li>
+  <li>Como encher todo o array com um valor usando <code>.fill</code>.</li>
+  <li>Como copiar com <code>=</code> e comparar com <code>==</code> (e o erro real quando se tenta isso com o array estilo C).</li>
+  <li>Como passar um <code>std::array</code> para uma função sem perder o tamanho.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: a mesma fileira de armários, agora com uma placa</h2>
+<p>Lembra da fileira de armários numerados da aula <a href="arrays.html">Arrays</a>? O <code>std::array</code> é a mesma fileira, com uma <strong>placa na ponta</strong> dizendo quantos armários existem, e um <strong>zelador</strong> que, se você pedir com educação (<code>.at()</code>), confere se o armário que você pediu existe antes de abri-lo.</p>
+<p>Por dentro, ele guarda exatamente um array estilo C; não gasta memória a mais e é tão rápido quanto. A diferença está só nas ferramentas em volta. Por isso, no C++ moderno, <strong>quando a quantidade é fixa, use <code>std::array</code></strong>.</p>
+
+<hr>
+
+<h2>1. Criar e usar</h2>
+
+<pre class="file" data-file="criar.cpp">#include &lt;array&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::array&lt;int, 5&gt; notas = {7, 9, 6, 8, 10};
+    std::cout &lt;&lt; "Tamanho: " &lt;&lt; notas.size() &lt;&lt; '\n';
+    std::cout &lt;&lt; "Primeira: " &lt;&lt; notas[0] &lt;&lt; '\n';
+    std::cout &lt;&lt; "Última: " &lt;&lt; notas[notas.size() - 1] &lt;&lt; '\n';
+    std::cout &lt;&lt; "front: " &lt;&lt; notas.front() &lt;&lt; ", back: " &lt;&lt; notas.back() &lt;&lt; '\n';
+
+    for (int nota : notas) {
+        std::cout &lt;&lt; nota &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#include &lt;array&gt;</dt><dd>O cabeçalho do <code>std::array</code>. Às vezes o programa compila sem ele, porque outro cabeçalho (como o <code>&lt;iostream&gt;</code>) o inclui "por acaso"; não conte com isso, inclua sempre.</dd>
+  <dt>std::array</dt><dd>O tipo, da biblioteca padrão (por isso o <code>std::</code>).</dd>
+  <dt>&lt;int, 5&gt;</dt><dd>Entre <code>&lt; &gt;</code>, duas informações: o <strong>tipo</strong> dos elementos (<code>int</code>) e o <strong>tamanho</strong> (5). O tamanho faz parte do tipo: um <code>std::array&lt;int, 5&gt;</code> e um <code>std::array&lt;int, 6&gt;</code> são tipos diferentes. Ele precisa ser conhecido na hora de compilar.</dd>
+  <dt>notas</dt><dd>O nome da variável.</dd>
+  <dt>= {7, 9, 6, 8, 10};</dt><dd>Os valores, igual ao array estilo C. Os que faltarem viram 0; com <code>{}</code>, todos viram 0.</dd>
+  <dt>notas.size()</dt><dd>O <strong>tamanho</strong>, perguntado ao próprio array. O ponto (<code>.</code>) chama uma <strong>função-membro</strong>: uma ferramenta que pertence ao objeto (você já usou com <code>texto.size()</code> em <a href="funcoes-string.html">Funções de String</a>).</dd>
+  <dt>notas[0]</dt><dd>O acesso por índice que você já conhece, de <code>0</code> a <code>size() − 1</code>.</dd>
+  <dt>.front() / .back()</dt><dd>Atalhos para o primeiro e o último elemento.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra criar.cpp -o criar
+$ ./criar
+Tamanho: 5
+Primeira: 7
+Última: 10
+front: 7, back: 10
+7 9 6 8 10 </pre>
+
+<p>Tudo o que funciona com o array estilo C funciona aqui: índices do 0, <code>for</code> com índice, <a href="for-range.html">for de intervalo</a>. O <code>.size()</code>, porém, está <strong>sempre</strong> disponível, até dentro de uma função (seção 6).</p>
+
+<div class="tip">
+<strong>Deixe o compilador contar <span class="versao">C++17</span></strong>
+<p>Desde o C++17, você pode omitir o tipo e o tamanho: <code>std::array precos = {12.5, 8.0, 27.0};</code> vira um <code>std::array&lt;double, 3&gt;</code>. Útil para listas fixas escritas à mão.</p>
+</div>
+
+<hr>
+
+<h2 id="at">2. <code>[i]</code> × <code>.at(i)</code>: o acesso conferido</h2>
+<p>Há duas formas de acessar um elemento:</p>
+<ul>
+  <li><code>notas[i]</code>: rápido, e a linguagem <strong>não promete</strong> conferir o índice. Fora do intervalo, é comportamento indefinido, como no array estilo C.</li>
+  <li><code>notas.at(i)</code>: confere <strong>sempre</strong>. Se o índice não existir, em vez de ler memória alheia, o programa <strong>lança uma exceção</strong>: um aviso de erro que interrompe o caminho normal.</li>
+</ul>
+
+<pre class="file" data-file="at.cpp">#include &lt;array&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::array&lt;int, 5&gt; notas = {7, 9, 6, 8, 10};
+    std::cout &lt;&lt; "notas.at(2): " &lt;&lt; notas.at(2) &lt;&lt; '\n';
+    std::cout &lt;&lt; "notas.at(5): " &lt;&lt; notas.at(5) &lt;&lt; '\n';
+    std::cout &lt;&lt; "Fim\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra at.cpp -o at
+$ ./at
+notas.at(2): 6
+terminate called after throwing an instance of 'std::out_of_range'
+  what():  array::at: __n (which is 5) >= _Nm (which is 5)
+Abortado                   (imagem do núcleo gravada) ./at
+$ echo $?
+134</pre>
+
+<p>Linha por linha:</p>
+<dl class="anatomy">
+  <dt>terminate called after throwing an instance of 'std::out_of_range'</dt><dd>"O programa foi encerrado depois de lançar uma exceção do tipo <code>std::out_of_range</code>" (<em>out of range</em> = fora do intervalo). Como ninguém tratou a exceção, o C++ encerrou o programa.</dd>
+  <dt>what(): array::at: __n (which is 5) &gt;= _Nm (which is 5)</dt><dd>A explicação: no <code>array::at</code>, o índice pedido (<code>__n</code>, que é 5) é maior ou igual ao tamanho (<code>_Nm</code>, que é 5). Os nomes com sublinhado são os nomes internos da biblioteca.</dd>
+  <dt>Abortado (imagem do núcleo gravada)</dt><dd>Mensagem do terminal (o Bash): o programa foi abortado. A "imagem do núcleo" (<em>core dump</em>) é uma cópia da memória para depuração; você pode ignorá-la.</dd>
+  <dt>134</dt><dd>O código de saída de um programa abortado (128 + 6, o número do sinal de "abortar").</dd>
+</dl>
+
+<p>O <code>Fim</code> nunca apareceu. Parece ruim, mas compare com o array estilo C da aula anterior, que mostrou um <code>0</code> inventado e seguiu em frente como se nada tivesse acontecido. Um programa que <strong>para e diz onde errou</strong> é muito melhor que um que continua com dados errados.</p>
+
+<h3>Tratando a exceção</h3>
+<p>Uma exceção pode ser "pega" com <code>try</code> e <code>catch</code>, e aí o programa decide o que fazer em vez de morrer. Isso tem aula própria (<a href="excecoes.html">Exceções</a>); veja só a ideia:</p>
+
+<pre class="file" data-file="trycatch.cpp">#include &lt;array&gt;
+#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+
+int main() {
+    std::array&lt;int, 5&gt; notas = {7, 9, 6, 8, 10};
+    int posicao = 7;
+    try {
+        std::cout &lt;&lt; notas.at(posicao) &lt;&lt; '\n';
+    } catch (const std::out_of_range&amp; erro) {
+        std::cout &lt;&lt; "Posição inválida: " &lt;&lt; erro.what() &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "O programa continua.\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra trycatch.cpp -o trycatch
+$ ./trycatch
+Posição inválida: array::at: __n (which is 7) &gt;= _Nm (which is 5)
+O programa continua.</pre>
+
+<h3>E o <code>[i]</code> fora do intervalo?</h3>
+<p>Pela regra da linguagem, <code>notas[5]</code> é comportamento indefinido. Na prática, depende de como você compila. O g++ 15, <strong>sem otimização</strong> (o comando padrão do guia), liga verificações extras na biblioteca, e o programa para com uma mensagem:</p>
+
+<pre class="file" data-file="colchete.cpp">#include &lt;array&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::array&lt;int, 5&gt; notas = {7, 9, 6, 8, 10};
+    std::cout &lt;&lt; "notas[5]: " &lt;&lt; notas[5] &lt;&lt; '\n';
+    std::cout &lt;&lt; "Fim\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra colchete.cpp -o colchete
+$ ./colchete
+/usr/include/c++/15/array:210: constexpr std::array&lt;_Tp, _Nm&gt;::value_type&amp; std::array&lt;_Tp, _Nm&gt;::operator[](size_type) [with _Tp = int; long unsigned int _Nm = 5; reference = int&amp;; size_type = long unsigned int]: Assertion '__n &lt; this-&gt;size()' failed.
+Abortado                   (imagem do núcleo gravada) ./colchete
+$ echo $?
+134</pre>
+
+<p>"Asserção <code>__n &lt; this-&gt;size()</code> falhou": o índice não é menor que o tamanho. Mas basta compilar com otimização (<code>-O2</code>, o que se faz na versão final de um programa) para a verificação sumir e o comportamento indefinido voltar:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -O2 colchete.cpp -o colchete
+colchete.cpp: In function ‘int main()’:
+colchete.cpp:6:41: warning: array subscript 5 is outside array bounds of ‘std::array&lt;int, 5&gt; [1]’ [-Warray-bounds=]
+    6 |     std::cout &lt;&lt; "notas[5]: " &lt;&lt; notas[5] &lt;&lt; '\n';
+      |                                         ^
+colchete.cpp:5:24: note: at offset 20 into object ‘notas’ of size 20
+    5 |     std::array&lt;int, 5&gt; notas = {7, 9, 6, 8, 10};
+      |                        ^~~~~
+$ ./colchete
+notas[5]: 0
+Fim</pre>
+
+<p>Aqui o compilador até percebeu o índice 5 escrito no código e avisou; com um índice calculado durante a execução, nem isso. Conclusão: <strong>não conte com a verificação do <code>[i]</code></strong>. Quando o índice vem de fora (digitado pelo usuário, lido de um arquivo, calculado), use <code>.at(i)</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>notas[i]</code></th><th><code>notas.at(i)</code></th></tr>
+<tr><td>Índice válido</td><td>O elemento</td><td>O elemento</td></tr>
+<tr><td>Índice inválido</td><td>Comportamento indefinido (o g++ 15 sem <code>-O</code> aborta; com <code>-O2</code>, lixo)</td><td>Sempre lança <code>std::out_of_range</code></td></tr>
+<tr><td>Quando usar</td><td>Em laços de <code>0</code> a <code>size() − 1</code>, onde o índice é certo</td><td>Quando o índice vem de fora ou pode estar errado</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>3. Encher tudo: <code>.fill</code></h2>
+<p><code>.fill(valor)</code> coloca o mesmo valor em todas as posições, de uma vez:</p>
+
+<pre class="file" data-file="fill.cpp">#include &lt;array&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::array&lt;int, 6&gt; placar{};
+    for (int x : placar) std::cout &lt;&lt; x &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+
+    placar.fill(3);
+    for (int x : placar) std::cout &lt;&lt; x &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra fill.cpp -o fill
+$ ./fill
+0 0 0 0 0 0
+3 3 3 3 3 3 </pre>
+
+<p><code>placar{}</code> (sem o <code>=</code>, também vale) cria tudo zerado. O <code>.fill(3)</code> substitui um laço inteiro: útil para "reiniciar" um placar, limpar um tabuleiro (<code>.fill(' ')</code>) ou começar todos os estoques com o mesmo valor.</p>
+
+<div class="trycpp" data-goal="out:Soma: 50,src:\.fill\s*\(">
+<p class="try-task"><strong>Missão:</strong> a lojinha recebeu 10 unidades de cada um dos 5 produtos. Use <code>.fill</code> para colocar <code>10</code> em todo o <code>estoque</code> e depois some tudo com um laço. Deve aparecer <code>Soma: 50</code>.</p>
+<pre class="script">#include &lt;array&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::array&lt;int, 5&gt; estoque{};
+    // encha o estoque aqui
+
+    int soma = 0;
+    for (int qtd : estoque) {
+        soma += qtd;
+    }
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+<pre class="solucao">#include &lt;array&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::array&lt;int, 5&gt; estoque{};
+    estoque.fill(10);
+    int soma = 0;
+    for (int qtd : estoque) {
+        soma += qtd;
+    }
+    std::cout &lt;&lt; "Soma: " &lt;&lt; soma &lt;&lt; '\n';
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>4. Copiar com <code>=</code></h2>
+<p>Com <code>std::array</code>, copiar é como copiar um <code>int</code>: um <code>=</code> e pronto. A cópia é <strong>independente</strong>: mudar uma não muda a outra.</p>
+
+<pre class="file" data-file="copiar.cpp">#include &lt;array&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::array&lt;int, 3&gt; original = {7, 9, 6};
+    std::array&lt;int, 3&gt; copia = original;
+    copia[0] = 10;
+
+    std::cout &lt;&lt; "original: ";
+    for (int x : original) std::cout &lt;&lt; x &lt;&lt; ' ';
+    std::cout &lt;&lt; "\ncopia:    ";
+    for (int x : copia) std::cout &lt;&lt; x &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+
+    std::array&lt;int, 3&gt; outra = {0, 0, 0};
+    outra = original;
+    std::cout &lt;&lt; "outra:    ";
+    for (int x : outra) std::cout &lt;&lt; x &lt;&lt; ' ';
+    std::cout &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra copiar.cpp -o copiar
+$ ./copiar
+original: 7 9 6
+copia:    10 9 6
+outra:    7 9 6 </pre>
+
+<p>Funciona ao criar (<code>copia = original</code> na declaração) e depois (<code>outra = original;</code>). Os dois precisam ter o <strong>mesmo tipo e o mesmo tamanho</strong>.</p>
+
+<p>Com o array estilo C, isso nem compila:</p>
+
+<pre class="file" data-file="copiarc.cpp">int main() {
+    int original[3] = {7, 9, 6};
+    int copia[3] = {};
+    copia = original;
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra copiarc.cpp -o copiarc
+copiarc.cpp: In function ‘int main()’:
+copiarc.cpp:4:11: error: invalid array assignment
+    4 |     copia = original;
+      |     ~~~~~~^~~~~~~~~~</pre>
+
+<p>"Atribuição de array inválida". Um array estilo C não pode receber outro com <code>=</code>; seria preciso copiar elemento por elemento num laço. O Clang do editor diz <code>error: array type 'int[3]' is not assignable</code> ("o tipo array <code>int[3]</code> não aceita atribuição").</p>
+
+<hr>
+
+<h2>5. Comparar com <code>==</code></h2>
+<p><code>==</code> entre dois <code>std::array</code> compara <strong>elemento por elemento</strong>: são iguais se todos os valores forem iguais, na mesma ordem. <code>!=</code> é o contrário:</p>
+
+<pre class="file" data-file="comparar.cpp">#include &lt;array&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::array&lt;int, 3&gt; a = {7, 9, 6};
+    std::array&lt;int, 3&gt; b = {7, 9, 6};
+    std::array&lt;int, 3&gt; c = {7, 9, 5};
+    std::cout &lt;&lt; std::boolalpha;
+    std::cout &lt;&lt; "a == b: " &lt;&lt; (a == b) &lt;&lt; '\n';
+    std::cout &lt;&lt; "a == c: " &lt;&lt; (a == c) &lt;&lt; '\n';
+    std::cout &lt;&lt; "a != c: " &lt;&lt; (a != c) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra comparar.cpp -o comparar
+$ ./comparar
+a == b: true
+a == c: false
+a != c: true</pre>
+
+<p>(<code>std::boolalpha</code> faz o <code>std::cout</code> mostrar <code>true</code>/<code>false</code> em vez de <code>1</code>/<code>0</code>, veja <a href="bool.html">Booleanos</a>.) Também funcionam <code>&lt;</code> e <code>&gt;</code>, que comparam como num dicionário: o primeiro elemento diferente decide.</p>
+
+<p>Com o array estilo C, <code>==</code> compila, mas faz <strong>outra coisa</strong>:</p>
+
+<pre class="file" data-file="compararc.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int a[3] = {7, 9, 6};
+    int b[3] = {7, 9, 6};
+    std::cout &lt;&lt; std::boolalpha &lt;&lt; (a == b) &lt;&lt; '\n';
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra compararc.cpp -o compararc
+compararc.cpp: In function ‘int main()’:
+compararc.cpp:6:39: warning: comparison between two arrays is deprecated in C++20 [-Warray-compare]
+    6 |     std::cout &lt;&lt; std::boolalpha &lt;&lt; (a == b) &lt;&lt; '\n';
+      |                                     ~~^~~~
+compararc.cpp:6:39: note: use unary ‘+’ which decays operands to pointers or ‘&amp;a[0] == &amp;b[0]’ to compare the addresses
+$ ./compararc
+false</pre>
+
+<p>Os valores são iguais, e a resposta foi <code>false</code>. Os dois nomes "decaíram" para os <strong>endereços</strong> dos arrays, e dois arrays diferentes moram em endereços diferentes. O g++ avisa que essa comparação está "obsoleta desde o C++20" e sugere, na nota, como escrever se você quisesse mesmo comparar endereços. É mais um motivo para usar <code>std::array</code>.</p>
+
+<hr>
+
+<h2>6. Em funções, o tamanho vai junto</h2>
+<p>O array estilo C perdia o tamanho ao ir para uma função. O <code>std::array</code> não: o tamanho faz parte do tipo. Funções têm aula própria (<a href="funcoes.html">Funções</a>); por ora, repare que <code>.size()</code> funciona lá dentro:</p>
+
+<pre class="file" data-file="funcao.cpp">#include &lt;array&gt;
+#include &lt;iostream&gt;
+
+void mostrar(const std::array&lt;int, 5&gt;&amp; notas) {
+    std::cout &lt;&lt; notas.size() &lt;&lt; " notas: ";
+    for (int nota : notas) {
+        std::cout &lt;&lt; nota &lt;&lt; ' ';
+    }
+    std::cout &lt;&lt; '\n';
+}
+
+int main() {
+    std::array&lt;int, 5&gt; notas = {7, 9, 6, 8, 10};
+    mostrar(notas);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra funcao.cpp -o funcao
+$ ./funcao
+5 notas: 7 9 6 8 10 </pre>
+
+<p>O <code>const ... &amp;</code> no parâmetro é a mesma ideia do <code>const auto&amp;</code> do <a href="for-range.html#modificar">for de intervalo</a>: a função lê o array original, sem copiá-lo e sem poder alterá-lo (veja <a href="passagem-referencia.html">Por Valor × Por Referência</a>).</p>
+
+<hr>
+
+<h2>Qual usar?</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th></tr>
+<tr><td>A quantidade é fixa e conhecida ao escrever o programa (dias da semana, casas do tabuleiro, 4 provas)</td><td><code>std::array</code></td></tr>
+<tr><td>A quantidade muda durante a execução (itens digitados, linhas de um arquivo)</td><td><a href="vector.html">std::vector</a></td></tr>
+<tr><td>Código antigo ou bibliotecas da linguagem C</td><td>Array estilo C (com cuidado)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2 id="erros">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"terminate called after throwing an instance of 'std::out_of_range'"</strong>
+<p><strong>O que aconteceu:</strong> um <code>.at(i)</code> recebeu um índice que não existe, e ninguém tratou a exceção (<a href="#at">seção 2</a>). A linha <code>what()</code> diz o índice pedido (<code>__n</code>) e o tamanho (<code>_Nm</code>).</p>
+<p><strong>Como consertar:</strong> confira de onde vem o índice (um laço com <code>&lt;=</code>? um número digitado?). Se o índice pode mesmo vir errado, teste antes (<code>if (i &lt; notas.size())</code>) ou trate a exceção com <code>try</code>/<code>catch</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Assertion '__n &lt; this-&gt;size()' failed"</strong>
+<p><strong>O que aconteceu:</strong> um <code>[i]</code> com índice inválido, pego pela verificação que o g++ 15 liga sem otimização. Com <code>-O2</code>, o mesmo erro passaria em silêncio.</p>
+<p><strong>Como consertar:</strong> a primeira linha da mensagem diz o arquivo da biblioteca, não o seu; procure no seu código o <code>[ ]</code> com o índice errado (o <a href="depuracao-gdb.html">gdb</a> mostra a linha exata).</p>
+</div>
+
+<div class="cenario">
+<strong>"wrong number of template arguments (1, should be 2)"</strong>
+<pre class="file" data-file="semtam.cpp">#include &lt;array&gt;
+
+int main() {
+    std::array&lt;int&gt; notas = {7, 9, 6};
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semtam.cpp -o semtam
+semtam.cpp: In function ‘int main()’:
+semtam.cpp:4:19: error: wrong number of template arguments (1, should be 2)
+    4 |     std::array&lt;int&gt; notas = {7, 9, 6};
+      |                   ^
+In file included from /usr/include/c++/15/bits/stl_algobase.h:64,
+                 from /usr/include/c++/15/array:45,
+                 from semtam.cpp:1:
+/usr/include/c++/15/bits/stl_pair.h:99:12: note: provided for ‘template&lt;class _Tp, long unsigned int _Nm&gt; struct std::array’
+   99 |     struct array;
+      |            ^~~~~
+semtam.cpp:4:21: error: scalar object ‘notas’ requires one element in initializer
+    4 |     std::array&lt;int&gt; notas = {7, 9, 6};
+      |                     ^~~~~</pre>
+<p><strong>O que significa:</strong> "número errado de argumentos de modelo (1, deveriam ser 2)". O <code>std::array</code> precisa do tipo <strong>e</strong> do tamanho. A nota mostra a "receita" dele: <code>template&lt;class _Tp, long unsigned int _Nm&gt;</code>, um tipo e um número. O segundo erro é consequência do primeiro.</p>
+<p><strong>Como consertar:</strong> <code>std::array&lt;int, 3&gt;</code>, ou deixe o compilador deduzir tudo: <code>std::array notas = {7, 9, 6};</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"the value of ‘n’ is not usable in a constant expression"</strong>
+<pre class="file" data-file="variavel.cpp">#include &lt;array&gt;
+
+int main() {
+    int n = 5;
+    std::array&lt;int, n&gt; notas{};
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra variavel.cpp -o variavel
+variavel.cpp: In function ‘int main()’:
+variavel.cpp:5:22: error: the value of ‘n’ is not usable in a constant expression
+    5 |     std::array&lt;int, n&gt; notas{};
+      |                      ^
+variavel.cpp:4:9: note: ‘int n’ is not const
+    4 |     int n = 5;
+      |         ^
+variavel.cpp:5:22: note: in template argument for type ‘long unsigned int’
+    5 |     std::array&lt;int, n&gt; notas{};
+      |                      ^
+variavel.cpp:5:24: warning: unused variable ‘notas’ [-Wunused-variable]
+    5 |     std::array&lt;int, n&gt; notas{};
+      |                        ^~~~~</pre>
+<p><strong>O que significa:</strong> "o valor de <code>n</code> não pode ser usado numa expressão constante"; a nota explica: "<code>int n</code> não é <code>const</code>". O tamanho de um <code>std::array</code> é decidido na compilação, e uma variável comum só tem valor durante a execução.</p>
+<p><strong>Como consertar:</strong> se o tamanho é fixo, <code>constexpr int n = 5;</code> (veja <a href="constantes.html">Constantes</a>). Se ele só é conhecido durante a execução (digitado pelo usuário), use <a href="vector.html">std::vector</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>"invalid array assignment" / comparação que dá <code>false</code> com valores iguais</strong>
+<p><strong>O que aconteceu:</strong> você usou <code>=</code> ou <code>==</code> com arrays <strong>estilo C</strong>, que não copiam nem comparam valores.</p>
+<p><strong>Como consertar:</strong> troque <code>int a[3]</code> por <code>std::array&lt;int, 3&gt; a</code>; o resto do código continua igual.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que faz</th></tr>
+<tr><td><code>std::array&lt;T, N&gt; a = {…};</code></td><td>Array de <code>N</code> elementos do tipo <code>T</code> (<code>#include &lt;array&gt;</code>).</td></tr>
+<tr><td><code>std::array&lt;T, N&gt; a{};</code></td><td>Todos os elementos zerados.</td></tr>
+<tr><td><code>std::array a = {1, 2, 3};</code></td><td><span class="versao">C++17</span> Tipo e tamanho deduzidos.</td></tr>
+<tr><td><code>a.size()</code></td><td>Quantidade de elementos.</td></tr>
+<tr><td><code>a[i]</code></td><td>Elemento <code>i</code>, sem garantia de conferência.</td></tr>
+<tr><td><code>a.at(i)</code></td><td>Elemento <code>i</code>, conferido: lança <code>std::out_of_range</code>.</td></tr>
+<tr><td><code>a.front()</code> / <code>a.back()</code></td><td>Primeiro / último elemento.</td></tr>
+<tr><td><code>a.fill(v)</code></td><td>Coloca <code>v</code> em todas as posições.</td></tr>
+<tr><td><code>b = a;</code></td><td>Copia todos os elementos (mesmo tipo e tamanho).</td></tr>
+<tr><td><code>a == b</code>, <code>a != b</code>, <code>a &lt; b</code></td><td>Compara elemento por elemento.</td></tr>
+</table>
+</div>
+<p>A lista completa de funções-membro dos containers está em <a href="ref-containers.html">Referência: Containers</a>.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Declare</h3>
+<p>Complete para criar um <code>std::array</code> de 7 <code>double</code> chamado <code>temperaturas</code>, todo zerado:</p>
+<div class="ex-code">std::array&lt;<input data-answer="double, 7|double,7" aria-label="tipo e tamanho" size="10">&gt; temperaturas{};</div>
+</div>
+
+<div class="exercise">
+<h3>2. O acesso conferido</h3>
+<p>Complete para ler o elemento da posição <code>i</code> de forma conferida:</p>
+<div class="ex-code">int x = notas.<input data-answer="at(i)" aria-label="acesso" size="6">;</div>
+</div>
+
+<div class="exercise">
+<h3>3. Zerar o placar</h3>
+<p>Complete para colocar <code>0</code> em todas as posições de <code>placar</code>:</p>
+<div class="ex-code">placar.<input data-answer="fill(0)" aria-label="chamada" size="8">;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. <code>std::array&lt;int, 3&gt; a = {1, 2, 3}; auto b = a; b[0] = 9;</code> Quanto vale <code>a[0]</code>?</p>
+<label><input type="radio" name="q4"> 9</label>
+<label><input type="radio" name="q4"> 1</label>
+<label><input type="radio" name="q4"> Não compila</label>
+<label><input type="radio" name="q4"> Comportamento indefinido</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. O que acontece com <code>notas.at(10)</code> num <code>std::array&lt;int, 5&gt;</code>, sem <code>try</code>/<code>catch</code>?</p>
+<label><input type="radio" name="q5"> Devolve 0.</label>
+<label><input type="radio" name="q5"> Erro de compilação.</label>
+<label><input type="radio" name="q5"> Lê a memória depois do array.</label>
+<label><input type="radio" name="q5"> Lança <code>std::out_of_range</code> e o programa é encerrado.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Com <code>int a[3] = {1, 2, 3}; int b[3] = {1, 2, 3};</code>, o que <code>a == b</code> compara?</p>
+<label><input type="radio" name="q6"> Os endereços dos arrays (por isso dá <code>false</code>), com um aviso de que isso é obsoleto.</label>
+<label><input type="radio" name="q6"> Os valores, elemento por elemento.</label>
+<label><input type="radio" name="q6"> Só o primeiro elemento.</label>
+<label><input type="radio" name="q6"> Os tamanhos.</label>
+</div>
+
+<h3>Missão final: o backup das notas</h3>
+<div class="trycpp" data-goal="out:Nota antiga: 9,out:Houve revisão de nota,src:=\s*notas\s*;">
+<p class="try-task"><strong>Missão:</strong> antes de revisar uma nota, a Ana guarda uma cópia. Crie <code>backup</code> como cópia de <code>notas</code> (com <code>=</code>), <strong>depois</strong> troque <code>notas[1]</code> para <code>10</code>. Por fim, mostre <code>Nota antiga: 9</code> (lida do backup) e, comparando os dois arrays com <code>==</code>, mostre <code>Houve revisão de nota</code> se forem diferentes (ou <code>Nada mudou</code> se forem iguais).</p>
+<pre class="script">#include &lt;array&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::array&lt;int, 5&gt; notas = {7, 9, 6, 8, 10};
+    // 1. crie o backup aqui
+
+    // 2. revise a nota da posição 1
+
+    // 3. mostre a nota antiga e compare
+
+}
+</pre>
+<pre class="solucao">#include &lt;array&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    std::array&lt;int, 5&gt; notas = {7, 9, 6, 8, 10};
+    std::array&lt;int, 5&gt; backup = notas;
+    notas[1] = 10;
+    std::cout &lt;&lt; "Nota antiga: " &lt;&lt; backup[1] &lt;&lt; '\n';
+    if (notas == backup) {
+        std::cout &lt;&lt; "Nada mudou\n";
+    } else {
+        std::cout &lt;&lt; "Houve revisão de nota\n";
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>std::array&lt;int, 5&gt;</code> é um array de tamanho fixo que sabe o próprio tamanho (<code>.size()</code>), sem custo extra.</li>
+  <li><code>[i]</code> não tem conferência garantida; <code>.at(i)</code> sempre confere e lança <code>std::out_of_range</code>.</li>
+  <li><code>.fill(v)</code> enche tudo; <code>.front()</code> e <code>.back()</code> dão as pontas.</li>
+  <li>Copia com <code>=</code> e compara com <code>==</code> elemento por elemento; o array estilo C dá <code>invalid array assignment</code> e compara endereços.</li>
+  <li>Em funções, o tamanho vai junto, porque faz parte do tipo.</li>
+  <li>O tamanho precisa ser constante. Se ele só é conhecido ao rodar, use <a href="vector.html">std::vector</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
