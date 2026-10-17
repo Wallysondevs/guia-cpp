@@ -1,0 +1,2465 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Projeto Agenda de Contatos — struct, vector, menu e arquivo passo a passo | Guia C++</title>
+<meta name="description" content="Projeto passo a passo: uma agenda de contatos em C++ com struct Contato, std::vector, um menu para adicionar, listar, buscar e remover, busca sem diferenciar maiúsculas e minúsculas e os contatos salvos num arquivo de texto com fstream, uma linha por contato separada por ponto e vírgula. Seis etapas com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>Projeto <span class="hl">Agenda de Contatos</span></h1>
+
+<p class="intro">A Ana quer guardar os contatos dos clientes da lojinha: nome, telefone e e-mail. Neste projeto você vai construir uma agenda de terminal com um menu para <strong>adicionar</strong>, <strong>listar</strong>, <strong>buscar</strong> e <strong>remover</strong> contatos, e que <strong>guarda tudo num arquivo</strong>: ao abrir o programa no dia seguinte, os contatos continuam lá. É o primeiro projeto do guia com dados que sobrevivem ao fim do programa.</p>
+
+<div class="note">
+<strong>Você vai praticar</strong>
+<ul>
+  <li>Criar um tipo próprio com <a href="structs.html">struct</a>.</li>
+  <li>Guardar vários contatos num <a href="vector.html">std::vector</a>: <code>push_back</code>, <code>size</code>, <code>erase</code>.</li>
+  <li>Montar um menu com <a href="while.html">while</a> e <a href="switch.html">switch</a>.</li>
+  <li>Ler linhas inteiras com <a href="getline.html">getline</a>, e o problema de misturá-lo com <code>cin &gt;&gt;</code>.</li>
+  <li>Comparar textos sem diferenciar maiúsculas e minúsculas (<a href="funcoes-string.html">funções de string</a>, <code>tolower</code>).</li>
+  <li>Gravar e ler um arquivo de texto com <a href="arquivos.html">fstream</a>.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>O que vamos construir</h2>
+<p>A agenda pronta, aberta pela segunda vez na máquina da Ana (os contatos vieram do arquivo gravado na primeira vez). Depois de "Opção:" e das outras perguntas está o que ela digitou:</p>
+
+<pre class="term" data-cwd="~/cpp/agenda">$ ./agenda
+=== Agenda da Ana ===
+Carregados 2 contatos de agenda.txt.
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 1
+Nome: Carla Dias
+Telefone: (31) 90000-0003
+E-mail: carla@exemplo.com
+Contato adicionado: Carla Dias
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 3
+Buscar por: LI
+2. Bruno Lima | (21) 90000-0002 | bruno@exemplo.com
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 0
+Agenda salva em agenda.txt (3 contatos).
+Até logo!
+$ cat agenda.txt
+Ana Souza;(11) 90000-0001;ana@exemplo.com
+Bruno Lima;(21) 90000-0002;bruno@exemplo.com
+Carla Dias;(31) 90000-0003;carla@exemplo.com</pre>
+
+<p>Os telefones e e-mails são de mentira (<code>exemplo.com</code> é um domínio reservado para exemplos). Seis etapas até lá:</p>
+
+<ol class="passo">
+  <li><a href="#etapa1">O contato e a lista</a> (<code>struct</code>, <code>vector</code>).</li>
+  <li><a href="#etapa2">O menu e o "adicionar"</a> (<code>while</code>, <code>switch</code>, <code>getline</code> e <code>std::ws</code>).</li>
+  <li><a href="#etapa3">Buscar sem diferenciar maiúsculas</a> (<code>tolower</code>, <code>contains</code>).</li>
+  <li><a href="#etapa4">Remover</a> (<code>erase</code> e validação do número).</li>
+  <li><a href="#etapa5">Salvar no arquivo</a> (<code>std::ofstream</code>).</li>
+  <li><a href="#etapa6">Carregar do arquivo</a> (<code>std::ifstream</code>, <code>istringstream</code>).</li>
+</ol>
+
+<h3>Antes de começar</h3>
+<p>Este projeto usa o Nível 1 inteiro e um pouco do Nível 2. Você precisa ter visto <a href="structs.html">Structs</a>, <a href="vector.html">std::vector</a>, <a href="funcoes.html">Funções</a>, <a href="passagem-referencia.html">Por Valor × Por Referência</a> e <a href="getline.html">getline</a>; a aula <a href="arquivos.html">Ler e Escrever Arquivos</a> ajuda nas etapas 5 e 6. Fazer antes a <a href="projeto-calculadora.html">Calculadora</a> também ajuda: a validação da entrada é parecida.</p>
+
+<pre class="term">$ mkdir -p cpp/agenda
+$ cd cpp/agenda</pre>
+
+<hr>
+
+<h2 id="etapa1">Etapa 1 · O contato e a lista</h2>
+<p>Um contato tem três informações: nome, telefone e e-mail. Poderíamos usar três variáveis soltas, mas com 50 contatos seriam 150 variáveis. Em vez disso, criamos um <strong>tipo novo</strong>, <code>Contato</code>, que junta as três (veja <a href="structs.html">Structs</a>). E para guardar vários contatos, um <code>std::vector&lt;Contato&gt;</code>: uma lista que cresce.</p>
+
+<pre class="file" data-file="agenda.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Contato {
+    std::string nome;
+    std::string telefone;
+    std::string email;
+};
+
+void mostrar(std::size_t numero, const Contato&amp; c) {
+    std::cout &lt;&lt; numero &lt;&lt; ". " &lt;&lt; c.nome &lt;&lt; " | " &lt;&lt; c.telefone &lt;&lt; " | " &lt;&lt; c.email &lt;&lt; '\n';
+}
+
+void listar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    if (agenda.empty()) {
+        std::cout &lt;&lt; "A agenda está vazia.\n";
+        return;
+    }
+    std::cout &lt;&lt; "--- Contatos (" &lt;&lt; agenda.size() &lt;&lt; ") ---\n";
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        mostrar(i + 1, agenda[i]);
+    }
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Agenda da Ana ===\n";
+    std::vector&lt;Contato&gt; agenda{
+        {"Ana Souza", "(11) 90000-0001", "ana@exemplo.com"},
+        {"Bruno Lima", "(21) 90000-0002", "bruno@exemplo.com"},
+    };
+    listar(agenda);
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>struct Contato { … };</dt><dd>Define o tipo <code>Contato</code>, com três campos <code>std::string</code>. Repare no <code>;</code> depois da chave: ele é obrigatório no fim de uma <code>struct</code>.</dd>
+  <dt>void mostrar(std::size_t numero, const Contato&amp; c)</dt><dd>Mostra <strong>um</strong> contato numa linha, com o número dele na frente. O contato é recebido por <code>const&amp;</code>: sem cópia, sem poder mudar (veja <a href="boas-praticas.html">Boas Práticas</a>). <code>std::size_t</code> é o tipo dos tamanhos e posições de um <code>vector</code> (um inteiro sem sinal).</dd>
+  <dt>c.nome</dt><dd>O ponto acessa um campo do contato: "o nome de <code>c</code>".</dd>
+  <dt>agenda.empty()</dt><dd><code>true</code> se a lista estiver vazia. Nesse caso, avisamos e saímos com <code>return;</code>.</dd>
+  <dt>for (std::size_t i = 0; i &lt; agenda.size(); ++i)</dt><dd>Percorre a lista pela <strong>posição</strong>. Aqui o <a href="for.html">for com índice</a> é melhor que o range-for, porque precisamos do número de cada contato. O <code>i</code> é <code>std::size_t</code>, do mesmo tipo de <code>size()</code>: assim não há o aviso de "sinais diferentes".</dd>
+  <dt>mostrar(i + 1, agenda[i])</dt><dd>As posições do <code>vector</code> começam em 0, mas pessoas contam a partir de 1. Por isso mostramos <code>i + 1</code>.</dd>
+  <dt>std::vector&lt;Contato&gt; agenda{ {…}, {…}, };</dt><dd>Cria a lista já com dois contatos. Cada <code>{"Ana Souza", "(11) 90000-0001", "ana@exemplo.com"}</code> preenche os campos na ordem em que foram declarados na <code>struct</code>.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/agenda">$ g++ -std=c++23 -Wall -Wextra agenda.cpp -o agenda
+$ ./agenda
+=== Agenda da Ana ===
+--- Contatos (2) ---
+1. Ana Souza | (11) 90000-0001 | ana@exemplo.com
+2. Bruno Lima | (21) 90000-0002 | bruno@exemplo.com</pre>
+
+<div class="trycpp" data-goal="out:--- Contatos (3) ---,out:3. Carla Dias | (31) 90000-0003 | carla@exemplo.com">
+<p class="try-task"><strong>Missão (etapa 1):</strong> acrescente um terceiro contato à lista inicial: <code>Carla Dias</code>, telefone <code>(31) 90000-0003</code>, e-mail <code>carla@exemplo.com</code>. A listagem deve mostrar <code>--- Contatos (3) ---</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Contato {
+    std::string nome;
+    std::string telefone;
+    std::string email;
+};
+
+void mostrar(std::size_t numero, const Contato&amp; c) {
+    std::cout &lt;&lt; numero &lt;&lt; ". " &lt;&lt; c.nome &lt;&lt; " | " &lt;&lt; c.telefone &lt;&lt; " | " &lt;&lt; c.email &lt;&lt; '\n';
+}
+
+void listar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    if (agenda.empty()) {
+        std::cout &lt;&lt; "A agenda está vazia.\n";
+        return;
+    }
+    std::cout &lt;&lt; "--- Contatos (" &lt;&lt; agenda.size() &lt;&lt; ") ---\n";
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        mostrar(i + 1, agenda[i]);
+    }
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Agenda da Ana ===\n";
+    std::vector&lt;Contato&gt; agenda{
+        {"Ana Souza", "(11) 90000-0001", "ana@exemplo.com"},
+        {"Bruno Lima", "(21) 90000-0002", "bruno@exemplo.com"},
+    };
+    listar(agenda);
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Contato {
+    std::string nome;
+    std::string telefone;
+    std::string email;
+};
+
+void mostrar(std::size_t numero, const Contato&amp; c) {
+    std::cout &lt;&lt; numero &lt;&lt; ". " &lt;&lt; c.nome &lt;&lt; " | " &lt;&lt; c.telefone &lt;&lt; " | " &lt;&lt; c.email &lt;&lt; '\n';
+}
+
+void listar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    if (agenda.empty()) {
+        std::cout &lt;&lt; "A agenda está vazia.\n";
+        return;
+    }
+    std::cout &lt;&lt; "--- Contatos (" &lt;&lt; agenda.size() &lt;&lt; ") ---\n";
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        mostrar(i + 1, agenda[i]);
+    }
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Agenda da Ana ===\n";
+    std::vector&lt;Contato&gt; agenda{
+        {"Ana Souza", "(11) 90000-0001", "ana@exemplo.com"},
+        {"Bruno Lima", "(21) 90000-0002", "bruno@exemplo.com"},
+        {"Carla Dias", "(31) 90000-0003", "carla@exemplo.com"},
+    };
+    listar(agenda);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa2">Etapa 2 · O menu e o "adicionar"</h2>
+<p>Agora a agenda vira um programa interativo: um menu que se repete até a pessoa escolher <code>0</code>. Cada opção chama uma função. Nesta etapa, o menu tem "Adicionar", "Listar" e "Sair". Estas são as partes novas (as funções <code>mostrar</code> e <code>listar</code> e a <code>struct</code> não mudam):</p>
+
+<pre class="file" data-file="agenda.cpp">int ler_opcao() {
+    int opcao = -1;
+    std::cout &lt;&lt; "Opção: ";
+    if (!(std::cin &gt;&gt; opcao)) {
+        if (std::cin.eof()) {
+            return 0;  // a entrada acabou: sai (e salva)
+        }
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        return -1;  // não era número: opção inválida
+    }
+    return opcao;
+}
+
+void adicionar(std::vector&lt;Contato&gt;&amp; agenda) {
+    Contato novo;
+    std::cout &lt;&lt; "Nome: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.nome);
+    std::cout &lt;&lt; "Telefone: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.telefone);
+    std::cout &lt;&lt; "E-mail: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.email);
+    agenda.push_back(novo);
+    std::cout &lt;&lt; "Contato adicionado: " &lt;&lt; novo.nome &lt;&lt; '\n';
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Agenda da Ana ===\n";
+    std::vector&lt;Contato&gt; agenda{
+        {"Ana Souza", "(11) 90000-0001", "ana@exemplo.com"},
+        {"Bruno Lima", "(21) 90000-0002", "bruno@exemplo.com"},
+    };
+
+    int opcao = -1;
+    while (opcao != 0) {
+        std::cout &lt;&lt; "\n1. Adicionar  2. Listar  0. Sair\n";
+        opcao = ler_opcao();
+        switch (opcao) {
+            case 1: adicionar(agenda); break;
+            case 2: listar(agenda); break;
+            case 0: break;
+            default: std::cout &lt;&lt; "Opção inválida.\n";
+        }
+    }
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parte</th><th>O que faz</th></tr>
+<tr><td><code>ler_opcao()</code></td><td>Lê o número da opção. Se a pessoa digitar texto, limpa o erro do <code>cin</code> e devolve <code>-1</code> ("opção inválida"). Se a entrada acabar (<kbd>Ctrl</kbd>+<kbd>D</kbd>), devolve <code>0</code>, como se ela tivesse escolhido sair. É a mesma técnica da <a href="projeto-calculadora.html#etapa5">etapa 5 da Calculadora</a>.</td></tr>
+<tr><td><code>void adicionar(std::vector&lt;Contato&gt;&amp; agenda)</code></td><td>Recebe a agenda por <strong>referência</strong> (<code>&amp;</code>, sem <code>const</code>): a função precisa <strong>mudar</strong> a lista original, acrescentando um contato. Sem o <code>&amp;</code>, ela acrescentaria numa cópia, que sumiria no fim da função.</td></tr>
+<tr><td><code>Contato novo;</code></td><td>Um contato vazio, preenchido campo por campo.</td></tr>
+<tr><td><code>std::getline(std::cin &gt;&gt; std::ws, novo.nome);</code></td><td>Lê a <strong>linha inteira</strong>, com espaços. O <code>&gt;&gt;</code> sozinho pararia no primeiro espaço e leria só "Carla". O <code>std::ws</code> é explicado logo abaixo.</td></tr>
+<tr><td><code>agenda.push_back(novo);</code></td><td>Acrescenta o contato no fim da lista.</td></tr>
+<tr><td><code>int opcao = -1; while (opcao != 0)</code></td><td>O laço do menu: repete até a opção ser 0. Começa com -1 para entrar no laço na primeira vez.</td></tr>
+<tr><td><code>case 0: break;</code></td><td>Nada a fazer: o <code>while</code> vê o 0 e termina. Sem esse <code>case</code>, o 0 cairia no <code>default</code> e mostraria "Opção inválida".</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/cpp/agenda">$ g++ -std=c++23 -Wall -Wextra agenda.cpp -o agenda
+$ ./agenda
+=== Agenda da Ana ===
+
+1. Adicionar  2. Listar  0. Sair
+Opção: 2
+--- Contatos (2) ---
+1. Ana Souza | (11) 90000-0001 | ana@exemplo.com
+2. Bruno Lima | (21) 90000-0002 | bruno@exemplo.com
+
+1. Adicionar  2. Listar  0. Sair
+Opção: 1
+Nome: Carla Dias
+Telefone: (31) 90000-0003
+E-mail: carla@exemplo.com
+Contato adicionado: Carla Dias
+
+1. Adicionar  2. Listar  0. Sair
+Opção: 2
+--- Contatos (3) ---
+1. Ana Souza | (11) 90000-0001 | ana@exemplo.com
+2. Bruno Lima | (21) 90000-0002 | bruno@exemplo.com
+3. Carla Dias | (31) 90000-0003 | carla@exemplo.com
+
+1. Adicionar  2. Listar  0. Sair
+Opção: 7
+Opção inválida.
+
+1. Adicionar  2. Listar  0. Sair
+Opção: 0
+Até logo!</pre>
+
+<h3>Por que o <code>std::ws</code>: o <code>getline</code> que "pula" a pergunta</h3>
+<p>Na primeira versão, a Ana escreveu só <code>std::getline(std::cin, novo.nome);</code>. Veja o que aconteceu:</p>
+
+<pre class="term" data-cwd="~/cpp/agenda">$ ./agenda
+=== Agenda da Ana ===
+
+1. Adicionar  2. Listar  0. Sair
+Opção: 1
+Nome: Telefone: Carla Dias           « o "Nome:" não esperou!
+E-mail: (31) 90000-0003
+Contato adicionado:
+
+1. Adicionar  2. Listar  0. Sair
+Opção: 2
+--- Contatos (3) ---
+1. Ana Souza | (11) 90000-0001 | ana@exemplo.com
+2. Bruno Lima | (21) 90000-0002 | bruno@exemplo.com
+3.  | Carla Dias | (31) 90000-0003  « nome vazio, e tudo deslocado uma casa</pre>
+
+<p>Quando a Ana digitou <code>1</code> e apertou <kbd>Enter</kbd>, a entrada recebeu dois caracteres: o <code>1</code> e uma <strong>quebra de linha</strong> (<code>\n</code>). O <code>std::cin &gt;&gt; opcao</code> leu o <code>1</code> e deixou o <code>\n</code> lá. Aí o <code>getline</code> do nome, que lê "até o fim da linha", encontrou o <code>\n</code> imediatamente e leu uma linha <strong>vazia</strong>, sem esperar. O nome digitado foi parar no telefone, o telefone no e-mail.</p>
+
+<p>O <code>std::ws</code> (de <em>whitespace</em>, "espaço em branco") resolve: <code>std::cin &gt;&gt; std::ws</code> descarta espaços e quebras de linha que estejam esperando, e só então o <code>getline</code> lê. Esse problema de misturar <code>&gt;&gt;</code> e <code>getline</code> é tão comum que tem uma seção só para ele na aula <a href="getline.html">getline</a>.</p>
+
+<div class="trycpp" data-stdin="1\nCarla Dias\n(31) 90000-0003\ncarla@exemplo.com\n2\n0\n" data-goal="out:3. Carla Dias | (31) 90000-0003 | carla@exemplo.com,src:ws">
+<p class="try-task"><strong>Missão (etapa 2):</strong> este código tem o problema do <code>getline</code> que "pula" a pergunta. Rode e veja o contato sair torto na listagem. Depois conserte as três leituras do <code>adicionar</code> com <code>std::cin &gt;&gt; std::ws</code>. A entrada adiciona a Carla Dias e lista.</p>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Contato {
+    std::string nome;
+    std::string telefone;
+    std::string email;
+};
+
+void mostrar(std::size_t numero, const Contato&amp; c) {
+    std::cout &lt;&lt; numero &lt;&lt; ". " &lt;&lt; c.nome &lt;&lt; " | " &lt;&lt; c.telefone &lt;&lt; " | " &lt;&lt; c.email &lt;&lt; '\n';
+}
+
+void listar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    if (agenda.empty()) {
+        std::cout &lt;&lt; "A agenda está vazia.\n";
+        return;
+    }
+    std::cout &lt;&lt; "--- Contatos (" &lt;&lt; agenda.size() &lt;&lt; ") ---\n";
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        mostrar(i + 1, agenda[i]);
+    }
+}
+
+int ler_opcao() {
+    int opcao = -1;
+    std::cout &lt;&lt; "Opção: ";
+    if (!(std::cin &gt;&gt; opcao)) {
+        if (std::cin.eof()) {
+            return 0;  // a entrada acabou: sai (e salva)
+        }
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        return -1;  // não era número: opção inválida
+    }
+    return opcao;
+}
+
+void adicionar(std::vector&lt;Contato&gt;&amp; agenda) {
+    Contato novo;
+    std::cout &lt;&lt; "Nome: ";
+    std::getline(std::cin, novo.nome);
+    std::cout &lt;&lt; "Telefone: ";
+    std::getline(std::cin, novo.telefone);
+    std::cout &lt;&lt; "E-mail: ";
+    std::getline(std::cin, novo.email);
+    agenda.push_back(novo);
+    std::cout &lt;&lt; "Contato adicionado: " &lt;&lt; novo.nome &lt;&lt; '\n';
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Agenda da Ana ===\n";
+    std::vector&lt;Contato&gt; agenda{
+        {"Ana Souza", "(11) 90000-0001", "ana@exemplo.com"},
+        {"Bruno Lima", "(21) 90000-0002", "bruno@exemplo.com"},
+    };
+
+    int opcao = -1;
+    while (opcao != 0) {
+        std::cout &lt;&lt; "\n1. Adicionar  2. Listar  0. Sair\n";
+        opcao = ler_opcao();
+        switch (opcao) {
+            case 1: adicionar(agenda); break;
+            case 2: listar(agenda); break;
+            case 0: break;
+            default: std::cout &lt;&lt; "Opção inválida.\n";
+        }
+    }
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Contato {
+    std::string nome;
+    std::string telefone;
+    std::string email;
+};
+
+void mostrar(std::size_t numero, const Contato&amp; c) {
+    std::cout &lt;&lt; numero &lt;&lt; ". " &lt;&lt; c.nome &lt;&lt; " | " &lt;&lt; c.telefone &lt;&lt; " | " &lt;&lt; c.email &lt;&lt; '\n';
+}
+
+void listar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    if (agenda.empty()) {
+        std::cout &lt;&lt; "A agenda está vazia.\n";
+        return;
+    }
+    std::cout &lt;&lt; "--- Contatos (" &lt;&lt; agenda.size() &lt;&lt; ") ---\n";
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        mostrar(i + 1, agenda[i]);
+    }
+}
+
+int ler_opcao() {
+    int opcao = -1;
+    std::cout &lt;&lt; "Opção: ";
+    if (!(std::cin &gt;&gt; opcao)) {
+        if (std::cin.eof()) {
+            return 0;  // a entrada acabou: sai (e salva)
+        }
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        return -1;  // não era número: opção inválida
+    }
+    return opcao;
+}
+
+void adicionar(std::vector&lt;Contato&gt;&amp; agenda) {
+    Contato novo;
+    std::cout &lt;&lt; "Nome: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.nome);
+    std::cout &lt;&lt; "Telefone: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.telefone);
+    std::cout &lt;&lt; "E-mail: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.email);
+    agenda.push_back(novo);
+    std::cout &lt;&lt; "Contato adicionado: " &lt;&lt; novo.nome &lt;&lt; '\n';
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Agenda da Ana ===\n";
+    std::vector&lt;Contato&gt; agenda{
+        {"Ana Souza", "(11) 90000-0001", "ana@exemplo.com"},
+        {"Bruno Lima", "(21) 90000-0002", "bruno@exemplo.com"},
+    };
+
+    int opcao = -1;
+    while (opcao != 0) {
+        std::cout &lt;&lt; "\n1. Adicionar  2. Listar  0. Sair\n";
+        opcao = ler_opcao();
+        switch (opcao) {
+            case 1: adicionar(agenda); break;
+            case 2: listar(agenda); break;
+            case 0: break;
+            default: std::cout &lt;&lt; "Opção inválida.\n";
+        }
+    }
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa3">Etapa 3 · Buscar sem diferenciar maiúsculas</h2>
+<p>Com muitos contatos, a Ana quer digitar um pedaço do nome e ver só quem combina. A primeira ideia: percorrer a lista e perguntar se o nome <strong>contém</strong> o texto buscado. O C++23 tem um método para isso, <code>contains</code> (veja <a href="funcoes-string.html">Funções de String</a>; em versões antigas, usa-se <code>nome.find(busca) != std::string::npos</code>):</p>
+
+<pre class="file" data-file="agenda.cpp">        if (agenda[i].nome.contains(busca)) {</pre>
+
+<pre class="term" data-cwd="~/cpp/agenda">$ ./agenda
+=== Agenda da Ana ===
+
+1. Adicionar  2. Listar  3. Buscar  0. Sair
+Opção: 3
+Buscar por: ana
+Nenhum contato encontrado com "ana".
+
+1. Adicionar  2. Listar  3. Buscar  0. Sair
+Opção: 3
+Buscar por: Ana
+1. Ana Souza | (11) 90000-0001 | ana@exemplo.com
+
+1. Adicionar  2. Listar  3. Buscar  0. Sair
+Opção: 0
+Até logo!</pre>
+
+<p>Funciona, mas só com a letra maiúscula certa: para o computador, <code>a</code> e <code>A</code> são caracteres diferentes. A solução é comparar as duas coisas em <strong>minúsculas</strong>: o nome e o texto buscado. Para isso, uma função que troca cada letra pela minúscula:</p>
+
+<pre class="file" data-file="agenda.cpp">// Devolve uma cópia do texto com as letras A-Z trocadas por a-z.
+std::string minusculas(std::string texto) {
+    for (char&amp; letra : texto) {
+        letra = static_cast&lt;char&gt;(std::tolower(static_cast&lt;unsigned char&gt;(letra)));
+    }
+    return texto;
+}
+
+void buscar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    std::string busca;
+    std::cout &lt;&lt; "Buscar por: ";
+    std::getline(std::cin &gt;&gt; std::ws, busca);
+    const std::string procurado = minusculas(busca);
+
+    int encontrados = 0;
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        if (minusculas(agenda[i].nome).contains(procurado)) {
+            mostrar(i + 1, agenda[i]);
+            ++encontrados;
+        }
+    }
+    if (encontrados == 0) {
+        std::cout &lt;&lt; "Nenhum contato encontrado com \"" &lt;&lt; busca &lt;&lt; "\".\n";
+    }
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>std::string minusculas(std::string texto)</dt><dd>Aqui o parâmetro é <strong>por valor</strong>, de propósito: a função recebe uma cópia, muda a cópia e a devolve. O nome original do contato fica intacto.</dd>
+  <dt>for (char&amp; letra : texto)</dt><dd>Percorre cada caractere <strong>por referência</strong> (<code>&amp;</code>), para poder trocá-lo dentro do texto.</dd>
+  <dt>std::tolower(…)</dt><dd>De <em>to lower</em>, "para minúscula": devolve a minúscula de uma letra (<code>'A'</code> → <code>'a'</code>) e devolve qualquer outro caractere sem mudar. Vem do <code>&lt;cctype&gt;</code>.</dd>
+  <dt>static_cast&lt;unsigned char&gt;(letra)</dt><dd>Um detalhe chato, mas importante: o <code>tolower</code> só aceita valores de 0 a 255, e um <code>char</code> com acento pode ser negativo. Converter para <code>unsigned char</code> antes evita <a href="comportamento-indefinido.html">comportamento indefinido</a> (veja <a href="conversao-tipos.html">Conversão de Tipos</a>). O <code>static_cast&lt;char&gt;</code> de fora converte o resultado de volta para <code>char</code>.</dd>
+  <dt>const std::string procurado = minusculas(busca);</dt><dd>Converte o texto buscado uma vez só, antes do laço.</dd>
+  <dt>minusculas(agenda[i].nome).contains(procurado)</dt><dd>"O nome, em minúsculas, contém o texto procurado, em minúsculas?"</dd>
+  <dt>int encontrados</dt><dd>Conta quantos combinaram, para avisar quando não houver nenhum.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/agenda">$ g++ -std=c++23 -Wall -Wextra agenda.cpp -o agenda
+$ ./agenda
+=== Agenda da Ana ===
+
+1. Adicionar  2. Listar  3. Buscar  0. Sair
+Opção: 3
+Buscar por: ana
+1. Ana Souza | (11) 90000-0001 | ana@exemplo.com
+
+1. Adicionar  2. Listar  3. Buscar  0. Sair
+Opção: 3
+Buscar por: LI
+2. Bruno Lima | (21) 90000-0002 | bruno@exemplo.com
+
+1. Adicionar  2. Listar  3. Buscar  0. Sair
+Opção: 3
+Buscar por: zé
+Nenhum contato encontrado com "zé".
+
+1. Adicionar  2. Listar  3. Buscar  0. Sair
+Opção: 1
+Nome: Érica Melo
+Telefone: (41) 90000-0004
+E-mail: erica@exemplo.com
+Contato adicionado: Érica Melo
+
+1. Adicionar  2. Listar  3. Buscar  0. Sair
+Opção: 3
+Buscar por: érica
+Nenhum contato encontrado com "érica".      « o acento atrapalhou
+
+1. Adicionar  2. Listar  3. Buscar  0. Sair
+Opção: 3
+Buscar por: rica
+3. Érica Melo | (41) 90000-0004 | erica@exemplo.com
+
+1. Adicionar  2. Listar  3. Buscar  0. Sair
+Opção: 0
+Até logo!</pre>
+
+<div class="warning">
+<strong>Só as letras sem acento (ASCII)</strong>
+<p>A busca encontrou "Ana" com <code>ana</code> e "Lima" com <code>LI</code>, mas não encontrou "Érica" com <code>érica</code>. O motivo: no UTF-8, que é como o Linux guarda o texto, uma letra acentuada como <code>É</code> ocupa <strong>dois</strong> <code>char</code>, e o <code>tolower</code> olha um <code>char</code> de cada vez. Ele só sabe converter as 26 letras sem acento (a tabela ASCII). Resolver isso direito exige uma biblioteca especializada; a aula <a href="acentos-utf8.html">Acentos e UTF-8</a> explica o porquê. Para a agenda da Ana, buscar pela parte sem acento (<code>rica</code>) é suficiente.</p>
+</div>
+
+<div class="trycpp" data-stdin="3\nana\n0\n" data-goal="out:1. Ana Souza,src:minusculas\s*\(\s*agenda">
+<p class="try-task"><strong>Missão (etapa 3):</strong> a função <code>minusculas</code> já existe, mas a busca ainda compara o texto exato. Mude a condição do <code>if</code> no <code>buscar</code> para comparar <code>minusculas(agenda[i].nome)</code> com <code>procurado</code>. A entrada busca <code>ana</code>, em minúsculas.</p>
+<pre class="script">#include &lt;cctype&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Contato {
+    std::string nome;
+    std::string telefone;
+    std::string email;
+};
+
+void mostrar(std::size_t numero, const Contato&amp; c) {
+    std::cout &lt;&lt; numero &lt;&lt; ". " &lt;&lt; c.nome &lt;&lt; " | " &lt;&lt; c.telefone &lt;&lt; " | " &lt;&lt; c.email &lt;&lt; '\n';
+}
+
+void listar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    if (agenda.empty()) {
+        std::cout &lt;&lt; "A agenda está vazia.\n";
+        return;
+    }
+    std::cout &lt;&lt; "--- Contatos (" &lt;&lt; agenda.size() &lt;&lt; ") ---\n";
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        mostrar(i + 1, agenda[i]);
+    }
+}
+
+int ler_opcao() {
+    int opcao = -1;
+    std::cout &lt;&lt; "Opção: ";
+    if (!(std::cin &gt;&gt; opcao)) {
+        if (std::cin.eof()) {
+            return 0;  // a entrada acabou: sai (e salva)
+        }
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        return -1;  // não era número: opção inválida
+    }
+    return opcao;
+}
+
+void adicionar(std::vector&lt;Contato&gt;&amp; agenda) {
+    Contato novo;
+    std::cout &lt;&lt; "Nome: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.nome);
+    std::cout &lt;&lt; "Telefone: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.telefone);
+    std::cout &lt;&lt; "E-mail: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.email);
+    agenda.push_back(novo);
+    std::cout &lt;&lt; "Contato adicionado: " &lt;&lt; novo.nome &lt;&lt; '\n';
+}
+
+// Devolve uma cópia do texto com as letras A-Z trocadas por a-z.
+std::string minusculas(std::string texto) {
+    for (char&amp; letra : texto) {
+        letra = static_cast&lt;char&gt;(std::tolower(static_cast&lt;unsigned char&gt;(letra)));
+    }
+    return texto;
+}
+
+void buscar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    std::string busca;
+    std::cout &lt;&lt; "Buscar por: ";
+    std::getline(std::cin &gt;&gt; std::ws, busca);
+    const std::string procurado = minusculas(busca);
+
+    int encontrados = 0;
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        if (agenda[i].nome.contains(busca)) {
+            mostrar(i + 1, agenda[i]);
+            ++encontrados;
+        }
+    }
+    if (encontrados == 0) {
+        std::cout &lt;&lt; "Nenhum contato encontrado com \"" &lt;&lt; busca &lt;&lt; "\".\n";
+    }
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Agenda da Ana ===\n";
+    std::vector&lt;Contato&gt; agenda{
+        {"Ana Souza", "(11) 90000-0001", "ana@exemplo.com"},
+        {"Bruno Lima", "(21) 90000-0002", "bruno@exemplo.com"},
+    };
+
+    int opcao = -1;
+    while (opcao != 0) {
+        std::cout &lt;&lt; "\n1. Adicionar  2. Listar  3. Buscar  0. Sair\n";
+        opcao = ler_opcao();
+        switch (opcao) {
+            case 1: adicionar(agenda); break;
+            case 2: listar(agenda); break;
+            case 3: buscar(agenda); break;
+            case 0: break;
+            default: std::cout &lt;&lt; "Opção inválida.\n";
+        }
+    }
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;cctype&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Contato {
+    std::string nome;
+    std::string telefone;
+    std::string email;
+};
+
+void mostrar(std::size_t numero, const Contato&amp; c) {
+    std::cout &lt;&lt; numero &lt;&lt; ". " &lt;&lt; c.nome &lt;&lt; " | " &lt;&lt; c.telefone &lt;&lt; " | " &lt;&lt; c.email &lt;&lt; '\n';
+}
+
+void listar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    if (agenda.empty()) {
+        std::cout &lt;&lt; "A agenda está vazia.\n";
+        return;
+    }
+    std::cout &lt;&lt; "--- Contatos (" &lt;&lt; agenda.size() &lt;&lt; ") ---\n";
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        mostrar(i + 1, agenda[i]);
+    }
+}
+
+int ler_opcao() {
+    int opcao = -1;
+    std::cout &lt;&lt; "Opção: ";
+    if (!(std::cin &gt;&gt; opcao)) {
+        if (std::cin.eof()) {
+            return 0;  // a entrada acabou: sai (e salva)
+        }
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        return -1;  // não era número: opção inválida
+    }
+    return opcao;
+}
+
+void adicionar(std::vector&lt;Contato&gt;&amp; agenda) {
+    Contato novo;
+    std::cout &lt;&lt; "Nome: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.nome);
+    std::cout &lt;&lt; "Telefone: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.telefone);
+    std::cout &lt;&lt; "E-mail: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.email);
+    agenda.push_back(novo);
+    std::cout &lt;&lt; "Contato adicionado: " &lt;&lt; novo.nome &lt;&lt; '\n';
+}
+
+// Devolve uma cópia do texto com as letras A-Z trocadas por a-z.
+std::string minusculas(std::string texto) {
+    for (char&amp; letra : texto) {
+        letra = static_cast&lt;char&gt;(std::tolower(static_cast&lt;unsigned char&gt;(letra)));
+    }
+    return texto;
+}
+
+void buscar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    std::string busca;
+    std::cout &lt;&lt; "Buscar por: ";
+    std::getline(std::cin &gt;&gt; std::ws, busca);
+    const std::string procurado = minusculas(busca);
+
+    int encontrados = 0;
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        if (minusculas(agenda[i].nome).contains(procurado)) {
+            mostrar(i + 1, agenda[i]);
+            ++encontrados;
+        }
+    }
+    if (encontrados == 0) {
+        std::cout &lt;&lt; "Nenhum contato encontrado com \"" &lt;&lt; busca &lt;&lt; "\".\n";
+    }
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Agenda da Ana ===\n";
+    std::vector&lt;Contato&gt; agenda{
+        {"Ana Souza", "(11) 90000-0001", "ana@exemplo.com"},
+        {"Bruno Lima", "(21) 90000-0002", "bruno@exemplo.com"},
+    };
+
+    int opcao = -1;
+    while (opcao != 0) {
+        std::cout &lt;&lt; "\n1. Adicionar  2. Listar  3. Buscar  0. Sair\n";
+        opcao = ler_opcao();
+        switch (opcao) {
+            case 1: adicionar(agenda); break;
+            case 2: listar(agenda); break;
+            case 3: buscar(agenda); break;
+            case 0: break;
+            default: std::cout &lt;&lt; "Opção inválida.\n";
+        }
+    }
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa4">Etapa 4 · Remover</h2>
+<p>Para remover, a agenda mostra a lista numerada, pergunta o número e apaga aquele contato. O cuidado principal é com o número: ele precisa existir na lista.</p>
+
+<pre class="file" data-file="agenda.cpp">void remover(std::vector&lt;Contato&gt;&amp; agenda) {
+    listar(agenda);
+    if (agenda.empty()) {
+        return;
+    }
+    std::cout &lt;&lt; "Número do contato a remover: ";
+    std::size_t numero = 0;
+    if (!(std::cin &gt;&gt; numero) || numero &lt; 1 || numero &gt; agenda.size()) {
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        std::cout &lt;&lt; "Número inválido.\n";
+        return;
+    }
+    std::cout &lt;&lt; "Removido: " &lt;&lt; agenda[numero - 1].nome &lt;&lt; '\n';
+    agenda.erase(agenda.begin() + (numero - 1));
+}
+</pre>
+
+<p>E no <code>switch</code> do <code>main</code>, uma linha nova: <code>case 4: remover(agenda); break;</code>.</p>
+
+<dl class="anatomy">
+  <dt>if (!(std::cin &gt;&gt; numero) || numero &lt; 1 || numero &gt; agenda.size())</dt><dd>Três motivos para recusar: a leitura falhou (texto), o número é menor que 1, ou é maior que a quantidade de contatos. O <code>||</code> para no primeiro que for verdadeiro.</dd>
+  <dt>agenda[numero - 1].nome</dt><dd>O contato número 1 está na posição 0. Pegamos o nome <strong>antes</strong> de apagar, para mostrar a mensagem.</dd>
+  <dt>agenda.erase(agenda.begin() + (numero - 1));</dt><dd><code>erase</code> ("apagar") remove um elemento do <code>vector</code>, e os seguintes andam uma posição para trás. Ele não recebe uma posição, e sim um <a href="iteradores.html">iterador</a>: <code>agenda.begin()</code> aponta para o primeiro elemento, e <code>+ (numero - 1)</code> anda até o escolhido.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/agenda">$ g++ -std=c++23 -Wall -Wextra agenda.cpp -o agenda
+$ ./agenda
+=== Agenda da Ana ===
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 4
+--- Contatos (2) ---
+1. Ana Souza | (11) 90000-0001 | ana@exemplo.com
+2. Bruno Lima | (21) 90000-0002 | bruno@exemplo.com
+Número do contato a remover: 2
+Removido: Bruno Lima
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 2
+--- Contatos (1) ---
+1. Ana Souza | (11) 90000-0001 | ana@exemplo.com
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 4
+--- Contatos (1) ---
+1. Ana Souza | (11) 90000-0001 | ana@exemplo.com
+Número do contato a remover: 9
+Número inválido.
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 4
+--- Contatos (1) ---
+1. Ana Souza | (11) 90000-0001 | ana@exemplo.com
+Número do contato a remover: abc
+Número inválido.
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 0
+Até logo!</pre>
+
+<div class="cenario">
+<strong>Sem validar o número: o programa aborta</strong>
+<p>Numa versão sem o <code>if</code> de validação (só <code>std::cin &gt;&gt; numero;</code>), a Ana digitou 9 numa agenda com 2 contatos:</p>
+<pre class="term" data-cwd="~/cpp/agenda">$ ./agenda
+=== Agenda da Ana ===
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 4
+--- Contatos (2) ---
+1. Ana Souza | (11) 90000-0001 | ana@exemplo.com
+2. Bruno Lima | (21) 90000-0002 | bruno@exemplo.com
+Número do contato a remover: 9
+/usr/include/c++/15/bits/stl_vector.h:1263: constexpr std::vector&lt; &lt;template-parameter-1-1&gt;, &lt;template-parameter-1-2&gt; &gt;::reference std::vector&lt; &lt;template-parameter-1-1&gt;, &lt;template-parameter-1-2&gt; &gt;::operator[](size_type) [with _Tp = Contato; _Alloc = std::allocator&lt;Contato&gt;; reference = Contato&amp;; size_type = long unsigned int]: Assertion '__n &lt; this-&gt;size()' failed.
+Abortado                   (imagem do núcleo gravada) ./agenda
+$ echo $?
+134</pre>
+<p><strong>O que significa:</strong> o <code>agenda[numero - 1]</code> tentou ler a posição 8 de uma lista com 2 elementos. A mensagem enorme vem de dentro do <code>vector</code> (<code>stl_vector.h</code>), e o que importa está no fim: <em>Assertion '__n &lt; this-&gt;size()' failed</em>, "a verificação 'posição menor que o tamanho' falhou". O g++ do Ubuntu liga essa verificação por padrão, e o programa é <strong>abortado</strong> na hora (código de saída 134). Em outros compiladores ou configurações, a verificação pode não existir: aí é <a href="comportamento-indefinido.html">comportamento indefinido</a>, e o programa pode mostrar lixo ou apagar o contato errado.</p>
+<p><strong>Como consertar:</strong> confira o número antes de usá-lo, como no código da etapa. Os contatos que a Ana tinha digitado nessa sessão foram perdidos: mais um motivo para a etapa 5.</p>
+</div>
+
+<div class="trycpp" data-stdin="4\n2\n2\n0\n" data-goal="out:Removido: Bruno Lima,out:--- Contatos (1) ---,src:erase">
+<p class="try-task"><strong>Missão (etapa 4):</strong> a função <code>remover</code> já mostra a lista, lê e valida o número. Complete o final: mostre <code>Removido: </code> com o nome do contato e apague-o com <code>agenda.erase(agenda.begin() + (numero - 1));</code>. A entrada remove o contato 2 e lista.</p>
+<pre class="script">#include &lt;cctype&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Contato {
+    std::string nome;
+    std::string telefone;
+    std::string email;
+};
+
+void mostrar(std::size_t numero, const Contato&amp; c) {
+    std::cout &lt;&lt; numero &lt;&lt; ". " &lt;&lt; c.nome &lt;&lt; " | " &lt;&lt; c.telefone &lt;&lt; " | " &lt;&lt; c.email &lt;&lt; '\n';
+}
+
+void listar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    if (agenda.empty()) {
+        std::cout &lt;&lt; "A agenda está vazia.\n";
+        return;
+    }
+    std::cout &lt;&lt; "--- Contatos (" &lt;&lt; agenda.size() &lt;&lt; ") ---\n";
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        mostrar(i + 1, agenda[i]);
+    }
+}
+
+int ler_opcao() {
+    int opcao = -1;
+    std::cout &lt;&lt; "Opção: ";
+    if (!(std::cin &gt;&gt; opcao)) {
+        if (std::cin.eof()) {
+            return 0;  // a entrada acabou: sai (e salva)
+        }
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        return -1;  // não era número: opção inválida
+    }
+    return opcao;
+}
+
+void adicionar(std::vector&lt;Contato&gt;&amp; agenda) {
+    Contato novo;
+    std::cout &lt;&lt; "Nome: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.nome);
+    std::cout &lt;&lt; "Telefone: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.telefone);
+    std::cout &lt;&lt; "E-mail: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.email);
+    agenda.push_back(novo);
+    std::cout &lt;&lt; "Contato adicionado: " &lt;&lt; novo.nome &lt;&lt; '\n';
+}
+
+// Devolve uma cópia do texto com as letras A-Z trocadas por a-z.
+std::string minusculas(std::string texto) {
+    for (char&amp; letra : texto) {
+        letra = static_cast&lt;char&gt;(std::tolower(static_cast&lt;unsigned char&gt;(letra)));
+    }
+    return texto;
+}
+
+void buscar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    std::string busca;
+    std::cout &lt;&lt; "Buscar por: ";
+    std::getline(std::cin &gt;&gt; std::ws, busca);
+    const std::string procurado = minusculas(busca);
+
+    int encontrados = 0;
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        if (minusculas(agenda[i].nome).contains(procurado)) {
+            mostrar(i + 1, agenda[i]);
+            ++encontrados;
+        }
+    }
+    if (encontrados == 0) {
+        std::cout &lt;&lt; "Nenhum contato encontrado com \"" &lt;&lt; busca &lt;&lt; "\".\n";
+    }
+}
+
+void remover(std::vector&lt;Contato&gt;&amp; agenda) {
+    listar(agenda);
+    if (agenda.empty()) {
+        return;
+    }
+    std::cout &lt;&lt; "Número do contato a remover: ";
+    std::size_t numero = 0;
+    if (!(std::cin &gt;&gt; numero) || numero &lt; 1 || numero &gt; agenda.size()) {
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        std::cout &lt;&lt; "Número inválido.\n";
+        return;
+    }
+    // mostre "Removido: " e o nome, e apague o contato da agenda
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Agenda da Ana ===\n";
+    std::vector&lt;Contato&gt; agenda{
+        {"Ana Souza", "(11) 90000-0001", "ana@exemplo.com"},
+        {"Bruno Lima", "(21) 90000-0002", "bruno@exemplo.com"},
+    };
+
+    int opcao = -1;
+    while (opcao != 0) {
+        std::cout &lt;&lt; "\n1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair\n";
+        opcao = ler_opcao();
+        switch (opcao) {
+            case 1: adicionar(agenda); break;
+            case 2: listar(agenda); break;
+            case 3: buscar(agenda); break;
+            case 4: remover(agenda); break;
+            case 0: break;
+            default: std::cout &lt;&lt; "Opção inválida.\n";
+        }
+    }
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;cctype&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Contato {
+    std::string nome;
+    std::string telefone;
+    std::string email;
+};
+
+void mostrar(std::size_t numero, const Contato&amp; c) {
+    std::cout &lt;&lt; numero &lt;&lt; ". " &lt;&lt; c.nome &lt;&lt; " | " &lt;&lt; c.telefone &lt;&lt; " | " &lt;&lt; c.email &lt;&lt; '\n';
+}
+
+void listar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    if (agenda.empty()) {
+        std::cout &lt;&lt; "A agenda está vazia.\n";
+        return;
+    }
+    std::cout &lt;&lt; "--- Contatos (" &lt;&lt; agenda.size() &lt;&lt; ") ---\n";
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        mostrar(i + 1, agenda[i]);
+    }
+}
+
+int ler_opcao() {
+    int opcao = -1;
+    std::cout &lt;&lt; "Opção: ";
+    if (!(std::cin &gt;&gt; opcao)) {
+        if (std::cin.eof()) {
+            return 0;  // a entrada acabou: sai (e salva)
+        }
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        return -1;  // não era número: opção inválida
+    }
+    return opcao;
+}
+
+void adicionar(std::vector&lt;Contato&gt;&amp; agenda) {
+    Contato novo;
+    std::cout &lt;&lt; "Nome: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.nome);
+    std::cout &lt;&lt; "Telefone: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.telefone);
+    std::cout &lt;&lt; "E-mail: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.email);
+    agenda.push_back(novo);
+    std::cout &lt;&lt; "Contato adicionado: " &lt;&lt; novo.nome &lt;&lt; '\n';
+}
+
+// Devolve uma cópia do texto com as letras A-Z trocadas por a-z.
+std::string minusculas(std::string texto) {
+    for (char&amp; letra : texto) {
+        letra = static_cast&lt;char&gt;(std::tolower(static_cast&lt;unsigned char&gt;(letra)));
+    }
+    return texto;
+}
+
+void buscar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    std::string busca;
+    std::cout &lt;&lt; "Buscar por: ";
+    std::getline(std::cin &gt;&gt; std::ws, busca);
+    const std::string procurado = minusculas(busca);
+
+    int encontrados = 0;
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        if (minusculas(agenda[i].nome).contains(procurado)) {
+            mostrar(i + 1, agenda[i]);
+            ++encontrados;
+        }
+    }
+    if (encontrados == 0) {
+        std::cout &lt;&lt; "Nenhum contato encontrado com \"" &lt;&lt; busca &lt;&lt; "\".\n";
+    }
+}
+
+void remover(std::vector&lt;Contato&gt;&amp; agenda) {
+    listar(agenda);
+    if (agenda.empty()) {
+        return;
+    }
+    std::cout &lt;&lt; "Número do contato a remover: ";
+    std::size_t numero = 0;
+    if (!(std::cin &gt;&gt; numero) || numero &lt; 1 || numero &gt; agenda.size()) {
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        std::cout &lt;&lt; "Número inválido.\n";
+        return;
+    }
+    std::cout &lt;&lt; "Removido: " &lt;&lt; agenda[numero - 1].nome &lt;&lt; '\n';
+    agenda.erase(agenda.begin() + (numero - 1));
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Agenda da Ana ===\n";
+    std::vector&lt;Contato&gt; agenda{
+        {"Ana Souza", "(11) 90000-0001", "ana@exemplo.com"},
+        {"Bruno Lima", "(21) 90000-0002", "bruno@exemplo.com"},
+    };
+
+    int opcao = -1;
+    while (opcao != 0) {
+        std::cout &lt;&lt; "\n1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair\n";
+        opcao = ler_opcao();
+        switch (opcao) {
+            case 1: adicionar(agenda); break;
+            case 2: listar(agenda); break;
+            case 3: buscar(agenda); break;
+            case 4: remover(agenda); break;
+            case 0: break;
+            default: std::cout &lt;&lt; "Opção inválida.\n";
+        }
+    }
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa5">Etapa 5 · Salvar no arquivo</h2>
+<p>Até agora, tudo o que a Ana digita some quando o programa fecha: as variáveis vivem na memória, e a memória do programa é devolvida ao sistema no fim. Para guardar de verdade, os contatos precisam ir para um <strong>arquivo</strong> no disco.</p>
+
+<p>Primeiro, decidimos o <strong>formato</strong> do arquivo. O mais simples: um contato por linha, com os campos separados por ponto e vírgula. É parecido com um arquivo CSV (o formato das planilhas), e dá para abrir e ler num editor de texto:</p>
+
+<pre class="file" data-file="agenda.txt">Ana Souza;(11) 90000-0001;ana@exemplo.com
+Bruno Lima;(21) 90000-0002;bruno@exemplo.com</pre>
+
+<p>Por que ponto e vírgula e não vírgula? Porque vírgula aparece em nomes e endereços com mais frequência. Para gravar, usamos um <code>std::ofstream</code> (de <em>output file stream</em>, "fluxo de saída para arquivo"), que funciona como o <code>cout</code>, mas escreve num arquivo (veja <a href="arquivos.html">Ler e Escrever Arquivos</a>):</p>
+
+<pre class="file" data-file="agenda.cpp">#include &lt;fstream&gt;   // novo: ofstream e ifstream
+
+// ...
+
+const std::string arquivo_agenda = "agenda.txt";
+
+void salvar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    std::ofstream arquivo(arquivo_agenda);
+    if (!arquivo) {
+        std::cout &lt;&lt; "Não consegui abrir " &lt;&lt; arquivo_agenda &lt;&lt; " para gravar.\n";
+        return;
+    }
+    for (const Contato&amp; c : agenda) {
+        arquivo &lt;&lt; c.nome &lt;&lt; ';' &lt;&lt; c.telefone &lt;&lt; ';' &lt;&lt; c.email &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "Agenda salva em " &lt;&lt; arquivo_agenda &lt;&lt; " (" &lt;&lt; agenda.size() &lt;&lt; " contatos).\n";
+}
+</pre>
+
+<p>E no <code>main</code>, a opção 0 passa a salvar antes de sair: <code>case 0: salvar(agenda); break;</code>.</p>
+
+<dl class="anatomy">
+  <dt>#include &lt;fstream&gt;</dt><dd>O cabeçalho dos arquivos: <code>std::ofstream</code> (escrever) e <code>std::ifstream</code> (ler).</dd>
+  <dt>const std::string arquivo_agenda = "agenda.txt";</dt><dd>O nome do arquivo numa constante, fora das funções: <code>salvar</code> e (na próxima etapa) <code>carregar</code> usam o mesmo nome, escrito num lugar só. O arquivo fica na pasta onde o programa roda.</dd>
+  <dt>std::ofstream arquivo(arquivo_agenda);</dt><dd>Abre o arquivo para escrita. Se ele não existe, é criado; se existe, é <strong>apagado e reescrito</strong> do zero. Como sempre gravamos a agenda inteira, é exatamente o que queremos.</dd>
+  <dt>if (!arquivo)</dt><dd>Confere se abriu. Pode falhar se a pasta não deixar gravar, por exemplo.</dd>
+  <dt>arquivo &lt;&lt; c.nome &lt;&lt; ';' &lt;&lt; …</dt><dd>Escreve como no <code>cout</code>: nome, <code>;</code>, telefone, <code>;</code>, e-mail e a quebra de linha.</dd>
+  <dt>(fim da função)</dt><dd>Não há <code>close()</code>: quando a variável <code>arquivo</code> sai de escopo, no fim da função, o <code>ofstream</code> fecha o arquivo sozinho. É o RAII (veja <a href="destrutores-raii.html">Destrutores e RAII</a>).</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp/agenda">$ g++ -std=c++23 -Wall -Wextra agenda.cpp -o agenda
+$ ./agenda
+=== Agenda da Ana ===
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 1
+Nome: Carla Dias
+Telefone: (31) 90000-0003
+E-mail: carla@exemplo.com
+Contato adicionado: Carla Dias
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 0
+Agenda salva em agenda.txt (3 contatos).
+Até logo!
+$ cat agenda.txt                « o cat mostra o conteúdo do arquivo
+Ana Souza;(11) 90000-0001;ana@exemplo.com
+Bruno Lima;(21) 90000-0002;bruno@exemplo.com
+Carla Dias;(31) 90000-0003;carla@exemplo.com</pre>
+
+<div class="cenario">
+<strong>Esqueceu o <code>#include &lt;fstream&gt;</code></strong>
+<pre class="term" data-cwd="~/cpp/agenda">$ g++ -std=c++23 -Wall -Wextra agenda.cpp -o agenda
+agenda.cpp: In function ‘void salvar(const std::vector&lt;Contato&gt;&amp;)’:
+agenda.cpp:101:41: error: variable ‘std::ofstream arquivo’ has initializer but incomplete type
+  101 |     std::ofstream arquivo(arquivo_agenda);
+      |                                         ^
+agenda.cpp:5:1: note: ‘std::ofstream’ is defined in header ‘&lt;fstream&gt;’; this is probably fixable by adding ‘#include &lt;fstream&gt;’
+    4 | #include &lt;vector&gt;
+  +++ |+#include &lt;fstream&gt;
+    5 | </pre>
+<p><strong>O que significa:</strong> "a variável <code>arquivo</code> tem valor inicial, mas o tipo está incompleto": o compilador sabe que <code>std::ofstream</code> existe (o <code>&lt;iostream&gt;</code> o anuncia), mas não sabe como ele é por dentro. A nota é ótima: diz que <code>std::ofstream</code> é definido em <code>&lt;fstream&gt;</code> e até mostra, com <code>+++ |+</code>, onde colocar a linha.</p>
+<p><strong>Como consertar:</strong> <code>#include &lt;fstream&gt;</code>.</p>
+</div>
+
+<div class="trycpp" data-stdin="1\nCarla Dias\n(31) 90000-0003\ncarla@exemplo.com\n0\n" data-goal="out:Agenda salva em agenda.txt (3 contatos).,src:ofstream">
+<p class="try-task"><strong>Missão (etapa 5):</strong> a função <code>salvar</code> está vazia. Abra o arquivo com <code>std::ofstream</code>, grave cada contato numa linha no formato <code>nome;telefone;email</code> e mostre <code>Agenda salva em agenda.txt (3 contatos).</code> (o 3 vem de <code>agenda.size()</code>). A entrada adiciona a Carla e escolhe 0.</p>
+<pre class="script">#include &lt;cctype&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Contato {
+    std::string nome;
+    std::string telefone;
+    std::string email;
+};
+
+const std::string arquivo_agenda = "agenda.txt";
+
+void mostrar(std::size_t numero, const Contato&amp; c) {
+    std::cout &lt;&lt; numero &lt;&lt; ". " &lt;&lt; c.nome &lt;&lt; " | " &lt;&lt; c.telefone &lt;&lt; " | " &lt;&lt; c.email &lt;&lt; '\n';
+}
+
+void listar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    if (agenda.empty()) {
+        std::cout &lt;&lt; "A agenda está vazia.\n";
+        return;
+    }
+    std::cout &lt;&lt; "--- Contatos (" &lt;&lt; agenda.size() &lt;&lt; ") ---\n";
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        mostrar(i + 1, agenda[i]);
+    }
+}
+
+int ler_opcao() {
+    int opcao = -1;
+    std::cout &lt;&lt; "Opção: ";
+    if (!(std::cin &gt;&gt; opcao)) {
+        if (std::cin.eof()) {
+            return 0;  // a entrada acabou: sai (e salva)
+        }
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        return -1;  // não era número: opção inválida
+    }
+    return opcao;
+}
+
+void adicionar(std::vector&lt;Contato&gt;&amp; agenda) {
+    Contato novo;
+    std::cout &lt;&lt; "Nome: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.nome);
+    std::cout &lt;&lt; "Telefone: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.telefone);
+    std::cout &lt;&lt; "E-mail: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.email);
+    agenda.push_back(novo);
+    std::cout &lt;&lt; "Contato adicionado: " &lt;&lt; novo.nome &lt;&lt; '\n';
+}
+
+// Devolve uma cópia do texto com as letras A-Z trocadas por a-z.
+std::string minusculas(std::string texto) {
+    for (char&amp; letra : texto) {
+        letra = static_cast&lt;char&gt;(std::tolower(static_cast&lt;unsigned char&gt;(letra)));
+    }
+    return texto;
+}
+
+void buscar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    std::string busca;
+    std::cout &lt;&lt; "Buscar por: ";
+    std::getline(std::cin &gt;&gt; std::ws, busca);
+    const std::string procurado = minusculas(busca);
+
+    int encontrados = 0;
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        if (minusculas(agenda[i].nome).contains(procurado)) {
+            mostrar(i + 1, agenda[i]);
+            ++encontrados;
+        }
+    }
+    if (encontrados == 0) {
+        std::cout &lt;&lt; "Nenhum contato encontrado com \"" &lt;&lt; busca &lt;&lt; "\".\n";
+    }
+}
+
+void remover(std::vector&lt;Contato&gt;&amp; agenda) {
+    listar(agenda);
+    if (agenda.empty()) {
+        return;
+    }
+    std::cout &lt;&lt; "Número do contato a remover: ";
+    std::size_t numero = 0;
+    if (!(std::cin &gt;&gt; numero) || numero &lt; 1 || numero &gt; agenda.size()) {
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        std::cout &lt;&lt; "Número inválido.\n";
+        return;
+    }
+    std::cout &lt;&lt; "Removido: " &lt;&lt; agenda[numero - 1].nome &lt;&lt; '\n';
+    agenda.erase(agenda.begin() + (numero - 1));
+}
+
+void salvar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    // grave cada contato numa linha do arquivo, no formato nome;telefone;email
+    // e mostre: Agenda salva em agenda.txt (N contatos).
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Agenda da Ana ===\n";
+    std::vector&lt;Contato&gt; agenda{
+        {"Ana Souza", "(11) 90000-0001", "ana@exemplo.com"},
+        {"Bruno Lima", "(21) 90000-0002", "bruno@exemplo.com"},
+    };
+
+    int opcao = -1;
+    while (opcao != 0) {
+        std::cout &lt;&lt; "\n1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair\n";
+        opcao = ler_opcao();
+        switch (opcao) {
+            case 1: adicionar(agenda); break;
+            case 2: listar(agenda); break;
+            case 3: buscar(agenda); break;
+            case 4: remover(agenda); break;
+            case 0: salvar(agenda); break;
+            default: std::cout &lt;&lt; "Opção inválida.\n";
+        }
+    }
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;cctype&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Contato {
+    std::string nome;
+    std::string telefone;
+    std::string email;
+};
+
+const std::string arquivo_agenda = "agenda.txt";
+
+void mostrar(std::size_t numero, const Contato&amp; c) {
+    std::cout &lt;&lt; numero &lt;&lt; ". " &lt;&lt; c.nome &lt;&lt; " | " &lt;&lt; c.telefone &lt;&lt; " | " &lt;&lt; c.email &lt;&lt; '\n';
+}
+
+void listar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    if (agenda.empty()) {
+        std::cout &lt;&lt; "A agenda está vazia.\n";
+        return;
+    }
+    std::cout &lt;&lt; "--- Contatos (" &lt;&lt; agenda.size() &lt;&lt; ") ---\n";
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        mostrar(i + 1, agenda[i]);
+    }
+}
+
+int ler_opcao() {
+    int opcao = -1;
+    std::cout &lt;&lt; "Opção: ";
+    if (!(std::cin &gt;&gt; opcao)) {
+        if (std::cin.eof()) {
+            return 0;  // a entrada acabou: sai (e salva)
+        }
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        return -1;  // não era número: opção inválida
+    }
+    return opcao;
+}
+
+void adicionar(std::vector&lt;Contato&gt;&amp; agenda) {
+    Contato novo;
+    std::cout &lt;&lt; "Nome: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.nome);
+    std::cout &lt;&lt; "Telefone: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.telefone);
+    std::cout &lt;&lt; "E-mail: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.email);
+    agenda.push_back(novo);
+    std::cout &lt;&lt; "Contato adicionado: " &lt;&lt; novo.nome &lt;&lt; '\n';
+}
+
+// Devolve uma cópia do texto com as letras A-Z trocadas por a-z.
+std::string minusculas(std::string texto) {
+    for (char&amp; letra : texto) {
+        letra = static_cast&lt;char&gt;(std::tolower(static_cast&lt;unsigned char&gt;(letra)));
+    }
+    return texto;
+}
+
+void buscar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    std::string busca;
+    std::cout &lt;&lt; "Buscar por: ";
+    std::getline(std::cin &gt;&gt; std::ws, busca);
+    const std::string procurado = minusculas(busca);
+
+    int encontrados = 0;
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        if (minusculas(agenda[i].nome).contains(procurado)) {
+            mostrar(i + 1, agenda[i]);
+            ++encontrados;
+        }
+    }
+    if (encontrados == 0) {
+        std::cout &lt;&lt; "Nenhum contato encontrado com \"" &lt;&lt; busca &lt;&lt; "\".\n";
+    }
+}
+
+void remover(std::vector&lt;Contato&gt;&amp; agenda) {
+    listar(agenda);
+    if (agenda.empty()) {
+        return;
+    }
+    std::cout &lt;&lt; "Número do contato a remover: ";
+    std::size_t numero = 0;
+    if (!(std::cin &gt;&gt; numero) || numero &lt; 1 || numero &gt; agenda.size()) {
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        std::cout &lt;&lt; "Número inválido.\n";
+        return;
+    }
+    std::cout &lt;&lt; "Removido: " &lt;&lt; agenda[numero - 1].nome &lt;&lt; '\n';
+    agenda.erase(agenda.begin() + (numero - 1));
+}
+
+void salvar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    std::ofstream arquivo(arquivo_agenda);
+    if (!arquivo) {
+        std::cout &lt;&lt; "Não consegui abrir " &lt;&lt; arquivo_agenda &lt;&lt; " para gravar.\n";
+        return;
+    }
+    for (const Contato&amp; c : agenda) {
+        arquivo &lt;&lt; c.nome &lt;&lt; ';' &lt;&lt; c.telefone &lt;&lt; ';' &lt;&lt; c.email &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "Agenda salva em " &lt;&lt; arquivo_agenda &lt;&lt; " (" &lt;&lt; agenda.size() &lt;&lt; " contatos).\n";
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Agenda da Ana ===\n";
+    std::vector&lt;Contato&gt; agenda{
+        {"Ana Souza", "(11) 90000-0001", "ana@exemplo.com"},
+        {"Bruno Lima", "(21) 90000-0002", "bruno@exemplo.com"},
+    };
+
+    int opcao = -1;
+    while (opcao != 0) {
+        std::cout &lt;&lt; "\n1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair\n";
+        opcao = ler_opcao();
+        switch (opcao) {
+            case 1: adicionar(agenda); break;
+            case 2: listar(agenda); break;
+            case 3: buscar(agenda); break;
+            case 4: remover(agenda); break;
+            case 0: salvar(agenda); break;
+            default: std::cout &lt;&lt; "Opção inválida.\n";
+        }
+    }
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa6">Etapa 6 · Carregar do arquivo</h2>
+<p>O arquivo já é gravado; falta lê-lo quando o programa abre. A lista inicial com a Ana e o Bruno escrita no código sai de cena: a agenda começa com o que estiver no arquivo. Para ler, um <code>std::ifstream</code> (<em>input file stream</em>, "fluxo de entrada de arquivo"), que funciona como o <code>cin</code>. E para separar os campos de cada linha, um truque: transformar a linha num "mini <code>cin</code>" com <code>std::istringstream</code> e usar o <code>getline</code> com o <code>;</code> como separador.</p>
+
+<pre class="file" data-file="agenda.cpp">#include &lt;sstream&gt;   // novo: istringstream
+
+// ...
+
+std::vector&lt;Contato&gt; carregar() {
+    std::vector&lt;Contato&gt; agenda;
+    std::ifstream arquivo(arquivo_agenda);
+    if (!arquivo) {
+        std::cout &lt;&lt; "Nenhuma agenda salva ainda (" &lt;&lt; arquivo_agenda &lt;&lt; " não existe).\n";
+        return agenda;
+    }
+    std::string linha;
+    while (std::getline(arquivo, linha)) {
+        std::istringstream campos(linha);
+        Contato c;
+        std::getline(campos, c.nome, ';');
+        std::getline(campos, c.telefone, ';');
+        std::getline(campos, c.email);
+        if (!c.nome.empty()) {
+            agenda.push_back(c);
+        }
+    }
+    std::cout &lt;&lt; "Carregados " &lt;&lt; agenda.size() &lt;&lt; " contatos de " &lt;&lt; arquivo_agenda &lt;&lt; ".\n";
+    return agenda;
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Agenda da Ana ===\n";
+    std::vector&lt;Contato&gt; agenda = carregar();
+
+    // ... (o resto do main não muda)
+</pre>
+
+<dl class="anatomy">
+  <dt>std::ifstream arquivo(arquivo_agenda); if (!arquivo)</dt><dd>Abre para leitura. Na primeira vez que a agenda roda, o arquivo ainda não existe e a abertura falha. Isso não é um erro: só avisamos e devolvemos a agenda vazia.</dd>
+  <dt>while (std::getline(arquivo, linha))</dt><dd>Lê o arquivo linha por linha. O <code>getline</code> devolve "falso" quando o arquivo acaba, e o laço termina.</dd>
+  <dt>std::istringstream campos(linha);</dt><dd>Um fluxo de entrada que lê de uma <code>std::string</code> em vez do teclado (vem do <code>&lt;sstream&gt;</code>; veja <a href="string-numero.html">Texto ↔ Número</a>). Assim podemos usar <code>getline</code> dentro da linha.</dd>
+  <dt>std::getline(campos, c.nome, ';');</dt><dd>O terceiro argumento muda o separador: em vez de ler até o fim da linha, lê até o <code>;</code>. Primeiro o nome, depois o telefone…</dd>
+  <dt>std::getline(campos, c.email);</dt><dd>…e o e-mail, que é o resto da linha.</dd>
+  <dt>if (!c.nome.empty())</dt><dd>Pula linhas vazias (por exemplo, uma linha em branco no fim do arquivo, se alguém o editar à mão).</dd>
+  <dt>std::vector&lt;Contato&gt; agenda = carregar();</dt><dd>No <code>main</code>, a agenda nasce com o que a função devolveu.</dd>
+</dl>
+
+<p>A primeira vez, sem arquivo, e a segunda vez, com o arquivo gravado pela primeira:</p>
+
+<pre class="term" data-cwd="~/cpp/agenda">$ g++ -std=c++23 -Wall -Wextra agenda.cpp -o agenda
+$ rm agenda.txt                 « apaga o arquivo da etapa 5, para começar do zero
+$ ./agenda
+=== Agenda da Ana ===
+Nenhuma agenda salva ainda (agenda.txt não existe).
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 1
+Nome: Ana Souza
+Telefone: (11) 90000-0001
+E-mail: ana@exemplo.com
+Contato adicionado: Ana Souza
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 1
+Nome: Bruno Lima
+Telefone: (21) 90000-0002
+E-mail: bruno@exemplo.com
+Contato adicionado: Bruno Lima
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 0
+Agenda salva em agenda.txt (2 contatos).
+Até logo!
+$ ./agenda
+=== Agenda da Ana ===
+Carregados 2 contatos de agenda.txt.  « os contatos sobreviveram ao fim do programa
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 2
+--- Contatos (2) ---
+1. Ana Souza | (11) 90000-0001 | ana@exemplo.com
+2. Bruno Lima | (21) 90000-0002 | bruno@exemplo.com
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 0
+Agenda salva em agenda.txt (2 contatos).
+Até logo!</pre>
+
+<div class="cenario">
+<strong>Um <code>;</code> dentro do nome bagunça o arquivo</strong>
+<p>A Ana cadastrou um cliente como <code>Dias; Carla</code> (sobrenome primeiro). A agenda salvou sem reclamar, mas na próxima abertura:</p>
+<pre class="term" data-cwd="~/cpp/agenda">$ cat agenda.txt
+Ana Souza;(11) 90000-0001;ana@exemplo.com
+Bruno Lima;(21) 90000-0002;bruno@exemplo.com
+Dias; Carla;(31) 90000-0003;carla@exemplo.com
+$ ./agenda | head -9           « (a Ana escolheu 2 e depois 0)
+=== Agenda da Ana ===
+Carregados 3 contatos de agenda.txt.
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 2
+--- Contatos (3) ---
+1. Ana Souza | (11) 90000-0001 | ana@exemplo.com
+2. Bruno Lima | (21) 90000-0002 | bruno@exemplo.com
+3. Dias |  Carla | (31) 90000-0003;carla@exemplo.com</pre>
+<p><strong>O que significa:</strong> o <code>;</code> do nome foi confundido com o separador. O nome virou <code>Dias</code>, o telefone virou <code> Carla</code>, e o resto da linha caiu no e-mail. Todo formato com separador tem esse problema: o separador não pode aparecer dentro dos dados.</p>
+<p><strong>Como consertar:</strong> no <code>adicionar</code>, recuse (ou troque) o <code>;</code> nos campos. É o desafio 2 abaixo. Formatos profissionais, como o CSV de verdade e o JSON, resolvem isso com aspas e "escapes" (veja <a href="escapes.html">Caracteres Especiais</a>).</p>
+</div>
+
+<div class="trycpp" data-stdin="2\n0\n" data-goal="out:Carregados 3 contatos de agenda.txt.,out:3. Carla Dias | (31) 90000-0003 | carla@exemplo.com">
+<p class="try-task"><strong>Missão (etapa 6):</strong> o arquivo <code>agenda.txt</code> (na segunda aba) já tem três contatos, mas a função <code>carregar</code> só devolve uma agenda vazia. Escreva a leitura: abra com <code>std::ifstream</code>, leia cada linha com <code>getline</code>, separe os campos com <code>std::istringstream</code> e <code>getline(campos, …, ';')</code>, e mostre <code>Carregados 3 contatos de agenda.txt.</code>. A entrada lista e sai.</p>
+<pre class="script" data-file="agenda.cpp">#include &lt;cctype&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Contato {
+    std::string nome;
+    std::string telefone;
+    std::string email;
+};
+
+const std::string arquivo_agenda = "agenda.txt";
+
+void mostrar(std::size_t numero, const Contato&amp; c) {
+    std::cout &lt;&lt; numero &lt;&lt; ". " &lt;&lt; c.nome &lt;&lt; " | " &lt;&lt; c.telefone &lt;&lt; " | " &lt;&lt; c.email &lt;&lt; '\n';
+}
+
+void listar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    if (agenda.empty()) {
+        std::cout &lt;&lt; "A agenda está vazia.\n";
+        return;
+    }
+    std::cout &lt;&lt; "--- Contatos (" &lt;&lt; agenda.size() &lt;&lt; ") ---\n";
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        mostrar(i + 1, agenda[i]);
+    }
+}
+
+int ler_opcao() {
+    int opcao = -1;
+    std::cout &lt;&lt; "Opção: ";
+    if (!(std::cin &gt;&gt; opcao)) {
+        if (std::cin.eof()) {
+            return 0;  // a entrada acabou: sai (e salva)
+        }
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        return -1;  // não era número: opção inválida
+    }
+    return opcao;
+}
+
+void adicionar(std::vector&lt;Contato&gt;&amp; agenda) {
+    Contato novo;
+    std::cout &lt;&lt; "Nome: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.nome);
+    std::cout &lt;&lt; "Telefone: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.telefone);
+    std::cout &lt;&lt; "E-mail: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.email);
+    agenda.push_back(novo);
+    std::cout &lt;&lt; "Contato adicionado: " &lt;&lt; novo.nome &lt;&lt; '\n';
+}
+
+// Devolve uma cópia do texto com as letras A-Z trocadas por a-z.
+std::string minusculas(std::string texto) {
+    for (char&amp; letra : texto) {
+        letra = static_cast&lt;char&gt;(std::tolower(static_cast&lt;unsigned char&gt;(letra)));
+    }
+    return texto;
+}
+
+void buscar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    std::string busca;
+    std::cout &lt;&lt; "Buscar por: ";
+    std::getline(std::cin &gt;&gt; std::ws, busca);
+    const std::string procurado = minusculas(busca);
+
+    int encontrados = 0;
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        if (minusculas(agenda[i].nome).contains(procurado)) {
+            mostrar(i + 1, agenda[i]);
+            ++encontrados;
+        }
+    }
+    if (encontrados == 0) {
+        std::cout &lt;&lt; "Nenhum contato encontrado com \"" &lt;&lt; busca &lt;&lt; "\".\n";
+    }
+}
+
+void remover(std::vector&lt;Contato&gt;&amp; agenda) {
+    listar(agenda);
+    if (agenda.empty()) {
+        return;
+    }
+    std::cout &lt;&lt; "Número do contato a remover: ";
+    std::size_t numero = 0;
+    if (!(std::cin &gt;&gt; numero) || numero &lt; 1 || numero &gt; agenda.size()) {
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        std::cout &lt;&lt; "Número inválido.\n";
+        return;
+    }
+    std::cout &lt;&lt; "Removido: " &lt;&lt; agenda[numero - 1].nome &lt;&lt; '\n';
+    agenda.erase(agenda.begin() + (numero - 1));
+}
+
+void salvar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    std::ofstream arquivo(arquivo_agenda);
+    if (!arquivo) {
+        std::cout &lt;&lt; "Não consegui abrir " &lt;&lt; arquivo_agenda &lt;&lt; " para gravar.\n";
+        return;
+    }
+    for (const Contato&amp; c : agenda) {
+        arquivo &lt;&lt; c.nome &lt;&lt; ';' &lt;&lt; c.telefone &lt;&lt; ';' &lt;&lt; c.email &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "Agenda salva em " &lt;&lt; arquivo_agenda &lt;&lt; " (" &lt;&lt; agenda.size() &lt;&lt; " contatos).\n";
+}
+
+std::vector&lt;Contato&gt; carregar() {
+    std::vector&lt;Contato&gt; agenda;
+    // abra o arquivo, leia linha por linha, separe os campos pelo ';'
+    // e mostre: Carregados N contatos de agenda.txt.
+    return agenda;
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Agenda da Ana ===\n";
+    std::vector&lt;Contato&gt; agenda = carregar();
+
+    int opcao = -1;
+    while (opcao != 0) {
+        std::cout &lt;&lt; "\n1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair\n";
+        opcao = ler_opcao();
+        switch (opcao) {
+            case 1: adicionar(agenda); break;
+            case 2: listar(agenda); break;
+            case 3: buscar(agenda); break;
+            case 4: remover(agenda); break;
+            case 0: salvar(agenda); break;
+            default: std::cout &lt;&lt; "Opção inválida.\n";
+        }
+    }
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+<pre class="script" data-file="agenda.txt">Ana Souza;(11) 90000-0001;ana@exemplo.com
+Bruno Lima;(21) 90000-0002;bruno@exemplo.com
+Carla Dias;(31) 90000-0003;carla@exemplo.com
+</pre>
+<pre class="solucao" data-file="agenda.cpp">#include &lt;cctype&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Contato {
+    std::string nome;
+    std::string telefone;
+    std::string email;
+};
+
+const std::string arquivo_agenda = "agenda.txt";
+
+void mostrar(std::size_t numero, const Contato&amp; c) {
+    std::cout &lt;&lt; numero &lt;&lt; ". " &lt;&lt; c.nome &lt;&lt; " | " &lt;&lt; c.telefone &lt;&lt; " | " &lt;&lt; c.email &lt;&lt; '\n';
+}
+
+void listar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    if (agenda.empty()) {
+        std::cout &lt;&lt; "A agenda está vazia.\n";
+        return;
+    }
+    std::cout &lt;&lt; "--- Contatos (" &lt;&lt; agenda.size() &lt;&lt; ") ---\n";
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        mostrar(i + 1, agenda[i]);
+    }
+}
+
+int ler_opcao() {
+    int opcao = -1;
+    std::cout &lt;&lt; "Opção: ";
+    if (!(std::cin &gt;&gt; opcao)) {
+        if (std::cin.eof()) {
+            return 0;  // a entrada acabou: sai (e salva)
+        }
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        return -1;  // não era número: opção inválida
+    }
+    return opcao;
+}
+
+void adicionar(std::vector&lt;Contato&gt;&amp; agenda) {
+    Contato novo;
+    std::cout &lt;&lt; "Nome: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.nome);
+    std::cout &lt;&lt; "Telefone: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.telefone);
+    std::cout &lt;&lt; "E-mail: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.email);
+    agenda.push_back(novo);
+    std::cout &lt;&lt; "Contato adicionado: " &lt;&lt; novo.nome &lt;&lt; '\n';
+}
+
+// Devolve uma cópia do texto com as letras A-Z trocadas por a-z.
+std::string minusculas(std::string texto) {
+    for (char&amp; letra : texto) {
+        letra = static_cast&lt;char&gt;(std::tolower(static_cast&lt;unsigned char&gt;(letra)));
+    }
+    return texto;
+}
+
+void buscar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    std::string busca;
+    std::cout &lt;&lt; "Buscar por: ";
+    std::getline(std::cin &gt;&gt; std::ws, busca);
+    const std::string procurado = minusculas(busca);
+
+    int encontrados = 0;
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        if (minusculas(agenda[i].nome).contains(procurado)) {
+            mostrar(i + 1, agenda[i]);
+            ++encontrados;
+        }
+    }
+    if (encontrados == 0) {
+        std::cout &lt;&lt; "Nenhum contato encontrado com \"" &lt;&lt; busca &lt;&lt; "\".\n";
+    }
+}
+
+void remover(std::vector&lt;Contato&gt;&amp; agenda) {
+    listar(agenda);
+    if (agenda.empty()) {
+        return;
+    }
+    std::cout &lt;&lt; "Número do contato a remover: ";
+    std::size_t numero = 0;
+    if (!(std::cin &gt;&gt; numero) || numero &lt; 1 || numero &gt; agenda.size()) {
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        std::cout &lt;&lt; "Número inválido.\n";
+        return;
+    }
+    std::cout &lt;&lt; "Removido: " &lt;&lt; agenda[numero - 1].nome &lt;&lt; '\n';
+    agenda.erase(agenda.begin() + (numero - 1));
+}
+
+void salvar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    std::ofstream arquivo(arquivo_agenda);
+    if (!arquivo) {
+        std::cout &lt;&lt; "Não consegui abrir " &lt;&lt; arquivo_agenda &lt;&lt; " para gravar.\n";
+        return;
+    }
+    for (const Contato&amp; c : agenda) {
+        arquivo &lt;&lt; c.nome &lt;&lt; ';' &lt;&lt; c.telefone &lt;&lt; ';' &lt;&lt; c.email &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "Agenda salva em " &lt;&lt; arquivo_agenda &lt;&lt; " (" &lt;&lt; agenda.size() &lt;&lt; " contatos).\n";
+}
+
+std::vector&lt;Contato&gt; carregar() {
+    std::vector&lt;Contato&gt; agenda;
+    std::ifstream arquivo(arquivo_agenda);
+    if (!arquivo) {
+        std::cout &lt;&lt; "Nenhuma agenda salva ainda (" &lt;&lt; arquivo_agenda &lt;&lt; " não existe).\n";
+        return agenda;
+    }
+    std::string linha;
+    while (std::getline(arquivo, linha)) {
+        std::istringstream campos(linha);
+        Contato c;
+        std::getline(campos, c.nome, ';');
+        std::getline(campos, c.telefone, ';');
+        std::getline(campos, c.email);
+        if (!c.nome.empty()) {
+            agenda.push_back(c);
+        }
+    }
+    std::cout &lt;&lt; "Carregados " &lt;&lt; agenda.size() &lt;&lt; " contatos de " &lt;&lt; arquivo_agenda &lt;&lt; ".\n";
+    return agenda;
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Agenda da Ana ===\n";
+    std::vector&lt;Contato&gt; agenda = carregar();
+
+    int opcao = -1;
+    while (opcao != 0) {
+        std::cout &lt;&lt; "\n1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair\n";
+        opcao = ler_opcao();
+        switch (opcao) {
+            case 1: adicionar(agenda); break;
+            case 2: listar(agenda); break;
+            case 3: buscar(agenda); break;
+            case 4: remover(agenda); break;
+            case 0: salvar(agenda); break;
+            default: std::cout &lt;&lt; "Opção inválida.\n";
+        }
+    }
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>O código completo</h2>
+
+<pre class="file" data-file="agenda.cpp">#include &lt;cctype&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Contato {
+    std::string nome;
+    std::string telefone;
+    std::string email;
+};
+
+const std::string arquivo_agenda = "agenda.txt";
+
+void mostrar(std::size_t numero, const Contato&amp; c) {
+    std::cout &lt;&lt; numero &lt;&lt; ". " &lt;&lt; c.nome &lt;&lt; " | " &lt;&lt; c.telefone &lt;&lt; " | " &lt;&lt; c.email &lt;&lt; '\n';
+}
+
+void listar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    if (agenda.empty()) {
+        std::cout &lt;&lt; "A agenda está vazia.\n";
+        return;
+    }
+    std::cout &lt;&lt; "--- Contatos (" &lt;&lt; agenda.size() &lt;&lt; ") ---\n";
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        mostrar(i + 1, agenda[i]);
+    }
+}
+
+int ler_opcao() {
+    int opcao = -1;
+    std::cout &lt;&lt; "Opção: ";
+    if (!(std::cin &gt;&gt; opcao)) {
+        if (std::cin.eof()) {
+            return 0;  // a entrada acabou: sai (e salva)
+        }
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        return -1;  // não era número: opção inválida
+    }
+    return opcao;
+}
+
+void adicionar(std::vector&lt;Contato&gt;&amp; agenda) {
+    Contato novo;
+    std::cout &lt;&lt; "Nome: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.nome);
+    std::cout &lt;&lt; "Telefone: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.telefone);
+    std::cout &lt;&lt; "E-mail: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.email);
+    agenda.push_back(novo);
+    std::cout &lt;&lt; "Contato adicionado: " &lt;&lt; novo.nome &lt;&lt; '\n';
+}
+
+// Devolve uma cópia do texto com as letras A-Z trocadas por a-z.
+std::string minusculas(std::string texto) {
+    for (char&amp; letra : texto) {
+        letra = static_cast&lt;char&gt;(std::tolower(static_cast&lt;unsigned char&gt;(letra)));
+    }
+    return texto;
+}
+
+void buscar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    std::string busca;
+    std::cout &lt;&lt; "Buscar por: ";
+    std::getline(std::cin &gt;&gt; std::ws, busca);
+    const std::string procurado = minusculas(busca);
+
+    int encontrados = 0;
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        if (minusculas(agenda[i].nome).contains(procurado)) {
+            mostrar(i + 1, agenda[i]);
+            ++encontrados;
+        }
+    }
+    if (encontrados == 0) {
+        std::cout &lt;&lt; "Nenhum contato encontrado com \"" &lt;&lt; busca &lt;&lt; "\".\n";
+    }
+}
+
+void remover(std::vector&lt;Contato&gt;&amp; agenda) {
+    listar(agenda);
+    if (agenda.empty()) {
+        return;
+    }
+    std::cout &lt;&lt; "Número do contato a remover: ";
+    std::size_t numero = 0;
+    if (!(std::cin &gt;&gt; numero) || numero &lt; 1 || numero &gt; agenda.size()) {
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        std::cout &lt;&lt; "Número inválido.\n";
+        return;
+    }
+    std::cout &lt;&lt; "Removido: " &lt;&lt; agenda[numero - 1].nome &lt;&lt; '\n';
+    agenda.erase(agenda.begin() + (numero - 1));
+}
+
+void salvar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    std::ofstream arquivo(arquivo_agenda);
+    if (!arquivo) {
+        std::cout &lt;&lt; "Não consegui abrir " &lt;&lt; arquivo_agenda &lt;&lt; " para gravar.\n";
+        return;
+    }
+    for (const Contato&amp; c : agenda) {
+        arquivo &lt;&lt; c.nome &lt;&lt; ';' &lt;&lt; c.telefone &lt;&lt; ';' &lt;&lt; c.email &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "Agenda salva em " &lt;&lt; arquivo_agenda &lt;&lt; " (" &lt;&lt; agenda.size() &lt;&lt; " contatos).\n";
+}
+
+std::vector&lt;Contato&gt; carregar() {
+    std::vector&lt;Contato&gt; agenda;
+    std::ifstream arquivo(arquivo_agenda);
+    if (!arquivo) {
+        std::cout &lt;&lt; "Nenhuma agenda salva ainda (" &lt;&lt; arquivo_agenda &lt;&lt; " não existe).\n";
+        return agenda;
+    }
+    std::string linha;
+    while (std::getline(arquivo, linha)) {
+        std::istringstream campos(linha);
+        Contato c;
+        std::getline(campos, c.nome, ';');
+        std::getline(campos, c.telefone, ';');
+        std::getline(campos, c.email);
+        if (!c.nome.empty()) {
+            agenda.push_back(c);
+        }
+    }
+    std::cout &lt;&lt; "Carregados " &lt;&lt; agenda.size() &lt;&lt; " contatos de " &lt;&lt; arquivo_agenda &lt;&lt; ".\n";
+    return agenda;
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Agenda da Ana ===\n";
+    std::vector&lt;Contato&gt; agenda = carregar();
+
+    int opcao = -1;
+    while (opcao != 0) {
+        std::cout &lt;&lt; "\n1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair\n";
+        opcao = ler_opcao();
+        switch (opcao) {
+            case 1: adicionar(agenda); break;
+            case 2: listar(agenda); break;
+            case 3: buscar(agenda); break;
+            case 4: remover(agenda); break;
+            case 0: salvar(agenda); break;
+            default: std::cout &lt;&lt; "Opção inválida.\n";
+        }
+    }
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+
+<p>O projeto juntou <a href="structs.html">struct</a>, <a href="vector.html">vector</a> (<code>push_back</code>, <code>erase</code>, <code>size</code>), <a href="switch.html">switch</a> num <a href="while.html">while</a>, <a href="getline.html">getline</a> com <code>std::ws</code>, <a href="funcoes-string.html">funções de string</a>, <a href="passagem-referencia.html">referências</a> (<code>const&amp;</code> para ler, <code>&amp;</code> para mudar) e <a href="arquivos.html">arquivos</a>. O padrão "carregar no começo, salvar no fim" é o de muitos programas de verdade, de editores de texto a jogos.</p>
+
+<hr>
+
+<h2>Desafios extras</h2>
+<ol>
+  <li><strong>Buscar também pelo telefone.</strong> Faça a busca encontrar o contato quando o texto aparecer no nome <strong>ou</strong> no telefone. (Faça no editor, logo abaixo.)</li>
+  <li><strong>Nada de <code>;</code> nos campos.</strong> No <code>adicionar</code>, se algum campo tiver <code>;</code>, mostre um aviso e peça de novo (dica: <code>campo.contains(';')</code>).</li>
+  <li><strong>Lista em ordem alfabética.</strong> Depois de adicionar, ordene a agenda pelo nome com <code>std::ranges::sort</code> e uma <a href="lambdas.html">lambda</a> (veja <a href="algoritmos.html">Algoritmos</a>).</li>
+  <li><strong>Editar.</strong> Uma opção 5 que pergunta o número do contato e deixa trocar o telefone e o e-mail.</li>
+  <li><strong>Confirmar antes de remover.</strong> "Remover Bruno Lima? (s/n)".</li>
+  <li><strong>Salvar sempre.</strong> Hoje, se o programa for fechado com <kbd>Ctrl</kbd>+<kbd>C</kbd>, as mudanças da sessão se perdem. Chame <code>salvar</code> logo depois de cada adição e remoção.</li>
+</ol>
+
+<div class="trycpp" data-stdin="3\n90000-0002\n0\n" data-goal="out:2. Bruno Lima | (21) 90000-0002 | bruno@exemplo.com,src:telefone\.contains">
+<p class="try-task"><strong>Desafio 1 no editor:</strong> mude a condição da busca para também aceitar quando <code>agenda[i].telefone</code> contiver o texto procurado (use <code>||</code>, o "ou"). A entrada busca <code>90000-0002</code>, o telefone do Bruno.</p>
+<pre class="script" data-file="agenda.cpp">#include &lt;cctype&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Contato {
+    std::string nome;
+    std::string telefone;
+    std::string email;
+};
+
+const std::string arquivo_agenda = "agenda.txt";
+
+void mostrar(std::size_t numero, const Contato&amp; c) {
+    std::cout &lt;&lt; numero &lt;&lt; ". " &lt;&lt; c.nome &lt;&lt; " | " &lt;&lt; c.telefone &lt;&lt; " | " &lt;&lt; c.email &lt;&lt; '\n';
+}
+
+void listar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    if (agenda.empty()) {
+        std::cout &lt;&lt; "A agenda está vazia.\n";
+        return;
+    }
+    std::cout &lt;&lt; "--- Contatos (" &lt;&lt; agenda.size() &lt;&lt; ") ---\n";
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        mostrar(i + 1, agenda[i]);
+    }
+}
+
+int ler_opcao() {
+    int opcao = -1;
+    std::cout &lt;&lt; "Opção: ";
+    if (!(std::cin &gt;&gt; opcao)) {
+        if (std::cin.eof()) {
+            return 0;  // a entrada acabou: sai (e salva)
+        }
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        return -1;  // não era número: opção inválida
+    }
+    return opcao;
+}
+
+void adicionar(std::vector&lt;Contato&gt;&amp; agenda) {
+    Contato novo;
+    std::cout &lt;&lt; "Nome: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.nome);
+    std::cout &lt;&lt; "Telefone: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.telefone);
+    std::cout &lt;&lt; "E-mail: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.email);
+    agenda.push_back(novo);
+    std::cout &lt;&lt; "Contato adicionado: " &lt;&lt; novo.nome &lt;&lt; '\n';
+}
+
+// Devolve uma cópia do texto com as letras A-Z trocadas por a-z.
+std::string minusculas(std::string texto) {
+    for (char&amp; letra : texto) {
+        letra = static_cast&lt;char&gt;(std::tolower(static_cast&lt;unsigned char&gt;(letra)));
+    }
+    return texto;
+}
+
+void buscar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    std::string busca;
+    std::cout &lt;&lt; "Buscar por: ";
+    std::getline(std::cin &gt;&gt; std::ws, busca);
+    const std::string procurado = minusculas(busca);
+
+    int encontrados = 0;
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        if (minusculas(agenda[i].nome).contains(procurado)) {
+            mostrar(i + 1, agenda[i]);
+            ++encontrados;
+        }
+    }
+    if (encontrados == 0) {
+        std::cout &lt;&lt; "Nenhum contato encontrado com \"" &lt;&lt; busca &lt;&lt; "\".\n";
+    }
+}
+
+void remover(std::vector&lt;Contato&gt;&amp; agenda) {
+    listar(agenda);
+    if (agenda.empty()) {
+        return;
+    }
+    std::cout &lt;&lt; "Número do contato a remover: ";
+    std::size_t numero = 0;
+    if (!(std::cin &gt;&gt; numero) || numero &lt; 1 || numero &gt; agenda.size()) {
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        std::cout &lt;&lt; "Número inválido.\n";
+        return;
+    }
+    std::cout &lt;&lt; "Removido: " &lt;&lt; agenda[numero - 1].nome &lt;&lt; '\n';
+    agenda.erase(agenda.begin() + (numero - 1));
+}
+
+void salvar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    std::ofstream arquivo(arquivo_agenda);
+    if (!arquivo) {
+        std::cout &lt;&lt; "Não consegui abrir " &lt;&lt; arquivo_agenda &lt;&lt; " para gravar.\n";
+        return;
+    }
+    for (const Contato&amp; c : agenda) {
+        arquivo &lt;&lt; c.nome &lt;&lt; ';' &lt;&lt; c.telefone &lt;&lt; ';' &lt;&lt; c.email &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "Agenda salva em " &lt;&lt; arquivo_agenda &lt;&lt; " (" &lt;&lt; agenda.size() &lt;&lt; " contatos).\n";
+}
+
+std::vector&lt;Contato&gt; carregar() {
+    std::vector&lt;Contato&gt; agenda;
+    std::ifstream arquivo(arquivo_agenda);
+    if (!arquivo) {
+        std::cout &lt;&lt; "Nenhuma agenda salva ainda (" &lt;&lt; arquivo_agenda &lt;&lt; " não existe).\n";
+        return agenda;
+    }
+    std::string linha;
+    while (std::getline(arquivo, linha)) {
+        std::istringstream campos(linha);
+        Contato c;
+        std::getline(campos, c.nome, ';');
+        std::getline(campos, c.telefone, ';');
+        std::getline(campos, c.email);
+        if (!c.nome.empty()) {
+            agenda.push_back(c);
+        }
+    }
+    std::cout &lt;&lt; "Carregados " &lt;&lt; agenda.size() &lt;&lt; " contatos de " &lt;&lt; arquivo_agenda &lt;&lt; ".\n";
+    return agenda;
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Agenda da Ana ===\n";
+    std::vector&lt;Contato&gt; agenda = carregar();
+
+    int opcao = -1;
+    while (opcao != 0) {
+        std::cout &lt;&lt; "\n1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair\n";
+        opcao = ler_opcao();
+        switch (opcao) {
+            case 1: adicionar(agenda); break;
+            case 2: listar(agenda); break;
+            case 3: buscar(agenda); break;
+            case 4: remover(agenda); break;
+            case 0: salvar(agenda); break;
+            default: std::cout &lt;&lt; "Opção inválida.\n";
+        }
+    }
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+<pre class="script" data-file="agenda.txt">Ana Souza;(11) 90000-0001;ana@exemplo.com
+Bruno Lima;(21) 90000-0002;bruno@exemplo.com
+Carla Dias;(31) 90000-0003;carla@exemplo.com
+</pre>
+<pre class="solucao" data-file="agenda.cpp">#include &lt;cctype&gt;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+struct Contato {
+    std::string nome;
+    std::string telefone;
+    std::string email;
+};
+
+const std::string arquivo_agenda = "agenda.txt";
+
+void mostrar(std::size_t numero, const Contato&amp; c) {
+    std::cout &lt;&lt; numero &lt;&lt; ". " &lt;&lt; c.nome &lt;&lt; " | " &lt;&lt; c.telefone &lt;&lt; " | " &lt;&lt; c.email &lt;&lt; '\n';
+}
+
+void listar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    if (agenda.empty()) {
+        std::cout &lt;&lt; "A agenda está vazia.\n";
+        return;
+    }
+    std::cout &lt;&lt; "--- Contatos (" &lt;&lt; agenda.size() &lt;&lt; ") ---\n";
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        mostrar(i + 1, agenda[i]);
+    }
+}
+
+int ler_opcao() {
+    int opcao = -1;
+    std::cout &lt;&lt; "Opção: ";
+    if (!(std::cin &gt;&gt; opcao)) {
+        if (std::cin.eof()) {
+            return 0;  // a entrada acabou: sai (e salva)
+        }
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        return -1;  // não era número: opção inválida
+    }
+    return opcao;
+}
+
+void adicionar(std::vector&lt;Contato&gt;&amp; agenda) {
+    Contato novo;
+    std::cout &lt;&lt; "Nome: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.nome);
+    std::cout &lt;&lt; "Telefone: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.telefone);
+    std::cout &lt;&lt; "E-mail: ";
+    std::getline(std::cin &gt;&gt; std::ws, novo.email);
+    agenda.push_back(novo);
+    std::cout &lt;&lt; "Contato adicionado: " &lt;&lt; novo.nome &lt;&lt; '\n';
+}
+
+// Devolve uma cópia do texto com as letras A-Z trocadas por a-z.
+std::string minusculas(std::string texto) {
+    for (char&amp; letra : texto) {
+        letra = static_cast&lt;char&gt;(std::tolower(static_cast&lt;unsigned char&gt;(letra)));
+    }
+    return texto;
+}
+
+void buscar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    std::string busca;
+    std::cout &lt;&lt; "Buscar por: ";
+    std::getline(std::cin &gt;&gt; std::ws, busca);
+    const std::string procurado = minusculas(busca);
+
+    int encontrados = 0;
+    for (std::size_t i = 0; i &lt; agenda.size(); ++i) {
+        if (minusculas(agenda[i].nome).contains(procurado) || agenda[i].telefone.contains(procurado)) {
+            mostrar(i + 1, agenda[i]);
+            ++encontrados;
+        }
+    }
+    if (encontrados == 0) {
+        std::cout &lt;&lt; "Nenhum contato encontrado com \"" &lt;&lt; busca &lt;&lt; "\".\n";
+    }
+}
+
+void remover(std::vector&lt;Contato&gt;&amp; agenda) {
+    listar(agenda);
+    if (agenda.empty()) {
+        return;
+    }
+    std::cout &lt;&lt; "Número do contato a remover: ";
+    std::size_t numero = 0;
+    if (!(std::cin &gt;&gt; numero) || numero &lt; 1 || numero &gt; agenda.size()) {
+        std::cin.clear();
+        std::string lixo;
+        std::getline(std::cin, lixo);
+        std::cout &lt;&lt; "Número inválido.\n";
+        return;
+    }
+    std::cout &lt;&lt; "Removido: " &lt;&lt; agenda[numero - 1].nome &lt;&lt; '\n';
+    agenda.erase(agenda.begin() + (numero - 1));
+}
+
+void salvar(const std::vector&lt;Contato&gt;&amp; agenda) {
+    std::ofstream arquivo(arquivo_agenda);
+    if (!arquivo) {
+        std::cout &lt;&lt; "Não consegui abrir " &lt;&lt; arquivo_agenda &lt;&lt; " para gravar.\n";
+        return;
+    }
+    for (const Contato&amp; c : agenda) {
+        arquivo &lt;&lt; c.nome &lt;&lt; ';' &lt;&lt; c.telefone &lt;&lt; ';' &lt;&lt; c.email &lt;&lt; '\n';
+    }
+    std::cout &lt;&lt; "Agenda salva em " &lt;&lt; arquivo_agenda &lt;&lt; " (" &lt;&lt; agenda.size() &lt;&lt; " contatos).\n";
+}
+
+std::vector&lt;Contato&gt; carregar() {
+    std::vector&lt;Contato&gt; agenda;
+    std::ifstream arquivo(arquivo_agenda);
+    if (!arquivo) {
+        std::cout &lt;&lt; "Nenhuma agenda salva ainda (" &lt;&lt; arquivo_agenda &lt;&lt; " não existe).\n";
+        return agenda;
+    }
+    std::string linha;
+    while (std::getline(arquivo, linha)) {
+        std::istringstream campos(linha);
+        Contato c;
+        std::getline(campos, c.nome, ';');
+        std::getline(campos, c.telefone, ';');
+        std::getline(campos, c.email);
+        if (!c.nome.empty()) {
+            agenda.push_back(c);
+        }
+    }
+    std::cout &lt;&lt; "Carregados " &lt;&lt; agenda.size() &lt;&lt; " contatos de " &lt;&lt; arquivo_agenda &lt;&lt; ".\n";
+    return agenda;
+}
+
+int main() {
+    std::cout &lt;&lt; "=== Agenda da Ana ===\n";
+    std::vector&lt;Contato&gt; agenda = carregar();
+
+    int opcao = -1;
+    while (opcao != 0) {
+        std::cout &lt;&lt; "\n1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair\n";
+        opcao = ler_opcao();
+        switch (opcao) {
+            case 1: adicionar(agenda); break;
+            case 2: listar(agenda); break;
+            case 3: buscar(agenda); break;
+            case 4: remover(agenda); break;
+            case 0: salvar(agenda); break;
+            default: std::cout &lt;&lt; "Opção inválida.\n";
+        }
+    }
+    std::cout &lt;&lt; "Até logo!\n";
+}
+</pre>
+</div>
+
+<p>Na máquina da Ana, com o arquivo de três contatos:</p>
+
+<pre class="term" data-cwd="~/cpp/agenda">$ ./agenda
+=== Agenda da Ana ===
+Carregados 3 contatos de agenda.txt.
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 3
+Buscar por: 90000-0002
+2. Bruno Lima | (21) 90000-0002 | bruno@exemplo.com
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 3
+Buscar por: carla
+3. Carla Dias | (31) 90000-0003 | carla@exemplo.com
+
+1. Adicionar  2. Listar  3. Buscar  4. Remover  0. Sair
+Opção: 0
+Agenda salva em agenda.txt (3 contatos).
+Até logo!</pre>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">1. Depois de <code>std::cin &gt;&gt; opcao;</code>, um <code>std::getline(std::cin, nome);</code> leu um nome vazio sem esperar. Por quê?</p>
+<label><input type="radio" name="q1"> O <code>getline</code> não funciona com <code>std::string</code>.</label>
+<label><input type="radio" name="q1"> O <code>&gt;&gt;</code> deixou a quebra de linha na entrada, e o <code>getline</code> leu essa linha vazia.</label>
+<label><input type="radio" name="q1"> Faltou <code>#include &lt;fstream&gt;</code>.</label>
+<label><input type="radio" name="q1"> O nome digitado tinha espaço.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">2. Por que <code>adicionar</code> recebe <code>std::vector&lt;Contato&gt;&amp; agenda</code> (com <code>&amp;</code> e sem <code>const</code>)?</p>
+<label><input type="radio" name="q2"> Para não copiar, mas sem poder mudar a lista.</label>
+<label><input type="radio" name="q2"> Porque <code>vector</code> sempre precisa de <code>&amp;</code>.</label>
+<label><input type="radio" name="q2"> Para o programa compilar mais rápido.</label>
+<label><input type="radio" name="q2"> Para acrescentar o contato na lista original do <code>main</code>, e não numa cópia.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">3. O que acontece com o conteúdo antigo de <code>agenda.txt</code> quando <code>std::ofstream arquivo("agenda.txt");</code> abre o arquivo?</p>
+<label><input type="radio" name="q3"> É apagado: o arquivo é reescrito do zero.</label>
+<label><input type="radio" name="q3"> É mantido, e o novo conteúdo vai para o fim.</label>
+<label><input type="radio" name="q3"> O programa dá erro, porque o arquivo já existe.</label>
+<label><input type="radio" name="q3"> É copiado para <code>agenda.txt.bak</code>.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Por que a busca não acha "Érica" quando a Ana digita "érica"?</p>
+<label><input type="radio" name="q4"> Porque o <code>contains</code> não aceita acentos.</label>
+<label><input type="radio" name="q4"> Porque o arquivo foi salvo errado.</label>
+<label><input type="radio" name="q4"> Porque o <code>tolower</code> converte um <code>char</code> por vez e só conhece as letras sem acento; o <code>É</code> em UTF-8 ocupa dois <code>char</code>.</label>
+<label><input type="radio" name="q4"> Porque o nome tem espaço.</label>
+</div>
+
+<div class="exercise">
+<p>5. Complete a leitura do telefone, que vai até o próximo <code>;</code>:</p>
+<div class="ex-code">std::getline(campos, c.telefone, <input data-answer="';'" aria-label="separador">);</div>
+</div>
+
+<div class="exercise">
+<p>6. Complete para ler uma linha inteira depois de um <code>cin &gt;&gt;</code>, descartando a quebra de linha que sobrou:</p>
+<div class="ex-code">std::getline(std::cin &gt;&gt; <input data-answer="std::ws|ws" aria-label="manipulador">, novo.nome);</div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma <code>struct</code> junta as informações de um contato; um <code>std::vector</code> guarda quantos forem precisos.</li>
+  <li>Menu = <code>while (opcao != 0)</code> + <code>switch</code> + uma função por opção.</li>
+  <li>Para ler uma linha com espaços depois de um <code>&gt;&gt;</code>: <code>std::getline(std::cin &gt;&gt; std::ws, texto)</code>.</li>
+  <li>Busca sem diferenciar maiúsculas: compare tudo em minúsculas (<code>std::tolower</code> com <code>unsigned char</code>). Só funciona para letras sem acento.</li>
+  <li>Antes de usar um número digitado como posição, confira se ele existe na lista. <code>erase(begin() + posição)</code> remove.</li>
+  <li><code>std::ofstream</code> grava (e apaga o conteúdo antigo); <code>std::ifstream</code> lê; <code>std::istringstream</code> + <code>getline(…, ';')</code> separa os campos. Os arquivos fecham sozinhos.</li>
+  <li>O separador (<code>;</code>) não pode aparecer dentro dos dados.</li>
+</ul>
+<p>Próximo projeto: <a href="projeto-banco.html">Contas Bancárias (POO)</a>, em que os dados ganham regras próprias dentro de classes.</p>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
