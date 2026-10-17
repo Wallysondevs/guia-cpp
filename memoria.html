@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Como a Memória Funciona — bytes, endereços, pilha e heap | Guia C++</title>
+<meta name="description" content="Como a memória funciona em C++ para quem nunca programou: bytes e endereços (o número da casa), sizeof, o operador &amp; que mostra onde a variável mora, a pilha (stack) e o monte (heap), o tempo de vida das variáveis e o estouro da pilha, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Como a Memória Funciona</span></h1>
+
+<p class="intro">Até agora você criou variáveis sem pensar <strong>onde</strong> elas ficam. Para entender ponteiros, <code>new</code> e ponteiros inteligentes (as próximas aulas), você precisa de um mapa da memória. Esta aula não tem nada de novo para decorar: é o mapa. Você vai ver que a memória é uma rua comprida de casinhas numeradas, que cada variável mora num endereço, e que existem dois "bairros" com regras bem diferentes: a <strong>pilha</strong> e o <strong>heap</strong>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que são <strong>bytes</strong> e <strong>endereços</strong> (o "número da casa" de cada byte).</li>
+  <li>Como perguntar o tamanho de um tipo ou variável com <code>sizeof</code>.</li>
+  <li>Como ver o endereço de uma variável com <code>&amp;x</code>, e por que ele muda a cada execução.</li>
+  <li>A diferença entre a <strong>pilha</strong> (stack) e o <strong>monte</strong> (heap).</li>
+  <li>Quanto tempo vive cada variável, e o que acontece quando a pilha estoura.</li>
+</ul>
+</div>
+
+<p>Todos os programas foram compilados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>, um Linux de 64 bits), na pasta <code>~/cpp</code>, com o comando padrão do guia, <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code> (veja <a href="compilar.html">Compilar com g++</a>).</p>
+
+<hr>
+
+<h2>A ideia: uma rua de casinhas numeradas</h2>
+<p>Imagine uma rua muito, muito comprida. Cada casa é minúscula e guarda <strong>um único número pequeno</strong>, de 0 a 255. Cada casa tem uma placa com o seu <strong>número</strong>, e não existem duas casas com o mesmo número. A memória do computador (a RAM) é exatamente isso:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na rua</th><th>Na memória</th></tr>
+<tr><td>Uma casa</td><td>Um <strong>byte</strong>: o menor pedaço de memória que tem número próprio. Guarda um valor de 0 a 255 (8 <em>bits</em>, oito "zeros ou uns").</td></tr>
+<tr><td>O número da casa</td><td>O <strong>endereço</strong> do byte.</td></tr>
+<tr><td>Uma família que precisa de 4 casas</td><td>Uma variável <code>int</code>, que ocupa 4 bytes <strong>vizinhos</strong>.</td></tr>
+<tr><td>O endereço da família</td><td>O número da <strong>primeira</strong> casa que ela ocupa.</td></tr>
+</table>
+</div>
+
+<p>Quando você escreve <code>int idade = 29;</code>, o compilador reserva 4 casas seguidas, guarda o 29 nelas e anota: "<code>idade</code> mora a partir da casa tal". O nome <code>idade</code> só existe no seu código. Lá dentro do computador, só existem os números das casas.</p>
+
+<hr>
+
+<h2>1. Quantas casas cada tipo ocupa: <code>sizeof</code></h2>
+<p>O operador <code>sizeof</code> ("size of", tamanho de) responde quantos bytes um tipo ou uma variável ocupa:</p>
+
+<pre class="file" data-file="tamanhos.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::cout &lt;&lt; "char:        " &lt;&lt; sizeof(char) &lt;&lt; " byte\n";
+    std::cout &lt;&lt; "bool:        " &lt;&lt; sizeof(bool) &lt;&lt; " byte\n";
+    std::cout &lt;&lt; "int:         " &lt;&lt; sizeof(int) &lt;&lt; " bytes\n";
+    std::cout &lt;&lt; "long long:   " &lt;&lt; sizeof(long long) &lt;&lt; " bytes\n";
+    std::cout &lt;&lt; "float:       " &lt;&lt; sizeof(float) &lt;&lt; " bytes\n";
+    std::cout &lt;&lt; "double:      " &lt;&lt; sizeof(double) &lt;&lt; " bytes\n";
+    std::cout &lt;&lt; "std::string: " &lt;&lt; sizeof(std::string) &lt;&lt; " bytes\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tamanhos.cpp -o tamanhos
+$ ./tamanhos
+char:        1 byte
+bool:        1 byte
+int:         4 bytes
+long long:   8 bytes
+float:       4 bytes
+double:      8 bytes
+std::string: 32 bytes        « o "envelope" da string, não o texto (veja abaixo)</pre>
+
+<p>Alguns detalhes:</p>
+<ul>
+  <li><code>char</code> sempre ocupa 1 byte, por definição. Os outros tamanhos dependem da máquina e do compilador. Os números acima são os de um Linux de 64 bits com o g++, que é o caso mais comum hoje. Veja a tabela completa em <a href="ref-tipos.html">Tipos e Limites</a>.</li>
+  <li>O <code>bool</code> só precisa de um bit (verdadeiro ou falso), mas ocupa 1 byte inteiro, porque o byte é a menor casa com endereço.</li>
+  <li>O <code>sizeof(std::string)</code> dá 32 <strong>mesmo que o texto tenha mil letras</strong>. Os 32 bytes são o "envelope" (onde está o texto, quantas letras tem). Texto grande fica guardado em outro lugar, o heap, que você vai ver daqui a pouco.</li>
+</ul>
+
+<h3><code>sizeof</code> de uma variável</h3>
+<p>Você também pode perguntar o tamanho de uma variável. Com variável, os parênteses são opcionais (<code>sizeof altura</code>); com um tipo, são obrigatórios (<code>sizeof(int)</code>). Num array, <code>sizeof</code> devolve o tamanho de <strong>todos</strong> os itens juntos:</p>
+
+<pre class="file" data-file="sizeof-var.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 29;
+    double altura = 1.65;
+    int notas[5] = {7, 8, 6, 9, 10};
+
+    std::cout &lt;&lt; "idade:  " &lt;&lt; sizeof(idade) &lt;&lt; " bytes\n";
+    std::cout &lt;&lt; "altura: " &lt;&lt; sizeof altura &lt;&lt; " bytes\n";
+    std::cout &lt;&lt; "notas:  " &lt;&lt; sizeof(notas) &lt;&lt; " bytes\n";
+    std::cout &lt;&lt; "itens:  " &lt;&lt; sizeof(notas) / sizeof(notas[0]) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sizeof-var.cpp -o sizeof-var
+$ ./sizeof-var
+idade:  4 bytes
+altura: 8 bytes
+notas:  20 bytes             « 5 itens × 4 bytes
+itens:  5                    « 20 bytes ÷ 4 bytes por item</pre>
+
+<p>A conta <code>sizeof(notas) / sizeof(notas[0])</code> (tamanho total dividido pelo tamanho de um item) é um truque antigo para descobrir quantos itens um array tem. Ele tem uma armadilha séria, que aparece em <a href="ponteiros-arrays.html">Ponteiros e Arrays</a>. Hoje, prefira <code>std::size(notas)</code>, ou use logo um <a href="std-array.html"><code>std::array</code></a> ou <a href="vector.html"><code>std::vector</code></a>, que sabem o próprio tamanho com <code>.size()</code>.</p>
+
+<hr>
+
+<h2>2. Onde a variável mora: o endereço <code>&amp;x</code></h2>
+<p>Colocar <code>&amp;</code> <strong>antes</strong> do nome de uma variável pergunta: "qual é o número da sua casa?". O resultado é o <strong>endereço</strong> dela:</p>
+
+<pre class="file" data-file="endereco.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 29;
+    double altura = 1.65;
+
+    std::cout &lt;&lt; "idade  vale " &lt;&lt; idade  &lt;&lt; " e mora em " &lt;&lt; &amp;idade  &lt;&lt; "\n";
+    std::cout &lt;&lt; "altura vale " &lt;&lt; altura &lt;&lt; " e mora em " &lt;&lt; &amp;altura &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra endereco.cpp -o endereco
+$ ./endereco
+idade  vale 29 e mora em 0x7ffe28cde85c
+altura vale 1.65 e mora em 0x7ffe28cde860
+$ ./endereco                  « o mesmo programa, de novo
+idade  vale 29 e mora em 0x7fff6199f62c
+altura vale 1.65 e mora em 0x7fff6199f630</pre>
+
+<dl class="anatomy">
+  <dt>&amp;idade</dt><dd>O <strong>operador de endereço</strong>. Não confunda com o <code>&amp;</code> da aula <a href="referencias.html">Referências</a>: lá ele vinha <strong>depois de um tipo</strong> (<code>int&amp; r</code>, "referência para int"); aqui ele vem <strong>antes de uma variável</strong> (<code>&amp;idade</code>, "endereço de idade"). Mesmo símbolo, dois trabalhos.</dd>
+  <dt>0x</dt><dd>Avisa que o número está em <strong>hexadecimal</strong> (base 16). Endereços são números enormes, e o hexadecimal os escreve mais curto. Os "algarismos" vão de <code>0</code> a <code>9</code> e depois de <code>a</code> (10) a <code>f</code> (15).</dd>
+  <dt>7ffe28cde85c</dt><dd>O número da casa. Em decimal, seria 140 729 583 003 740. Você não precisa fazer essa conta: endereços servem para comparar e para o computador usar, não para ler.</dd>
+</dl>
+
+<p>Repare em duas coisas na saída:</p>
+
+<ol>
+  <li><strong>Os endereços mudaram de uma execução para outra.</strong> Isso é normal e proposital. O Linux sorteia, a cada execução, onde cada região de memória do programa vai começar. Essa proteção se chama <strong>ASLR</strong> (<em>Address Space Layout Randomization</em>, "embaralhamento do mapa de memória") e atrapalha quem tenta invadir um programa adivinhando onde estão as coisas. Por isso, quando você rodar estes exemplos, vai ver <strong>outros</strong> números. Nunca escreva um endereço fixo no seu código.</li>
+  <li><strong>As duas variáveis moram coladas.</strong> Na primeira execução, <code>idade</code> começa em <code>…85c</code> e <code>altura</code> em <code>…860</code>. A diferença é 4 (em hexadecimal, depois de <code>c</code> vem <code>d</code>, <code>e</code>, <code>f</code>, <code>60</code>), exatamente o tamanho de um <code>int</code>.</li>
+</ol>
+
+<figure>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Casa (endereço)</th><th>…85c</th><th>…85d</th><th>…85e</th><th>…85f</th><th>…860</th><th>…861</th><th>…</th><th>…867</th><th>…868</th></tr>
+<tr><td>Quem mora</td><td colspan="4"><code>idade</code> (4 bytes) = 29</td><td colspan="4"><code>altura</code> (8 bytes) = 1.65</td><td>outra coisa</td></tr>
+</table>
+</div>
+<figcaption>A rua da primeira execução. <code>&amp;idade</code> é o número da <strong>primeira</strong> casa da família <code>idade</code>; as outras três vêm logo em seguida.</figcaption>
+</figure>
+
+<p>O compilador escolhe a ordem e a posição das variáveis como achar melhor: às vezes deixa um espaço vazio entre elas, às vezes inverte a ordem. Nos <strong>arrays</strong>, porém, a regra é fixa: os itens moram sempre colados, um depois do outro:</p>
+
+<pre class="file" data-file="vizinhos.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int notas[3] = {7, 8, 6};
+
+    std::cout &lt;&lt; "notas[0] mora em " &lt;&lt; &amp;notas[0] &lt;&lt; "\n";
+    std::cout &lt;&lt; "notas[1] mora em " &lt;&lt; &amp;notas[1] &lt;&lt; "\n";
+    std::cout &lt;&lt; "notas[2] mora em " &lt;&lt; &amp;notas[2] &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra vizinhos.cpp -o vizinhos
+$ ./vizinhos
+notas[0] mora em 0x7ffc4ea0571c
+notas[1] mora em 0x7ffc4ea05720     « 4 casas depois
+notas[2] mora em 0x7ffc4ea05724     « mais 4 casas</pre>
+
+<p>Essa "rua sem buracos" é o que permite andar de item em item com ponteiros (aula <a href="ponteiros-arrays.html">Ponteiros e Arrays</a>).</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode e veja onde as variáveis moram. Rode de novo e compare. Depois crie uma variável <code>char inicial = 'A';</code> e mostre <code>sizeof(inicial)</code>. No editor do guia, os endereços terão outra cara (números bem menores): o programa roda em WebAssembly, dentro do navegador, que organiza a memória do seu jeito. A ideia é a mesma.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int idade = 29;
+    double altura = 1.65;
+
+    std::cout &lt;&lt; "idade:  " &lt;&lt; sizeof(idade)  &lt;&lt; " bytes, mora em " &lt;&lt; &amp;idade  &lt;&lt; "\n";
+    std::cout &lt;&lt; "altura: " &lt;&lt; sizeof(altura) &lt;&lt; " bytes, mora em " &lt;&lt; &amp;altura &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Dois bairros: a pilha e o heap</h2>
+<p>A memória de um programa em execução é dividida em regiões. Duas delas importam muito para você:</p>
+
+<ul>
+  <li>A <strong>pilha</strong> (em inglês, <em>stack</em>). Pense numa pilha de bandejas no restaurante. Cada função que começa a rodar pega uma bandeja e coloca em cima da pilha, com as variáveis locais dela. Quando a função termina, a bandeja dela sai de cima e é reaproveitada. Rápido, automático e organizado, mas pequeno.</li>
+  <li>O <strong>monte</strong> (em inglês, <em>heap</em>). Pense num depósito de aluguel. Você pede um espaço do tamanho que precisar, quando precisar, e ele fica seu até você <strong>devolver</strong>. Grande e flexível, mas alguém precisa lembrar de devolver.</li>
+</ul>
+
+<figure>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Região</th><th>Endereços (na Ana)</th><th>O que mora lá</th></tr>
+<tr><td><strong>Pilha</strong> ↓ cresce para baixo</td><td>altos, perto de <code>0x7ff…</code></td><td>Variáveis locais e parâmetros de cada função em andamento.</td></tr>
+<tr><td>(espaço livre)</td><td></td><td>A pilha e o heap crescem um em direção ao outro.</td></tr>
+<tr><td><strong>Heap</strong> ↑ cresce para cima</td><td>mais baixos, perto de <code>0x5…</code> ou <code>0x6…</code></td><td>O que é pedido durante a execução: os itens de um <code>std::vector</code>, o texto de uma <code>std::string</code> grande, o que se cria com <code>new</code>.</td></tr>
+<tr><td><strong>Globais</strong></td><td>perto do heap</td><td>Variáveis criadas fora de qualquer função.</td></tr>
+<tr><td><strong>Código</strong></td><td>os mais baixos do programa</td><td>As instruções do próprio programa.</td></tr>
+</table>
+</div>
+<figcaption>O mapa simplificado de um programa no Linux de 64 bits. Os números exatos mudam a cada execução (ASLR), mas a arrumação é sempre essa.</figcaption>
+</figure>
+
+<h3>A pilha em ação</h3>
+<p>Veja as bandejas se empilhando: <code>main</code> chama <code>primeira</code>, que chama <code>segunda</code>. Cada uma tem uma variável local:</p>
+
+<pre class="file" data-file="pilha.cpp">#include &lt;iostream&gt;
+
+void segunda() {
+    int c = 3;
+    std::cout &lt;&lt; "c (em segunda) mora em " &lt;&lt; &amp;c &lt;&lt; "\n";
+}
+
+void primeira() {
+    int b = 2;
+    std::cout &lt;&lt; "b (em primeira) mora em " &lt;&lt; &amp;b &lt;&lt; "\n";
+    segunda();
+}
+
+int main() {
+    int a = 1;
+    std::cout &lt;&lt; "a (em main)     mora em " &lt;&lt; &amp;a &lt;&lt; "\n";
+    primeira();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra pilha.cpp -o pilha
+$ ./pilha
+a (em main)     mora em 0x7ffd4c532854
+b (em primeira) mora em 0x7ffd4c532834     « 0x20 (32) casas abaixo
+c (em segunda) mora em 0x7ffd4c532814      « mais 32 casas abaixo</pre>
+
+<p>Cada função nova ganhou uma bandeja <strong>abaixo</strong> da anterior: no computador, a pilha cresce para os endereços menores. Desenhando de cima para baixo, como os endereços:</p>
+
+<figure>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Bandeja (de quem)</th><th>Variáveis</th><th>Endereço</th></tr>
+<tr><td><code>main</code></td><td><code>a = 1</code></td><td><code>0x7ffd4c532854</code></td></tr>
+<tr><td><code>primeira</code></td><td><code>b = 2</code></td><td><code>0x7ffd4c532834</code></td></tr>
+<tr><td><code>segunda</code> (o topo da pilha)</td><td><code>c = 3</code></td><td><code>0x7ffd4c532814</code></td></tr>
+</table>
+</div>
+<figcaption>A pilha no momento em que <code>segunda</code> mostra o endereço de <code>c</code>. Quando <code>segunda</code> termina, a bandeja dela sai; depois sai a de <code>primeira</code>.</figcaption>
+</figure>
+
+<h3>A bandeja é reaproveitada</h3>
+<p>Quando uma função termina, as variáveis locais dela <strong>deixam de existir</strong>. Se a mesma função for chamada de novo, ela ganha uma bandeja nova (muitas vezes no mesmo lugar) e as variáveis nascem de novo, do zero:</p>
+
+<pre class="file" data-file="reuso.cpp">#include &lt;iostream&gt;
+
+void contar() {
+    int vezes = 0;
+    vezes = vezes + 1;
+    std::cout &lt;&lt; "vezes = " &lt;&lt; vezes &lt;&lt; " (mora em " &lt;&lt; &amp;vezes &lt;&lt; ")\n";
+}
+
+int main() {
+    contar();
+    contar();
+    contar();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra reuso.cpp -o reuso
+$ ./reuso
+vezes = 1 (mora em 0x7ffc20a28944)
+vezes = 1 (mora em 0x7ffc20a28944)       « mesma casa, mas a variável nasceu de novo
+vezes = 1 (mora em 0x7ffc20a28944)</pre>
+
+<p>A <code>vezes</code> nunca chega a 2: cada chamada cria uma <code>vezes</code> nova, valendo 0. É por isso que, na aula <a href="referencias.html">Referências</a>, devolver um apelido para uma variável local dava problema: quando a função termina, a bandeja dela vira terreno livre, e a próxima função pode escrever por cima.</p>
+
+<h3>O heap em ação</h3>
+<p>Você já usou o heap sem saber. Um <code>std::vector</code> tem duas partes: um "controle" pequeno, que mora na pilha como qualquer variável local, e os <strong>itens</strong>, que moram no heap. O <code>.data()</code> mostra onde começam os itens:</p>
+
+<pre class="file" data-file="heap.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    int local = 10;
+    std::vector&lt;int&gt; lista = {1, 2, 3};
+
+    std::cout &lt;&lt; "local          (pilha) mora em  " &lt;&lt; &amp;local &lt;&lt; "\n";
+    std::cout &lt;&lt; "lista          (pilha) mora em  " &lt;&lt; &amp;lista &lt;&lt; "\n";
+    std::cout &lt;&lt; "itens da lista (heap)  moram em " &lt;&lt; lista.data() &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra heap.cpp -o heap
+$ ./heap
+local          (pilha) mora em  0x7fff449b82b4
+lista          (pilha) mora em  0x7fff449b82c0
+itens da lista (heap)  moram em 0x65010a34a020    « outro bairro, bem longe</pre>
+
+<p>Os dois primeiros endereços começam com <code>0x7fff…</code> (pilha). O terceiro, <code>0x6501…</code>, é de outro bairro: o heap. O vetor pediu ao heap espaço para 3 <code>int</code>s e, quando a <code>lista</code> deixar de existir, ele <strong>devolve</strong> esse espaço sozinho. Você não precisa fazer nada. Pedir e devolver espaço no heap "na mão" é assunto da aula <a href="new-delete.html">Memória Dinâmica (new e delete)</a>, e fazer isso com segurança, da aula <a href="smart-pointers.html">Ponteiros Inteligentes</a>.</p>
+
+<h3>Pilha × heap</h3>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Pilha (stack)</th><th>Heap (monte)</th></tr>
+<tr><td>Quem usa</td><td>Variáveis locais e parâmetros</td><td><code>std::vector</code>, <code>std::string</code>, <code>new</code>, <code>std::make_unique</code></td></tr>
+<tr><td>Quem reserva e devolve</td><td>O compilador, sozinho, na entrada e na saída de cada bloco</td><td>O programa, quando pede e quando devolve</td></tr>
+<tr><td>Tamanho</td><td>Pequeno: 8 MB por padrão no Linux</td><td>Quase toda a RAM livre</td></tr>
+<tr><td>Velocidade</td><td>Muito rápida</td><td>Mais lenta (é preciso achar um espaço livre)</td></tr>
+<tr><td>Tamanho da variável</td><td>Precisa ser conhecido ao compilar</td><td>Pode ser decidido durante a execução</td></tr>
+<tr><td>Erro típico</td><td>Estouro da pilha (<em>stack overflow</em>)</td><td>Esquecer de devolver (vazamento) ou usar depois de devolver</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>4. Quanto tempo vive cada variável</h2>
+<p>O <strong>tempo de vida</strong> é o intervalo entre o momento em que a caixa é montada e o momento em que é desmontada. Em C++, existem três tipos principais:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Exemplo</th><th>Nasce</th><th>Morre</th></tr>
+<tr><td><strong>Automático</strong> (local, na pilha)</td><td><code>int x = 5;</code> dentro de uma função ou bloco</td><td>Na linha da declaração</td><td>No <code>}</code> que fecha o bloco onde ela foi criada</td></tr>
+<tr><td><strong>Estático</strong> (global)</td><td><code>int visitas = 0;</code> fora das funções</td><td>Antes do <code>main</code> começar</td><td>Quando o programa termina</td></tr>
+<tr><td><strong>Dinâmico</strong> (no heap)</td><td>os itens de um <code>std::vector</code>, um <code>new int</code></td><td>Quando o programa pede</td><td>Quando o programa devolve</td></tr>
+</table>
+</div>
+
+<h3>Morreu no <code>}</code></h3>
+<p>Qualquer par de chaves <code>{ }</code> forma um bloco, e a variável criada dentro dele morre no <code>}</code>. Depois disso, o nome nem existe mais:</p>
+
+<pre class="file" data-file="escopo.cpp">#include &lt;iostream&gt;
+
+int main() {
+    {
+        int temporaria = 5;
+        std::cout &lt;&lt; "Dentro: " &lt;&lt; temporaria &lt;&lt; "\n";
+    }
+    std::cout &lt;&lt; "Fora: " &lt;&lt; temporaria &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra escopo.cpp -o escopo
+escopo.cpp: In function ‘int main()’:
+escopo.cpp:8:30: error: ‘temporaria’ was not declared in this scope
+    8 |     std::cout &lt;&lt; "Fora: " &lt;&lt; temporaria &lt;&lt; "\n";
+      |                              ^~~~~~~~~~</pre>
+
+<p>"<code>temporaria</code> não foi declarada neste escopo". O <strong>escopo</strong> (a região do código onde um nome vale) e o <strong>tempo de vida</strong> andam juntos para as variáveis locais. A aula <a href="escopo.html">Escopo</a> explica as regras dos nomes.</p>
+
+<h3>A global vive o programa inteiro</h3>
+
+<pre class="file" data-file="global.cpp">#include &lt;iostream&gt;
+
+int visitas = 0;              // global: vive o programa inteiro
+
+void visitar() {
+    int agora = 1;            // local: nasce e morre a cada chamada
+    visitas = visitas + agora;
+    std::cout &lt;&lt; "visitas = " &lt;&lt; visitas &lt;&lt; "\n";
+}
+
+int main() {
+    visitar();
+    visitar();
+    visitar();
+    std::cout &lt;&lt; "global visitas mora em " &lt;&lt; &amp;visitas &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra global.cpp -o global
+$ ./global
+visitas = 1
+visitas = 2                  « a global guardou o valor entre as chamadas
+visitas = 3
+global visitas mora em 0x62832db57154    « longe da pilha (0x7ff…)</pre>
+
+<p>Compare com o <code>reuso.cpp</code>: lá, a local voltava sempre a 0. Variáveis globais são práticas, mas qualquer função pode mexer nelas, e isso torna o programa difícil de entender. Use pouco.</p>
+
+<hr>
+
+<h2>5. A pilha é pequena</h2>
+<p>No Linux, cada programa ganha, por padrão, uma pilha de <strong>8 MB</strong>. Você pode conferir com <code>ulimit -s</code>, que mostra o tamanho em kilobytes:</p>
+
+<pre class="term" data-cwd="~/cpp">$ ulimit -s
+8192                         « 8192 KB = 8 MB</pre>
+
+<p>Parece muito, mas um array local grande passa disso fácil. Três milhões de <code>int</code> são 12 MB:</p>
+
+<pre class="file" data-file="estouro.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int numeros[3'000'000];      // 3 milhões de int na pilha: 12 MB
+    numeros[0] = 1;
+    std::cout &lt;&lt; "Coube! " &lt;&lt; numeros[0] &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra estouro.cpp -o estouro
+$ ./estouro
+Falha de segmentação     (imagem do núcleo gravada) ./estouro
+$ echo $?
+139</pre>
+
+<p>Compilou sem nenhum aviso, e o programa morreu antes de mostrar qualquer coisa. Isso é um <strong>estouro da pilha</strong> (<em>stack overflow</em>, o nome do famoso site de perguntas vem daí): o programa tentou usar casas além do fim do bairro. O sistema percebe e mata o programa com uma <strong>falha de segmentação</strong> (em inglês, <code>Segmentation fault</code>); o código <code>139</code> é a marca disso. Os apóstrofos em <code>3'000'000</code> são só separadores de milhar, permitidos desde o C++14.</p>
+
+<p><strong>Conserto:</strong> coisas grandes vão para o heap. O jeito mais simples é um <code>std::vector</code>:</p>
+
+<pre class="file" data-file="estouro-ok.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int main() {
+    std::vector&lt;int&gt; numeros(3'000'000);   // os itens vão para o heap
+    numeros[0] = 1;
+    std::cout &lt;&lt; "Coube! " &lt;&lt; numeros[0] &lt;&lt; " (" &lt;&lt; numeros.size() &lt;&lt; " itens)\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra estouro-ok.cpp -o estouro-ok
+$ ./estouro-ok
+Coube! 1 (3000000 itens)</pre>
+
+<p>O outro jeito clássico de estourar a pilha é uma função que chama a si mesma sem parar: cada chamada empilha mais uma bandeja. Veja em <a href="recursao.html">Recursão</a>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"Falha de segmentação" sem mensagem nenhuma do programa</strong>
+<pre class="term" data-cwd="~/cpp">$ ./estouro
+Falha de segmentação     (imagem do núcleo gravada) ./estouro
+$ echo $?
+139</pre>
+<p><strong>O que aconteceu:</strong> o programa mexeu numa memória que não podia. Nesta aula, a causa foi um array local grande demais para a pilha. Outras causas comuns aparecem nas próximas aulas: ponteiro nulo (<a href="nullptr.html">nullptr</a>), ponteiro para memória já devolvida (<a href="new-delete.html">new e delete</a>) e referência pendurada.</p>
+<p><strong>Como resolver:</strong> se você tem um array local enorme, troque por <code>std::vector</code>. Se não sabe onde está o problema, compile com <code>-g</code> e use o <a href="depuracao-gdb.html">GDB</a>, ou um <a href="sanitizers.html">sanitizer</a>, que dizem a linha.</p>
+</div>
+
+<div class="cenario">
+<strong>"was not declared in this scope" para uma variável que existe</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra escopo.cpp -o escopo
+escopo.cpp: In function ‘int main()’:
+escopo.cpp:8:30: error: ‘temporaria’ was not declared in this scope
+    8 |     std::cout &lt;&lt; "Fora: " &lt;&lt; temporaria &lt;&lt; "\n";
+      |                              ^~~~~~~~~~</pre>
+<p><strong>O que aconteceu:</strong> a variável existe, mas morreu no <code>}</code> antes da linha que a usa.</p>
+<p><strong>Como resolver:</strong> declare a variável <strong>antes</strong> do bloco, no nível em que ela vai ser usada.</p>
+</div>
+
+<div class="cenario">
+<strong>O endereço de um <code>char</code> aparece como texto</strong>
+<pre class="file" data-file="letra.cpp">#include &lt;iostream&gt;
+
+int main() {
+    char letra = 'A';
+    std::cout &lt;&lt; "Endereço? " &lt;&lt; &amp;letra &lt;&lt; "\n";
+    std::cout &lt;&lt; "Endereço: " &lt;&lt; static_cast&lt;void*&gt;(&amp;letra) &lt;&lt; "\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra letra.cpp -o letra
+$ ./letra
+Endereço? A
+Endereço: 0x7ffcbe2cb217</pre>
+<p><strong>O que aconteceu:</strong> para o <code>std::cout</code>, o endereço de um <code>char</code> é o começo de um texto no estilo antigo do C, e ele mostra as letras a partir dali até encontrar um byte zero. Desta vez saiu só <code>A</code>, por sorte; poderia vir lixo depois do <code>A</code>.</p>
+<p><strong>Como resolver:</strong> para ver o número da casa de um <code>char</code>, converta para "endereço genérico" com <code>static_cast&lt;void*&gt;(&amp;letra)</code> (veja <a href="conversao-tipos.html">Conversão de Tipos</a>). Com <code>int</code>, <code>double</code> e os outros tipos, isso não é preciso.</p>
+</div>
+
+<div class="cenario">
+<strong>"Os meus endereços são diferentes dos da aula"</strong>
+<p><strong>O que aconteceu:</strong> nada de errado. Por causa do ASLR, os endereços mudam a cada execução, em qualquer computador. No editor do guia, eles têm até outro formato, porque o programa roda em WebAssembly.</p>
+<p><strong>Como resolver:</strong> não há o que resolver. Compare endereços <strong>do mesmo programa, na mesma execução</strong> (a diferença entre eles), nunca o número em si.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código ou termo</th><th>O que é</th></tr>
+<tr><td>byte</td><td>A menor casa da memória com endereço próprio (8 bits, valores de 0 a 255).</td></tr>
+<tr><td>endereço</td><td>O número de um byte. O endereço de uma variável é o da primeira casa que ela ocupa.</td></tr>
+<tr><td><code>sizeof(tipo)</code></td><td>Quantos bytes o tipo ocupa. <code>sizeof(int)</code> → 4 no Linux de 64 bits.</td></tr>
+<tr><td><code>sizeof variavel</code></td><td>Quantos bytes a variável ocupa. Num array, o total de todos os itens.</td></tr>
+<tr><td><code>&amp;x</code></td><td>O endereço de <code>x</code>, mostrado em hexadecimal (<code>0x…</code>).</td></tr>
+<tr><td><code>static_cast&lt;void*&gt;(&amp;c)</code></td><td>Mostra o endereço de um <code>char</code> em vez do texto.</td></tr>
+<tr><td>pilha (stack)</td><td>Região das variáveis locais. Automática, rápida, pequena (8 MB).</td></tr>
+<tr><td>heap (monte)</td><td>Região do que é pedido durante a execução. Grande; precisa ser devolvida.</td></tr>
+<tr><td>ASLR</td><td>Proteção que sorteia os endereços a cada execução.</td></tr>
+<tr><td><code>ulimit -s</code></td><td>Mostra o tamanho máximo da pilha, em KB (no terminal, não no C++).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Tamanho de um tipo</h3>
+<p>Complete para mostrar quantos bytes um <code>double</code> ocupa:</p>
+<div class="ex-code">std::cout &lt;&lt; <input data-answer="sizeof" aria-label="operador">(double);</div>
+</div>
+
+<div class="exercise">
+<h3>2. O endereço</h3>
+<p>Complete para mostrar o endereço da variável <code>preco</code>:</p>
+<div class="ex-code">std::cout &lt;&lt; <input data-answer="&amp;preco" aria-label="expressão">;</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Você rodou o mesmo programa duas vezes e o endereço de <code>idade</code> mudou. Por quê?</p>
+<label><input type="radio" name="q3"> O programa tem um bug</label>
+<label><input type="radio" name="q3"> A variável mudou de valor</label>
+<label><input type="radio" name="q3"> O sistema sorteia onde as regiões da memória começam (ASLR)</label>
+<label><input type="radio" name="q3"> Faltou compilar com <code>-Wall</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Onde moram os <strong>itens</strong> de um <code>std::vector&lt;int&gt;</code> criado dentro do <code>main</code>?</p>
+<label><input type="radio" name="q4"> Na pilha, junto com as outras variáveis locais</label>
+<label><input type="radio" name="q4"> No heap; na pilha fica só o "controle" do vetor</label>
+<label><input type="radio" name="q4"> Junto com o código do programa</label>
+<label><input type="radio" name="q4"> No disco</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Uma função tem <code>int contador = 0; contador++;</code> e é chamada 3 vezes. Quanto vale <code>contador</code> no fim da terceira chamada?</p>
+<label><input type="radio" name="q5"> 3</label>
+<label><input type="radio" name="q5"> 0</label>
+<label><input type="radio" name="q5"> Um valor imprevisível</label>
+<label><input type="radio" name="q5"> 1, porque a variável local nasce de novo a cada chamada</label>
+</div>
+
+<h3>Missão final: quantos produtos?</h3>
+
+<div class="trycpp" data-goal="out:Bytes: 48,out:Itens: 6,src:sizeof">
+<p class="try-task"><strong>Missão:</strong> a lojinha da Ana guarda 6 preços num array de <code>double</code>. Sem contar à mão e sem escrever o número 6 no <code>std::cout</code>, use <code>sizeof</code> para mostrar quantos bytes o array ocupa e quantos itens ele tem:</p>
+<pre class="out">Bytes: 48
+Itens: 6</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    double precos[6] = {4.5, 3.0, 12.9, 7.25, 1.99, 5.0};
+
+    // mostre "Bytes: " e o tamanho total do array
+    // mostre "Itens: " e o total dividido pelo tamanho de um item
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    double precos[6] = {4.5, 3.0, 12.9, 7.25, 1.99, 5.0};
+
+    std::cout &lt;&lt; "Bytes: " &lt;&lt; sizeof(precos) &lt;&lt; "\n";
+    std::cout &lt;&lt; "Itens: " &lt;&lt; sizeof(precos) / sizeof(precos[0]) &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>A memória é uma rua de <strong>bytes</strong>; cada byte tem um <strong>endereço</strong> (o número da casa).</li>
+  <li><code>sizeof</code> diz quantos bytes um tipo ou variável ocupa: <code>char</code> 1, <code>int</code> 4, <code>double</code> 8 (no Linux de 64 bits).</li>
+  <li><code>&amp;x</code> mostra o endereço de <code>x</code>, em hexadecimal. Ele muda a cada execução (ASLR); isso é normal.</li>
+  <li>Variáveis locais moram na <strong>pilha</strong>: cada função ganha uma bandeja, que sai quando ela termina. A pilha é rápida, mas pequena (8 MB).</li>
+  <li>O <strong>heap</strong> guarda o que é pedido durante a execução (itens de <code>std::vector</code>, <code>std::string</code>, <code>new</code>) e precisa ser devolvido. Os containers devolvem sozinhos.</li>
+  <li>Locais morrem no <code>}</code>; globais vivem o programa inteiro; o que está no heap vive até ser devolvido.</li>
+  <li>Próxima aula: <a href="ponteiros.html">Ponteiros</a>, variáveis que <strong>guardam</strong> um endereço.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
