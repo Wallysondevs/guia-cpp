@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ switch — case, break e default | Guia C++</title>
+<meta name="description" content="switch em C++ para quem nunca programou: case, break e default, o fall-through e o aviso -Wimplicit-fallthrough, [[fallthrough]], por que switch só aceita inteiros, char e enum (o erro real com std::string), e o erro jump to case label ao declarar variável dentro de um case, com saídas reais do g++ 15.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">switch</span></h1>
+
+<p class="intro">Um caixa eletrônico mostra: "1 - Saldo, 2 - Depósito, 3 - Sair". Dá para tratar cada opção com <a href="else-if.html">else if</a> (<code>if (opcao == 1) … else if (opcao == 2) …</code>), mas, quando você compara <strong>uma variável</strong> com uma lista de <strong>valores exatos</strong>, o C++ tem uma estrutura feita sob medida: o <code>switch</code> ("chave", como a chave de trilhos que desvia o trem). Nesta aula você vai montar o menu do caixa, entender a famosa "queda" de um <code>case</code> para o outro e conhecer os erros que o <code>switch</code> provoca quando usado fora do que ele aceita.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>As peças do <code>switch</code>: <code>case</code>, <code>break</code> e <code>default</code>.</li>
+  <li>O que acontece quando falta o <code>break</code> (o <em>fall-through</em>) e o aviso <code>-Wimplicit-fallthrough</code>.</li>
+  <li>Como juntar vários valores na mesma resposta e como cair de propósito com <code>[[fallthrough]]</code>.</li>
+  <li>Por que o <code>switch</code> só aceita inteiros, <code>char</code> e <code>enum</code> (e o erro com <code>std::string</code>).</li>
+  <li>O erro <code>jump to case label</code> ao criar uma variável dentro de um <code>case</code>, e o conserto com <code>{ }</code>.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15.2</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: o elevador</h2>
+<p>No painel de um elevador, você aperta <strong>um número exato</strong>: 1, 2, 3. O elevador não pergunta "o andar é maior que 2?"; ele vai direto ao andar pedido. Se você apertar um botão que não existe, nada acontece (ou toca um alarme).</p>
+<p>O <code>switch</code> é assim: ele olha o valor de uma variável e <strong>pula direto</strong> para o <code>case</code> ("caso") com aquele valor. Se nenhum <code>case</code> combinar, vai para o <code>default</code> ("padrão"), o "alarme" para valores inesperados.</p>
+
+<hr>
+
+<h2>1. O menu do caixa eletrônico</h2>
+
+<pre class="file" data-file="menu.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int opcao = 0;
+    std::cout &lt;&lt; "1-Saldo 2-Depósito 3-Sair: ";
+    std::cin &gt;&gt; opcao;
+
+    switch (opcao) {
+        case 1:
+            std::cout &lt;&lt; "Seu saldo é R$ 150\n";
+            break;
+        case 2:
+            std::cout &lt;&lt; "Quanto quer depositar?\n";
+            break;
+        case 3:
+            std::cout &lt;&lt; "Até logo!\n";
+            break;
+        default:
+            std::cout &lt;&lt; "Opção inválida\n";
+    }
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>switch (opcao)</dt><dd>A variável a ser examinada, entre parênteses. O <code>switch</code> calcula o valor dela <strong>uma vez</strong>.</dd>
+  <dt>{ … }</dt><dd>O corpo do <code>switch</code>, com todos os casos dentro de um único par de chaves.</dd>
+  <dt>case 1:</dt><dd>Um <strong>rótulo</strong>: "se o valor for 1, comece aqui". Termina com <strong>dois-pontos</strong>, não com ponto e vírgula. O valor precisa ser uma <strong>constante</strong> (um número escrito no código, um <code>char</code> como <code>'S'</code>, uma <code>const</code>).</dd>
+  <dt>break;</dt><dd>"Quebre": sai do <code>switch</code> e continua depois da <code>}</code>. Sem ele, o programa continua executando o <code>case</code> de baixo (seção 2).</dd>
+  <dt>default:</dt><dd>Para qualquer valor que não tenha <code>case</code>. É opcional, mas quase sempre útil. Como é o último, não precisa de <code>break</code> (muita gente coloca assim mesmo, por hábito).</dd>
+</dl>
+
+<pre class="term" data-cwd="~/switch">$ g++ -std=c++23 -Wall -Wextra menu.cpp -o menu
+$ ./menu
+1-Saldo 2-Depósito 3-Sair: 1      « a Ana digitou 1 e Enter
+Seu saldo é R$ 150
+$ ./menu
+1-Saldo 2-Depósito 3-Sair: 3
+Até logo!
+$ ./menu
+1-Saldo 2-Depósito 3-Sair: 9
+Opção inválida</pre>
+
+<p>O mesmo menu com <code>else if</code> funcionaria igual. A vantagem do <code>switch</code> é a <strong>leitura</strong>: fica claro que tudo depende de uma variável só, e cada valor aparece alinhado, como numa tabela. Para muitas opções, o compilador também consegue gerar um código que pula direto ao caso certo, sem testar um por um.</p>
+
+<hr>
+
+<h2>2. Sem <code>break</code>: o programa "cai" no próximo caso</h2>
+<p>Este é o comportamento mais estranho do <code>switch</code>, herdado da linguagem C. O <code>case</code> marca só onde <strong>começar</strong>; não marca onde parar. Quem para é o <code>break</code>. Veja o menu sem nenhum <code>break</code>, com a opção 1:</p>
+
+<pre class="file" data-file="cai.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int opcao = 1;
+
+    switch (opcao) {
+        case 1:
+            std::cout &lt;&lt; "Seu saldo é R$ 150\n";
+        case 2:
+            std::cout &lt;&lt; "Quanto quer depositar?\n";
+        case 3:
+            std::cout &lt;&lt; "Até logo!\n";
+        default:
+            std::cout &lt;&lt; "Opção inválida\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/switch">$ g++ -std=c++23 -Wall -Wextra cai.cpp -o cai
+cai.cpp: In function ‘int main()’:
+cai.cpp:8:26: warning: this statement may fall through [-Wimplicit-fallthrough=]
+    8 |             std::cout &lt;&lt; "Seu saldo é R$ 150\n";
+      |                          ^~~~~~~~~~~~~~~~~~~~~~
+cai.cpp:9:9: note: here
+    9 |         case 2:
+      |         ^~~~
+cai.cpp:10:26: warning: this statement may fall through [-Wimplicit-fallthrough=]
+   10 |             std::cout &lt;&lt; "Quanto quer depositar?\n";
+      |                          ^~~~~~~~~~~~~~~~~~~~~~~~~~
+cai.cpp:11:9: note: here
+   11 |         case 3:
+      |         ^~~~
+cai.cpp:12:26: warning: this statement may fall through [-Wimplicit-fallthrough=]
+   12 |             std::cout &lt;&lt; "Até logo!\n";
+      |                          ^~~~~~~~~~~~~
+cai.cpp:13:9: note: here
+   13 |         default:
+      |         ^~~~~~~
+$ ./cai
+Seu saldo é R$ 150
+Quanto quer depositar?   « caiu no case 2…
+Até logo!                « …no case 3…
+Opção inválida           « …e no default</pre>
+
+<p>O <code>switch</code> pulou para o <code>case 1</code> e foi executando tudo para baixo, passando por cima dos outros rótulos como se eles não existissem. Isso se chama <strong>fall-through</strong> ("cair através").</p>
+
+<dl class="anatomy">
+  <dt>warning: this statement may fall through</dt><dd>"Esta instrução pode cair para o próximo caso".</dd>
+  <dt>note: here</dt><dd>"Aqui": mostra o <code>case</code> em que ela vai cair.</dd>
+  <dt>[-Wimplicit-fallthrough=]</dt><dd>O nome do aviso. No g++, ele vem com o <code>-Wextra</code>: mais um motivo para nunca compilar sem ele.</dd>
+</dl>
+
+<p>No editor do guia (Clang), esse aviso <strong>não</strong> vem com <code>-Wall -Wextra</code>: é preciso pedir <code>-Wimplicit-fallthrough</code>. A caixa abaixo já pede. A mensagem do Clang é outra: <code>warning: unannotated fall-through between switch labels [-Wimplicit-fallthrough]</code> ("queda não anotada entre rótulos do switch").</p>
+
+<div class="trycpp" data-flags="-std=c++23 -Wall -Wextra -Wimplicit-fallthrough" data-goal="semaviso,out:Quanto quer depositar?,src:break">
+<p class="try-task"><strong>Missão:</strong> com a opção 2, este menu mostra três mensagens e três avisos. Coloque os <code>break</code> que faltam para que apareça só <code>Quanto quer depositar?</code> e os avisos sumam.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    int opcao = 2;
+
+    switch (opcao) {
+        case 1:
+            std::cout &lt;&lt; "Seu saldo é R$ 150\n";
+        case 2:
+            std::cout &lt;&lt; "Quanto quer depositar?\n";
+        case 3:
+            std::cout &lt;&lt; "Até logo!\n";
+        default:
+            std::cout &lt;&lt; "Opção inválida\n";
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    int opcao = 2;
+
+    switch (opcao) {
+        case 1:
+            std::cout &lt;&lt; "Seu saldo é R$ 150\n";
+            break;
+        case 2:
+            std::cout &lt;&lt; "Quanto quer depositar?\n";
+            break;
+        case 3:
+            std::cout &lt;&lt; "Até logo!\n";
+            break;
+        default:
+            std::cout &lt;&lt; "Opção inválida\n";
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Quando a queda é útil</h2>
+
+<h3>Vários valores, a mesma resposta</h3>
+<p>Rótulos colados, sem nada entre eles, são o jeito de dizer "para este <strong>ou</strong> este valor":</p>
+
+<pre class="file" data-file="grupos.cpp">#include &lt;iostream&gt;
+
+int main() {
+    char resposta = 's';
+
+    switch (resposta) {
+        case 'S':
+        case 's':
+            std::cout &lt;&lt; "Confirmado\n";
+            break;
+        case 'N':
+        case 'n':
+            std::cout &lt;&lt; "Cancelado\n";
+            break;
+        default:
+            std::cout &lt;&lt; "Responda S ou N\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/switch">$ g++ -std=c++23 -Wall -Wextra grupos.cpp -o grupos
+$ ./grupos
+Confirmado               « 's' minúsculo caiu no mesmo bloco do 'S'</pre>
+
+<p>Aqui não há aviso: um <code>case</code> vazio caindo no próximo é obviamente proposital. Repare nas <strong>aspas simples</strong>: <code>'S'</code> é um caractere (<code>char</code>, aula <a href="char.html">Caracteres</a>), que por dentro é um número, e por isso o <code>switch</code> o aceita.</p>
+
+<h3>Cair de propósito: <code>[[fallthrough]]</code> <span class="versao">C++17</span></h3>
+<p>Às vezes você quer mesmo que um caso com código continue no de baixo. Por exemplo, nos planos de uma empresa de nuvem, cada plano inclui tudo o que os planos menores têm:</p>
+
+<pre class="file" data-file="proposital.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int plano = 2;
+
+    std::cout &lt;&lt; "Seu plano inclui:\n";
+    switch (plano) {
+        case 3:
+            std::cout &lt;&lt; "- suporte 24h\n";
+            [[fallthrough]];
+        case 2:
+            std::cout &lt;&lt; "- backup diário\n";
+            [[fallthrough]];
+        case 1:
+            std::cout &lt;&lt; "- 10 GB de espaço\n";
+            break;
+        default:
+            std::cout &lt;&lt; "- nada (plano inválido)\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/switch">$ g++ -std=c++23 -Wall -Wextra proposital.cpp -o proposital
+$ ./proposital
+Seu plano inclui:
+- backup diário          « começou no case 2…
+- 10 GB de espaço        « …caiu no case 1 e parou no break</pre>
+
+<dl class="anatomy">
+  <dt>[[fallthrough]];</dt><dd>Um <strong>atributo</strong> (as instruções entre colchetes duplos são recados para o compilador). Ele diz: "a queda aqui é proposital". O aviso some, e quem lê o código entende que não é esquecimento. Vai sempre logo antes do próximo <code>case</code>, com <code>;</code>.</dd>
+</dl>
+
+<p>Antes do C++17, os programadores escreviam um comentário <code>// fall through</code> no mesmo lugar; o g++ ainda reconhece esse comentário e não avisa. Prefira o atributo, que é padrão e funciona em todo compilador.</p>
+
+<hr>
+
+<h2>4. O que o <code>switch</code> aceita (e o que não aceita)</h2>
+<p>A variável do <code>switch</code> precisa ser de um tipo <strong>inteiro</strong>: <code>int</code>, <code>long</code>, <code>char</code>, <code>bool</code>, ou um <code>enum</code>. E os valores dos <code>case</code> precisam ser <strong>constantes</strong> conhecidas na compilação.</p>
+
+<h3>Texto não: <code>switch</code> com <code>std::string</code></h3>
+<pre class="file" data-file="texto.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+int main() {
+    std::string fruta = "maçã";
+
+    switch (fruta) {
+        case "maçã":
+            std::cout &lt;&lt; "R$ 4,50 o kg\n";
+            break;
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/switch">$ g++ -std=c++23 -Wall -Wextra texto.cpp -o texto
+texto.cpp: In function ‘int main()’:
+texto.cpp:7:13: error: switch quantity not an integer
+    7 |     switch (fruta) {
+      |             ^~~~~</pre>
+
+<p>"A quantidade do <code>switch</code> não é um inteiro". Diferente de Java, C# ou JavaScript, o <code>switch</code> do C++ não compara textos. Para escolher por texto, use <code>if (fruta == "maçã") … else if …</code>. (Quando você conhecer o <code>std::map</code>, no Nível 2, vai ver um jeito ainda melhor para tabelas de preços.)</p>
+
+<h3>Número com vírgula também não</h3>
+<pre class="term" data-cwd="~/switch">$ g++ -std=c++23 -Wall -Wextra dbl.cpp -o dbl      « double nota = 7.5; switch (nota) { case 7.5: … }
+dbl.cpp: In function ‘int main()’:
+dbl.cpp:5:13: error: switch quantity not an integer
+    5 |     switch (nota) {
+      |             ^~~~</pre>
+<p>Notas, preços e outras <strong>faixas</strong> são trabalho do <code>else if</code>, com <code>&gt;=</code> e <code>&lt;</code>.</p>
+
+<h3>O valor do <code>case</code> precisa ser constante</h3>
+<pre class="file" data-file="variavelcase.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int senha = 1234;
+    int digitado = 1234;
+    switch (digitado) {
+        case senha:
+            std::cout &lt;&lt; "Entrou\n";
+            break;
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/switch">$ g++ -std=c++23 -Wall -Wextra variavelcase.cpp -o variavelcase
+variavelcase.cpp: In function ‘int main()’:
+variavelcase.cpp:7:14: error: the value of ‘senha’ is not usable in a constant expression
+    7 |         case senha:
+      |              ^~~~~
+variavelcase.cpp:4:9: note: ‘int senha’ is not const
+    4 |     int senha = 1234;
+      |         ^~~~~
+<em>…(a mesma mensagem aparece duas vezes)…</em></pre>
+
+<p>"O valor de <code>senha</code> não pode ser usado numa expressão constante", e a nota explica: "<code>senha</code> não é <code>const</code>". Uma variável comum pode mudar durante o programa, e os rótulos do <code>switch</code> são fixados na compilação. Com <code>const int senha = 1234;</code> (aula <a href="constantes.html">Constantes</a>), compila e mostra <code>Entrou</code>. Se o valor só é conhecido ao rodar (digitado pelo usuário, lido de um arquivo), use <code>if</code>.</p>
+
+<h3>O <code>switch</code> com <code>enum</code> confere se você esqueceu algum caso</h3>
+<p>Um <code>enum class</code> (aula <a href="enums.html">Enums</a>) é um tipo com uma lista fechada de valores, como as cores do semáforo. Com ele, o <code>-Wall</code> avisa quando um valor ficou sem <code>case</code>:</p>
+
+<pre class="file" data-file="enum.cpp">#include &lt;iostream&gt;
+
+enum class Cor { Verde, Amarelo, Vermelho };
+
+int main() {
+    Cor semaforo = Cor::Amarelo;
+    switch (semaforo) {
+        case Cor::Verde:
+            std::cout &lt;&lt; "Siga\n";
+            break;
+        case Cor::Vermelho:
+            std::cout &lt;&lt; "Pare\n";
+            break;
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/switch">$ g++ -std=c++23 -Wall -Wextra enum.cpp -o enum
+enum.cpp: In function ‘int main()’:
+enum.cpp:7:12: warning: enumeration value ‘Amarelo’ not handled in switch [-Wswitch]
+    7 |     switch (semaforo) {
+      |            ^
+$ ./enum
+                         « Amarelo não tem case: nada aparece</pre>
+
+<p>"O valor <code>Amarelo</code> da enumeração não é tratado no switch". Essa conferência é um dos melhores motivos para usar <code>switch</code> com <code>enum</code>: se alguém acrescentar uma cor nova ao <code>enum</code>, o compilador aponta cada <code>switch</code> que precisa ser atualizado.</p>
+
+<hr>
+
+<h2>5. Criar uma variável dentro de um <code>case</code></h2>
+<p>Parece natural criar uma variável dentro de um caso. Mas:</p>
+
+<pre class="file" data-file="declarar.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int opcao = 2;
+    switch (opcao) {
+        case 1:
+            int saldo = 150;
+            std::cout &lt;&lt; "Saldo: " &lt;&lt; saldo &lt;&lt; "\n";
+            break;
+        case 2:
+            std::cout &lt;&lt; "Depósito\n";
+            break;
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/switch">$ g++ -std=c++23 -Wall -Wextra declarar.cpp -o declarar
+declarar.cpp: In function ‘int main()’:
+declarar.cpp:10:14: error: jump to case label
+   10 |         case 2:
+      |              ^
+declarar.cpp:7:17: note:   crosses initialization of ‘int saldo’
+    7 |             int saldo = 150;
+      |                 ^~~~~</pre>
+
+<dl class="anatomy">
+  <dt>error: jump to case label</dt><dd>"Salto para um rótulo de case". O problema está no salto para o <code>case 2</code>.</dd>
+  <dt>note: crosses initialization of ‘int saldo’</dt><dd>"Atravessa a inicialização de <code>saldo</code>".</dd>
+</dl>
+
+<p>O motivo: o corpo do <code>switch</code> é <strong>um bloco só</strong>, e os <code>case</code> são apenas pontos de entrada nele. A variável <code>saldo</code> existe do ponto em que foi criada até a <code>}</code> do <code>switch</code>, o que inclui o <code>case 2</code>. Quando a opção é 2, o programa pula direto para o <code>case 2</code>, por cima da linha <code>int saldo = 150;</code>: <code>saldo</code> existiria ali, mas sem valor. O C++ proíbe esse salto.</p>
+
+<p><strong>Conserto:</strong> coloque o código do <code>case</code> dentro de chaves próprias. Assim, <code>saldo</code> só existe dentro delas:</p>
+
+<pre class="file" data-file="declarar2.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int opcao = 2;
+    switch (opcao) {
+        case 1: {
+            int saldo = 150;
+            std::cout &lt;&lt; "Saldo: " &lt;&lt; saldo &lt;&lt; "\n";
+            break;
+        }
+        case 2:
+            std::cout &lt;&lt; "Depósito\n";
+            break;
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/switch">$ g++ -std=c++23 -Wall -Wextra declarar2.cpp -o declarar2
+$ ./declarar2
+Depósito</pre>
+
+<p>No editor do guia, o Clang diz o mesmo com outras palavras: <code>error: cannot jump from switch statement to this case label</code> ("não é possível pular do switch para este rótulo") e <code>note: jump bypasses variable initialization</code> ("o salto passa por cima da inicialização de uma variável").</p>
+
+<hr>
+
+<h2>Formas diferentes + qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th><th>Por quê</th></tr>
+<tr><td>Uma variável inteira, <code>char</code> ou <code>enum</code> comparada com valores exatos (menu, opção, letra)</td><td><code>switch</code></td><td>Mais legível; com <code>enum</code>, o compilador confere se faltou um caso.</td></tr>
+<tr><td>Faixas (<code>nota &gt;= 7</code>), <code>double</code></td><td><code>else if</code></td><td>O <code>switch</code> só compara igualdade, e não aceita <code>double</code>.</td></tr>
+<tr><td>Textos (<code>std::string</code>)</td><td><code>else if</code> com <code>==</code></td><td>O <code>switch</code> não aceita texto.</td></tr>
+<tr><td>Valores conhecidos só ao rodar</td><td><code>else if</code></td><td>Os <code>case</code> precisam de constantes.</td></tr>
+<tr><td>Condições variadas, com <code>&amp;&amp;</code> e <code>||</code></td><td><code>else if</code></td><td>Cada <code>case</code> só testa "é igual a este valor?".</td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>E <code>case 1 ... 5:</code>?</strong>
+<p>Você pode encontrar na internet <code>case 1 ... 5:</code> (uma faixa de valores). Isso <strong>não é C++ padrão</strong>: é uma extensão do g++ e do Clang, que não funciona em outros compiladores, como o Visual Studio. Com a opção <code>-Wpedantic</code> (que avisa sobre tudo o que foge do padrão), o g++ denuncia: <code>warning: range expressions in switch statements are non-standard [-Wpedantic]</code> ("faixas em switch não são padrão"). Para faixas, use <code>else if</code>.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>warning: this statement may fall through [-Wimplicit-fallthrough=]</code></strong>
+<p><strong>O que significa:</strong> um <code>case</code> com código termina sem <code>break</code>, e o programa vai continuar no <code>case</code> de baixo.</p>
+<p><strong>Como consertar:</strong> se foi esquecimento (quase sempre), ponha o <code>break;</code>. Se a queda é proposital, escreva <code>[[fallthrough]];</code> antes do próximo <code>case</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: switch quantity not an integer</code></strong>
+<p><strong>O que significa:</strong> a variável do <code>switch</code> é <code>std::string</code>, <code>double</code> ou outro tipo não inteiro.</p>
+<p><strong>Como consertar:</strong> use <code>if</code>/<code>else if</code>. Se for um texto de uma letra só, use um <code>char</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: the value of ‘x’ is not usable in a constant expression</code></strong>
+<p><strong>O que significa:</strong> um <code>case</code> usa uma variável comum.</p>
+<p><strong>Como consertar:</strong> torne-a <code>const</code> (se o valor é fixo) ou troque o <code>switch</code> por <code>if</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: duplicate case value</code></strong>
+<pre class="term" data-cwd="~/switch">$ g++ -std=c++23 -Wall -Wextra duplicado.cpp -o duplicado
+duplicado.cpp: In function ‘int main()’:
+duplicado.cpp:9:9: error: duplicate case value
+    9 |         case 1:
+      |         ^~~~
+duplicado.cpp:6:9: note: previously used here
+    6 |         case 1:
+      |         ^~~~</pre>
+<p><strong>O que significa:</strong> "valor de case duplicado"; a nota mostra onde ele já tinha sido usado ("usado antes aqui"). Normalmente é um erro de copiar e colar.</p>
+<p><strong>Como consertar:</strong> cada valor só pode aparecer em um <code>case</code>. Corrija o número ou junte os dois blocos.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: jump to case label</code> + <code>crosses initialization of …</code></strong>
+<p><strong>O que significa:</strong> uma variável foi criada dentro de um <code>case</code>, sem chaves, e um <code>case</code> abaixo dela "pularia" a criação.</p>
+<p><strong>Como consertar:</strong> envolva o código do <code>case</code> em <code>{ … }</code>, com o <code>break</code> dentro.</p>
+</div>
+
+<div class="cenario">
+<strong><code>warning: enumeration value ‘…’ not handled in switch [-Wswitch]</code></strong>
+<p><strong>O que significa:</strong> um valor do <code>enum</code> ficou sem <code>case</code>.</p>
+<p><strong>Como consertar:</strong> acrescente o <code>case</code> que falta. Evite pôr um <code>default</code> só para calar o aviso: você perde a conferência quando o <code>enum</code> ganhar valores novos.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>switch (x) { … }</code></td><td>Pula para o <code>case</code> com o valor de <code>x</code> (inteiro, <code>char</code>, <code>bool</code> ou <code>enum</code>)</td></tr>
+<tr><td><code>case 3:</code></td><td>Ponto de entrada para o valor 3 (constante, termina com <code>:</code>)</td></tr>
+<tr><td><code>break;</code></td><td>Sai do <code>switch</code></td></tr>
+<tr><td><code>default:</code></td><td>Para os valores sem <code>case</code></td></tr>
+<tr><td><code>case 'S': case 's':</code></td><td>Dois valores, mesmo código</td></tr>
+<tr><td><code>[[fallthrough]];</code></td><td>Queda proposital para o próximo <code>case</code> (C++17)</td></tr>
+<tr><td><code>case 1: { int v = …; break; }</code></td><td>Variável própria do <code>case</code></td></tr>
+<tr><td><code>switch (int v = f(); v) { … }</code></td><td><code>switch</code> com inicializador (C++17), como o do <a href="if-else.html">if</a></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Complete o switch</h3>
+<p>Complete as palavras que faltam:</p>
+<div class="ex-code"><input data-answer="switch" aria-label="palavra"> (dia) { <input data-answer="case" aria-label="palavra"> 1: std::cout &lt;&lt; "Domingo"; <input data-answer="break" aria-label="palavra">; <input data-answer="default" aria-label="palavra">: std::cout &lt;&lt; "Outro dia"; }</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">2. Com <code>x = 2</code>, o que mostra: <code>switch (x) { case 1: std::cout &lt;&lt; "a"; case 2: std::cout &lt;&lt; "b"; case 3: std::cout &lt;&lt; "c"; break; default: std::cout &lt;&lt; "d"; }</code>?</p>
+<label><input type="radio" name="q2"> <code>b</code></label>
+<label><input type="radio" name="q2"> <code>abc</code></label>
+<label><input type="radio" name="q2"> <code>bc</code></label>
+<label><input type="radio" name="q2"> <code>bcd</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">3. Qual destas variáveis <strong>não</strong> pode ir num <code>switch</code>?</p>
+<label><input type="radio" name="q3"> <code>int opcao</code></label>
+<label><input type="radio" name="q3"> <code>char letra</code></label>
+<label><input type="radio" name="q3"> Um <code>enum class Cor</code></label>
+<label><input type="radio" name="q3"> <code>std::string comando</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. Como consertar o erro <code>jump to case label</code>?</p>
+<label><input type="radio" name="q4"> Pondo o código do <code>case</code> entre chaves <code>{ }</code></label>
+<label><input type="radio" name="q4"> Tirando o <code>break</code></label>
+<label><input type="radio" name="q4"> Trocando <code>case</code> por <code>default</code></label>
+<label><input type="radio" name="q4"> Escrevendo <code>[[fallthrough]];</code></label>
+</div>
+
+<h3>Missão final: a calculadora</h3>
+
+<div class="trycpp" data-stdin="8 * 5" data-goal="out:Resultado: 40,src:case\s*'\*',src:default">
+<p class="try-task"><strong>Missão:</strong> a calculadora lê uma conta como <code>8 * 5</code> (a caixa já digita isso para você) e só sabe somar. Acrescente os casos <code>'-'</code>, <code>'*'</code> e <code>'/'</code>, cada um com seu <code>break</code>. Com <code>8 * 5</code>, deve aparecer <code>Resultado: 40</code>. Bônus: faça a letra <code>'x'</code> também multiplicar, juntando dois <code>case</code>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    double a = 0, b = 0;
+    char op = ' ';
+    std::cin &gt;&gt; a &gt;&gt; op &gt;&gt; b;
+
+    switch (op) {
+        case '+':
+            std::cout &lt;&lt; "Resultado: " &lt;&lt; a + b &lt;&lt; "\n";
+            break;
+        default:
+            std::cout &lt;&lt; "Operação inválida: " &lt;&lt; op &lt;&lt; "\n";
+    }
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int main() {
+    double a = 0, b = 0;
+    char op = ' ';
+    std::cin &gt;&gt; a &gt;&gt; op &gt;&gt; b;
+
+    switch (op) {
+        case '+':
+            std::cout &lt;&lt; "Resultado: " &lt;&lt; a + b &lt;&lt; "\n";
+            break;
+        case '-':
+            std::cout &lt;&lt; "Resultado: " &lt;&lt; a - b &lt;&lt; "\n";
+            break;
+        case '*':
+        case 'x':
+            std::cout &lt;&lt; "Resultado: " &lt;&lt; a * b &lt;&lt; "\n";
+            break;
+        case '/':
+            std::cout &lt;&lt; "Resultado: " &lt;&lt; a / b &lt;&lt; "\n";
+            break;
+        default:
+            std::cout &lt;&lt; "Operação inválida: " &lt;&lt; op &lt;&lt; "\n";
+    }
+}
+</pre>
+</div>
+
+<pre class="term" data-cwd="~/switch">$ ./calc
+8 x 5                    « no terminal, a Ana testou o bônus
+Resultado: 40
+$ ./calc
+9 / 2
+Resultado: 4.5
+$ ./calc
+9 % 2
+Operação inválida: %</pre>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>switch (x)</code> pula direto para o <code>case</code> com o valor de <code>x</code>; o <code>default</code> pega o resto.</li>
+  <li>O <code>case</code> só marca onde começar. Quem para é o <code>break</code>; sem ele, o programa cai no próximo caso (<code>-Wimplicit-fallthrough</code>, ligado pelo <code>-Wextra</code> no g++).</li>
+  <li>Rótulos colados (<code>case 'S': case 's':</code>) dividem o mesmo código. Queda proposital com código: <code>[[fallthrough]];</code>.</li>
+  <li>Só inteiros, <code>char</code>, <code>bool</code> e <code>enum</code>; os <code>case</code> precisam de constantes. <code>std::string</code> e <code>double</code> dão <code>switch quantity not an integer</code>.</li>
+  <li>Variável dentro de um <code>case</code>: use chaves, ou vem <code>jump to case label</code>.</li>
+  <li>Faixas, textos e condições compostas: <code>else if</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
