@@ -1,0 +1,794 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Retorno — return, tipo de retorno e auto | Guia C++</title>
+<meta name="description" content="O return em C++ para quem nunca programou: devolver um resultado, o tipo de retorno, o return que encerra a função, o aviso real -Wreturn-type quando você esquece o return (e o programa que cai com Instrução ilegal), funções que devolvem bool, a ideia de devolver vários valores e o auto no retorno. Com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Retorno</span></h1>
+
+<p class="intro">As funções das aulas anteriores <strong>faziam</strong> coisas: mostravam uma frase, um item do recibo. Mas muitas vezes você quer que a função <strong>calcule</strong> algo e entregue o resultado para quem a chamou, que decide o que fazer com ele: guardar numa variável, somar com outro, testar num <code>if</code>. Isso é o <strong>retorno</strong>. Nesta aula você vai usar o <code>return</code>, escolher o tipo de retorno, ver o que acontece (de verdade) quando esquece o <code>return</code>, criar funções que respondem "sim ou não" e conhecer o <code>auto</code> no retorno.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que o <code>return</code> faz: devolve um valor <strong>e</strong> encerra a função.</li>
+  <li>O <strong>tipo de retorno</strong>, escrito antes do nome da função, e o que acontece quando o valor devolvido é de outro tipo.</li>
+  <li>Como usar o valor devolvido: numa variável, numa conta, dentro de outra chamada.</li>
+  <li>O aviso <code>-Wreturn-type</code> quando você esquece o <code>return</code>, e por que isso derruba o programa.</li>
+  <li>Funções que devolvem <code>bool</code>, perfeitas para usar em <code>if</code>.</li>
+  <li>A ideia de devolver <strong>vários valores</strong> (com <code>struct</code> ou <code>std::pair</code>).</li>
+  <li>O <code>auto</code> como tipo de retorno <span class="versao">C++14</span>.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com o comando padrão do guia, <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: a máquina de suco</h2>
+<p>Você coloca laranjas na máquina de suco (os <strong>argumentos</strong>, aula <a href="parametros.html">Parâmetros</a>), ela trabalha lá dentro e <strong>devolve</strong> um copo de suco. O que você faz com o suco é problema seu: beber agora, guardar na geladeira, misturar com outro. A máquina não bebe o suco por você; ela só entrega.</p>
+
+<p>Uma função com retorno é assim: recebe valores, calcula e <strong>entrega</strong> o resultado no lugar onde foi chamada. Compare com o que você já viu:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Quem chama recebe</th></tr>
+<tr><td><code>void mostrarDobro(int x)</code></td><td>Calcula e <strong>mostra</strong> o dobro na tela</td><td>Nada. O número foi para a tela e acabou.</td></tr>
+<tr><td><code>int dobro(int x)</code></td><td>Calcula e <strong>devolve</strong> o dobro</td><td>Um <code>int</code>, para usar como quiser.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. <code>return</code>: devolver um valor</h2>
+
+<pre class="file" data-file="dobro.cpp">#include &lt;iostream&gt;
+
+int dobro(int x) {
+    return x * 2;
+}
+
+int main() {
+    int resultado = dobro(5);
+    std::cout &lt;&lt; resultado &lt;&lt; "\n";
+    std::cout &lt;&lt; dobro(21) &lt;&lt; "\n";
+    std::cout &lt;&lt; dobro(3) + 1 &lt;&lt; "\n";
+    std::cout &lt;&lt; dobro(dobro(2)) &lt;&lt; "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>int dobro(int x)</dt><dd>O <code>int</code> do começo é o <strong>tipo de retorno</strong>: esta função promete devolver um número inteiro. (Nas aulas anteriores ele era <code>void</code>, "nada".)</dd>
+  <dt>return x * 2;</dt><dd><code>return</code> ("devolver", "retornar"): calcula <code>x * 2</code> e entrega o resultado a quem chamou. O valor tem de ser do tipo prometido, aqui <code>int</code>.</dd>
+  <dt>int resultado = dobro(5);</dt><dd>A chamada <code>dobro(5)</code> "vira" o valor devolvido, <code>10</code>, e ele é guardado na variável.</dd>
+  <dt>dobro(3) + 1</dt><dd>A chamada pode estar no meio de uma conta: <code>dobro(3)</code> vira 6, e 6 + 1 dá 7.</dd>
+  <dt>dobro(dobro(2))</dt><dd>O resultado de uma chamada pode ser o argumento de outra. O C++ resolve de dentro para fora: <code>dobro(2)</code> = 4, depois <code>dobro(4)</code> = 8.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra dobro.cpp -o dobro
+$ ./dobro
+10
+42
+7
+8</pre>
+
+<p>Pense assim: depois que a função termina, a chamada é <strong>substituída</strong> pelo valor que ela devolveu. <code>std::cout &lt;&lt; dobro(21)</code> vira <code>std::cout &lt;&lt; 42</code>.</p>
+
+<h3>Um exemplo da lojinha</h3>
+<p>A Ana quer somar o total de dois itens e dar um brinde se a compra passar de R$ 30. Com uma função que <strong>devolve</strong> o total de cada item, o <code>main</code> pode somar e comparar:</p>
+
+<pre class="file" data-file="total.cpp">#include &lt;iostream&gt;
+
+double total(int quantidade, double preco) {
+    return quantidade * preco;
+}
+
+int main() {
+    double compra = total(3, 10.0) + total(2, 2.5);
+    std::cout &lt;&lt; "Total da compra: R$ " &lt;&lt; compra &lt;&lt; "\n";
+    if (compra &gt; 30) {
+        std::cout &lt;&lt; "Ganhou um brinde!\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra total.cpp -o total
+$ ./total
+Total da compra: R$ 35
+Ganhou um brinde!</pre>
+
+<p>O tipo de retorno é <code>double</code> porque preço tem centavos. Se a função só <strong>mostrasse</strong> o total (como a <code>item</code> da aula de parâmetros), o <code>main</code> não teria como somar os dois nem comparar com 30. É por isso que funções que calculam costumam <strong>devolver</strong> em vez de mostrar: quem chama decide o que fazer.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> crie uma função <code>int triplo(int x)</code> ao lado da <code>dobro</code> e mostre <code>triplo(4)</code>. Depois tente <code>dobro(triplo(2))</code>: quanto dá? Faça a conta de cabeça antes de rodar.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int dobro(int x) {
+    return x * 2;
+}
+
+int main() {
+    std::cout &lt;&lt; dobro(5) &lt;&lt; "\n";
+    std::cout &lt;&lt; dobro(5) + dobro(1) &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. O <code>return</code> encerra a função na hora</h2>
+<p>O <code>return</code> faz duas coisas: entrega o valor <strong>e</strong> sai da função imediatamente. O que estiver depois dele, no mesmo caminho, nunca roda:</p>
+
+<pre class="file" data-file="depois.cpp">#include &lt;iostream&gt;
+
+int dobro(int x) {
+    return x * 2;
+    std::cout &lt;&lt; "esta linha nunca aparece\n";
+}
+
+int main() {
+    std::cout &lt;&lt; dobro(4) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra depois.cpp -o depois
+$ ./depois
+8                        « a frase da linha 5 não apareceu</pre>
+
+<p>Isso é útil: uma função pode ter <strong>vários</strong> <code>return</code>, um em cada caminho, e sai no primeiro que alcançar. A Ana classifica os alunos do reforço assim:</p>
+
+<pre class="file" data-file="situacao.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+std::string situacao(double nota) {
+    if (nota &gt;= 6) {
+        return "aprovado";
+    }
+    if (nota &gt;= 4) {
+        return "recuperação";
+    }
+    return "reprovado";
+}
+
+int main() {
+    std::cout &lt;&lt; "Bruno: " &lt;&lt; situacao(7.5) &lt;&lt; "\n";
+    std::cout &lt;&lt; "Carla: " &lt;&lt; situacao(5) &lt;&lt; "\n";
+    std::cout &lt;&lt; "Davi: " &lt;&lt; situacao(2.5) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra situacao.cpp -o situacao
+$ ./situacao
+Bruno: aprovado
+Carla: recuperação
+Davi: reprovado</pre>
+
+<ol class="passo">
+  <li><code>situacao(7.5)</code>: 7.5 &gt;= 6 é verdade, então <code>return "aprovado"</code> e a função acaba ali. Os outros testes nem são feitos.</li>
+  <li><code>situacao(5)</code>: o primeiro <code>if</code> falha; o segundo (5 &gt;= 4) passa: <code>"recuperação"</code>.</li>
+  <li><code>situacao(2.5)</code>: os dois <code>if</code> falham e a função chega ao último <code>return</code>: <code>"reprovado"</code>.</li>
+</ol>
+
+<p>Repare que não precisou de <code>else</code>: se o primeiro <code>return</code> acontece, o resto já não roda. O tipo de retorno aqui é <code>std::string</code>: uma função pode devolver texto, número, <code>bool</code>, um <code>std::vector</code>… qualquer tipo.</p>
+
+<h3><code>return;</code> sozinho, numa função <code>void</code></h3>
+<p>Uma função <code>void</code> não devolve nada, mas pode usar <code>return;</code> (sem valor) para <strong>sair mais cedo</strong>:</p>
+
+<pre class="file" data-file="voidret.cpp">#include &lt;iostream&gt;
+
+void dividir(int a, int b) {
+    if (b == 0) {
+        std::cout &lt;&lt; "Não dá para dividir por zero.\n";
+        return;
+    }
+    std::cout &lt;&lt; a &lt;&lt; " / " &lt;&lt; b &lt;&lt; " = " &lt;&lt; a / b &lt;&lt; "\n";
+}
+
+int main() {
+    dividir(10, 2);
+    dividir(7, 0);
+    dividir(9, 3);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra voidret.cpp -o voidret
+$ ./voidret
+10 / 2 = 5
+Não dá para dividir por zero.        « o return; pulou a divisão
+9 / 3 = 3</pre>
+
+<p>Programadores chamam isso de <strong>retorno antecipado</strong> (em inglês, <em>early return</em> ou "cláusula de guarda"): trate o caso problemático primeiro e saia; o resto da função fica mais simples, sem um <code>else</code> enorme.</p>
+
+<hr>
+
+<h2>3. O tipo de retorno tem de bater</h2>
+<p>O tipo antes do nome é uma <strong>promessa</strong>. O compilador confere cada <code>return</code> contra ela.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>O que acontece</th></tr>
+<tr><td><code>void saudar() { return 5; }</code></td><td>Erro: prometeu "nada" e devolveu um número.</td></tr>
+<tr><td><code>int dobro(int x) { return; }</code></td><td>Erro: prometeu um <code>int</code> e não devolveu nenhum.</td></tr>
+<tr><td><code>int idade() { return "vinte e nove"; }</code></td><td>Erro: texto não vira <code>int</code>.</td></tr>
+<tr><td><code>int media(int a, int b) { return (a + b) / 2.0; }</code></td><td><strong>Compila sem aviso</strong>, mas o resultado perde as casas decimais.</td></tr>
+</table>
+</div>
+
+<p>As três primeiras linhas, no g++:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra voidvalor.cpp -o voidvalor
+voidvalor.cpp: In function ‘void saudar()’:
+voidvalor.cpp:2:12: error: return-statement with a value, in function returning ‘void’ [-fpermissive]
+    2 |     return 5;
+      |            ^
+$ g++ -std=c++23 -Wall -Wextra semvalor.cpp -o semvalor
+semvalor.cpp: In function ‘int dobro(int)’:
+semvalor.cpp:2:5: error: return-statement with no value, in function returning ‘int’ [-fpermissive]
+    2 |     return;
+      |     ^~~~~~
+semvalor.cpp:1:15: warning: unused parameter ‘x’ [-Wunused-parameter]
+    1 | int dobro(int x) {
+      |           ~~~~^
+$ g++ -std=c++23 -Wall -Wextra texto.cpp -o texto
+texto.cpp: In function ‘int idade()’:
+texto.cpp:2:12: error: invalid conversion from ‘const char*’ to ‘int’ [-fpermissive]
+    2 |     return "vinte e nove";
+      |            ^~~~~~~~~~~~~~
+      |            |
+      |            const char*</pre>
+
+<ul>
+  <li><em>Return-statement with a value, in function returning ‘void’</em> = "<code>return</code> com valor numa função que devolve <code>void</code>".</li>
+  <li><em>Return-statement with no value, in function returning ‘int’</em> = "<code>return</code> sem valor numa função que devolve <code>int</code>". (O aviso de parâmetro não usado é consequência: o <code>x</code> ficou sem uso.)</li>
+  <li><em>Invalid conversion from ‘const char*’ to ‘int’</em> = "conversão inválida de texto para <code>int</code>", o mesmo erro da aula <a href="parametros.html">Parâmetros</a>.</li>
+</ul>
+
+<p>A quarta linha da tabela é a traiçoeira. A média de 7 e 8 é 7.5, mas a função promete um <code>int</code>, então o C++ converte sozinho e corta o <code>.5</code>:</p>
+
+<pre class="file" data-file="tipoerrado.cpp">#include &lt;iostream&gt;
+
+int media(int a, int b) {
+    return (a + b) / 2.0;
+}
+
+int main() {
+    std::cout &lt;&lt; media(7, 8) &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra tipoerrado.cpp -o tipoerrado
+$ ./tipoerrado
+7                        « 7.5 virou 7, sem erro e sem aviso</pre>
+
+<p>A conta dentro da função estava certa; quem estragou foi o tipo de retorno. A correção é prometer o tipo certo: <code>double media(int a, int b)</code>. (Como na aula de parâmetros, a opção <code>-Wconversion</code> faria o g++ avisar.)</p>
+
+<hr>
+
+<h2>4. Esquecer o <code>return</code>: aviso e comportamento indefinido</h2>
+<p>Este é o erro mais perigoso da aula, porque o g++ <strong>não</strong> trata como erro: ele só avisa e gera o programa. A Ana calculou o dobro, guardou numa variável… e esqueceu de devolver:</p>
+
+<pre class="file" data-file="esqueceu.cpp">#include &lt;iostream&gt;
+
+int dobro(int x) {
+    int resultado = x * 2;
+}
+
+int main() {
+    std::cout &lt;&lt; dobro(5) &lt;&lt; "\n";
+    std::cout &lt;&lt; "fim\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra esqueceu.cpp -o esqueceu
+esqueceu.cpp: In function ‘int dobro(int)’:
+esqueceu.cpp:4:9: warning: unused variable ‘resultado’ [-Wunused-variable]
+    4 |     int resultado = x * 2;
+      |         ^~~~~~~~~
+esqueceu.cpp:5:1: warning: no return statement in function returning non-void [-Wreturn-type]
+    5 | }
+      | ^
+$ ./esqueceu
+Instrução ilegal         (imagem do núcleo gravada) ./esqueceu
+$ echo $?
+132</pre>
+
+<dl class="anatomy">
+  <dt>warning: unused variable ‘resultado’</dt><dd>A primeira pista: a variável foi calculada e ninguém usou.</dd>
+  <dt>warning: no return statement in function returning non-void</dt><dd>"Nenhum <code>return</code> numa função que não é <code>void</code>". A função prometeu um <code>int</code> e chega ao <code>}</code> sem entregar nada. O aviso aponta a linha 5, o fecha-chaves, onde a função "cai para fora".</dd>
+  <dt>[-Wreturn-type]</dt><dd>O nome do aviso. Ele já vem ligado no g++, mesmo sem <code>-Wall</code> (repare no comando com <code>-O2</code>, mais abaixo).</dd>
+  <dt>Instrução ilegal (imagem do núcleo gravada)</dt><dd>Ao rodar, o programa <strong>caiu</strong>: nem o número nem o <code>fim</code> apareceram. O g++ 15 coloca uma "armadilha" (uma instrução proibida para o processador) no ponto em que a função cai para fora sem <code>return</code>. Em inglês, a mensagem é <code>Illegal instruction (core dumped)</code>.</dd>
+  <dt>132</dt><dd>O código de saída: 128 + 4, o sinal 4 (<code>SIGILL</code>, instrução ilegal).</dd>
+</dl>
+
+<p>O mesmo acontece quando o <code>return</code> existe, mas só em <strong>alguns</strong> caminhos. A função <code>pontos</code> devolve um valor quando há acertos, e nada quando não há:</p>
+
+<pre class="file" data-file="esqueceu2.cpp">#include &lt;iostream&gt;
+
+int pontos(int acertos) {
+    if (acertos &gt; 0) {
+        return acertos * 10;
+    }
+}
+
+int main() {
+    std::cout &lt;&lt; pontos(3) &lt;&lt; "\n";
+    std::cout &lt;&lt; pontos(0) &lt;&lt; "\n";
+    std::cout &lt;&lt; "fim\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra esqueceu2.cpp -o esqueceu2
+esqueceu2.cpp: In function ‘int pontos(int)’:
+esqueceu2.cpp:7:1: warning: control reaches end of non-void function [-Wreturn-type]
+    7 | }
+      | ^
+$ ./esqueceu2
+30                       « pontos(3) passou pelo return: tudo bem
+Instrução ilegal         (imagem do núcleo gravada) ./esqueceu2
+$ echo $?
+132</pre>
+
+<p><em>Control reaches end of non-void function</em> = "a execução pode chegar ao fim de uma função não-<code>void</code>": existe um caminho (aqui, <code>acertos</code> igual a 0) sem <code>return</code>. A chamada <code>pontos(3)</code> funcionou; a <code>pontos(0)</code> derrubou o programa.</p>
+
+<h3>Por que "indefinido"?</h3>
+<p>A regra do C++ diz: se uma função que promete um valor chega ao fim sem <code>return</code>, o <strong>comportamento é indefinido</strong>. Quer dizer que a linguagem não promete <strong>nada</strong> sobre o que acontece. Cada compilador, e cada conjunto de opções, faz uma coisa diferente. Veja o mesmo <code>esqueceu2.cpp</code> compilado com otimização (<code>-O2</code>, a opção que deixa o programa mais rápido):</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -O2 esqueceu2.cpp -o esqueceu2
+esqueceu2.cpp: In function ‘int pontos(int)’:
+esqueceu2.cpp:7:1: warning: control reaches end of non-void function [-Wreturn-type]
+    7 | }
+      | ^
+$ ./esqueceu2
+30
+30
+30
+30                       « … e assim por mais de 27 mil linhas …
+30
+Falha de segmentação     (imagem do núcleo gravada) ./esqueceu2
+$ echo $?
+139</pre>
+
+<p>O mesmo código-fonte, outro comportamento: com <code>-O2</code>, o programa ficou repetindo o <code>30</code> dezenas de milhares de vezes (o número exato muda de uma execução para outra) e caiu com outra mensagem (<em>Falha de segmentação</em>, código 139). Em outros casos, um programa assim pode até "funcionar" e mostrar um número qualquer. É por isso que o guia insiste: <strong>leia os avisos</strong>. O <code>-Wreturn-type</code> sempre é um erro de verdade no seu código. A aula <a href="comportamento-indefinido.html">Comportamento Indefinido</a> mostra outros casos.</p>
+
+<div class="tip">
+<strong>Transforme o aviso em erro</strong>
+<p>A opção <code>-Werror=return-type</code> faz o g++ <strong>recusar</strong> o programa em vez de só avisar. Muitos projetos usam <code>-Werror</code> (todos os avisos viram erros); veja <a href="avisos.html">Avisos</a>.</p>
+</div>
+
+<div class="note">
+<strong>E o <code>main</code>?</strong>
+<p>O <code>main</code> é a única exceção: ele pode terminar sem <code>return</code> e o C++ considera <code>return 0;</code> (aula <a href="funcoes.html">Funções</a>). Em qualquer outra função não-<code>void</code>, todo caminho precisa de um <code>return</code> com valor.</p>
+</div>
+
+<div class="trycpp" data-goal="semaviso,out:Bruno: 30 pontos,out:Carla: 0 pontos">
+<p class="try-task"><strong>Missão:</strong> rode e veja o aviso (no editor, o Clang escreve <code>non-void function does not return a value in all control paths</code>: "a função não-void não devolve valor em todos os caminhos"). Conserte a função <code>pontos</code> para devolver <code>0</code> quando não houver acertos, até o programa compilar <strong>sem nenhum aviso</strong>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int pontos(int acertos) {
+    if (acertos &gt; 0) {
+        return acertos * 10;
+    }
+}
+
+int main() {
+    std::cout &lt;&lt; "Bruno: " &lt;&lt; pontos(3) &lt;&lt; " pontos\n";
+    std::cout &lt;&lt; "Carla: " &lt;&lt; pontos(0) &lt;&lt; " pontos\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+int pontos(int acertos) {
+    if (acertos &gt; 0) {
+        return acertos * 10;
+    }
+    return 0;
+}
+
+int main() {
+    std::cout &lt;&lt; "Bruno: " &lt;&lt; pontos(3) &lt;&lt; " pontos\n";
+    std::cout &lt;&lt; "Carla: " &lt;&lt; pontos(0) &lt;&lt; " pontos\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>5. Devolver <code>bool</code>: funções que respondem "sim ou não"</h2>
+<p>Muitas perguntas do dia a dia têm resposta sim ou não: "o número é par?", "o aluno passou?", "tem estoque?". Uma função que devolve <code>bool</code> (aula <a href="bool.html">Booleanos</a>) responde essas perguntas, e o resultado entra direto num <code>if</code>:</p>
+
+<pre class="file" data-file="bool.cpp">#include &lt;iostream&gt;
+
+bool ehPar(int n) {
+    return n % 2 == 0;
+}
+
+bool aprovado(double nota) {
+    return nota &gt;= 6;
+}
+
+int main() {
+    std::cout &lt;&lt; ehPar(4) &lt;&lt; " " &lt;&lt; ehPar(7) &lt;&lt; "\n";
+    std::cout &lt;&lt; std::boolalpha &lt;&lt; ehPar(4) &lt;&lt; " " &lt;&lt; ehPar(7) &lt;&lt; "\n";
+    for (int i = 1; i &lt;= 6; i++) {
+        if (ehPar(i)) {
+            std::cout &lt;&lt; i &lt;&lt; " é par\n";
+        }
+    }
+    if (!aprovado(5.5)) {
+        std::cout &lt;&lt; "Carla vai para a recuperação\n";
+    }
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>bool ehPar(int n)</dt><dd>Devolve <code>true</code> (verdadeiro) ou <code>false</code> (falso). Nomes que começam com <code>eh</code>, <code>tem</code>, <code>pode</code> deixam claro que a resposta é sim/não: <code>ehPar</code>, <code>temEstoque</code>, <code>podeVotar</code>.</dd>
+  <dt>return n % 2 == 0;</dt><dd>A comparação <code>n % 2 == 0</code> (o resto da divisão por 2 é zero?) <strong>já é</strong> um <code>bool</code>. Basta devolvê-la. Não precisa de <code>if (n % 2 == 0) return true; else return false;</code>.</dd>
+  <dt>std::boolalpha</dt><dd>Faz o <code>std::cout</code> mostrar <code>true</code>/<code>false</code> em vez de <code>1</code>/<code>0</code>.</dd>
+  <dt>if (ehPar(i))</dt><dd>Lê-se como uma frase: "se <code>i</code> é par". Não precisa escrever <code>== true</code>.</dd>
+  <dt>if (!aprovado(5.5))</dt><dd>O <code>!</code> ("não") inverte a resposta: "se não aprovado" (<a href="operadores-logicos.html">Operadores Lógicos</a>).</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra bool.cpp -o bool
+$ ./bool
+1 0                      « sem boolalpha: true = 1, false = 0
+true false
+2 é par
+4 é par
+6 é par
+Carla vai para a recuperação</pre>
+
+<hr>
+
+<h2>6. E para devolver vários valores?</h2>
+<p>Um <code>return</code> devolve <strong>um</strong> valor. Mas às vezes o resultado tem duas partes, como uma divisão: o quociente e o resto. A solução é devolver <strong>um valor que contém outros</strong>. Aqui fica só a ideia; cada forma tem aula própria.</p>
+
+<h3>Com uma <code>struct</code> (um tipo com campos que você nomeia)</h3>
+<pre class="file" data-file="struct.cpp">#include &lt;iostream&gt;
+
+struct Divisao {
+    int quociente;
+    int resto;
+};
+
+Divisao dividir(int a, int b) {
+    return {a / b, a % b};
+}
+
+int main() {
+    Divisao d = dividir(17, 5);
+    std::cout &lt;&lt; "17 / 5 = " &lt;&lt; d.quociente &lt;&lt; ", resto " &lt;&lt; d.resto &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra struct.cpp -o struct
+$ ./struct
+17 / 5 = 3, resto 2</pre>
+
+<p>A <code>struct Divisao</code> é uma "ficha" com dois campos; a função devolve uma ficha preenchida, e o <code>main</code> lê cada campo com o ponto (<code>d.quociente</code>). Tudo sobre structs: <a href="structs.html">Structs</a>.</p>
+
+<h3>Com <code>std::pair</code> (um par pronto)</h3>
+<pre class="file" data-file="pair.cpp">#include &lt;iostream&gt;
+#include &lt;utility&gt;
+
+std::pair&lt;int, int&gt; dividir(int a, int b) {
+    return {a / b, a % b};
+}
+
+int main() {
+    auto [quociente, resto] = dividir(17, 5);
+    std::cout &lt;&lt; "17 / 5 = " &lt;&lt; quociente &lt;&lt; ", resto " &lt;&lt; resto &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra pair.cpp -o pair
+$ ./pair
+17 / 5 = 3, resto 2</pre>
+
+<p><code>std::pair&lt;int, int&gt;</code> é um par de dois <code>int</code>, já pronto na biblioteca (<code>&lt;utility&gt;</code>). A linha <code>auto [quociente, resto] = …</code> abre o par em duas variáveis de uma vez <span class="versao">C++17</span>. Detalhes, e o <code>std::tuple</code> para três ou mais valores: <a href="pair-tuple.html">pair, tuple e Desestruturação</a>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Quando usar</th></tr>
+<tr><td><code>struct</code></td><td>Quando os valores têm significado (<code>quociente</code>, <code>resto</code>): o código fica mais legível. É a escolha mais comum.</td></tr>
+<tr><td><code>std::pair</code> / <code>std::tuple</code></td><td>Para algo rápido e local, sem criar um tipo novo.</td></tr>
+<tr><td>Parâmetros por referência</td><td>A forma antiga: a função escreve nas variáveis de quem chamou (<a href="passagem-referencia.html">Por Valor × Por Referência</a>). Hoje, prefira devolver.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>7. <code>auto</code> no retorno <span class="versao">C++14</span></h2>
+<p>Desde o C++14, você pode escrever <code>auto</code> no lugar do tipo de retorno e deixar o compilador <strong>deduzir</strong> o tipo olhando o <code>return</code>, como o <code>auto</code> das variáveis (aula <a href="auto.html">auto</a>):</p>
+
+<pre class="file" data-file="auto.cpp">#include &lt;iostream&gt;
+
+auto dobro(int x) {
+    return x * 2;
+}
+
+auto metade(double x) {
+    return x / 2;
+}
+
+int main() {
+    auto a = dobro(5);
+    auto b = metade(5);
+    std::cout &lt;&lt; a &lt;&lt; " " &lt;&lt; b &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra auto.cpp -o auto
+$ ./auto
+10 2.5</pre>
+
+<p><code>x * 2</code> com <code>x</code> inteiro dá <code>int</code>, então <code>dobro</code> devolve <code>int</code>; <code>x / 2</code> com <code>x</code> <code>double</code> dá <code>double</code>. Duas regras do <code>auto</code> no retorno:</p>
+
+<p><strong>Todos os <code>return</code> precisam dar o mesmo tipo.</strong></p>
+<pre class="file" data-file="autoerro.cpp">auto desconto(bool cliente_fiel) {
+    if (cliente_fiel) {
+        return 10;
+    }
+    return 2.5;
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra autoerro.cpp -o autoerro
+autoerro.cpp: In function ‘auto desconto(bool)’:
+autoerro.cpp:5:12: error: inconsistent deduction for auto return type: ‘int’ and then ‘double’
+    5 |     return 2.5;
+      |            ^~~</pre>
+<p>"Dedução inconsistente para o tipo de retorno <code>auto</code>: <code>int</code> e depois <code>double</code>". O primeiro <code>return</code> diz <code>int</code>, o segundo diz <code>double</code>. Escreva <code>10.0</code>, ou declare o tipo: <code>double desconto(bool cliente_fiel)</code>.</p>
+
+<p><strong>O compilador precisa ver o corpo antes da chamada.</strong> Com <code>auto</code>, um protótipo sozinho (<code>auto dobro(int x);</code>) não basta, porque sem o corpo ninguém sabe o tipo:</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra autoantes.cpp -o autoantes
+autoantes.cpp: In function ‘int main()’:
+autoantes.cpp:6:23: error: use of ‘auto dobro(int)’ before deduction of ‘auto’
+    6 |     std::cout &lt;&lt; dobro(5) &lt;&lt; "\n";
+      |                  ~~~~~^~~</pre>
+<p>"Uso de <code>auto dobro(int)</code> antes da dedução do <code>auto</code>". Defina a função antes do <code>main</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Quando usar</th></tr>
+<tr><td><code>int dobro(int x)</code></td><td>O padrão. Quem lê vê o tipo na hora. Use na maioria das funções.</td></tr>
+<tr><td><code>auto dobro(int x)</code></td><td>Funções curtas em que o tipo é óbvio, ou quando o tipo é longo e chato de escrever. Muito usado com <a href="templates-funcao.html">templates</a> e <a href="lambdas.html">lambdas</a>.</td></tr>
+<tr><td><code>auto dobro(int x) -&gt; int</code></td><td>"Tipo de retorno no fim" <span class="versao">C++11</span>: é o mesmo que <code>int dobro(int x)</code>, escrito de outro jeito. Aparece em código moderno e em templates; você vai reconhecê-lo.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>warning: no return statement in function returning non-void</code> ou <code>control reaches end of non-void function</code></strong>
+<p><strong>O que significa:</strong> a função promete devolver um valor, mas pelo menos um caminho chega ao <code>}</code> sem <code>return</code>. O programa é gerado mesmo assim e, ao passar por esse caminho, tem comportamento indefinido: no g++ 15 sem otimização, ele cai com <code>Instrução ilegal</code> (código 132).</p>
+<p><strong>Como consertar:</strong> garanta um <code>return</code> com valor em <strong>todos</strong> os caminhos. Um truque: termine a função com um <code>return</code> "padrão" depois dos <code>if</code>. Trate esse aviso como erro (<code>-Werror=return-type</code>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>Instrução ilegal (imagem do núcleo gravada)</code> ao rodar</strong>
+<pre class="term" data-cwd="~/cpp">$ ./esqueceu
+Instrução ilegal         (imagem do núcleo gravada) ./esqueceu
+$ echo $?
+132</pre>
+<p><strong>O que significa:</strong> o processador encontrou uma instrução proibida. Em programas seus, compilados pelo g++, a causa mais comum é exatamente esta: uma função não-<code>void</code> que terminou sem <code>return</code>. Volte à compilação e procure o aviso <code>-Wreturn-type</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: return-statement with a value, in function returning ‘void’</code></strong>
+<p><strong>O que significa:</strong> a função é <code>void</code> e tem <code>return algo;</code>.</p>
+<p><strong>Como consertar:</strong> se a função deve devolver o valor, troque o <code>void</code> pelo tipo certo (<code>int</code>, <code>double</code>…). Se não deve, use <code>return;</code> sem valor, ou tire o <code>return</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: return-statement with no value, in function returning ‘int’</code></strong>
+<p><strong>O que significa:</strong> a função promete um <code>int</code> e tem um <code>return;</code> vazio.</p>
+<p><strong>Como consertar:</strong> devolva um valor (<code>return 0;</code>, <code>return resultado;</code>) ou, se a função não precisa devolver nada, mude o tipo para <code>void</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O resultado sai sem as casas decimais</strong>
+<p><strong>O que significa:</strong> a conta é com casas decimais, mas o tipo de retorno é <code>int</code>. O valor é convertido e a parte decimal some, sem aviso.</p>
+<p><strong>Como consertar:</strong> use <code>double</code> como tipo de retorno quando o resultado pode ter casas decimais.</p>
+</div>
+
+<div class="cenario">
+<strong>O valor devolvido "sumiu"</strong>
+<pre class="file" data-file="ignorar.cpp">#include &lt;iostream&gt;
+
+int dobro(int x) {
+    return x * 2;
+}
+
+int main() {
+    dobro(5);
+    std::cout &lt;&lt; "fim\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ignorar.cpp -o ignorar
+$ ./ignorar
+fim                      « o 10 foi calculado e jogado fora</pre>
+<p><strong>O que significa:</strong> chamar uma função que devolve um valor e não usar o resultado é permitido, e o g++ não avisa: o 10 é calculado e descartado. Para quem vem da aula anterior, é um engano comum achar que a função "mostra" o valor.</p>
+<p><strong>Como consertar:</strong> guarde (<code>int r = dobro(5);</code>) ou mostre (<code>std::cout &lt;&lt; dobro(5);</code>). Se você escreve uma função cujo resultado nunca deveria ser ignorado, marque-a com <code>[[nodiscard]]</code> <span class="versao">C++17</span> antes do tipo de retorno, e o compilador passa a avisar:</p>
+<pre class="file" data-file="nodiscard.cpp">#include &lt;iostream&gt;
+
+[[nodiscard]] int dobro(int x) {
+    return x * 2;
+}
+
+int main() {
+    dobro(5);
+    std::cout &lt;&lt; "fim\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra nodiscard.cpp -o nodiscard
+nodiscard.cpp: In function ‘int main()’:
+nodiscard.cpp:8:10: warning: ignoring return value of ‘int dobro(int)’, declared with attribute ‘nodiscard’ [-Wunused-result]
+    8 |     dobro(5);
+      |     ~~~~~^~~
+nodiscard.cpp:3:19: note: declared here
+    3 | [[nodiscard]] int dobro(int x) {
+      |                   ^~~~~</pre>
+<p>"Ignorando o valor de retorno de <code>int dobro(int)</code>, declarada com o atributo <code>nodiscard</code>" (<em>no discard</em> = "não descarte").</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>int f(…) { return valor; }</code></td><td>Devolve um <code>int</code> e encerra a função</td></tr>
+<tr><td><code>return;</code></td><td>Sai de uma função <code>void</code> antes do fim</td></tr>
+<tr><td><code>int r = f(5);</code></td><td>Guarda o valor devolvido</td></tr>
+<tr><td><code>f(g(2))</code></td><td>O retorno de <code>g</code> vira argumento de <code>f</code></td></tr>
+<tr><td><code>bool ehPar(int n) { return n % 2 == 0; }</code></td><td>Função que responde sim/não, para usar em <code>if</code></td></tr>
+<tr><td><code>struct</code> / <code>std::pair&lt;A, B&gt;</code></td><td>Devolver vários valores juntos</td></tr>
+<tr><td><code>auto f(int x) { return x * 2; }</code></td><td>Tipo de retorno deduzido pelo compilador (C++14)</td></tr>
+<tr><td><code>auto f(int x) -&gt; int</code></td><td>Tipo de retorno escrito no fim (C++11)</td></tr>
+<tr><td><code>[[nodiscard]]</code></td><td>Avisa se alguém ignorar o valor devolvido (C++17)</td></tr>
+<tr><td><code>-Wreturn-type</code></td><td>Aviso: função não-<code>void</code> sem <code>return</code> em algum caminho</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Devolver</h3>
+<p>Complete a função que devolve o quadrado de um número:</p>
+<div class="ex-code">int quadrado(int x) { <input data-answer="return" aria-label="palavra"> x * x; }</div>
+</div>
+
+<div class="exercise">
+<h3>2. O tipo certo</h3>
+<p>Complete o tipo de retorno de uma função que devolve o preço com 10% de desconto (o preço tem centavos):</p>
+<div class="ex-code"><input data-answer="double" aria-label="tipo"> comDesconto(double preco) { return preco * 0.9; }</div>
+</div>
+
+<div class="exercise">
+<h3>3. De dentro para fora</h3>
+<p>Com <code>int dobro(int x) { return x * 2; }</code>, quanto vale <code>dobro(dobro(3)) + 1</code>?</p>
+<div class="ex-code"><input data-answer="13" aria-label="resultado"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O que o <code>return</code> faz?</p>
+<label><input type="radio" name="q4"> Mostra o valor na tela</label>
+<label><input type="radio" name="q4"> Volta para o começo da função</label>
+<label><input type="radio" name="q4"> Entrega o valor a quem chamou e encerra a função</label>
+<label><input type="radio" name="q4"> Só guarda o valor numa variável</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. A função <code>int pontos(int a) { if (a &gt; 0) { return a * 10; } }</code> compila com o aviso <code>control reaches end of non-void function</code>. O que acontece em <code>pontos(0)</code>?</p>
+<label><input type="radio" name="q5"> Devolve 0 automaticamente</label>
+<label><input type="radio" name="q5"> Comportamento indefinido: no g++ 15, o programa cai</label>
+<label><input type="radio" name="q5"> Devolve o último valor devolvido</label>
+<label><input type="radio" name="q5"> Erro de compilação</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Qual é o jeito mais simples de escrever uma função que diz se alguém pode votar (16 anos ou mais)?</p>
+<label><input type="radio" name="q6"> <code>void podeVotar(int idade) { std::cout &lt;&lt; (idade &gt;= 16); }</code></label>
+<label><input type="radio" name="q6"> <code>int podeVotar(int idade) { return 16; }</code></label>
+<label><input type="radio" name="q6"> <code>bool podeVotar(int idade) { if (idade &gt;= 16) return true; }</code></label>
+<label><input type="radio" name="q6"> <code>bool podeVotar(int idade) { return idade &gt;= 16; }</code></label>
+</div>
+
+<h3>Missão final: média e aprovação</h3>
+
+<div class="trycpp" data-goal="out:Bruno: média 7 - aprovado,out:Carla: média 5 - reprovado,src:double\s+media\s*\(,src:bool\s+aprovado\s*\(,semaviso">
+<p class="try-task"><strong>Missão:</strong> complete as duas funções. <code>media</code> recebe três notas e <strong>devolve</strong> a média delas. <code>aprovado</code> recebe uma média e <strong>devolve</strong> <code>true</code> se ela for 6 ou mais. O <code>main</code> já está pronto e não deve mudar. Saída esperada:</p>
+<pre class="out">Bruno: média 7 - aprovado
+Carla: média 5 - reprovado</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+double media(double n1, double n2, double n3) {
+    // devolva a média das três notas
+}
+
+bool aprovado(double m) {
+    // devolva true se m for 6 ou mais
+}
+
+void boletim(std::string aluno, double n1, double n2, double n3) {
+    double m = media(n1, n2, n3);
+    std::cout &lt;&lt; aluno &lt;&lt; ": média " &lt;&lt; m &lt;&lt; " - ";
+    if (aprovado(m)) {
+        std::cout &lt;&lt; "aprovado\n";
+    } else {
+        std::cout &lt;&lt; "reprovado\n";
+    }
+}
+
+int main() {
+    boletim("Bruno", 6, 7, 8);
+    boletim("Carla", 4, 5.5, 5.5);
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+double media(double n1, double n2, double n3) {
+    return (n1 + n2 + n3) / 3;
+}
+
+bool aprovado(double m) {
+    return m &gt;= 6;
+}
+
+void boletim(std::string aluno, double n1, double n2, double n3) {
+    double m = media(n1, n2, n3);
+    std::cout &lt;&lt; aluno &lt;&lt; ": média " &lt;&lt; m &lt;&lt; " - ";
+    if (aprovado(m)) {
+        std::cout &lt;&lt; "aprovado\n";
+    } else {
+        std::cout &lt;&lt; "reprovado\n";
+    }
+}
+
+int main() {
+    boletim("Bruno", 6, 7, 8);
+    boletim("Carla", 4, 5.5, 5.5);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>O <strong>tipo de retorno</strong> vem antes do nome: <code>int dobro(…)</code> promete devolver um <code>int</code>; <code>void</code> promete nada.</li>
+  <li><code>return valor;</code> entrega o valor a quem chamou <strong>e</strong> encerra a função. A chamada "vira" o valor devolvido.</li>
+  <li>Uma função pode ter vários <code>return</code>; sai no primeiro que alcançar. Em <code>void</code>, <code>return;</code> sai mais cedo.</li>
+  <li>O valor devolvido é convertido para o tipo de retorno: <code>int</code> corta casas decimais em silêncio.</li>
+  <li>Esquecer o <code>return</code> numa função não-<code>void</code> dá só um <strong>aviso</strong> (<code>-Wreturn-type</code>) e cria <strong>comportamento indefinido</strong>: no g++ 15, <code>Instrução ilegal</code>. Nunca ignore esse aviso.</li>
+  <li>Funções <code>bool</code> respondem sim/não: <code>return n % 2 == 0;</code>, e cabem direto num <code>if</code>.</li>
+  <li>Para vários valores, devolva uma <a href="structs.html">struct</a> ou um <a href="pair-tuple.html">std::pair</a>.</li>
+  <li><code>auto</code> no retorno deixa o compilador deduzir o tipo; todos os <code>return</code> precisam concordar.</li>
+  <li>Próxima aula: <a href="valor-padrao.html">Valores Padrão</a>, para parâmetros opcionais.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
