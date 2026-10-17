@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Por Valor × Por Referência — cópia, &amp; e const&amp; | Guia C++</title>
+<meta name="description" content="Passagem de parâmetros em C++ para quem nunca programou: por valor (a função recebe uma cópia e não muda a variável de fora), por referência com &amp; (a função muda a variável: trocar dois valores), const&amp; para não copiar textos e vetores grandes, quando usar cada um e a ideia da passagem por ponteiro. Com saídas reais do g++ 15, tempos medidos e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Por Valor × Por Referência</span></h1>
+
+<p class="intro">Quando você chama <code>aumentar(estoque)</code>, a função recebe <strong>o quê</strong>: a própria variável <code>estoque</code> ou uma cópia do valor dela? Em C++, você escolhe. Por padrão, a função recebe uma <strong>cópia</strong> (passagem <strong>por valor</strong>), e nada do que ela fizer muda a variável de fora. Com um <code>&amp;</code> no parâmetro, ela recebe a <strong>própria variável</strong> (passagem <strong>por referência</strong>) e pode mudá-la. Nesta aula você vai ver as duas, entender o <code>const&amp;</code>, que evita cópias caras de textos e vetores, e saber qual usar em cada caso.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é passagem <strong>por valor</strong>, com a prova de que a variável de fora não muda.</li>
+  <li>O que é passagem <strong>por referência</strong> (<code>int&amp; x</code>), com o exemplo clássico: trocar dois valores.</li>
+  <li>Por que <code>aumentar(5)</code> não compila quando o parâmetro é <code>int&amp;</code>.</li>
+  <li>O <code>const&amp;</code>: receber sem copiar e sem poder mudar, ideal para <code>std::string</code> e <code>std::vector</code>, e quanto tempo uma cópia custa.</li>
+  <li>Uma tabela para decidir entre valor, <code>&amp;</code> e <code>const&amp;</code>.</li>
+  <li>A ideia da passagem por <strong>ponteiro</strong>, que você vai ver em código antigo e em C.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana, na pasta <code>~/cpp</code>, com o comando padrão do guia, <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: a fotocópia e o original</h2>
+<p>A Ana precisa que o contador revise a lista de compras da loja. Ela pode fazer duas coisas:</p>
+<ul>
+  <li><strong>Entregar uma fotocópia.</strong> O contador rabisca, corrige, risca o que quiser na cópia. A lista original da Ana, na gaveta, continua igual. Isso é passar <strong>por valor</strong>.</li>
+  <li><strong>Entregar a lista original.</strong> Tudo o que o contador escrever fica na lista da Ana. Isso é passar <strong>por referência</strong>.</li>
+</ul>
+<p>E existe uma terceira opção: entregar o original numa <strong>pasta lacrada com janelinha</strong>: o contador lê tudo, mas não consegue escrever. Ninguém gastou papel com cópia, e a lista está protegida. Isso é o <strong><code>const&amp;</code></strong>.</p>
+
+<hr>
+
+<h2>1. Por valor: a função recebe uma cópia</h2>
+<p>É o jeito que você usou em todas as aulas até aqui. A prova de que é uma cópia:</p>
+
+<pre class="file" data-file="valor.cpp">#include &lt;iostream&gt;
+
+void aumentar(int x) {
+    x = x + 10;
+    std::cout &lt;&lt; "dentro da função: " &lt;&lt; x &lt;&lt; "\n";
+}
+
+int main() {
+    int estoque = 5;
+    aumentar(estoque);
+    std::cout &lt;&lt; "no main: " &lt;&lt; estoque &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra valor.cpp -o valor
+$ ./valor
+dentro da função: 15
+no main: 5                   « o estoque do main não mudou</pre>
+
+<ol class="passo">
+  <li>No <code>main</code>, a caixa <code>estoque</code> guarda 5.</li>
+  <li>Na chamada <code>aumentar(estoque)</code>, o C++ cria uma caixa <strong>nova</strong>, <code>x</code>, e copia o 5 para ela.</li>
+  <li>A função muda a <strong>sua</strong> caixa: <code>x</code> vira 15. A caixa <code>estoque</code>, lá no <code>main</code>, nem fica sabendo.</li>
+  <li>A função termina e a caixa <code>x</code> é jogada fora. <code>estoque</code> continua 5.</li>
+</ol>
+
+<p>Isso não é um defeito: é uma <strong>proteção</strong>. Quando você chama uma função passando por valor, tem a garantia de que suas variáveis voltam intactas. Na maior parte do tempo, é isso que você quer.</p>
+
+<h3>O exemplo clássico: trocar dois valores (que não troca)</h3>
+<pre class="file" data-file="trocar1.cpp">#include &lt;iostream&gt;
+
+void trocar(int a, int b) {
+    int guarda = a;
+    a = b;
+    b = guarda;
+}
+
+int main() {
+    int x = 1;
+    int y = 2;
+    trocar(x, y);
+    std::cout &lt;&lt; "x = " &lt;&lt; x &lt;&lt; ", y = " &lt;&lt; y &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra trocar1.cpp -o trocar1
+$ ./trocar1
+x = 1, y = 2                 « nada foi trocado</pre>
+
+<p>A função trocou direitinho… as <strong>cópias</strong> <code>a</code> e <code>b</code>, que morreram no fim da função. Para trocar as variáveis do <code>main</code>, a função precisa receber as próprias variáveis.</p>
+
+<hr>
+
+<h2>2. Por referência: <code>&amp;</code> e a função mexe no original</h2>
+<p>Basta um <code>&amp;</code> (lê-se "e comercial") depois do tipo do parâmetro:</p>
+
+<pre class="file" data-file="referencia.cpp">#include &lt;iostream&gt;
+
+void aumentar(int&amp; x) {
+    x = x + 10;
+    std::cout &lt;&lt; "dentro da função: " &lt;&lt; x &lt;&lt; "\n";
+}
+
+int main() {
+    int estoque = 5;
+    aumentar(estoque);
+    std::cout &lt;&lt; "no main: " &lt;&lt; estoque &lt;&lt; "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>int&amp; x</dt><dd>"<code>x</code> é uma <strong>referência</strong> a um <code>int</code>". Uma referência é um <strong>apelido</strong>: <code>x</code> não é uma caixa nova, é outro nome para a caixa que veio na chamada.</dd>
+  <dt>x = x + 10;</dt><dd>Como <code>x</code> é um apelido de <code>estoque</code>, mudar <code>x</code> é mudar <code>estoque</code>.</dd>
+  <dt>aumentar(estoque);</dt><dd>A chamada é <strong>igual</strong> à da versão por valor. Só olhando a função dá para saber que ela pode mudar o argumento.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra referencia.cpp -o referencia
+$ ./referencia
+dentro da função: 15
+no main: 15                  « agora o estoque do main mudou</pre>
+
+<p>A única diferença entre <code>valor.cpp</code> e <code>referencia.cpp</code> é o <code>&amp;</code> na linha 3. Referências também existem fora de funções (<code>int&amp; apelido = estoque;</code>); a aula <a href="referencias.html">Referências</a> as explica em detalhe.</p>
+
+<div class="tip">
+<strong>Onde fica o <code>&amp;</code>?</strong>
+<p><code>int&amp; x</code>, <code>int &amp;x</code> e <code>int &amp; x</code> são a mesma coisa para o compilador. Este guia escreve <code>int&amp; x</code>, colado no tipo, porque "referência a int" é o tipo do parâmetro.</p>
+</div>
+
+<h3>Agora a troca funciona</h3>
+<pre class="file" data-file="trocar2.cpp">#include &lt;iostream&gt;
+
+void trocar(int&amp; a, int&amp; b) {
+    int guarda = a;
+    a = b;
+    b = guarda;
+}
+
+int main() {
+    int x = 1;
+    int y = 2;
+    trocar(x, y);
+    std::cout &lt;&lt; "x = " &lt;&lt; x &lt;&lt; ", y = " &lt;&lt; y &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra trocar2.cpp -o trocar2
+$ ./trocar2
+x = 2, y = 1</pre>
+
+<p><code>a</code> é apelido de <code>x</code>, <code>b</code> é apelido de <code>y</code>. A variável <code>guarda</code> é necessária pelo mesmo motivo de quando você troca o conteúdo de dois copos: precisa de um terceiro copo vazio. (A biblioteca padrão já tem essa função pronta, <code>std::swap</code>, em <code>&lt;utility&gt;</code>: <code>std::swap(x, y);</code>.)</p>
+
+<h3>Com vetores, a diferença aparece do mesmo jeito</h3>
+<pre class="file" data-file="vetor.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+void darBonus(std::vector&lt;double&gt; notas) {
+    for (double&amp; n : notas) {
+        n = n + 1;
+    }
+}
+
+void darBonusDeVerdade(std::vector&lt;double&gt;&amp; notas) {
+    for (double&amp; n : notas) {
+        n = n + 1;
+    }
+}
+
+void mostrar(const std::vector&lt;double&gt;&amp; notas) {
+    for (double n : notas) {
+        std::cout &lt;&lt; n &lt;&lt; " ";
+    }
+    std::cout &lt;&lt; "\n";
+}
+
+int main() {
+    std::vector&lt;double&gt; notas = {7.5, 8, 6.5};
+    darBonus(notas);
+    mostrar(notas);
+    darBonusDeVerdade(notas);
+    mostrar(notas);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra vetor.cpp -o vetor
+$ ./vetor
+7.5 8 6.5                    « darBonus mexeu numa cópia do vetor inteiro
+8.5 9 7.5                    « darBonusDeVerdade mexeu no vetor da Ana</pre>
+
+<p>O <code>double&amp; n</code> dentro do <code>for</code> é o mesmo truque, num laço: cada <code>n</code> é um apelido de um elemento do vetor (aula <a href="for-range.html">for de Intervalo</a>). O <code>mostrar</code> usa <code>const&amp;</code>, que é a próxima seção.</p>
+
+<div class="trycpp" data-goal="out:Antes: 4,out:Depois: 8,src:void\s+dobrar\s*\(\s*int\s*&amp;\s*\w+\s*\)">
+<p class="try-task"><strong>Missão:</strong> a função <code>dobrar</code> deveria dobrar a quantidade da Ana, mas o <code>Depois</code> continua 4. Rode, entenda por quê e conserte com <strong>um caractere</strong>.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+void dobrar(int quantidade) {
+    quantidade = quantidade * 2;
+}
+
+int main() {
+    int canetas = 4;
+    std::cout &lt;&lt; "Antes: " &lt;&lt; canetas &lt;&lt; "\n";
+    dobrar(canetas);
+    std::cout &lt;&lt; "Depois: " &lt;&lt; canetas &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+void dobrar(int&amp; quantidade) {
+    quantidade = quantidade * 2;
+}
+
+int main() {
+    int canetas = 4;
+    std::cout &lt;&lt; "Antes: " &lt;&lt; canetas &lt;&lt; "\n";
+    dobrar(canetas);
+    std::cout &lt;&lt; "Depois: " &lt;&lt; canetas &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<h3>Uma referência precisa de uma variável</h3>
+<p>Se a função vai <strong>escrever</strong> no argumento, o argumento tem de ser um lugar onde se possa escrever: uma variável. Um número solto não serve:</p>
+
+<pre class="file" data-file="literal.cpp">#include &lt;iostream&gt;
+
+void aumentar(int&amp; x) {
+    x = x + 10;
+}
+
+int main() {
+    aumentar(5);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra literal.cpp -o literal
+literal.cpp: In function ‘int main()’:
+literal.cpp:8:14: error: cannot bind non-const lvalue reference of type ‘int&amp;’ to an rvalue of type ‘int’
+    8 |     aumentar(5);
+      |              ^
+literal.cpp:3:20: note: initializing argument 1 of ‘void aumentar(int&amp;)’
+    3 | void aumentar(int&amp; x) {
+      |               ~~~~~^</pre>
+
+<dl class="anatomy">
+  <dt>cannot bind … reference of type ‘int&amp;’</dt><dd>"Não é possível ligar uma referência <code>int&amp;</code>…"</dd>
+  <dt>to an rvalue of type ‘int’</dt><dd>"…a um valor temporário do tipo <code>int</code>". <em>Rvalue</em> é o nome técnico de um valor que não mora numa variável: o <code>5</code>, o resultado de <code>x + 1</code>. Não faz sentido aumentar o número 5 "no original".</dd>
+  <dt>non-const lvalue reference</dt><dd>A mensagem já dá a dica: uma referência <strong>const</strong> aceitaria o 5. É o que vem a seguir.</dd>
+</dl>
+
+<hr>
+
+<h2>3. <code>const&amp;</code>: sem cópia e sem mudanças</h2>
+<p>Copiar um <code>int</code> é instantâneo: são poucos bytes. Mas copiar um <code>std::string</code> com um texto longo, ou um <code>std::vector</code> com milhares de notas, dá trabalho ao computador: ele precisa reservar memória nova e copiar elemento por elemento, <strong>a cada chamada</strong>. Quando a função só precisa <strong>ler</strong>, passe por <code>const&amp;</code> (referência constante):</p>
+
+<pre class="file" data-file="constref.cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+double media(const std::vector&lt;double&gt;&amp; notas) {
+    double soma = 0;
+    for (double n : notas) {
+        soma += n;
+    }
+    return soma / notas.size();
+}
+
+void mostrar(const std::string&amp; texto) {
+    std::cout &lt;&lt; "[" &lt;&lt; texto &lt;&lt; "]\n";
+}
+
+int main() {
+    std::vector&lt;double&gt; notas = {7.5, 8, 6.5, 9};
+    std::cout &lt;&lt; "Média: " &lt;&lt; media(notas) &lt;&lt; "\n";
+    std::string aviso = "Prova na sexta";
+    mostrar(aviso);
+    mostrar("Trazer calculadora");
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>const std::vector&lt;double&gt;&amp; notas</dt><dd>Lê-se da direita para a esquerda: <code>notas</code> é uma referência (<code>&amp;</code>) a um vetor de <code>double</code> constante (<code>const</code>). Sem cópia, como no <code>&amp;</code>; sem poder mudar, por causa do <code>const</code>.</dd>
+  <dt>mostrar("Trazer calculadora");</dt><dd>Diferente do <code>int&amp;</code>, um <code>const&amp;</code> aceita valores temporários: o C++ cria um <code>std::string</code> temporário com o texto e liga a referência a ele. Já que a função não vai escrever, não há problema.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra constref.cpp -o constref
+$ ./constref
+Média: 7.75
+[Prova na sexta]
+[Trazer calculadora]</pre>
+
+<h3>O <code>const</code> é uma promessa, e o compilador cobra</h3>
+<p>Se a função tentar mudar um parâmetro <code>const&amp;</code>, não compila. Com um <code>int</code>:</p>
+
+<pre class="file" data-file="constint.cpp">void zerar(const int&amp; x) {
+    x = 0;
+}
+
+int main() {
+    int n = 5;
+    zerar(n);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra constint.cpp -o constint
+constint.cpp: In function ‘void zerar(const int&amp;)’:
+constint.cpp:2:7: error: assignment of read-only reference ‘x’
+    2 |     x = 0;
+      |     ~~^~~</pre>
+
+<p><em>Assignment of read-only reference ‘x’</em> = "atribuição a uma referência somente leitura ‘x’". Com um vetor, a mensagem é mais longa, mas o começo diz o mesmo:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra constmuda.cpp -o constmuda        « notas.push_back(10); dentro de media
+constmuda.cpp: In function ‘double media(const std::vector&lt;double&gt;&amp;)’:
+constmuda.cpp:5:20: error: passing ‘const std::vector&lt;double&gt;’ as ‘this’ argument discards qualifiers [-fpermissive]
+    5 |     notas.push_back(10);
+      |     ~~~~~~~~~~~~~~~^~~~
+In file included from /usr/include/c++/15/vector:68,
+                 from constmuda.cpp:2:
+/usr/include/c++/15/bits/stl_vector.h:1433:7: note:   in call to ‘constexpr void std::vector&lt; &lt;template-parameter-1-1&gt;, &lt;template-parameter-1-2&gt; &gt;::push_back(value_type&amp;&amp;) [with _Tp = double; _Alloc = std::allocator&lt;double&gt;; value_type = double]’
+ 1433 |       push_back(value_type&amp;&amp; __x)
+      |       ^~~~~~~~~</pre>
+
+<p>Leia só a primeira linha de erro: <em>passing ‘const std::vector&lt;double&gt;’ … discards qualifiers</em> = "passar um vetor <code>const</code> para <code>push_back</code> descartaria o <code>const</code>". Em outras palavras: <code>push_back</code> muda o vetor, e o vetor é somente leitura. A nota de baixo mostra onde o <code>push_back</code> está escrito dentro da biblioteca padrão; não é seu código. A proteção é justamente o ponto: quem chama <code>media(notas)</code> tem a garantia de que as notas voltam iguais.</p>
+
+<h3>Quanto custa uma cópia?</h3>
+<p>Para sentir a diferença, a Ana escreveu dois programas iguais, com um vetor de um milhão de números passado 500 vezes a uma função que só lê o primeiro elemento. A única diferença é o parâmetro:</p>
+
+<pre class="file" data-file="copia-ref.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int primeiro(const std::vector&lt;int&gt;&amp; v) {      // em copia-valor.cpp: std::vector&lt;int&gt; v
+    return v[0];
+}
+
+int main() {
+    std::vector&lt;int&gt; numeros(1'000'000, 7);
+    long long total = 0;
+    for (int i = 0; i &lt; 500; i++) {
+        total += primeiro(numeros);
+    }
+    std::cout &lt;&lt; total &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ time ./copia-valor
+3500
+
+real	0m0,206s                « 500 cópias de um milhão de números
+user	0m0,196s
+sys	0m0,010s
+$ time ./copia-ref
+3500
+
+real	0m0,016s                « nenhuma cópia: mais de 10 vezes mais rápido
+user	0m0,013s
+sys	0m0,002s</pre>
+
+<p>O comando <code>time</code> mede quanto tempo o programa levou (<code>real</code> é o tempo de relógio). Os números mudam um pouco a cada execução e de máquina para máquina, mas a proporção fica. Num programa pequeno, 0,2 segundo não incomoda; num programa que chama a função milhões de vezes, ou com textos enormes, incomoda muito. Por isso a regra do C++ moderno é simples: <strong>textos, vetores e objetos grandes que a função só lê: <code>const&amp;</code></strong>.</p>
+
+<hr>
+
+<h2>4. Qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Parâmetro</th><th>Exemplo</th></tr>
+<tr><td>Tipo pequeno (<code>int</code>, <code>double</code>, <code>char</code>, <code>bool</code>) que a função só lê</td><td><strong>Por valor</strong></td><td><code>double dobro(double x)</code></td></tr>
+<tr><td>Tipo grande (<code>std::string</code>, <code>std::vector</code>, <a href="structs.html">structs</a>) que a função só lê</td><td><strong><code>const&amp;</code></strong></td><td><code>double media(const std::vector&lt;double&gt;&amp; notas)</code></td></tr>
+<tr><td>A função precisa <strong>mudar</strong> a variável de quem chama</td><td><strong><code>&amp;</code></strong></td><td><code>void trocar(int&amp; a, int&amp; b)</code></td></tr>
+<tr><td>A função precisa de uma cópia própria para mexer à vontade</td><td><strong>Por valor</strong> (mesmo se for grande)</td><td><code>std::string maiusculas(std::string s)</code>, que altera <code>s</code> e devolve</td></tr>
+<tr><td>A função calcula um resultado novo</td><td>Prefira <strong>devolver</strong> com <code>return</code> a escrever num <code>&amp;</code></td><td><code>int dobro(int x)</code> em vez de <code>void dobro(int x, int&amp; resultado)</code></td></tr>
+</table>
+</div>
+
+<p>Sobre a última linha: em código antigo você vai ver funções que "devolvem" resultados escrevendo em parâmetros <code>&amp;</code>. Hoje, com <a href="retorno.html">retorno</a> de <code>struct</code> e <code>std::pair</code>, isso é raro: <code>int r = dobro(5);</code> deixa claro de onde veio o valor; <code>dobro(5, r);</code> esconde.</p>
+
+<div class="warning">
+<strong>O <code>&amp;</code> tem dois significados em C++</strong>
+<p>No <strong>tipo</strong> (<code>int&amp; x</code>, num parâmetro ou numa declaração), <code>&amp;</code> quer dizer "referência". Numa <strong>expressão</strong> (<code>&amp;estoque</code>), quer dizer "o endereço de", e aparece com ponteiros, logo abaixo. E <code>&amp;&amp;</code> entre condições é o "e" lógico (<a href="operadores-logicos.html">Operadores Lógicos</a>). Mesmo símbolo, papéis diferentes.</p>
+</div>
+
+<hr>
+
+<h2>5. Por ponteiro: só a ideia</h2>
+<p>Antes das referências existirem (em C, a linguagem "mãe" do C++, não há referências), o jeito de uma função mudar uma variável de fora era receber o <strong>endereço</strong> dela na memória, um <strong>ponteiro</strong>:</p>
+
+<pre class="file" data-file="ponteiro.cpp">#include &lt;iostream&gt;
+
+void aumentar(int* x) {
+    *x = *x + 10;
+}
+
+int main() {
+    int estoque = 5;
+    aumentar(&amp;estoque);
+    std::cout &lt;&lt; "no main: " &lt;&lt; estoque &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ponteiro.cpp -o ponteiro
+$ ./ponteiro
+no main: 15</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>Leia como</th></tr>
+<tr><td><code>int* x</code></td><td><code>x</code> guarda o endereço de um <code>int</code></td></tr>
+<tr><td><code>&amp;estoque</code></td><td>"o endereço de <code>estoque</code>": a chamada deixa visível que a variável pode mudar</td></tr>
+<tr><td><code>*x</code></td><td>"o <code>int</code> que está nesse endereço"</td></tr>
+</table>
+</div>
+
+<p>O resultado é o mesmo da referência, com mais símbolos e mais jeitos de errar (um ponteiro pode ser nulo, uma referência não). Em C++ moderno, para "a função muda a variável", prefira <code>&amp;</code>. Ponteiros têm seus usos, explicados com calma em <a href="ponteiros.html">Ponteiros</a> e <a href="nullptr.html">nullptr</a>; e o <code>const</code> com ponteiros e referências em <a href="const-ponteiros.html">const com Ponteiros e Referências</a>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>A função "não funcionou": a variável de fora não mudou</strong>
+<pre class="term" data-cwd="~/cpp">$ ./trocar1
+x = 1, y = 2</pre>
+<p><strong>O que significa:</strong> o parâmetro é por valor; a função mudou só a cópia. Não há erro nem aviso, porque mudar a cópia é permitido.</p>
+<p><strong>Como consertar:</strong> se a função deve mudar a variável de quem chama, use <code>&amp;</code> no parâmetro: <code>void trocar(int&amp; a, int&amp; b)</code>. Se ela deve calcular algo novo, devolva com <code>return</code> e guarde o resultado: <code>estoque = aumentado(estoque);</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: cannot bind non-const lvalue reference of type ‘int&amp;’ to an rvalue of type ‘int’</code></strong>
+<p><strong>O que significa:</strong> o parâmetro é <code>int&amp;</code> (a função pode escrever nele) e você mandou um valor que não é variável: <code>aumentar(5)</code>, <code>aumentar(x + 1)</code>. No editor do guia, o Clang diz <code>candidate function not viable: expects an lvalue for 1st argument</code> ("espera uma variável no 1º argumento").</p>
+<p><strong>Como consertar:</strong> passe uma variável (<code>int n = 5; aumentar(n);</code>). Se a função não precisa mudar o argumento, troque o parâmetro por valor (<code>int x</code>) ou por <code>const int&amp; x</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: assignment of read-only reference</code> ou <code>passing ‘const …’ as ‘this’ argument discards qualifiers</code></strong>
+<p><strong>O que significa:</strong> a função recebeu <code>const&amp;</code> e tentou mudar o parâmetro: atribuir (<code>x = 0</code>) ou chamar algo que muda (<code>push_back</code>, <code>clear</code>, <code>+=</code>).</p>
+<p><strong>Como consertar:</strong> decida o que a função deve fazer. Se ela deve mudar o original, tire o <code>const</code> (<code>std::vector&lt;double&gt;&amp;</code>). Se ela só precisa de uma versão modificada para uso interno, receba por valor (uma cópia) e mexa na cópia.</p>
+</div>
+
+<div class="cenario">
+<strong>O programa ficou lento com textos ou vetores grandes</strong>
+<p><strong>O que significa:</strong> funções que recebem <code>std::string</code> ou <code>std::vector</code> por valor copiam tudo a cada chamada.</p>
+<p><strong>Como consertar:</strong> se a função só lê, troque <code>std::vector&lt;int&gt; v</code> por <code>const std::vector&lt;int&gt;&amp; v</code>. As chamadas não mudam.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parâmetro</th><th>Copia?</th><th>A função pode mudar o original?</th><th>Aceita <code>f(5)</code>?</th></tr>
+<tr><td><code>int x</code></td><td>Sim</td><td>Não (muda só a cópia)</td><td>Sim</td></tr>
+<tr><td><code>int&amp; x</code></td><td>Não</td><td><strong>Sim</strong></td><td>Não</td></tr>
+<tr><td><code>const int&amp; x</code></td><td>Não</td><td>Não (erro de compilação)</td><td>Sim</td></tr>
+<tr><td><code>int* x</code> (chamada <code>f(&amp;n)</code>)</td><td>Copia só o endereço</td><td>Sim, com <code>*x = …</code></td><td>Não</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Mudar o original</h3>
+<p>Complete o parâmetro para que a função zere a variável de quem chama:</p>
+<div class="ex-code">void zerar(<input data-answer="int&amp; x|int &amp;x|int &amp; x" aria-label="parâmetro">) { x = 0; }</div>
+</div>
+
+<div class="exercise">
+<h3>2. Ler sem copiar</h3>
+<p>Complete o parâmetro de uma função que só mostra um texto, sem copiá-lo e sem poder mudá-lo:</p>
+<div class="ex-code">void mostrar(<input data-answer="const std::string&amp; texto|const std::string &amp;texto|const std::string &amp; texto" aria-label="parâmetro">) { std::cout &lt;&lt; texto; }</div>
+</div>
+
+<div class="exercise">
+<h3>3. O que aparece?</h3>
+<p><code>void f(int x) { x = 99; }</code> e, no <code>main</code>: <code>int n = 1; f(n); std::cout &lt;&lt; n;</code></p>
+<div class="ex-code"><input data-answer="1" aria-label="saída"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Qual é o melhor parâmetro para uma função que calcula a média de um <code>std::vector&lt;double&gt;</code> sem alterá-lo?</p>
+<label><input type="radio" name="q4"> <code>std::vector&lt;double&gt; notas</code></label>
+<label><input type="radio" name="q4"> <code>const std::vector&lt;double&gt;&amp; notas</code></label>
+<label><input type="radio" name="q4"> <code>std::vector&lt;double&gt;&amp; notas</code></label>
+<label><input type="radio" name="q4"> <code>std::vector&lt;double&gt;* notas</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. A função é <code>void aumentar(int&amp; x)</code>. Qual chamada <strong>não</strong> compila?</p>
+<label><input type="radio" name="q5"> <code>int a = 1; aumentar(a);</code></label>
+<label><input type="radio" name="q5"> <code>int b = 0; aumentar(b); aumentar(b);</code></label>
+<label><input type="radio" name="q5"> <code>std::vector&lt;int&gt; v = {1}; aumentar(v[0]);</code></label>
+<label><input type="radio" name="q5"> <code>aumentar(10);</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Para um parâmetro <code>int</code> que a função só lê, o que o guia recomenda?</p>
+<label><input type="radio" name="q6"> Por valor: <code>int x</code>. Copiar um <code>int</code> é barato</label>
+<label><input type="radio" name="q6"> Sempre <code>const int&amp; x</code>, para nunca copiar</label>
+<label><input type="radio" name="q6"> <code>int&amp; x</code>, para ser mais rápido</label>
+<label><input type="radio" name="q6"> <code>int* x</code></label>
+</div>
+
+<h3>Missão final: promoção na lojinha</h3>
+
+<div class="trycpp" data-goal="out:Antes: 10 20 50,out:Depois: 9 18 45,out:Total: 72,src:aplicarDesconto\s*\(\s*std::vector&lt;double&gt;\s*&amp;,src:total\s*\(\s*const\s+std::vector&lt;double&gt;\s*&amp;,semaviso">
+<p class="try-task"><strong>Missão:</strong> complete as duas funções escolhendo o tipo de passagem certo para cada uma. <code>aplicarDesconto</code> deve <strong>mudar</strong> os preços da Ana (cada preço vira <code>preço * (1 - desconto)</code>). <code>total</code> só <strong>lê</strong> e devolve a soma, sem copiar o vetor. Saída esperada:</p>
+<pre class="out">Antes: 10 20 50
+Depois: 9 18 45
+Total: 72</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+void aplicarDesconto(std::vector&lt;double&gt; precos, double desconto) {
+    for (double&amp; p : precos) {
+        p = p * (1 - desconto);
+    }
+}
+
+double total(std::vector&lt;double&gt; precos) {
+    double soma = 0;
+    for (double p : precos) {
+        soma += p;
+    }
+    return soma;
+}
+
+void mostrar(const std::vector&lt;double&gt;&amp; precos) {
+    for (double p : precos) {
+        std::cout &lt;&lt; " " &lt;&lt; p;
+    }
+    std::cout &lt;&lt; "\n";
+}
+
+int main() {
+    std::vector&lt;double&gt; precos = {10, 20, 50};
+    std::cout &lt;&lt; "Antes:";
+    mostrar(precos);
+    aplicarDesconto(precos, 0.1);
+    std::cout &lt;&lt; "Depois:";
+    mostrar(precos);
+    std::cout &lt;&lt; "Total: " &lt;&lt; total(precos) &lt;&lt; "\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+void aplicarDesconto(std::vector&lt;double&gt;&amp; precos, double desconto) {
+    for (double&amp; p : precos) {
+        p = p * (1 - desconto);
+    }
+}
+
+double total(const std::vector&lt;double&gt;&amp; precos) {
+    double soma = 0;
+    for (double p : precos) {
+        soma += p;
+    }
+    return soma;
+}
+
+void mostrar(const std::vector&lt;double&gt;&amp; precos) {
+    for (double p : precos) {
+        std::cout &lt;&lt; " " &lt;&lt; p;
+    }
+    std::cout &lt;&lt; "\n";
+}
+
+int main() {
+    std::vector&lt;double&gt; precos = {10, 20, 50};
+    std::cout &lt;&lt; "Antes:";
+    mostrar(precos);
+    aplicarDesconto(precos, 0.1);
+    std::cout &lt;&lt; "Depois:";
+    mostrar(precos);
+    std::cout &lt;&lt; "Total: " &lt;&lt; total(precos) &lt;&lt; "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>Por valor</strong> (<code>int x</code>): a função recebe uma <strong>cópia</strong>. Mudar o parâmetro não muda a variável de fora. É o padrão e é seguro.</li>
+  <li><strong>Por referência</strong> (<code>int&amp; x</code>): o parâmetro é um <strong>apelido</strong> da variável de quem chama; mudar um muda o outro. Só aceita variáveis, não valores soltos como <code>5</code>.</li>
+  <li><strong><code>const&amp;</code></strong>: sem cópia e sem permissão para mudar. É o jeito certo de passar <code>std::string</code>, <code>std::vector</code> e outros tipos grandes que a função só lê. Copiar um vetor de um milhão de números 500 vezes levou 0,2 s; passar por <code>const&amp;</code>, 0,016 s.</li>
+  <li>Tipos pequenos que a função só lê: por valor. Para devolver resultados: prefira <code>return</code> a escrever num <code>&amp;</code>.</li>
+  <li><strong>Por ponteiro</strong> (<code>int* x</code>, chamada <code>f(&amp;n)</code>) faz o mesmo que a referência, do jeito do C. Detalhes em <a href="ponteiros.html">Ponteiros</a>.</li>
+  <li>Próxima aula: <a href="sobrecarga.html">Sobrecarga de Funções</a>, várias funções com o mesmo nome.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
