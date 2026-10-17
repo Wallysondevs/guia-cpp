@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ nullptr — o ponteiro nulo, NULL e 0 | Guia C++</title>
+<meta name="description" content="nullptr em C++ para quem nunca programou: o ponteiro nulo, como testar se um ponteiro aponta para algo, nullptr × NULL × 0 (com o erro real de ambiguidade), o que acontece ao desreferenciar um ponteiro nulo (falha de segmentação, código 139, e o relatório do AddressSanitizer) e por que checar antes de usar.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">nullptr</span></h1>
+
+<p class="intro">Na aula <a href="ponteiros.html">Ponteiros</a>, você viu que um ponteiro sem valor guarda lixo, e que isso é perigoso. A solução é dar a ele um valor que significa claramente "<strong>não aponta para nada</strong>": o <code>nullptr</code> ("null pointer", ponteiro nulo). Nesta aula você vai ver como criar e testar um ponteiro nulo, o que acontece quando alguém esquece de testar (o programa cai, e você vai ver a mensagem real), e por que o C++ moderno trocou o antigo <code>NULL</code> pelo <code>nullptr</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um ponteiro nulo e como criar um: <code>int* p = nullptr;</code>.</li>
+  <li>Como perguntar "este ponteiro aponta para algo?": <code>p != nullptr</code>, <code>if (p)</code>.</li>
+  <li>O que acontece ao desreferenciar um ponteiro nulo: <code>Falha de segmentação</code>, código 139.</li>
+  <li>Como o AddressSanitizer mostra a linha exata do erro.</li>
+  <li>A diferença entre <code>nullptr</code>, <code>NULL</code> e <code>0</code>, com o erro real de ambiguidade.</li>
+  <li>O hábito que evita tudo isso: <strong>sempre checar antes de usar</strong>.</li>
+</ul>
+</div>
+
+<p>Os programas foram compilados na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code>.</p>
+
+<hr>
+
+<h2>A ideia: o papel em branco</h2>
+<p>Lembra do ponteiro como um papel com um endereço anotado? Existem três estados possíveis para esse papel:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O papel</th><th>Em C++</th><th>Dá para ir até a casa?</th></tr>
+<tr><td>Com um endereço válido anotado</td><td><code>int* p = &amp;x;</code></td><td>Sim: <code>*p</code> é o <code>x</code>.</td></tr>
+<tr><td>Escrito "<strong>nenhum endereço</strong>", bem legível</td><td><code>int* p = nullptr;</code></td><td>Não, e você <strong>consegue saber</strong> que não dá.</td></tr>
+<tr><td>Rabiscado, ilegível</td><td><code>int* p;</code> (lixo)</td><td>Não, e você <strong>não tem como saber</strong>.</td></tr>
+</table>
+</div>
+
+<p>O <code>nullptr</code> é o papel com "nenhum endereço" escrito em letra de forma. Ele não evita que alguém tente ir até a casa, mas permite <strong>conferir antes</strong>. É a diferença entre um formulário com "Telefone: não tem" e um formulário com o campo borrado.</p>
+
+<hr>
+
+<h2>1. Criar e testar um ponteiro nulo</h2>
+
+<pre class="file" data-file="nulo.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int* p = nullptr;          // não aponta para nada (ainda)
+
+    std::cout &lt;&lt; "p = " &lt;&lt; p &lt;&lt; "\n";
+
+    if (p == nullptr) {
+        std::cout &lt;&lt; "p não aponta para nada\n";
+    }
+
+    int pontos = 10;
+    p = &amp;pontos;
+
+    if (p != nullptr) {
+        std::cout &lt;&lt; "Agora p aponta para um valor: " &lt;&lt; *p &lt;&lt; "\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra nulo.cpp -o nulo
+$ ./nulo
+p = 0                        « o ponteiro nulo aparece como 0
+p não aponta para nada
+Agora p aponta para um valor: 10</pre>
+
+<dl class="anatomy">
+  <dt>nullptr</dt><dd>Uma palavra reservada do C++ <span class="versao">C++11</span> que significa "ponteiro que não aponta para nada". Serve para ponteiros de qualquer tipo: <code>int*</code>, <code>double*</code>, <code>Produto*</code>.</dd>
+  <dt>p = 0</dt><dd>Na prática, o ponteiro nulo guarda o endereço 0. Esse endereço é reservado: nenhuma variável mora nele, e o sistema proíbe qualquer acesso ali. Por isso "0" funciona como "nenhum".</dd>
+  <dt>p == nullptr</dt><dd>"<code>p</code> é nulo?" Compara o endereço guardado com o nulo. Não usa <code>*</code>: você está olhando o <strong>papel</strong>, não indo até a casa.</dd>
+  <dt>p != nullptr</dt><dd>"<code>p</code> aponta para alguma coisa?" Só dentro desse <code>if</code> é seguro usar <code>*p</code>.</dd>
+</dl>
+
+<h3>O jeito curto: <code>if (p)</code></h3>
+<p>Um ponteiro pode ser usado direto como condição: nulo vale <code>false</code>, qualquer outro endereço vale <code>true</code>. Você vai ver muito este estilo:</p>
+
+<pre class="file" data-file="curto.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int pontos = 10;
+    int* p = nullptr;
+    int* q = &amp;pontos;
+
+    if (!p) std::cout &lt;&lt; "p é nulo\n";
+    if (q)  std::cout &lt;&lt; "q aponta para algo\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra curto.cpp -o curto
+$ ./curto
+p é nulo
+q aponta para algo</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma longa</th><th>Forma curta</th><th>Pergunta</th></tr>
+<tr><td><code>if (p != nullptr)</code></td><td><code>if (p)</code></td><td>"Aponta para algo?"</td></tr>
+<tr><td><code>if (p == nullptr)</code></td><td><code>if (!p)</code></td><td>"É nulo?"</td></tr>
+</table>
+</div>
+
+<p>As duas formas fazem exatamente a mesma coisa. A longa é mais clara para quem está começando; use a que achar mais fácil de ler, mas seja consistente no mesmo programa. O <code>!</code> é o "não" da aula <a href="operadores-logicos.html">Operadores Lógicos</a>.</p>
+
+<hr>
+
+<h2>2. Desreferenciar um ponteiro nulo</h2>
+<p>O <code>nullptr</code> só protege quem confere. Se o programa seguir um ponteiro nulo com <code>*p</code>, ele vai até o endereço 0, que é proibido, e o sistema o mata na hora:</p>
+
+<pre class="file" data-file="crash.cpp">#include &lt;iostream&gt;
+
+int main() {
+    int* p = nullptr;
+    std::cout &lt;&lt; "Antes\n";
+    std::cout &lt;&lt; *p &lt;&lt; "\n";      // segue um ponteiro nulo
+    std::cout &lt;&lt; "Depois\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra crash.cpp -o crash
+$ ./crash
+Antes
+Falha de segmentação     (imagem do núcleo gravada) ./crash
+$ echo $?
+139</pre>
+
+<dl class="anatomy">
+  <dt>(compilou sem avisos)</dt><dd>O g++ não reclamou de nada, mesmo com <code>-Wall -Wextra</code>. Na maioria dos programas reais, o compilador não tem como saber se um ponteiro vai estar nulo; quem descobre é o programa, ao rodar.</dd>
+  <dt>Antes</dt><dd>A primeira linha rodou normalmente.</dd>
+  <dt>Falha de segmentação</dt><dd>O sistema matou o programa por acessar uma memória proibida. Num Linux em inglês, a mensagem é <code>Segmentation fault (core dumped)</code>. "Segmentação" vem dos "segmentos" (pedaços) de memória que cada programa pode usar.</dd>
+  <dt>(imagem do núcleo gravada)</dt><dd>"Core dumped": o sistema pode ter guardado uma fotografia da memória do programa no momento da queda, para ser examinada com o <a href="depuracao-gdb.html">GDB</a>.</dd>
+  <dt>./crash</dt><dd>O comando que caiu.</dd>
+  <dt>139</dt><dd>O código de saída: 128 + 11. O 11 é o número do sinal <code>SIGSEGV</code> ("violação de segmento"). Quando um programa no terminal termina com 139, pense logo em ponteiro.</dd>
+</dl>
+
+<p>Repare: o <code>Depois</code> nunca apareceu. O programa morreu no meio, sem chance de salvar nada nem de mostrar uma mensagem amigável.</p>
+
+<h3>Descobrir a linha com o AddressSanitizer</h3>
+<p>Num programa grande, "Falha de segmentação" não diz <strong>onde</strong>. Compilando com <code>-g -fsanitize=address</code> (explicado em <a href="sanitizers.html">Sanitizers</a>), o programa ganha um vigia que, na queda, mostra o arquivo e a linha:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra -g -fsanitize=address crash.cpp -o crash
+$ ./crash
+Antes
+AddressSanitizer:DEADLYSIGNAL
+=================================================================
+==543431==ERROR: AddressSanitizer: SEGV on unknown address 0x000000000000 (pc 0x562ba99f3271 bp 0x7ffcdef99220 sp 0x7ffcdef99210 T0)
+==543431==The signal is caused by a READ memory access.
+==543431==Hint: address points to the zero page.
+    #0 0x562ba99f3271 in main /home/ana/cpp/crash.cpp:6
+…                                « outras linhas da pilha e os registradores
+SUMMARY: AddressSanitizer: SEGV /home/ana/cpp/crash.cpp:6 in main
+==543431==ABORTING</pre>
+
+<ul>
+  <li><strong>SEGV on unknown address 0x000000000000</strong>: falha de segmentação no endereço 0, o nulo.</li>
+  <li><strong>caused by a READ memory access</strong>: o programa tentou <strong>ler</strong> (era o <code>std::cout &lt;&lt; *p</code>).</li>
+  <li><strong>Hint: address points to the zero page</strong>: "dica: o endereço fica na página zero", o jeito do sanitizer dizer "isso é um ponteiro nulo".</li>
+  <li><strong>#0 … in main /home/ana/cpp/crash.cpp:6</strong>: a função e a <strong>linha</strong> exata: a 6.</li>
+</ul>
+
+<div class="note">
+<strong>No editor do guia</strong>
+<p>O editor roda o programa em WebAssembly, e lá o endereço 0 não é proibido como no Linux. Por isso, no editor, desreferenciar um ponteiro nulo pode <strong>não</strong> derrubar o programa: ele pode mostrar um número qualquer e seguir em frente. Isso não torna o código correto. É comportamento indefinido nos dois lugares; só o sintoma muda. As missões abaixo treinam o hábito que resolve em qualquer lugar: checar antes.</p>
+</div>
+
+<div class="trycpp" data-goal="out:Preço: 4.5,out:Sem preço">
+<p class="try-task"><strong>Missão:</strong> a função <code>mostrar_preco</code> recebe um ponteiro que pode ser nulo (produto sem preço cadastrado). Do jeito que está, ela segue o ponteiro sem conferir. Corrija: se <code>preco</code> for nulo, mostre <code>Sem preço</code>; senão, mostre <code>Preço: </code> e o valor.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+void mostrar_preco(const double* preco) {
+    // se preco for nulo, mostre "Sem preço"
+    // senão, mostre "Preço: " e o valor apontado
+    std::cout &lt;&lt; "Preço: " &lt;&lt; *preco &lt;&lt; "\n";
+}
+
+int main() {
+    double caneta = 4.5;
+    mostrar_preco(&amp;caneta);
+    mostrar_preco(nullptr);
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+void mostrar_preco(const double* preco) {
+    if (preco == nullptr) {
+        std::cout &lt;&lt; "Sem preço\n";
+    } else {
+        std::cout &lt;&lt; "Preço: " &lt;&lt; *preco &lt;&lt; "\n";
+    }
+}
+
+int main() {
+    double caneta = 4.5;
+    mostrar_preco(&amp;caneta);
+    mostrar_preco(nullptr);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. <code>nullptr</code> × <code>NULL</code> × <code>0</code></h2>
+<p>Em código antigo, você vai encontrar outras duas formas de escrever "ponteiro nulo":</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>De onde vem</th><th>O que é, de verdade</th><th>Use?</th></tr>
+<tr><td><code>nullptr</code></td><td>C++11 (2011)</td><td>Um valor especial, do tipo <code>std::nullptr_t</code>, que só combina com ponteiros.</td><td><strong>Sim, sempre.</strong></td></tr>
+<tr><td><code>NULL</code></td><td>Herdado do C (cabeçalho <code>&lt;cstddef&gt;</code>)</td><td>Um <strong>apelido para o número 0</strong>, criado pelo pré-processador (no g++, um 0 especial chamado <code>__null</code>).</td><td>Não em código novo.</td></tr>
+<tr><td><code>0</code></td><td>C e C++ antigos</td><td>O número zero, que o C++ aceita converter em ponteiro nulo.</td><td>Não.</td></tr>
+</table>
+</div>
+
+<p>Se as três "funcionam", por que o C++11 criou uma quarta coisa? Porque <code>NULL</code> e <code>0</code> são, no fundo, <strong>números</strong>, e isso confunde o compilador quando existe uma função para números e outra para ponteiros (funções com o mesmo nome e parâmetros diferentes são a <a href="sobrecarga.html">sobrecarga</a>):</p>
+
+<pre class="file" data-file="sobrecarga.cpp">#include &lt;iostream&gt;
+#include &lt;cstddef&gt;
+
+void mostrar(int)  { std::cout &lt;&lt; "chamou mostrar(int)\n"; }
+void mostrar(int*) { std::cout &lt;&lt; "chamou mostrar(int*)\n"; }
+
+int main() {
+    mostrar(0);
+    mostrar(NULL);
+    mostrar(nullptr);
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sobrecarga.cpp -o sobrecarga
+sobrecarga.cpp: In function ‘int main()’:
+sobrecarga.cpp:9:12: error: call of overloaded ‘mostrar(NULL)’ is ambiguous
+    9 |     mostrar(NULL);
+      |     ~~~~~~~^~~~~~
+sobrecarga.cpp:9:12: note: there are 2 candidates
+sobrecarga.cpp:4:6: note: candidate 1: ‘void mostrar(int)’
+    4 | void mostrar(int)  { std::cout &lt;&lt; "chamou mostrar(int)\n"; }
+      |      ^~~~~~~
+sobrecarga.cpp:5:6: note: candidate 2: ‘void mostrar(int*)’
+    5 | void mostrar(int*) { std::cout &lt;&lt; "chamou mostrar(int*)\n"; }
+      |      ^~~~~~~</pre>
+
+<p>"A chamada da função sobrecarregada <code>mostrar(NULL)</code> é <strong>ambígua</strong>": o <code>NULL</code> serve tanto para o <code>int</code> quanto para o <code>int*</code>, e o compilador não sabe qual escolher. As notas listam os dois candidatos. Apagando a linha do <code>NULL</code>:</p>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sobrecarga.cpp -o sobrecarga
+$ ./sobrecarga
+chamou mostrar(int)            « o 0 foi tratado como número
+chamou mostrar(int*)           « o nullptr só pode ser ponteiro</pre>
+
+<p>Quem escreveu <code>mostrar(0)</code> querendo dizer "ponteiro nulo" acabou chamando a versão errada, <strong>sem erro nenhum</strong>. Com <code>nullptr</code>, não há dúvida possível: ele nunca é confundido com um número. Por isso a regra é simples: <strong>em C++ moderno, ponteiro nulo é sempre <code>nullptr</code></strong>.</p>
+
+<hr>
+
+<h2>4. Sempre checar antes de usar</h2>
+<p>Ponteiros nulos aparecem muito como resposta de "procurei e não achei". A função devolve o endereço do que achou, ou <code>nullptr</code> se não achou, e <strong>quem chama tem a obrigação de conferir</strong>:</p>
+
+<pre class="file" data-file="buscar.cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+// devolve o endereço do primeiro item negativo, ou nullptr se não houver
+int* primeiro_negativo(std::vector&lt;int&gt;&amp; v) {
+    for (int&amp; n : v) {
+        if (n &lt; 0) {
+            return &amp;n;
+        }
+    }
+    return nullptr;
+}
+
+int main() {
+    std::vector&lt;int&gt; extrato = {100, 50, -30, 20};
+    std::vector&lt;int&gt; poupanca = {10, 20, 30};
+
+    int* p = primeiro_negativo(extrato);
+    if (p != nullptr) {
+        std::cout &lt;&lt; "Extrato: primeiro débito de " &lt;&lt; *p &lt;&lt; "\n";
+        *p = 0;     // dá para mudar pelo ponteiro
+    }
+
+    int* q = primeiro_negativo(poupanca);
+    if (q != nullptr) {
+        std::cout &lt;&lt; "Poupança: primeiro débito de " &lt;&lt; *q &lt;&lt; "\n";
+    } else {
+        std::cout &lt;&lt; "Poupança: nenhum débito\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra buscar.cpp -o buscar
+$ ./buscar
+Extrato: primeiro débito de -30
+Poupança: nenhum débito          « q era nulo, e o else tratou o caso</pre>
+
+<dl class="anatomy">
+  <dt>int* primeiro_negativo(…)</dt><dd>A função devolve um <code>int*</code>: o endereço de um item do vetor. O vetor veio por referência (<code>std::vector&lt;int&gt;&amp;</code>), então os itens continuam vivos depois que a função termina, e o endereço continua válido.</dd>
+  <dt>return &amp;n;</dt><dd>Como <code>n</code> é uma referência para o item (veja <a href="referencias.html">Referências</a>), <code>&amp;n</code> é o endereço do item dentro do vetor.</dd>
+  <dt>return nullptr;</dt><dd>"Não achei". Um valor claro, que quem chama consegue testar.</dd>
+  <dt>if (q != nullptr) … else …</dt><dd>O teste obrigatório. Sem ele, <code>*q</code> derrubaria o programa.</dd>
+</dl>
+
+<p>Um atalho útil: o <code>&amp;&amp;</code> só avalia o lado direito se o esquerdo for verdadeiro (<a href="operadores-logicos.html">curto-circuito</a>). Então <code>if (p != nullptr &amp;&amp; *p &gt; 100)</code> é seguro: se <code>p</code> for nulo, o <code>*p</code> nem é executado. Invertendo a ordem (<code>*p &gt; 100 &amp;&amp; p != nullptr</code>), o programa cai antes de conferir.</p>
+
+<h3>Hábitos que evitam o problema</h3>
+<ol>
+  <li><strong>Todo ponteiro nasce com valor</strong>: um endereço ou <code>nullptr</code>. Nunca <code>int* p;</code>.</li>
+  <li><strong>Função que pode devolver <code>nullptr</code> diz isso</strong> no comentário ou no nome (<code>buscar…</code>, <code>achar…</code>), e quem chama confere.</li>
+  <li><strong>Se "nada" não é uma resposta válida, não use ponteiro</strong>: use uma <a href="referencias.html">referência</a>, que nunca é nula.</li>
+  <li><strong>Para "talvez um valor"</strong>, o C++17 tem o <code>std::optional</code> (aula <a href="optional-variant.html">optional e variant</a>), que não precisa de ponteiro nenhum.</li>
+  <li><strong>Depois de devolver memória do heap</strong>, o ponteiro antigo vira perigoso; a aula <a href="new-delete.html">new e delete</a> mostra isso, e os <a href="smart-pointers.html">ponteiros inteligentes</a> resolvem.</li>
+</ol>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"Falha de segmentação" e código 139</strong>
+<pre class="term" data-cwd="~/cpp">$ ./crash
+Antes
+Falha de segmentação     (imagem do núcleo gravada) ./crash
+$ echo $?
+139</pre>
+<p><strong>O que aconteceu:</strong> o programa acessou uma memória proibida. As causas mais comuns são: seguir um ponteiro nulo (esta aula), um ponteiro não inicializado (<a href="ponteiros.html">Ponteiros</a>), um ponteiro para memória já devolvida (<a href="new-delete.html">new e delete</a>), passar do fim de um array ou estourar a pilha (<a href="memoria.html">Como a Memória Funciona</a>).</p>
+<p><strong>Como resolver:</strong> recompile com <code>-g -fsanitize=address</code> e rode de novo: a linha <code>#0 … arquivo.cpp:N</code> do relatório aponta o lugar. Se for um ponteiro nulo (<code>Hint: address points to the zero page</code>), descubra de onde ele veio e coloque o teste <code>if (p != nullptr)</code> antes do uso. Outra opção é o <a href="depuracao-gdb.html">GDB</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>"call of overloaded … (NULL) is ambiguous"</strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra sobrecarga.cpp -o sobrecarga
+sobrecarga.cpp: In function ‘int main()’:
+sobrecarga.cpp:9:12: error: call of overloaded ‘mostrar(NULL)’ is ambiguous
+    9 |     mostrar(NULL);
+      |     ~~~~~~~^~~~~~</pre>
+<p><strong>O que aconteceu:</strong> <code>NULL</code> é um número disfarçado, e existem versões da função para número e para ponteiro.</p>
+<p><strong>Como resolver:</strong> troque <code>NULL</code> por <code>nullptr</code>. Vale para todo o programa: procure <code>NULL</code> e substitua.</p>
+</div>
+
+<div class="cenario">
+<strong>"Testei com <code>if (p)</code> e mesmo assim caiu"</strong>
+<p><strong>O que aconteceu:</strong> o teste só reconhece o <code>nullptr</code>. Um ponteiro <strong>não inicializado</strong> (lixo) ou que aponta para memória já devolvida não é nulo: o <code>if (p)</code> dá verdadeiro, e o <code>*p</code> derruba o programa do mesmo jeito.</p>
+<p><strong>Como resolver:</strong> inicialize todo ponteiro com <code>nullptr</code> e volte a pôr <code>nullptr</code> quando o alvo deixar de existir. Melhor ainda: use ponteiros inteligentes, que fazem isso sozinhos.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>O que faz</th></tr>
+<tr><td><code>int* p = nullptr;</code></td><td>Cria um ponteiro que não aponta para nada.</td></tr>
+<tr><td><code>p == nullptr</code> / <code>!p</code></td><td>Verdadeiro se <code>p</code> for nulo.</td></tr>
+<tr><td><code>p != nullptr</code> / <code>p</code></td><td>Verdadeiro se <code>p</code> apontar para algo.</td></tr>
+<tr><td><code>if (p &amp;&amp; *p &gt; 0)</code></td><td>Seguro: o <code>*p</code> só roda se <code>p</code> não for nulo.</td></tr>
+<tr><td><code>return nullptr;</code></td><td>Jeito comum de uma função dizer "não achei".</td></tr>
+<tr><td><code>*p</code> com <code>p</code> nulo</td><td>Comportamento indefinido; no Linux, <code>Falha de segmentação</code>, código 139.</td></tr>
+<tr><td><code>NULL</code>, <code>0</code></td><td>Formas antigas; podem ser confundidas com número. Use <code>nullptr</code>.</td></tr>
+<tr><td><code>-g -fsanitize=address</code></td><td>Na queda, mostra arquivo e linha (<code>SEGV on unknown address 0x000000000000</code>).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Nasce nulo</h3>
+<p>Complete para criar um ponteiro para <code>double</code> que não aponta para nada:</p>
+<div class="ex-code">double* p = <input data-answer="nullptr" aria-label="valor">;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Conferir antes</h3>
+<p>Complete o teste para que o <code>*p</code> só rode quando <code>p</code> apontar para algo:</p>
+<div class="ex-code">if (p <input data-answer="!=" aria-label="operador"> nullptr) { std::cout &lt;&lt; *p; }</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Um programa terminou com <code>Falha de segmentação</code> e <code>echo $?</code> mostrou 139. O que isso indica?</p>
+<label><input type="radio" name="q3"> Um erro de compilação</label>
+<label><input type="radio" name="q3"> Que o programa terminou normalmente com <code>return 139</code></label>
+<label><input type="radio" name="q3"> Que o sistema matou o programa por acessar memória proibida (sinal 11, 128 + 11)</label>
+<label><input type="radio" name="q3"> Falta de espaço em disco</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Por que preferir <code>nullptr</code> a <code>NULL</code>?</p>
+<label><input type="radio" name="q4"> Porque <code>NULL</code> não existe mais no C++23</label>
+<label><input type="radio" name="q4"> Porque <code>NULL</code> é um número disfarçado e pode escolher a função errada ou causar ambiguidade</label>
+<label><input type="radio" name="q4"> Porque <code>nullptr</code> impede o programa de cair</label>
+<label><input type="radio" name="q4"> Porque <code>nullptr</code> é mais rápido</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Qual destes testes é seguro quando <code>p</code> pode ser nulo?</p>
+<label><input type="radio" name="q5"> <code>if (*p &gt; 0 &amp;&amp; p != nullptr)</code></label>
+<label><input type="radio" name="q5"> <code>if (*p != nullptr)</code></label>
+<label><input type="radio" name="q5"> <code>if (*p)</code></label>
+<label><input type="radio" name="q5"> <code>if (p != nullptr &amp;&amp; *p &gt; 0)</code></label>
+</div>
+
+<h3>Missão final: achou ou não achou?</h3>
+
+<div class="trycpp" data-goal="out:Primeiro acima de 8: 9,out:Nenhum acima de 20,src:return\s+nullptr">
+<p class="try-task"><strong>Missão:</strong> a função <code>primeiro_acima</code> devolve o endereço da primeira nota maior que o limite. Complete o que falta: (1) quando nenhuma nota passa do limite, a função deve devolver <code>nullptr</code>; (2) no <code>main</code>, confira <code>q</code> antes de usar e, se for nulo, mostre <code>Nenhum acima de 20</code>. A saída deve ser:</p>
+<pre class="out">Primeiro acima de 8: 9
+Nenhum acima de 20</pre>
+<pre class="script">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int* primeiro_acima(std::vector&lt;int&gt;&amp; v, int limite) {
+    for (int&amp; n : v) {
+        if (n &gt; limite) {
+            return &amp;n;
+        }
+    }
+    // o que devolver quando nenhum item passa do limite?
+}
+
+int main() {
+    std::vector&lt;int&gt; notas = {7, 8, 9, 10};
+
+    int* p = primeiro_acima(notas, 8);
+    if (p != nullptr) {
+        std::cout &lt;&lt; "Primeiro acima de 8: " &lt;&lt; *p &lt;&lt; "\n";
+    }
+
+    int* q = primeiro_acima(notas, 20);
+    // confira q antes de usar: mostre o valor ou "Nenhum acima de 20"
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+int* primeiro_acima(std::vector&lt;int&gt;&amp; v, int limite) {
+    for (int&amp; n : v) {
+        if (n &gt; limite) {
+            return &amp;n;
+        }
+    }
+    return nullptr;
+}
+
+int main() {
+    std::vector&lt;int&gt; notas = {7, 8, 9, 10};
+
+    int* p = primeiro_acima(notas, 8);
+    if (p != nullptr) {
+        std::cout &lt;&lt; "Primeiro acima de 8: " &lt;&lt; *p &lt;&lt; "\n";
+    }
+
+    int* q = primeiro_acima(notas, 20);
+    if (q != nullptr) {
+        std::cout &lt;&lt; "Primeiro acima de 20: " &lt;&lt; *q &lt;&lt; "\n";
+    } else {
+        std::cout &lt;&lt; "Nenhum acima de 20\n";
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>nullptr</code> <span class="versao">C++11</span> é o ponteiro que não aponta para nada. Use para inicializar ponteiros que ainda não têm alvo.</li>
+  <li>Teste com <code>p != nullptr</code> (ou <code>if (p)</code>) <strong>antes</strong> de usar <code>*p</code>.</li>
+  <li>Seguir um ponteiro nulo é comportamento indefinido: no Linux, <code>Falha de segmentação</code> (<code>Segmentation fault</code>), código 139. O <code>-fsanitize=address</code> mostra a linha.</li>
+  <li><code>NULL</code> e <code>0</code> são números disfarçados e confundem a sobrecarga (<code>call of overloaded … is ambiguous</code>). Use sempre <code>nullptr</code>.</li>
+  <li>Funções que "procuram" podem devolver <code>nullptr</code> para dizer "não achei"; quem chama confere.</li>
+  <li>Próxima aula: <a href="const-ponteiros.html">const com Ponteiros e Referências</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
