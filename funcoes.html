@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ Funções — criar, chamar, void e protótipo | Guia C++</title>
+<meta name="description" content="Funções em C++ para quem nunca programou: por que existem, como criar e chamar, o que é void, o erro was not declared in this scope quando a função vem depois do main, a declaração antecipada (protótipo) e por que o main também é uma função. Com saídas reais do g++ 15 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>C++ <span class="hl">Funções</span></h1>
+
+<p class="intro">Até aqui, todo o seu programa morava dentro do <code>main</code>, de cima a baixo. Isso funciona para programas pequenos, mas logo você se pega copiando e colando as mesmas linhas várias vezes. Uma <strong>função</strong> é um pedaço de código com <strong>nome</strong>: você escreve as linhas uma vez, dá um nome a elas e, sempre que precisar, chama esse nome. Nesta aula você vai criar e chamar suas primeiras funções, entender o <code>void</code>, ver o erro que aparece quando a função está "no lugar errado" do arquivo e descobrir que o <code>main</code> também é uma função.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma função e por que vale a pena usar funções.</li>
+  <li>Como <strong>criar</strong> (definir) uma função e como <strong>chamar</strong> uma função.</li>
+  <li>Em que ordem o programa executa as linhas quando chama uma função.</li>
+  <li>O que significa <code>void</code> ("vazio").</li>
+  <li>Por que o g++ diz <code>‘saudar’ was not declared in this scope</code> quando a função está depois do <code>main</code>, e como resolver com a <strong>declaração antecipada</strong> (o protótipo).</li>
+  <li>Que o <code>main</code> é uma função como as outras, com uma tarefa especial.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram compilados com o <strong>g++ 15</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/cpp</code>, com o comando padrão do guia: <code>g++ -std=c++23 -Wall -Wextra arquivo.cpp -o programa</code> (cada opção é explicada em <a href="compilar.html">Compilar com g++</a>). Você pode repetir cada um no editor do guia, que compila C++ de verdade no navegador.</p>
+
+<hr>
+
+<h2>A ideia: uma receita com nome</h2>
+<p>Pense num caderno de receitas. A receita do bolo de cenoura está escrita <strong>uma vez</strong>, na página 12. Quando alguém pede um bolo, você não reescreve a receita: você diz "faça o bolo da página 12". Se um dia descobrir que fica melhor com menos açúcar, corrige <strong>só a página 12</strong>, e todos os bolos dali em diante saem melhores.</p>
+
+<p>Uma função é exatamente isso:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No caderno de receitas</th><th>Em C++</th></tr>
+<tr><td>Escrever a receita uma vez, com um título</td><td><strong>Definir</strong> a função: dar um nome a um bloco de código</td></tr>
+<tr><td>"Faça o bolo de cenoura"</td><td><strong>Chamar</strong> a função: escrever o nome dela seguido de <code>()</code></td></tr>
+<tr><td>Corrigir a receita numa página só</td><td>Mudar o código da função num lugar só; todas as chamadas mudam juntas</td></tr>
+</table>
+</div>
+
+<p>Você já usou funções prontas sem perceber: <code>std::sqrt</code> (raiz quadrada, em <a href="matematica.html">Matemática</a>) e <code>std::getline</code> (em <a href="getline.html">Ler uma Linha</a>) são funções que alguém escreveu e você só chama. Agora você vai escrever as suas.</p>
+
+<hr>
+
+<h2>1. Criar e chamar uma função</h2>
+<p>A Ana quer que o programa da lojinha cumprimente os clientes. Em vez de escrever a frase dentro do <code>main</code>, ela cria uma função chamada <code>saudar</code>:</p>
+
+<pre class="file" data-file="saudar.cpp">#include &lt;iostream&gt;
+
+void saudar() {
+    std::cout &lt;&lt; "Olá! Bem-vinda à lojinha da Ana.\n";
+}
+
+int main() {
+    saudar();
+    saudar();
+}
+</pre>
+
+<p>As linhas 3 a 5 são a <strong>definição</strong> da função: elas ensinam ao compilador o que <code>saudar</code> faz. Peça por peça:</p>
+
+<dl class="anatomy">
+  <dt>void</dt><dd>O <strong>tipo de retorno</strong>: o que a função devolve quando termina. <code>void</code> quer dizer "vazio": esta função faz o trabalho dela (mostrar uma frase) e não devolve nenhum valor. Funções que devolvem valores ficam para a aula <a href="retorno.html">Retorno</a>.</dd>
+  <dt>saudar</dt><dd>O <strong>nome</strong> da função. Segue as mesmas regras dos nomes de variáveis (<a href="identificadores.html">Nomes de Variáveis</a>): letras, números e <code>_</code>, sem começar com número, sem espaço, sem acento. Costuma ser um <strong>verbo</strong>, porque função <em>faz</em> alguma coisa: <code>saudar</code>, <code>mostrarRecibo</code>, <code>calcular_total</code>.</dd>
+  <dt>()</dt><dd>Os parênteses guardam os <strong>parâmetros</strong>, as informações que a função recebe. Aqui estão vazios: <code>saudar</code> não precisa de nada para trabalhar. Os parâmetros têm aula própria: <a href="parametros.html">Parâmetros e Argumentos</a>.</dd>
+  <dt>{ … }</dt><dd>As chaves delimitam o <strong>corpo</strong> da função: as linhas que rodam cada vez que ela é chamada. Pode ter quantas linhas você quiser.</dd>
+</dl>
+
+<p>As linhas 8 e 9 são <strong>chamadas</strong>:</p>
+
+<dl class="anatomy">
+  <dt>saudar();</dt><dd>"Execute a função <code>saudar</code> agora." O nome, os parênteses (obrigatórios, mesmo vazios) e o ponto e vírgula, que termina a instrução como em qualquer linha do <code>main</code>.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra saudar.cpp -o saudar
+$ ./saudar
+Olá! Bem-vinda à lojinha da Ana.
+Olá! Bem-vinda à lojinha da Ana.        « duas chamadas, duas frases</pre>
+
+<p>A frase está escrita <strong>uma vez</strong> no código, mas apareceu <strong>duas vezes</strong> na tela, porque a função foi chamada duas vezes. Definir uma função sozinho não faz nada aparecer: o código do corpo só roda quando alguém chama a função.</p>
+
+<div class="note">
+<strong>Definir não é executar</strong>
+<p>Se você apagar as duas linhas <code>saudar();</code> do <code>main</code>, o programa compila e não mostra nada. A definição é a receita guardada no caderno; ninguém fez o bolo ainda.</p>
+</div>
+
+<h3>Em que ordem as linhas rodam</h3>
+<p>Todo programa C++ começa pelo <code>main</code>, não importa onde ele está no arquivo. Quando o <code>main</code> chama uma função, o programa <strong>pula</strong> para o corpo dela, executa tudo, e <strong>volta</strong> para a linha seguinte à chamada. Veja com números:</p>
+
+<pre class="file" data-file="ordem.cpp">#include &lt;iostream&gt;
+
+void saudar() {
+    std::cout &lt;&lt; "2. dentro da função saudar\n";
+}
+
+int main() {
+    std::cout &lt;&lt; "1. começo do main\n";
+    saudar();
+    std::cout &lt;&lt; "3. de volta ao main\n";
+    saudar();
+    std::cout &lt;&lt; "4. fim do main\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra ordem.cpp -o ordem
+$ ./ordem
+1. começo do main
+2. dentro da função saudar
+3. de volta ao main
+2. dentro da função saudar
+4. fim do main</pre>
+
+<ol class="passo">
+  <li>O programa começa no <code>main</code> (linha 7), mesmo com a função <code>saudar</code> escrita antes dele, e mostra <code>1.</code>.</li>
+  <li>Linha 9: chamada. O programa pula para a linha 4, mostra <code>2.</code>, chega ao <code>}</code> da função e <strong>volta</strong>.</li>
+  <li>Continua na linha 10, logo depois da chamada: <code>3.</code>.</li>
+  <li>Linha 11: nova chamada, novo pulo, <code>2.</code> outra vez, volta.</li>
+  <li>Linha 12: <code>4.</code>, e o <code>main</code> termina. O programa acabou.</li>
+</ol>
+
+<p>É como ler um livro com notas de rodapé: você para no meio da frase, lê a nota lá embaixo e volta exatamente de onde parou.</p>
+
+<div class="trycpp">
+<p class="try-task"><strong>Experimente:</strong> rode como está. Depois chame <code>saudar()</code> mais uma vez, <strong>antes</strong> da linha do <code>1.</code>, e veja a ordem mudar. Por último, apague todas as chamadas e rode: a função continua lá, mas nada dela aparece.</p>
+<pre class="script">#include &lt;iostream&gt;
+
+void saudar() {
+    std::cout &lt;&lt; "2. dentro da função saudar\n";
+}
+
+int main() {
+    std::cout &lt;&lt; "1. começo do main\n";
+    saudar();
+    std::cout &lt;&lt; "3. de volta ao main\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Por que usar funções</h2>
+<p>A Ana escreveu o recibo da lojinha assim, tudo no <code>main</code>:</p>
+
+<pre class="file" data-file="recibo1.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "--------------------\n";
+    std::cout &lt;&lt; "Lojinha da Ana\n";
+    std::cout &lt;&lt; "--------------------\n";
+    std::cout &lt;&lt; "3 cadernos   R$ 30\n";
+    std::cout &lt;&lt; "--------------------\n";
+    std::cout &lt;&lt; "Obrigada e volte sempre!\n";
+    std::cout &lt;&lt; "--------------------\n";
+}
+</pre>
+
+<p>Funciona, mas a linha de tracinhos aparece <strong>quatro vezes</strong> no código. Se a Ana resolver trocar os tracinhos por <code>====</code>, terá de mudar quatro lugares, e é fácil esquecer um. Com uma função, a linha de tracinhos fica escrita num lugar só:</p>
+
+<pre class="file" data-file="recibo2.cpp">#include &lt;iostream&gt;
+
+void linha() {
+    std::cout &lt;&lt; "--------------------\n";
+}
+
+int main() {
+    linha();
+    std::cout &lt;&lt; "Lojinha da Ana\n";
+    linha();
+    std::cout &lt;&lt; "3 cadernos   R$ 30\n";
+    linha();
+    std::cout &lt;&lt; "Obrigada e volte sempre!\n";
+    linha();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra recibo2.cpp -o recibo2
+$ ./recibo2
+--------------------
+Lojinha da Ana
+--------------------
+3 cadernos   R$ 30
+--------------------
+Obrigada e volte sempre!
+--------------------</pre>
+
+<p>A saída é igual à da primeira versão, letra por letra. O que mudou foi o código, e para melhor:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Vantagem</th><th>No exemplo</th></tr>
+<tr><td><strong>Não repetir código</strong></td><td>Os tracinhos estão escritos uma vez. Programadores chamam isso de DRY (<em>Don't Repeat Yourself</em>, "não se repita").</td></tr>
+<tr><td><strong>Mudar num lugar só</strong></td><td>Para trocar por <code>====</code>, a Ana muda a linha 4 e pronto: as quatro chamadas mudam juntas.</td></tr>
+<tr><td><strong>Ler mais fácil</strong></td><td><code>linha();</code> diz o que acontece. Quem lê o <code>main</code> entende o recibo sem contar tracinhos.</td></tr>
+<tr><td><strong>Dividir o problema</strong></td><td>Um programa grande vira várias funções pequenas, cada uma com uma tarefa. Fica mais fácil testar e consertar uma parte de cada vez.</td></tr>
+</table>
+</div>
+
+<h3>Uma função pode chamar outra</h3>
+<p>Dentro do corpo de uma função vale tudo o que vale no <code>main</code>, inclusive chamar outras funções. A Ana juntou o cabeçalho do recibo numa função que usa a <code>linha</code>:</p>
+
+<pre class="file" data-file="chamaoutra.cpp">#include &lt;iostream&gt;
+
+void linha() {
+    std::cout &lt;&lt; "--------------------\n";
+}
+
+void cabecalho() {
+    linha();
+    std::cout &lt;&lt; "Lojinha da Ana\n";
+    linha();
+}
+
+int main() {
+    cabecalho();
+    std::cout &lt;&lt; "3 cadernos   R$ 30\n";
+    linha();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra chamaoutra.cpp -o chamaoutra
+$ ./chamaoutra
+--------------------
+Lojinha da Ana
+--------------------
+3 cadernos   R$ 30
+--------------------</pre>
+
+<p>O <code>main</code> chama <code>cabecalho</code>, que chama <code>linha</code> duas vezes; cada uma volta para quem a chamou. Uma função pode até chamar <strong>a si mesma</strong>; isso se chama recursão e tem aula própria: <a href="recursao.html">Recursão</a>.</p>
+
+<h3>Onde não pode: função dentro de função</h3>
+<p>Em C++, toda função é definida <strong>fora</strong> das outras, lado a lado no arquivo. Escrever uma função dentro do <code>main</code> dá erro:</p>
+
+<pre class="file" data-file="dentro.cpp">#include &lt;iostream&gt;
+
+int main() {
+    void saudar() {
+        std::cout &lt;&lt; "Olá!\n";
+    }
+    saudar();
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra dentro.cpp -o dentro
+dentro.cpp: In function ‘int main()’:
+dentro.cpp:4:19: error: a function-definition is not allowed here before ‘{’ token
+    4 |     void saudar() {
+      |                   ^
+dentro.cpp:7:5: error: ‘saudar’ was not declared in this scope
+    7 |     saudar();
+      |     ^~~~~~</pre>
+
+<p><em>A function-definition is not allowed here</em> = "uma definição de função não é permitida aqui". Tire a função de dentro do <code>main</code> e coloque-a acima dele. (Existe um jeito de criar uma "funçãozinha" dentro de outra, a <strong>lambda</strong>, com outra escrita: veja <a href="lambdas.html">Lambdas</a>.)</p>
+
+<hr>
+
+<h2>3. <code>void</code>: a função que não devolve nada</h2>
+<p>Toda função em C++ começa dizendo o que ela <strong>devolve</strong>. Algumas funções servem para calcular e entregar um resultado (a raiz quadrada de 9 é 3); outras servem só para <strong>fazer</strong> alguma coisa, como mostrar uma frase. Para estas, o tipo de retorno é <code>void</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Começo da função</th><th>O que diz</th><th>Aula</th></tr>
+<tr><td><code>void linha()</code></td><td>Faz algo e não devolve nada.</td><td>esta</td></tr>
+<tr><td><code>int dobro(int x)</code></td><td>Recebe um <code>int</code> e devolve um <code>int</code>.</td><td><a href="parametros.html">Parâmetros</a> e <a href="retorno.html">Retorno</a></td></tr>
+<tr><td><code>bool ehPar(int x)</code></td><td>Devolve verdadeiro ou falso.</td><td><a href="retorno.html">Retorno</a></td></tr>
+</table>
+</div>
+
+<p>Como uma função <code>void</code> não devolve nada, não dá para guardar "o resultado" dela numa variável. O compilador recusa:</p>
+
+<pre class="file" data-file="voidvalor.cpp">#include &lt;iostream&gt;
+
+void saudar() {
+    std::cout &lt;&lt; "Olá!\n";
+}
+
+int main() {
+    int x = saudar();
+    std::cout &lt;&lt; x &lt;&lt; "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra voidvalor.cpp -o voidvalor
+voidvalor.cpp: In function ‘int main()’:
+voidvalor.cpp:8:19: error: void value not ignored as it ought to be
+    8 |     int x = saudar();
+      |             ~~~~~~^~</pre>
+
+<p><em>Void value not ignored as it ought to be</em> = "valor void não ignorado, como deveria ser": você tentou usar um "nada" como se fosse um número. Se precisa de um valor, a função tem de devolver um (aula <a href="retorno.html">Retorno</a>); se não precisa, chame a função sozinha na linha: <code>saudar();</code>.</p>
+
+<hr>
+
+<h2>4. A função precisa ser conhecida antes de ser chamada</h2>
+<p>O compilador lê o arquivo <strong>de cima para baixo</strong>, uma vez. Quando encontra um nome, ele precisa já saber o que esse nome é. Veja o que acontece se a Ana escrever o <code>main</code> primeiro e a função depois:</p>
+
+<pre class="file" data-file="antes.cpp">#include &lt;iostream&gt;
+
+int main() {
+    saudar();
+}
+
+void saudar() {
+    std::cout &lt;&lt; "Olá!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra antes.cpp -o antes
+antes.cpp: In function ‘int main()’:
+antes.cpp:4:5: error: ‘saudar’ was not declared in this scope
+    4 |     saudar();
+      |     ^~~~~~</pre>
+
+<dl class="anatomy">
+  <dt>In function ‘int main()’</dt><dd>O problema está dentro do <code>main</code>.</dd>
+  <dt>antes.cpp:4:5</dt><dd>Arquivo <code>antes.cpp</code>, linha 4, coluna 5: a chamada <code>saudar();</code>. (Como ler esse formato com calma: <a href="erros-compilacao.html">Lendo Erros do Compilador</a>.)</dd>
+  <dt>‘saudar’ was not declared in this scope</dt><dd>"‘saudar’ não foi declarado neste escopo": na linha 4, o compilador ainda não viu nenhuma função com esse nome. Ela existe, mas só na linha 7, e o compilador não olha para a frente.</dd>
+</dl>
+
+<p>Repare: o programa <strong>não foi criado</strong>. Com um erro, o g++ para e não gera o <code>./antes</code>. Há dois jeitos de consertar.</p>
+
+<h3>Jeito 1: mover a função para cima do <code>main</code></h3>
+<p>É o que fizemos até agora: as funções vêm primeiro, o <code>main</code> por último. Simples e muito usado em programas de um arquivo só.</p>
+
+<h3>Jeito 2: a declaração antecipada (o protótipo)</h3>
+<p>Às vezes você prefere o <code>main</code> no topo, para quem abre o arquivo ver logo o "roteiro" do programa. Então basta <strong>avisar</strong> o compilador, lá em cima, que a função existe e como ela é. Esse aviso se chama <strong>declaração</strong> ou <strong>protótipo</strong>:</p>
+
+<pre class="file" data-file="prototipo.cpp">#include &lt;iostream&gt;
+
+void saudar();
+
+int main() {
+    saudar();
+}
+
+void saudar() {
+    std::cout &lt;&lt; "Olá!\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>void saudar();</dt><dd>A <strong>declaração</strong> (protótipo): o começo da função seguido de <code>;</code>, <strong>sem corpo</strong>. Diz ao compilador: "existe uma função chamada <code>saudar</code>, que não recebe nada e não devolve nada; o corpo vem depois".</dd>
+  <dt>saudar();</dt><dd>Agora, na linha 6, o compilador já conhece o nome e aceita a chamada.</dd>
+  <dt>void saudar() { … }</dt><dd>A <strong>definição</strong>: o começo da função de novo, agora com o corpo entre chaves. Tem de bater com a declaração (mesmo nome, mesmo tipo de retorno, mesmos parâmetros).</dd>
+</dl>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra prototipo.cpp -o prototipo
+$ ./prototipo
+Olá!</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Declaração (protótipo)</th><th>Definição</th></tr>
+<tr><td>Como se escreve</td><td><code>void saudar();</code></td><td><code>void saudar() { … }</code></td></tr>
+<tr><td>Tem corpo?</td><td>Não; termina em <code>;</code></td><td>Sim, entre <code>{ }</code></td></tr>
+<tr><td>Para que serve</td><td>Apresentar o nome ao compilador</td><td>Dizer o que a função faz</td></tr>
+<tr><td>Quantas vezes pode aparecer</td><td>Várias (repetir não é erro)</td><td><strong>Uma vez só</strong> no programa inteiro</td></tr>
+</table>
+</div>
+
+<p>O protótipo parece um detalhe agora, mas é a base para dividir um programa em vários arquivos: os protótipos ficam num arquivo <code>.h</code> e as definições num <code>.cpp</code> (aulas <a href="headers.html">Arquivos .h e .cpp</a> e <a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>).</p>
+
+<div class="trycpp" data-goal="compila,out:Olá!,src:void\s+saudar\s*\(\s*\)\s*;">
+<p class="try-task"><strong>Missão:</strong> este programa não compila: rode e leia o erro. Conserte <strong>sem mover</strong> a função: acrescente o protótipo de <code>saudar</code> acima do <code>main</code>. (No editor, o compilador é o Clang, e a mensagem sai como <code>use of undeclared identifier 'saudar'</code>: "uso de identificador não declarado". É o mesmo problema com outras palavras.)</p>
+<pre class="script">#include &lt;iostream&gt;
+
+int main() {
+    saudar();
+}
+
+void saudar() {
+    std::cout &lt;&lt; "Olá!\n";
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+void saudar();
+
+int main() {
+    saudar();
+}
+
+void saudar() {
+    std::cout &lt;&lt; "Olá!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>5. O <code>main</code> também é uma função</h2>
+<p>Olhe de novo para o começo do <code>main</code>: <code>int main() { … }</code>. Tipo de retorno, nome, parênteses, corpo: é uma função como as outras. Ela só tem duas coisas especiais:</p>
+<ul>
+  <li><strong>Quem chama o <code>main</code> é o sistema</strong>, quando você roda <code>./programa</code>. Você nunca escreve <code>main();</code> no seu código.</li>
+  <li><strong>O <code>main</code> devolve um <code>int</code></strong>: o <strong>código de saída</strong> do programa. <code>0</code> quer dizer "deu tudo certo"; qualquer outro número quer dizer "algo deu errado". O terminal guarda esse número na variável <code>$?</code>.</li>
+</ul>
+
+<pre class="file" data-file="main3.cpp">#include &lt;iostream&gt;
+
+int main() {
+    std::cout &lt;&lt; "Algo deu errado.\n";
+    return 3;
+}
+</pre>
+
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra main3.cpp -o main3
+$ ./main3
+Algo deu errado.
+$ echo $?
+3                        « o número do return chegou ao terminal</pre>
+
+<dl class="anatomy">
+  <dt>return 3;</dt><dd>Termina o <code>main</code> e entrega o número 3 a quem chamou (o sistema). O <code>return</code> é explicado com calma em <a href="retorno.html">Retorno</a>.</dd>
+  <dt>echo $?</dt><dd>No terminal, mostra o código de saída do último programa.</dd>
+</dl>
+
+<p>E nos programas sem <code>return</code>? O <code>main</code> é a <strong>única</strong> função que pode terminar sem <code>return</code> mesmo devolvendo <code>int</code>: nesse caso o C++ considera <code>return 0;</code>. Por isso todos os exemplos desta aula terminaram com código 0. Em qualquer outra função que promete devolver um valor, esquecer o <code>return</code> é um erro sério, mostrado em <a href="retorno.html">Retorno</a>.</p>
+
+<div class="tip">
+<strong>Para que serve o código de saída?</strong>
+<p>Scripts e outros programas olham esse número para saber se o seu programa funcionou. O <code>g++</code> mesmo sai com código 1 quando encontra um erro de compilação. Combine assim: <code>0</code> para sucesso, <code>1</code> (ou outro número pequeno) para falha.</p>
+</div>
+
+<hr>
+
+<h2>Formas diferentes de organizar o arquivo</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Como fica</th><th>Quando usar</th></tr>
+<tr><td>Funções antes do <code>main</code></td><td><code>void linha() {…}</code> … <code>int main() {…}</code></td><td>Programas de um arquivo, pequenos. O jeito mais simples; é o que o guia usa na maioria dos exemplos.</td></tr>
+<tr><td>Protótipos no topo, <code>main</code>, definições embaixo</td><td><code>void linha();</code> … <code>int main() {…}</code> … <code>void linha() {…}</code></td><td>Quando você quer o <code>main</code> logo no começo, ou quando duas funções chamam uma à outra (aí uma delas precisa do protótipo).</td></tr>
+<tr><td>Protótipos num <code>.h</code>, definições num <code>.cpp</code></td><td><code>#include "loja.h"</code></td><td>Programas maiores, divididos em arquivos (<a href="headers.html">Arquivos .h e .cpp</a>).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>error: ‘saudar’ was not declared in this scope</code></strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra antes.cpp -o antes
+antes.cpp: In function ‘int main()’:
+antes.cpp:4:5: error: ‘saudar’ was not declared in this scope
+    4 |     saudar();
+      |     ^~~~~~</pre>
+<p><strong>O que significa:</strong> na linha da chamada, o compilador não conhece nenhuma função com esse nome. Ou a função está <strong>mais abaixo</strong> no arquivo, ou o nome está escrito diferente.</p>
+<p><strong>Como consertar:</strong> mova a função para cima do <code>main</code> ou acrescente o protótipo (<code>void saudar();</code>) no topo. Se ela já está em cima, compare o nome letra por letra. Quando o nome é parecido com um que existe, o g++ ajuda:</p>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra maiusc.cpp -o maiusc
+maiusc.cpp: In function ‘int main()’:
+maiusc.cpp:8:5: error: ‘Saudar’ was not declared in this scope; did you mean ‘saudar’?
+    8 |     Saudar();
+      |     ^~~~~~
+      |     saudar</pre>
+<p><em>Did you mean ‘saudar’?</em> = "você quis dizer ‘saudar’?". Maiúsculas e minúsculas contam: <code>Saudar</code> e <code>saudar</code> são nomes diferentes.</p>
+</div>
+
+<div class="cenario">
+<strong>Esqueceu os parênteses: <code>warning: statement is a reference, not call, to function</code></strong>
+<pre class="file" data-file="semparen.cpp">#include &lt;iostream&gt;
+
+void saudar() {
+    std::cout &lt;&lt; "Olá!\n";
+}
+
+int main() {
+    saudar;
+    std::cout &lt;&lt; "fim\n";
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semparen.cpp -o semparen
+semparen.cpp: In function ‘int main()’:
+semparen.cpp:8:5: warning: statement is a reference, not call, to function ‘saudar’ [-Waddress]
+    8 |     saudar;
+      |     ^~~~~~
+semparen.cpp:8:5: warning: statement has no effect [-Wunused-value]
+$ ./semparen
+fim                      « o "Olá!" não apareceu</pre>
+<p><strong>O que significa:</strong> "a instrução é uma referência à função ‘saudar’, não uma chamada" e "a instrução não tem efeito". Sem os <code>()</code>, você só citou o nome da função, sem mandar executá-la. É só um <strong>aviso</strong>: o programa foi criado e roda, mas a função nunca é chamada. Sem o <code>-Wall</code>, nem o aviso apareceria (veja <a href="avisos.html">Avisos</a>).</p>
+<p><strong>Como consertar:</strong> <code>saudar();</code>, com os parênteses, mesmo que vazios.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: void value not ignored as it ought to be</code></strong>
+<p><strong>O que significa:</strong> você usou o "resultado" de uma função <code>void</code>, por exemplo <code>int x = saudar();</code> ou <code>std::cout &lt;&lt; saudar();</code>. Uma função <code>void</code> não tem resultado.</p>
+<p><strong>Como consertar:</strong> chame a função sozinha (<code>saudar();</code>), ou mude-a para devolver um valor (aula <a href="retorno.html">Retorno</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>Protótipo sem definição: <code>referência não definida para "saudar()"</code></strong>
+<pre class="file" data-file="semdef.cpp">#include &lt;iostream&gt;
+
+void saudar();
+
+int main() {
+    saudar();
+}
+</pre>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra semdef.cpp -o semdef
+/usr/bin/x86_64-linux-gnu-ld.bfd: /tmp/ccCGBZ4L.o: na função "main":
+semdef.cpp:(.text+0x9): referência não definida para "saudar()"
+collect2: error: ld returned 1 exit status</pre>
+<p><strong>O que significa:</strong> esta mensagem é diferente das outras: não tem número de linha e parte dela está em português. Ela vem do <strong>ligador</strong> (<code>ld</code>, de <em>linker</em>), a última etapa da compilação, que junta as peças do programa (veja <a href="como-funciona.html">Como o C++ Vira Programa</a>). O compilador aceitou a chamada porque o protótipo prometeu que <code>saudar</code> existe; na hora de juntar tudo, o ligador procurou o corpo da função e não achou. <em>ld returned 1 exit status</em> = "o ld terminou com código 1" (falhou). O nome <code>/tmp/cc….o</code> é um arquivo temporário e muda a cada compilação. Em inglês, a mesma mensagem é <code>undefined reference to `saudar()'</code>.</p>
+<p><strong>Como consertar:</strong> escreva a definição (<code>void saudar() { … }</code>), ou confira se o nome e os parênteses da definição batem exatamente com os do protótipo. Em projetos com vários arquivos, esse erro costuma significar que você esqueceu de compilar um dos <code>.cpp</code> (<a href="multiplos-arquivos.html">Compilar Vários Arquivos</a>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>error: redefinition of ‘void saudar()’</code></strong>
+<pre class="term" data-cwd="~/cpp">$ g++ -std=c++23 -Wall -Wextra redef.cpp -o redef
+redef.cpp:7:6: error: redefinition of ‘void saudar()’
+    7 | void saudar() {
+      |      ^~~~~~
+redef.cpp:3:6: note: ‘void saudar()’ previously defined here
+    3 | void saudar() {
+      |      ^~~~~~</pre>
+<p><strong>O que significa:</strong> "redefinição de ‘void saudar()’": o arquivo tem <strong>duas definições</strong> (com corpo) da mesma função, nas linhas 3 e 7. A <code>note</code> ("nota") aponta onde está a primeira.</p>
+<p><strong>Como consertar:</strong> apague uma das duas, ou dê outro nome a uma delas. (Duas funções com o mesmo nome e parâmetros <strong>diferentes</strong> são permitidas; isso é a <a href="sobrecarga.html">sobrecarga</a>.)</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que é</th></tr>
+<tr><td><code>void nome() { … }</code></td><td>Definição de uma função que não recebe nada e não devolve nada</td></tr>
+<tr><td><code>nome();</code></td><td>Chamada: executa o corpo da função e volta</td></tr>
+<tr><td><code>void nome();</code></td><td>Declaração (protótipo): apresenta a função; o corpo vem depois</td></tr>
+<tr><td><code>void</code></td><td>Tipo de retorno "vazio": a função não devolve valor</td></tr>
+<tr><td><code>int main() { … }</code></td><td>A função por onde o programa começa; devolve o código de saída (0 = sucesso)</td></tr>
+<tr><td><code>return 3;</code> no <code>main</code></td><td>Termina o programa com código de saída 3</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Chamar a função</h3>
+<p>Complete a linha que chama a função <code>mostrarMenu</code>, que não recebe nada:</p>
+<div class="ex-code"><input data-answer="mostrarMenu();" aria-label="chamada"></div>
+</div>
+
+<div class="exercise">
+<h3>2. O tipo que não devolve nada</h3>
+<p>Complete a definição de uma função que só mostra uma frase e não devolve valor:</p>
+<div class="ex-code"><input data-answer="void" aria-label="tipo de retorno"> despedir() { std::cout &lt;&lt; "Tchau!\n"; }</div>
+</div>
+
+<div class="exercise">
+<h3>3. O protótipo</h3>
+<p>A função <code>void linha() { … }</code> está definida depois do <code>main</code>. Escreva o protótipo que vai acima do <code>main</code>:</p>
+<div class="ex-code"><input data-answer="void linha();" aria-label="protótipo"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Um programa tem a função <code>saudar</code> definida no topo e um <code>main</code> que <strong>não</strong> a chama. O que aparece ao rodar?</p>
+<label><input type="radio" name="q4"> A frase da função, uma vez, porque ela está no arquivo</label>
+<label><input type="radio" name="q4"> Nada da função: o corpo só roda quando alguém chama</label>
+<label><input type="radio" name="q4"> Um erro de compilação</label>
+<label><input type="radio" name="q4"> A frase aparece antes de tudo, porque a função vem antes do <code>main</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. O <code>main</code> chama <code>cabecalho()</code>, que mostra <code>A</code> e chama <code>linha()</code>, que mostra <code>B</code>. Depois da chamada, o <code>main</code> mostra <code>C</code>. Qual a saída?</p>
+<label><input type="radio" name="q5"> <code>C A B</code></label>
+<label><input type="radio" name="q5"> <code>A C B</code></label>
+<label><input type="radio" name="q5"> <code>A B C</code></label>
+<label><input type="radio" name="q5"> <code>B A C</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. O g++ mostra <code>error: ‘calcular’ was not declared in this scope</code> na linha do <code>main</code>, mas a função <code>calcular</code> está no arquivo, lá embaixo. Qual a causa mais provável?</p>
+<label><input type="radio" name="q6"> O compilador lê de cima para baixo e ainda não conhecia <code>calcular</code>; falta mover a função ou declarar o protótipo</label>
+<label><input type="radio" name="q6"> Falta o <code>-Wall</code> no comando</label>
+<label><input type="radio" name="q6"> Funções precisam ter nome em maiúsculas</label>
+<label><input type="radio" name="q6"> O <code>main</code> não pode chamar funções</label>
+</div>
+
+<h3>Missão final: o rodapé do recibo</h3>
+
+<div class="trycpp" data-goal="out:1 caneta,outre:(=+\nObrigada e volte sempre!\n=+[\s\S]*){2},src:void\s+rodape\s*\(\s*\),semaviso">
+<p class="try-task"><strong>Missão:</strong> crie uma função <code>void rodape()</code> que mostre três linhas: a linha de <code>=</code>, depois <code>Obrigada e volte sempre!</code>, depois outra linha de <code>=</code>. Use a função <code>linha()</code> que já existe dentro do seu <code>rodape()</code>. No <code>main</code>, chame <code>rodape()</code> <strong>duas vezes</strong> (um recibo para cada cliente), depois do texto de cada compra.</p>
+<pre class="out">Lojinha da Ana
+3 cadernos   R$ 30
+====================
+Obrigada e volte sempre!
+====================
+Lojinha da Ana
+1 caneta     R$ 4
+====================
+Obrigada e volte sempre!
+====================</pre>
+<pre class="script">#include &lt;iostream&gt;
+
+void linha() {
+    std::cout &lt;&lt; "====================\n";
+}
+
+// crie a função rodape aqui
+
+int main() {
+    std::cout &lt;&lt; "Lojinha da Ana\n";
+    std::cout &lt;&lt; "3 cadernos   R$ 30\n";
+    // chame rodape aqui
+
+    std::cout &lt;&lt; "Lojinha da Ana\n";
+    std::cout &lt;&lt; "1 caneta     R$ 4\n";
+    // e aqui
+}
+</pre>
+<pre class="solucao">#include &lt;iostream&gt;
+
+void linha() {
+    std::cout &lt;&lt; "====================\n";
+}
+
+void rodape() {
+    linha();
+    std::cout &lt;&lt; "Obrigada e volte sempre!\n";
+    linha();
+}
+
+int main() {
+    std::cout &lt;&lt; "Lojinha da Ana\n";
+    std::cout &lt;&lt; "3 cadernos   R$ 30\n";
+    rodape();
+
+    std::cout &lt;&lt; "Lojinha da Ana\n";
+    std::cout &lt;&lt; "1 caneta     R$ 4\n";
+    rodape();
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma <strong>função</strong> é um bloco de código com nome. Você <strong>define</strong> uma vez e <strong>chama</strong> quantas vezes quiser, com <code>nome();</code>.</li>
+  <li>Funções evitam repetição, deixam o <code>main</code> fácil de ler e permitem mudar uma coisa num lugar só.</li>
+  <li>O programa começa no <code>main</code>. Cada chamada pula para o corpo da função e volta para a linha seguinte.</li>
+  <li><code>void</code> = a função não devolve nada; não dá para usar o "resultado" dela.</li>
+  <li>O compilador lê de cima para baixo: a função tem de ser conhecida antes da chamada. Senão: <code>‘nome’ was not declared in this scope</code>.</li>
+  <li>Para usar uma função definida mais abaixo, declare o <strong>protótipo</strong> no topo: <code>void saudar();</code>. Protótipo sem definição dá erro do ligador (<code>referência não definida</code>).</li>
+  <li>O <code>main</code> é uma função: o sistema a chama, e o <code>int</code> que ela devolve é o código de saída (0 = sucesso).</li>
+  <li>Próxima aula: <a href="parametros.html">Parâmetros e Argumentos</a>, para mandar informações para dentro da função.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
