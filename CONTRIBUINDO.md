@@ -7,7 +7,7 @@ O guia é uma **escola**, estilo W3Schools, para quem **nunca programou**. **Uma
 - deixe o leitor praticar no editor do guia, que **compila e roda C++ de verdade** no navegador.
 
 ## 1. Esqueleto do arquivo
-Igual ao do Guia Java ([CONTRIBUINDO do Guia Java](https://github.com/Wallysondevs/guia-java/blob/main/CONTRIBUINDO.md), seção 1; modelo pronto: `/home/wallyson/guia-php/variaveis.html`), com:
+Igual ao do Guia Java ([CONTRIBUINDO do Guia Java](https://github.com/Wallysondevs/guia-java/blob/main/CONTRIBUINDO.md), seção 1; modelo pronto: [variaveis.html do Guia PHP](https://github.com/Wallysondevs/guia-php/blob/main/variaveis.html)), com:
 - `<title>C++ TEMA — descrição | Guia C++</title>`;
 - `<h1>C++ <span class="hl">TEMA</span></h1>`.
 
