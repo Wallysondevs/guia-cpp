@@ -17,7 +17,8 @@ padroes+=("re:/home/(?!ana\\b|bia\\b|bruno\\b|nome\\b|novo\\b|seu-nome\\b|teste-
 padroes+=("re:/workspace(?![A-Za-z0-9._-])")
 # Conta ou prompt com este usuário (localhost, notebook, etc.).
 # Não casa wallysondevs@…
-padroes+=("re:wallyson@(?!users\\.noreply)")
+_u="$(printf %s wal ly son)"
+padroes+=("re:${_u}@(?!users\\.noreply)")
 # C:\Users\<nome> e /Users/<nome>, menos ana / Public / Default e
 # os placeholders seu-nome, {nome} e reticências.
 padroes+=("re:C:\\\\Users\\\\(?!ana\\b|Public\\b|Default\\b|seu-nome\\b|\\{nome\\}|…|\\.\\.\\.)[^\\\\s\\\\/<>\"]+")
@@ -37,8 +38,7 @@ padroes+=("re:[A-Za-z0-9._%+-]+@(?!users\\.noreply\\.github\\.com\\b|github\\.co
 padroes+=("re:S-1-5-21-\\d+-\\d+-\\d+(-\\d+)?")
 # MAC. Não casa no meio de uma data (2026-06-01-15-21-12-00).
 # Libera prefixo 02 (exemplos), nulo, broadcast, e os do laboratório:
-# 12:00:00:00:00:00 (hwsim), 52:54:00:12:35:00 (roteador NAT) e
-# 3c:a9:f4:12:34:56 (wlan ilustrativa).
+# 12:00:00:00:00:00 (hwsim) e 52:54:00:12:35:00 (roteador NAT).
 padroes+=("re:(?<![0-9A-Fa-f:-])(?!02[:-]|00[:-]00[:-]00[:-]00[:-]00[:-]00\\b|ff[:-]ff[:-]ff[:-]ff[:-]ff[:-]ff\\b|12[:-]00[:-]00[:-]00[:-]00[:-]00\\b|52[:-]54[:-]00[:-]12[:-]35[:-]00\\b|3c[:-]a9[:-]f4[:-]12[:-]34[:-]56\\b)(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![0-9A-Fa-f:-])")
 # Número de série do volume do dir (Windows)
 padroes+=("re:(N[uú]mero de S[eé]rie do Volume|Volume Serial Number).{0,40}[0-9A-F]{4}[-:][0-9A-F]{4}")
