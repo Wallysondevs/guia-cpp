@@ -46,6 +46,7 @@ node tools/testar-missoes.js                 # todas as missões, com o mesmo Cl
 node tools/testar-missoes.js pagina.html     # só estas páginas (-v mostra as saídas)
 node tools/testar-missoes.js --nativo pagina.html   # compara também com o g++ 15 (precisa do laboratório)
 node tools/sim.js programa.cpp               # compila e roda um programa como o editor
+bash tools/checar-privacidade.sh             # páginas e histórico; lista extra: PROIBIDO=lista.txt
 ```
 
 ## Publicar no GitHub Pages
